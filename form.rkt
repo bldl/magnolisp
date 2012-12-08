@@ -37,6 +37,12 @@ them, to match our reader extensions.
              (else (lambda (x out) (print x out mode))))))
     (f (form-datum x) out)))
 
+(define form-functor
+  (case-lambda
+    ((x) (form-datum x))
+    ((x v) (form v (form-annos x)))
+    ))
+
 (struct form (datum annos)
         #:property
         prop:equal+hash
@@ -50,6 +56,9 @@ them, to match our reader extensions.
         #:property
         prop:custom-write
         form-print
+        #:property
+        prop:procedure
+        form-functor
         #:guard
         (lambda (datum annos type-name)
           (values datum
@@ -60,13 +69,22 @@ them, to match our reader extensions.
                              (make-immutable-hasheq annos)))
                       (error type-name "bad annos: ~e" annos)))))
 
-(define (make-form datum #:annos (annos #hasheq()))
+(define* (form-of pred? x)
+  (pred? (form-datum x)))
+
+(define (make-form datum (annos #hasheq()))
   (form datum annos))
 
 (provide form? form-datum form-annos
          (rename-out (make-form form)))
 
 #|
+(let ((x (form 1 #hasheq((doc . "one")))))
+  (parameterize ((print-annos? #t))
+    (writeln x)
+    (writeln (x))
+    (writeln (x 2))))
+
 (print-annos? #f)
 (form 1 #hasheq((type . num) (doc . "one")))
 (print-annos? #t)
