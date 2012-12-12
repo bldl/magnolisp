@@ -1,22 +1,26 @@
 #lang racket
 
+#|
+|#
+
 (require "module.rkt")
-(provide (all-from-out "module.rkt"))
 
-(require "print.rkt")
-(provide (all-from-out "print.rkt"))
-
-(require "let.rkt")
-(provide (all-from-out "let.rkt"))
-
-(define-syntax* fix
+(define-syntax* if-let
   (syntax-rules ()
-    ((_ fn arg ...)
-     (lambda rest (apply fn arg ... rest)))))
+    ((_ n c t e)
+     (let ((n c))
+       (if n t e)))))
+
+(define-syntax* when-let
+  (syntax-rules ()
+    ((_ n c e ...)
+     (let ((n c))
+       (when n
+         e ...)))))
 
 #|
 
-Copyright 2009 Helsinki Institute for Information Technology (HIIT)
+Copyright 2006 Helsinki Institute for Information Technology (HIIT)
 and the authors. All rights reserved.
 
 Authors: Tero Hasu <tero.hasu@hut.fi>

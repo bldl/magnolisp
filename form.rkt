@@ -2,11 +2,11 @@
 
 #|
 
-Prior to translating to Core language, we are dealing with forms only,
-with little semantics associated with them.
-
 We allow forms to contain annotations, hence this custom abstract data
-type. When forms are compared for equality, annotations are ignored.
+type for them. Racket also has a datatype for syntactic forms, namely
+'syntax'.
+
+When forms are compared for equality, annotations are ignored.
 
 Forms are not transparent, but we define a custom printer routine form
 them, to match our reader extensions.
