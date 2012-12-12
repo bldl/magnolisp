@@ -13,6 +13,7 @@ them, to match our reader extensions.
 
 |#
 
+(require "map.rkt")
 (require "util.rkt")
 
 (define* print-annos? (make-parameter #f))
@@ -77,6 +78,18 @@ them, to match our reader extensions.
 
 (provide form? form-datum form-annos
          (rename-out (make-form form)))
+
+(define* (form->datum x)
+  (if (not (form? x))
+      x
+      (let ((datum (form-datum x)))
+        (cond
+         ((list? datum)
+          (map form->datum datum))
+         ((coll? datum)
+          (coll-map form->datum datum))
+         (else
+          (form->datum datum))))))
 
 #|
 (let ((x (form 1 #hasheq((doc . "one")))))
