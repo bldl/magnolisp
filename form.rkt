@@ -13,23 +13,38 @@ them, to match our reader extensions.
 
 |#
 
+(require "case.rkt")
 (require "map.rkt")
 (require "util.rkt")
 
 (define* print-annos? (make-parameter #f))
+
+(define (syntax-loc stx)
+  (list
+   (let ((source (syntax-source stx)))
+     (and (path? source)
+          (let-values (((x y z) (split-path source)))
+            (if (path? y) (path->string y) y))))
+   (syntax-line stx)
+   (syntax-column stx)
+   (syntax-position stx)
+   (syntax-span stx)))
 
 (define (form-print x out mode)
   (when (print-annos?)
     (hash-for-each
      (form-annos x)
      (lambda (k v)
-       (if (eq? k 'type)
-           (begin
-             (write-string "^" out)
-             (write v out))
-           (begin
-             (write-string "@" out)
-             (write `(,k ,v) out)))
+       (case-eq k
+                (type
+                 (write-string "^" out)
+                 (write v out))
+                (syntax
+                 (write-string "@" out)
+                 (write `(syntax ,(syntax-loc v)) out))
+                (else
+                 (write-string "@" out)
+                 (write `(,k ,v) out)))
        (write-string " " out))))
   (write-string "$" out)
   (let ((f (case mode
