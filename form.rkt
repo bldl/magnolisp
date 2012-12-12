@@ -19,12 +19,24 @@ them, to match our reader extensions.
 
 (define* print-annos? (make-parameter #f))
 
-(define (syntax-loc stx)
+(define (syntax-loc/list stx)
   (list
    (let ((source (syntax-source stx)))
      (and (path? source)
           (let-values (((x y z) (split-path source)))
             (if (path? y) (path->string y) y))))
+   (syntax-line stx)
+   (syntax-column stx)
+   (syntax-position stx)
+   (syntax-span stx)))
+
+(define (syntax-loc/string stx)
+  (format "~a:(~a:~a):p~a:w~a"
+   (let ((source (syntax-source stx)))
+     (or (and (path? source)
+              (let-values (((x y z) (split-path source)))
+                y))
+         source))
    (syntax-line stx)
    (syntax-column stx)
    (syntax-position stx)
@@ -39,9 +51,9 @@ them, to match our reader extensions.
                 (type
                  (write-string "^" out)
                  (write v out))
-                (syntax
+                (stx
                  (write-string "@" out)
-                 (write `(syntax ,(syntax-loc v)) out))
+                 (display `(stx ,(syntax-loc/string v)) out))
                 (else
                  (write-string "@" out)
                  (write `(,k ,v) out)))

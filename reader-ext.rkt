@@ -11,7 +11,11 @@
    ((ch in) ;; trigger char and input port
     (let ((anno (read in)))
       `(set-anno (type ,anno) ,(read in))))
-   ((ch in src line col pos) ;; for read-syntax also location info
+   ((ch in src line col pos)
+    ;; Any reading we do here will get the same position into the
+    ;; syntax object. That is, annotations and their target will have
+    ;; the same source location, unless we do something to change
+    ;; that.
     (read-type-anno ch in))))
 
 (define read-generic-anno

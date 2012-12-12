@@ -13,13 +13,17 @@ program.
 
 (provide (rename-out (my-module-begin #%module-begin)))
 
+;; Note that 'syntax has special meaning to Racket, which affects
+;; 'write', at least.
 (define-for-syntax (annos/stx stx (annos #hasheq()))
-  (hash-set annos 'syntax stx))
+  ;;(writeln `(,annos ,stx))
+  (hash-set annos 'stx stx))
 
 (define-for-syntax (form/stx stx datum (annos #hasheq()))
   (form datum (annos/stx stx annos)))
 
 (define-for-syntax (set-anno->form lst annos)
+  ;;(writeln (list annos lst))
   (when (not (= (length lst) 3))
     (error 'set-anno "expected form (set-anno (NAME VALUE) EXPR)"))
   (let ((a-lst (syntax->list (second lst))))
@@ -32,7 +36,10 @@ program.
             (value-stx (second a-lst)))
         (syntax->form
          (third lst)
-         (hash-set annos name (syntax->form value-stx)))))))
+         ;; Should we want to annotate annotations.
+         ;;(hash-set annos name (syntax->form value-stx))
+         (hash-set annos name (syntax->datum value-stx))
+         )))))
 
 (define-for-syntax (syntax->form stx (annos #hasheq()))
   (let ((e (syntax-e stx)))
