@@ -22,7 +22,14 @@ program.
      ((null? e)
       (form e))
      ((pair? e)
-      (syntax-list->form e)) ;; xxx may not be a list
+      (with-handlers
+          ((exn:fail?
+            (lambda (ex) ;; handle improper list case
+              (form (cons (syntax->form (car e))
+                          (syntax->form (cdr e)))))))
+        ;; We preper this to get a single annotation for the entire
+        ;; list.
+        (syntax-list->form e)))
      (else
       (form e)))))
 
