@@ -9,10 +9,15 @@ program.
 
 |#
 
-(require "form.rkt" "util.rkt")
 (require (for-syntax racket "form.rkt" "util.rkt"))
 
 (provide (rename-out (my-module-begin #%module-begin)))
+
+(define-for-syntax (annos/stx stx (annos #hasheq()))
+  (hash-set annos 'syntax stx))
+
+(define-for-syntax (form/stx stx datum (annos #hasheq()))
+  (form datum (annos/stx stx annos)))
 
 (define-for-syntax (set-anno->form lst annos)
   (when (not (= (length lst) 3))
@@ -33,27 +38,28 @@ program.
   (let ((e (syntax-e stx)))
     (cond
      ((symbol? e)
-      (form e annos))
+      (form/stx stx e annos))
      ((null? e)
-      (form e annos))
+      (form/stx stx e annos))
      ((pair? e)
       (if-let lst (syntax->list stx)
               (let ((h (car lst)))
                 (if (and (identifier? h)
                          (eq? 'set-anno (syntax->datum h)))
                     (set-anno->form lst annos)
-                    (syntax-list->form lst annos)))
+                    (syntax-list->form lst (annos/stx stx annos))))
               (form (cons (syntax->form (car e))
-                          (syntax->form (cdr e))) annos)))
+                          (syntax->form (cdr e)))
+                    (annos/stx stx annos))))
      (else
-      (form e annos)))))
+      (form/stx stx e annos)))))
 
-(define-for-syntax (syntax-list->form lst (annos #hasheq()))
+(define-for-syntax (syntax-list->form lst annos)
   (form (map syntax->form lst) annos))
 
 (define-for-syntax (list-syntax->form stx (annos #hasheq()))
   (let ((lst (syntax->list stx)))
-    (syntax-list->form lst annos)))
+    (syntax-list->form lst (annos/stx stx annos))))
 
 (define-syntax (my-module-begin stx)
   (syntax-case stx ()

@@ -11,6 +11,12 @@
      (let ((n c))
        (if n t e)))))
 
+(define-syntax* if-not-let
+  (syntax-rules ()
+    ((_ n c t e)
+     (let ((n c))
+       (if (not n) t e)))))
+
 (define-syntax* when-let
   (syntax-rules ()
     ((_ n c e ...)
