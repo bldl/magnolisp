@@ -57,15 +57,12 @@ program.
 (define-for-syntax (syntax-list->form lst annos)
   (form (map syntax->form lst) annos))
 
-(define-for-syntax (list-syntax->form stx (annos #hasheq()))
-  (let ((lst (syntax->list stx)))
-    (syntax-list->form lst (annos/stx stx annos))))
-
 (define-syntax (my-module-begin stx)
   (syntax-case stx ()
       ((_ body ...)
        (begin
-         (let ((f (list-syntax->form #'(body ...))))
+         (let ((f (let ((lst (syntax->list #'(body ...))))
+                    (syntax-list->form lst (annos/stx stx)))))
            (pretty-print f)
            (parameterize ((print-annos? #t))
              (pretty-print f))
