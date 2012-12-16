@@ -118,6 +118,9 @@ them, to match our reader extensions.
          (else
           (form->datum datum))))))
 
+(define* (identifier?/form x)
+  (and (form? x) (symbol? (form-datum x))))
+
 #|
 (let ((x (form 1 #hasheq((doc . "one")))))
   (parameterize ((print-annos? #t))
