@@ -53,7 +53,7 @@ them, to match our reader extensions.
                  (write v out))
                 (stx
                  (write-string "@" out)
-                 (display `(stx ,(syntax-loc/string v)) out))
+                 (display `(stx ,(syntax-loc/string (v))) out))
                 (else
                  (write-string "@" out)
                  (write `(,k ,v) out)))

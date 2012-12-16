@@ -17,7 +17,7 @@ program.
 ;; 'write', at least.
 (define-for-syntax (annos/stx stx (annos #hasheq()))
   ;;(writeln `(,annos ,stx))
-  (hash-set annos 'stx stx))
+  (hash-set annos 'stx (form stx)))
 
 (define-for-syntax (form/stx stx datum (annos #hasheq()))
   (form datum (annos/stx stx annos)))
@@ -36,9 +36,9 @@ program.
             (value-stx (second a-lst)))
         (syntax->form
          (third lst)
-         ;; Should we want to annotate annotations.
-         ;;(hash-set annos name (syntax->form value-stx))
-         (hash-set annos name (syntax->datum value-stx))
+         ;; Should we want to allow annotation of annotations.
+         (hash-set annos name (syntax->form value-stx))
+         ;;(hash-set annos name (syntax->datum value-stx))
          )))))
 
 (define-for-syntax (syntax->form stx (annos #hasheq()))
