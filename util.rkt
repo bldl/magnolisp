@@ -9,6 +9,9 @@
 (require "let.rkt")
 (provide (all-from-out "let.rkt"))
 
+(define-syntax-rule* (if-not c t e)
+  (if (not c) t e))
+
 (define-syntax* fix
   (syntax-rules ()
     ((_ fn arg ...)

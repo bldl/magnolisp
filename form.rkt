@@ -106,6 +106,15 @@ them, to match our reader extensions.
 (provide form? form-datum form-annos
          (rename-out (make-form form)))
 
+(define* (form-on f x)
+  (f (form-datum x) (form-annos x)))
+
+(define* (form-on-datum f x)
+  (form (f (form-datum x)) (form-annos x)))
+
+(define* (form-on-annos f x)
+  (form (form-datum x) (f (form-annos x))))
+
 (define* (form->datum x)
   (if (not (form? x))
       x
