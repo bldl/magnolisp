@@ -14,7 +14,7 @@ them, to match our reader extensions.
 |#
 
 (require "case.rkt")
-(require "map.rkt")
+(require "coll.rkt")
 (require "util.rkt")
 
 (define* print-annos? (make-parameter #f))
