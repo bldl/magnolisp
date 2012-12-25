@@ -35,6 +35,12 @@
        (define-syntax-rule (name rest ...) body)
        (provide name)))))
 
+(define-syntax-rule*
+  (struct* nm rest ...)
+  (begin
+    (struct nm rest ...)
+    (provide (struct-out nm))))
+
 #|
 
 Copyright 2008 the authors. All rights reserved.
