@@ -8,7 +8,7 @@ Integration with forms and Racket's syntax objects.
 
 (require "form.rkt" "util.rkt")
 
-;; Note that 'syntax has special meaning to Racket, which affects
+;; Note that 'syntax' has special meaning to Racket, which affects
 ;; 'write', at least.
 (define* (annos/stx stx (annos #hasheq()))
   ;;(writeln `(,annos ,stx))
@@ -56,5 +56,5 @@ Integration with forms and Racket's syntax objects.
      (else
       (form/stx stx e annos)))))
 
-(define* (syntax-list->form lst annos)
+(define* (syntax-list->form lst (annos #hasheq()))
   (form (map syntax->form lst) annos))
