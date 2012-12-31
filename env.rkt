@@ -25,7 +25,7 @@ comparisons, but we nonetheless treat it as an abstract data type.
 ;; 'id' is a 'gensym'ed unique name for the named thing, which is (1)
 ;; a special form, (2) a macro, or (3) a variable. Top-level names
 ;; must be unique, and have their name as their 'id'.
-(struct* binding (id) #:transparent)
-(struct* special-b binding (eval compile) #:transparent)
-(struct* macro-b binding (expand mode) #:transparent)
-(struct* var-b binding (decl) #:transparent)
+(define-struct* binding (id) #:transparent)
+(define-struct* special-b binding (eval compile) #:transparent)
+(define-struct* macro-b binding (expand mode) #:transparent)
+(define-struct* var-b binding (decl) #:transparent)

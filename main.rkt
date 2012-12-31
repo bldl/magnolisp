@@ -2,18 +2,23 @@
 
 #|
 
-Defines the language for Magnolisp. This really just grabs the input
-programs as syntax objects, and then transforms and evaluates those to
-implement language semantics. Racket is a foreign language to an input
-program.
+Defines a Racket module language for Magnolisp. This really just grabs
+the input programs as syntax objects, and then transforms then into
+our internal representation. Currently the forms are merely displayed.
+
+We will have a separate API for compiling/evaluating/etc., and we
+might consider hooking up our #lang with the evaluator, for convenient
+testing.
 
 |#
 
-(require (for-syntax racket "form.rkt" "syntax.rkt" "util.rkt"))
+(require (for-syntax racket racket/stxparam
+                     "form.rkt" "syntax.rkt" "util.rkt"))
 
-(provide (rename-out (my-module-begin #%module-begin)))
+(provide (rename-out (printing-module-begin #%module-begin)))
 
-(define-syntax (my-module-begin stx)
+;; For debugging. Produces and prints IR.
+(define-syntax (printing-module-begin stx)
   (syntax-case stx ()
       ((_ body ...)
        (begin

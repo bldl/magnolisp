@@ -1,2 +1,14 @@
-* =main.rkt= needs some parameter to control whether to interpret or compile the module
+* implement =racket= form
+
+  Any sexps here will be eval'ed as Racket, at top-level, and will be available for use at macro expansion time.
+
+  This means that things like =sc-macro-transformer= can be defined in Racket, within the =racket= form.
+
+  We might actually consider calling it =begin-for-syntax=, as that is what it is called in Racket.
+
+* support an =include= construct (in core language)
+
+  This will allow for loading of the =std-lib.rkt= module, which we will also have to implement.
+
+* implement evalutor and compiler API
 
