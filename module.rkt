@@ -35,8 +35,9 @@
        (define-syntax-rule (name rest ...) body)
        (provide name)))))
 
+;; Note that 'struct*' is already defined in 'rackat'.
 (define-syntax-rule*
-  (struct* nm rest ...)
+  (define-struct* nm rest ...)
   (begin
     (struct nm rest ...)
     (provide (struct-out nm))))
