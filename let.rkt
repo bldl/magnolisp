@@ -24,6 +24,13 @@
        (when n
          e ...)))))
 
+(define-syntax* let-and
+  (syntax-rules ()
+    ((_ e) e)
+    ((_ n v more ...)
+     (let ((n v))
+       (and n (let-and more ...))))))
+
 #|
 
 Copyright 2006 Helsinki Institute for Information Technology (HIIT)

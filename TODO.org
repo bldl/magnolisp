@@ -10,5 +10,8 @@
 
   This will allow for loading of the =std-lib.rkt= module, which we will also have to implement.
 
-* implement evalutor and compiler API
+* implement evaluator and compiler API
 
+* should perhaps do macro expansion in annos, too, and perhaps Racket evaluation
+
+  Clearly it's metadata, so perhaps meta level evaluation (in Racket) is in order.

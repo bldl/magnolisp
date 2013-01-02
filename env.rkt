@@ -19,6 +19,9 @@ comparisons, but we nonetheless treat it as an abstract data type.
           (hash-keys env-names)))
 
 (define* (env-get env name)
+  (hash-ref env name #f))
+  
+(define* (env-must-get env name)
   (hash-ref env name
             (thunk (error 'env-get "undefined name: ~a" name))))
 
@@ -26,6 +29,7 @@ comparisons, but we nonetheless treat it as an abstract data type.
 ;; a special form, (2) a macro, or (3) a variable. Top-level names
 ;; must be unique, and have their name as their 'id'.
 (define-struct* binding (id) #:transparent)
-(define-struct* special-b binding (eval compile) #:transparent)
-(define-struct* macro-b binding (expand mode) #:transparent)
-(define-struct* var-b binding (decl) #:transparent)
+(define-struct* expandable binding (expand? expand) #:transparent)
+(define-struct* special-binding expandable (eval compile) #:transparent)
+(define-struct* macro-binding expandable () #:transparent)
+(define-struct* var-binding binding (decl) #:transparent)
