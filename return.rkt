@@ -1,43 +1,60 @@
 #lang racket
 
+#|
+
+'define' with 'return' support.
+
+E.g.
+
+  (define/r (f x)
+    (when (= x 0) (return x))
+    (+ x 1))
+
+  (define/r (g x y)
+    (when (= x 0) (return x y))
+    (values (+ x 1) (+ y 1)))
+
+  (f 0) ; => 0
+  (f 1) ; => 2
+  (g 0 5) ; => 0 5
+  (g 1 5) ; => 2 6
+
+|#
+
 (require "module.rkt")
-(provide (all-from-out "module.rkt"))
 
-(require "print.rkt")
-(provide (all-from-out "print.rkt"))
+(require racket/stxparam)
 
-(require "let.rkt")
-(provide (all-from-out "let.rkt"))
+(define-syntax-parameter return
+  (syntax-rules ()))
+(provide return)
 
-(require "return.rkt")
-(provide (all-from-out "return.rkt"))
-
-(define-syntax-rule* (if-not c t e)
-  (if (not c) t e))
-
-(define-syntax* lets
-  (syntax-rules (then then-if then-if-not
-                 then-let then-if-let then-if-not-let)
-    ((_ then e) e)
-    ((_ then e rest ...) (begin e (lets rest ...)))
-    ((_ then-if e) e)
-    ((_ then-if e rest ...) (and e (lets rest ...)))
-    ((_ then-if-not e) (not e))
-    ((_ then-if-not e rest ...) (and (not e) (lets rest ...)))
-    ((_ then-let n e rest ...) (let ((n e)) (lets rest ...)))
-    ((_ then-if-let n e rest ...) (let ((n e)) (and n (lets rest ...))))
-    ((_) (void))
-    ((_ rest ...) (begin rest ...))))
-
-(define-syntax* fix
+(define-syntax* define/r
   (syntax-rules ()
-    ((_ fn arg ...)
-     (lambda rest (apply fn arg ... rest)))))
+    ((define/r sig body ...)
+     (define sig
+       (let/cc k
+               (syntax-parameterize
+                ((return (syntax-rules ()
+                           ((_ . rest)
+                            (k . rest)))))
+                body ...))))))
+
+(define-syntax* define*/r
+  (syntax-rules ()
+    ((_ (name arg ... . rest) body ...)
+     (begin
+       (define/r (name arg ... . rest) body ...)
+       (provide name)))
+    ((_ (name arg ...) body ...)
+     (begin
+       (define/r (name arg ...) body ...)
+       (provide name)))
+    ))
 
 #|
 
-Copyright 2009 Helsinki Institute for Information Technology (HIIT)
-and the authors. All rights reserved.
+Copyright 2013 the authors.
 
 Authors: Tero Hasu <tero.hasu@hut.fi>
 
