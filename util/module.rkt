@@ -35,12 +35,18 @@
        (define-syntax-rule (name rest ...) body)
        (provide name)))))
 
-;; Note that 'struct*' is already defined in 'rackat'.
+;; Note that 'struct*' is already defined in 'racket'.
 (define-syntax-rule*
   (define-struct* nm rest ...)
   (begin
     (struct nm rest ...)
     (provide (struct-out nm))))
+
+(define-syntax-rule*
+  (require* n ...)
+  (begin
+    (require n ...)
+    (provide (all-from-out n ...))))
 
 #|
 

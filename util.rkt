@@ -1,16 +1,11 @@
 #lang racket
 
-(require "module.rkt")
-(provide (all-from-out "module.rkt"))
+(require "util/module.rkt")
+(provide (all-from-out "util/module.rkt"))
 
-(require "print.rkt")
-(provide (all-from-out "print.rkt"))
-
-(require "let.rkt")
-(provide (all-from-out "let.rkt"))
-
-(require "return.rkt")
-(provide (all-from-out "return.rkt"))
+(require* "util/print.rkt")
+(require* "util/let.rkt")
+(require* "util/return.rkt")
 
 (define-syntax-rule* (if-not c t e)
   (if (not c) t e))

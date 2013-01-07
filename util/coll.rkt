@@ -14,7 +14,7 @@ variant.) Mutable pairs are not supported.
 
 |#
 
-(require "util.rkt")
+(require "module.rkt")
 
 (define* (coll? x)
   (or (list? x)
