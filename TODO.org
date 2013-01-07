@@ -1,17 +1,1 @@
-* implement =racket= form
-
-  Any sexps here will be eval'ed as Racket, at top-level, and will be available for use at macro expansion time.
-
-  This means that things like =sc-macro-transformer= can be defined in Racket, within the =racket= form.
-
-  We might actually consider calling it =begin-for-syntax=, as that is what it is called in Racket.
-
-* support an =include= construct (in core language)
-
-  This will allow for loading of the =std-lib.rkt= module, which we will also have to implement.
-
 * implement evaluator and compiler API
-
-* should perhaps do macro expansion in annos, too, and perhaps Racket evaluation
-
-  Clearly it's metadata, so perhaps meta level evaluation (in Racket) is in order.
