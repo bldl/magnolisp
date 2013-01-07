@@ -2,6 +2,10 @@
 
 #|
 
+An extended "readtable" to support type and generic annotations. The
+language must implement matching macros to process any annotations
+appearing in programs.
+
 |#
 
 (require "util.rkt")
@@ -12,7 +16,7 @@
   (case-lambda
    ((ch in) ;; trigger char and input port
     (let ((v (read in)))
-      `(set-anno:type ,(read in) ,v)))
+      `(set-anno:type ,v ,(read in))))
    ((ch in src line col pos)
     ;; Any reading we do here will get the same position into the
     ;; syntax object. That is, annotations and their target will have
@@ -28,7 +32,7 @@
                               (src "<read>") (line #f) (col #f) (pos #f))
   (let ((datum (read in)))
     (if (symbol? datum)
-        `(,(make-setter-name datum) ,(read in))
+        `(,(make-setter-name datum) () ,(read in))
         (begin
           (unless (pair? datum)
             (raise-read-error "expected pair or symbol to follow @"
@@ -37,7 +41,7 @@
             (unless (symbol? n)
               (raise-read-error "expected @(SYMBOL value ...)"
                                 src line col pos #f))
-            `(,(make-setter-name n) ,(read in) ,@(cdr datum)))))))
+            `(,(make-setter-name n) ,(cdr datum) ,(read in) ))))))
 
 (define read-generic-anno
   (case-lambda
@@ -56,6 +60,7 @@
 ;;; tests
 ;;; 
 
+#;
 (parameterize ((current-readtable magnolisp-readtable))
   (for-each
    (lambda (s)
