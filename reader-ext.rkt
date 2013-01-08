@@ -53,8 +53,8 @@ appearing in programs.
 (define* magnolisp-readtable
   (make-readtable
    (current-readtable)
-   #\^ 'terminating-macro read-type-anno
-   #\@ 'terminating-macro read-generic-anno))
+   #\^ 'non-terminating-macro read-type-anno
+   #\@ 'non-terminating-macro read-generic-anno))
 
 ;;; 
 ;;; tests
