@@ -56,6 +56,30 @@ appearing in programs.
    #\^ 'non-terminating-macro read-type-anno
    #\@ 'non-terminating-macro read-generic-anno))
 
+;; Reads all available syntax in the specified input stream. Returns a
+;; list of syntax objects. As a special feature adjusts the syntax by
+;; translating annotation setters to syntax properties. The values are
+;; stored as syntax.
+(define (read-syntaxes source-name in)
+  (let* ((read (lambda (in)
+                 (read-syntax source-name in))))
+    (for/list ((obj (in-port read in)))
+        obj))) ;; xxx must adjust obj -- can use syntax-case
+
+;; Reads all Magnolisp syntax from a file. Produces a list of Racket
+;; syntax objects. Any #lang directive is ignored. Filename extension
+;; matters not.
+(define* (load-as-syntaxes file)
+  (let* ((path (cleanse-path file)))
+    (call-with-input-file path
+      (lambda (in)
+        (parameterize ((current-readtable magnolisp-readtable))
+          (port-count-lines! in)
+          (read-language in (thunk (void)))
+          (read-syntaxes path in))))))
+
+;;(load-as-syntaxes "try-program-3.rkt")
+
 ;;; 
 ;;; tests
 ;;; 
