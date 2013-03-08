@@ -64,7 +64,7 @@ appearing in programs.
   (let* ((read (lambda (in)
                  (read-syntax source-name in))))
     (for/list ((obj (in-port read in)))
-        obj))) ;; xxx must adjust obj -- can use syntax-case
+        obj))) ;; xxx must adjust obj -- can use syntax-case -- should also study read-syntax/recursive, which may be useful for this sort of thing
 
 ;; Reads all Magnolisp syntax from a file. Produces a list of Racket
 ;; syntax objects. Any #lang directive is ignored. Filename extension

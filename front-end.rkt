@@ -34,8 +34,6 @@ runtime code.
           (for/list ((obj (in-port read in)))
               obj))))))
 
-;;(load-as-syntaxes "try-magnolisp-3.rkt")
-
 (define (ml-load file)
   (let ((lst (load-as-syntaxes file)))
     (syntax-list->form lst)))
