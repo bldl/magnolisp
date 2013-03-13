@@ -22,7 +22,7 @@
               (parameterize ((current-namespace ns))
                 (namespace-require '(for-syntax racket))
                 (namespace-require 'racket/base) ;; xxx we do not really want to do this, but may need to have some of it for macro expansion to work -- but does not appear to make it happen -- we only appear to be getting partial results, though -- forms such as 'unless' do expand, but all macro applications
-                (namespace-require '"runtime.rkt")
+                (namespace-require '"runtime-compiler.rkt")
                 (expand-syntax-top-level-with-compile-time-evals
                  ;; namespace-syntax-introduce seems to make no difference -- xxx how do we get our macros to expand, the ones given in runtime.rkt
                  (namespace-syntax-introduce #'(begin body ...))))))

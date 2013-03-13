@@ -29,8 +29,8 @@ explicitly -- think 'auto' in C++).
 
 (provide #%module-begin)
 
-(require "runtime.rkt")
-(provide (all-from-out "runtime.rkt"))
+(require "runtime-evaluator.rkt")
+(provide (all-from-out "runtime-evaluator.rkt"))
 
 (require (for-syntax racket/base))
 (provide (for-syntax (all-from-out racket/base)))

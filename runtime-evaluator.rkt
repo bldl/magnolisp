@@ -3,7 +3,7 @@
 #|
 
 We shall try to implement the entire language by mapping to
-corresponding Racket values and construct. If this should prove
+corresponding Racket values and constructs. If this should prove
 infeasible, we can use a custom '#%module-begin' to do required
 analysis and transformations. Should that also be infeasible, then we
 can (less efficiently) implement an evaluator, perhaps by using the
@@ -13,13 +13,9 @@ to syntax objects and invoking 'eval-syntax'.
 |#
 
 (require "util.rkt")
+(require "runtime-common.rkt")
 
-(provide begin-for-syntax
-         define-for-syntax
-         define-syntax
-         define-syntax-rule
-         provide
-         require)
+(provide (all-from-out "runtime-common.rkt"))
 
 ;;; 
 ;;; declarations
@@ -40,5 +36,3 @@ to syntax objects and invoking 'eval-syntax'.
 (define-syntax-rule*
   (pass)
   (void))
-
-
