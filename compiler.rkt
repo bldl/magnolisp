@@ -1,36 +1,19 @@
 #lang racket
 
 #|
-
-Defines a Racket module language for Magnolisp. This really just grabs
-the input programs as syntax objects, and then transforms them into
-our internal representation. Currently the forms are merely displayed.
-
-We will have a separate API for compiling/evaluating/etc., and we
-might consider hooking up our #lang with the evaluator, for convenient
-testing.
-
 |#
 
-(require (for-syntax racket/syntax
-                     syntax/toplevel
-                     "util.rkt"))
+(require "reader-ext.rkt")
+(require "util.rkt")
+(require racket/require-transform)
+(require syntax/modcode syntax/moddep syntax/modresolve) 
 
-;;; 
-;;; exports (only needed for %code export)
-;;; 
+;; cannot use unless transforming
+;(expand-import #'"util.rkt")
 
-(require racket/base)
-(provide (rename-out (my-module-begin #%module-begin)))
-(provide (except-out (all-from-out racket/base) #%module-begin))
+(resolve-module-path "util.rkt" #f)
 
-(require (for-syntax racket/base))
-(provide (for-syntax (all-from-out racket/base)))
-
-;;; 
-;;; transformations
-;;; 
-
+#;
 (define-syntax (my-module-begin stx)
   (syntax-case stx ()
     ((_ body ...)
