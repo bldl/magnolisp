@@ -12,18 +12,10 @@ commonalities.
 
 (require "util.rkt")
 
+;; xxx it is not really appropriate to export 'provide' and 'require' without additional restrictions
 (provide begin-for-syntax
          define-for-syntax
          define-syntax
          define-syntax-rule
          provide
          require)
-
-;;; 
-;;; declarations
-;;; 
-
-;;; 
-;;; statements
-;;; 
-
