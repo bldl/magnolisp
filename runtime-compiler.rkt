@@ -20,6 +20,7 @@ make sure that macros get expanded. Again, no problem, as we can use
 ;; racket/base exports nothing for-syntax
 (provide (for-syntax (all-from-out racket/base)))
 (provide (rename-out (my-module-begin #%module-begin)))
+;(provide (rename-out (my-app #%app)))
 ;(provide (rename-out (#%app %app)))
 
 ;; For now this is easier. We want to be more selective, though. We
@@ -39,6 +40,13 @@ make sure that macros get expanded. Again, no problem, as we can use
 
 ;; Trying to make 'expand' insert this particular identifier.
 (provide #%app)
+
+;; Problem is we should use this here, too, in macros like 'pass', but
+;; if we defined it as a function, it would not be treated the same by
+;; expander, and another #%app would get inserted. But what now is a
+;; macro going to do for us.
+(define-syntax-rule (my-app x ...)
+  (#%app x ...))
 
 ;; Only required if we actually wrap the read code into a 'module'
 ;; before expansion.

@@ -31,5 +31,5 @@
 (define-ast* Module (body))
 (define-ast* Pass ())
 (define-ast* Call (proc))
-(define-ast* Procedure (name body))
+(define-ast* Define (name body))
 

@@ -57,6 +57,9 @@ to be compiled to C++.
 ;;(namespace-require '(only racket/base module))
 ;;(namespace-require '"runtime-compiler-lang.rkt")
 
+;; (let ((mod-id (car (syntax-e in-stx))))
+;;   (writeln (list mod-id (identifier-binding mod-id))))
+
 (define* (compile-file pn)
   (define stx-lst (load-as-syntaxes pn))
   (define in-stx
@@ -66,20 +69,20 @@ to be compiled to C++.
      ;; itself must come from elsewhere.
      #`(module main "runtime-compiler-lang.rkt"
          #,@stx-lst)))
+  ;;(print-stx-with-bindings in-stx)
   (let ((ns (make-base-empty-namespace)))
     (parameterize ((current-namespace ns))
       (namespace-require '(only racket/base module))
       ;;(namespace-require '"runtime-compiler-lang.rkt")
       (let ((in-stx (namespace-syntax-introduce in-stx)))
-        (let ((mod-id (car (syntax-e in-stx))))
-          (writeln (list mod-id (identifier-binding mod-id))))
         (let ((core-stx (expand-syntax in-stx)))
           (pretty-println (syntax->datum core-stx))
-          #; (let ((core-ast (parse core-stx)))
+          ;;(print-stx-with-bindings core-stx)
+          (let ((core-ast (parse core-stx)))
             (pretty-println core-ast)
             ))))))
 
 (define* (compile-module mn)
   (compile-file (resolve-module-path mn #f)))
 
-(compile-module "try-program-5.rkt")
+(compile-module "try-program-6.rkt")
