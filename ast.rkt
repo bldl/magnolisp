@@ -5,6 +5,10 @@
 
 (require "util.rkt")
 
+;;; 
+;;; location info
+;;; 
+
 (define-struct* loc (source line column position span) #:transparent)
 
 (define* (stx-loc stx)
@@ -15,18 +19,30 @@
    (syntax-position stx)
    (syntax-span stx)))
 
-(define-struct* Ast (annos))
+;;; 
+;;; syntax-derived annotations
+;;; 
 
 (define* (stx-annos stx)
-  (cons
-   (cons 'loc (stx-loc stx))
-   (map
-    (lambda (k) (cons k (syntax-property stx k)))
-    (syntax-property-symbol-keys stx))))
+  (let ((h (for/hasheq ((k (syntax-property-symbol-keys stx)))
+                       (values k (syntax-property stx k)))))
+    (set! h (hash-set h 'loc (stx-loc stx)))
+    (set! h (hash-set h 'stx stx))
+    h))
+
+;;; 
+;;; abstract node
+;;; 
+
+(define-struct* Ast (annos))
 
 (define-syntax-rule
   (define-ast* name (field ...))
   (define-struct* name Ast (field ...) #:transparent))
+
+;;; 
+;;; concrete nodes
+;;; 
 
 (define-ast* Module (body))
 (define-ast* Pass ())
