@@ -4,6 +4,7 @@
 |#
 
 (require "util.rkt")
+(require (for-syntax racket/syntax))
 
 ;;; 
 ;;; location info
@@ -36,9 +37,14 @@
 
 (define-struct* Ast (annos))
 
-(define-syntax-rule
-  (define-ast* name (field ...))
-  (define-struct* name Ast (field ...) #:transparent))
+(define-syntax (define-ast* stx)
+  (syntax-case stx ()
+    ((_ name (field ...))
+     #`(begin
+         (define-struct* name Ast (field ...) #:transparent)
+         (define* #,(format-id stx "new-~a" (syntax-e #'name))
+           (lambda (stx . args)
+             (apply name (stx-annos stx) args)))))))
 
 ;;; 
 ;;; concrete nodes
