@@ -20,11 +20,14 @@ Have thus far been unable to get free-identifier=? check to match for
          ;;(and (identifier? #'a) (free-identifier=? #'a #'rt.%ast))
          (Pass (stx-annos stx))))
 
+The same problem may exist for 'lambda'.
+
 |#
 
 (require "ast.rkt")
 (require "util.rkt")
 (require (prefix-in rt. "runtime-compiler.rkt"))
+(require racket/list)
 
 ;;(syntax-local-phase-level)
 ;;(free-identifier=? #'rt.%app #'#%app)
@@ -38,16 +41,29 @@ Have thus far been unable to get free-identifier=? check to match for
     (syntax-case stx (#%plain-module-begin
                       define-values
                       module quote rt.%ast)
+
       ((module n pn (#%plain-module-begin body ...))
        (new-Module stx (p-lst (syntax->list #'(body ...)))))
-      ((_ rt.ast% (quote n) _)
+
+      ((_ rt.%ast (quote n) _)
        (eq? 'pass (syntax-e #'n))
        (new-Pass stx))
-      ((_ rt.ast% (quote n) id-stx)
+
+      ((_ rt.%ast (quote n) id-stx)
        (eq? 'call (syntax-e #'n))
        (new-Call stx (Var-from-stx #'id-stx)))
-      ((define-values (n) e)
-       (new-Define stx (Var-from-stx #'n) #'e))
+
+      ((define-values (n) def)
+       (let ((def-stx #'def))
+         (syntax-case def-stx (quote rt.%ast)
+           ((_ rt.%ast (quote t) (_ () body ...))
+            (eq? 'procedure (syntax-e #'t))
+            (new-Define stx (Var-from-stx #'n)
+                        'procedure
+                        (p-lst (syntax->list #'(body ...)))))
+           (else
+            (error "not core language 'define'" stx)))))
+
       (else (error "not core language" stx))))
 
   (define (p-lst lst)

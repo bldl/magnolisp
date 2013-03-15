@@ -28,15 +28,7 @@ make sure that macros get expanded. Again, no problem, as we can use
 ;; version of the latter.
 ;;(provide (except-out (all-from-out racket/base) #%module-begin))
 
-;; Merely by exporting these almost anything may appear in a top-level
-;; program. Such an expansion is not very useful, however. We can
-;; instead just list our core language in a stoplist. Which is not
-;; useful either unless there is a way to do just a 'local-expand',
-;; essentially, without ultimately doing the whole tree. Note also
-;; that for language that we export from here, any #%app and such is
-;; lexically bound already within the macro, and need not necessarily
-;; exist in the use context.
-; (provide #%app #%top)
+(provide lambda)
 
 ;; Trying to make 'expand' insert this particular identifier.
 (provide #%app)
@@ -53,20 +45,7 @@ make sure that macros get expanded. Again, no problem, as we can use
 (define-syntax-rule (my-module-begin form ...)
   (#%plain-module-begin form ...))
 
-#;
-(define-syntax* (%compilation-unit stx)
-  (let ((stx-lst (cdr (syntax->list stx)))
-        (def-ctx (syntax-local-make-definition-context))
-        (ctx (generate-expand-context))
-        )
-    #`(begin #,@stx-lst)
-    ))
-    ;;local-expand  module
-
-;; We bind accessors explicitly so that we get to bind the identifier
-;; of the ctor ourselves, and know what it is.
-(define-values (struct:%ast %ast %ast? %ast-ref %ast-set!)
-  (make-struct-type '%ast #f 2 2))
+(define %ast list)
 
 ;; Provide this so the compiler can compare syntax of ID against this
 ;; one to see if it is the same one.
