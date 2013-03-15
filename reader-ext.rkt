@@ -78,8 +78,6 @@ appearing in programs.
           (read-language in (thunk (void)))
           (read-syntaxes path in))))))
 
-;;(load-as-syntaxes "try-program-3.rkt")
-
 ;;; 
 ;;; tests
 ;;; 

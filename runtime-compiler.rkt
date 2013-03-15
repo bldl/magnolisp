@@ -20,6 +20,12 @@ make sure that macros get expanded. Again, no problem, as we can use
 ;; racket/base exports nothing for-syntax
 (provide (for-syntax (all-from-out racket/base)))
 (provide (rename-out (my-module-begin #%module-begin)))
+;(provide (rename-out (#%app %app)))
+
+;; For now this is easier. We want to be more selective, though. We
+;; want at least 'module' and '#%app', but we could define our own
+;; version of the latter.
+;;(provide (except-out (all-from-out racket/base) #%module-begin))
 
 ;; Merely by exporting these almost anything may appear in a top-level
 ;; program. Such an expansion is not very useful, however. We can
@@ -31,11 +37,15 @@ make sure that macros get expanded. Again, no problem, as we can use
 ;; exist in the use context.
 ; (provide #%app #%top)
 
+;; Trying to make 'expand' insert this particular identifier.
+(provide #%app)
+
 ;; Only required if we actually wrap the read code into a 'module'
 ;; before expansion.
 (define-syntax-rule (my-module-begin form ...)
   (#%plain-module-begin form ...))
 
+#;
 (define-syntax* (%compilation-unit stx)
   (let ((stx-lst (cdr (syntax->list stx)))
         (def-ctx (syntax-local-make-definition-context))
