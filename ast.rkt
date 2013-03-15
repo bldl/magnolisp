@@ -1,6 +1,9 @@
 #lang racket
 
 #|
+
+For more compact printing, we do not make annotations transparent.
+
 |#
 
 (require "util.rkt")
@@ -50,8 +53,13 @@
 ;;; concrete nodes
 ;;; 
 
+(define-ast* Var (name))
 (define-ast* Module (body))
 (define-ast* Pass ())
 (define-ast* Call (proc))
 (define-ast* Define (name body))
 
+(define* (Var-from-stx id-stx)
+  (new-Var id-stx (syntax-e id-stx)))
+
+  
