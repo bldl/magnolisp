@@ -45,23 +45,21 @@ make sure that macros get expanded. Again, no problem, as we can use
 (define-syntax-rule (my-module-begin form ...)
   (#%plain-module-begin form ...))
 
-(define %ast list)
-
 ;; Provide this so the compiler can compare syntax of ID against this
 ;; one to see if it is the same one.
-(provide %ast)
+(define* %core list)
 
 (define-syntax-rule*
   (pass)
-  (%ast 'pass #f))
+  (%core 'pass #f))
 
 (define-syntax-rule*
   (call n)
-  (%ast 'call n))
+  (%core 'call n))
 
 (define-syntax* (procedure stx)
   (syntax-case stx ()
     ((_ (n) body ...)
      #'(define n
-         (%ast 'procedure
-               (lambda () body ...))))))
+         (%core 'procedure
+                (lambda () body ...))))))

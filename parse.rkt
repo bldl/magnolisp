@@ -17,7 +17,7 @@ Have thus far been unable to get free-identifier=? check to match for
          (writeln (free-identifier=? #'#%app #'app))
          (writeln (and (identifier? #'app)
                        (free-identifier=? #'app #'rt.#%app)))
-         ;;(and (identifier? #'a) (free-identifier=? #'a #'rt.%ast))
+         ;;(and (identifier? #'a) (free-identifier=? #'a #'rt.%core))
          (Pass (stx-annos stx))))
 
 The same problem may exist for 'lambda'.
@@ -40,23 +40,23 @@ The same problem may exist for 'lambda'.
   (define (p stx)
     (syntax-case stx (#%plain-module-begin
                       define-values
-                      module quote rt.%ast)
+                      module quote rt.%core)
 
       ((module n pn (#%plain-module-begin body ...))
        (new-Module stx (p-lst (syntax->list #'(body ...)))))
 
-      ((_ rt.%ast (quote n) _)
+      ((_ rt.%core (quote n) _)
        (eq? 'pass (syntax-e #'n))
        (new-Pass stx))
 
-      ((_ rt.%ast (quote n) id-stx)
+      ((_ rt.%core (quote n) id-stx)
        (eq? 'call (syntax-e #'n))
        (new-Call stx (Var-from-stx #'id-stx)))
 
       ((define-values (n) def)
        (let ((def-stx #'def))
-         (syntax-case def-stx (quote rt.%ast)
-           ((_ rt.%ast (quote t) (_ () body ...))
+         (syntax-case def-stx (quote rt.%core)
+           ((_ rt.%core (quote t) (_ () body ...))
             (eq? 'procedure (syntax-e #'t))
             (new-Define stx (Var-from-stx #'n)
                         'procedure
