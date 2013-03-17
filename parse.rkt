@@ -2,6 +2,11 @@
 
 #|
 
+Note that language not in the runtime library may appear. Such
+language may come from the lexical cope of 'expand' itself, or from
+the lexical scope of a macro expander, and indeed macros may form
+chains.
+
 Note that #%app and lambda in 'racket' are macros that probably expand
 to code containing '#%kernel versions thereof. All macros must
 'expand' to something. Something to keep in mind when comparing
@@ -15,8 +20,16 @@ identifiers.
 (require (prefix-in rt. "runtime-compiler.rkt"))
 (require racket/list)
 
-;; Drops macro definitions, does alpha conversion, and turns the input
-;; syntax object into an AST.
+(define (filter-ast ast)
+  (cond
+   ((Module? ast)
+    (struct-copy Module ast
+                 (body (filter Define? (Module-body ast)))))
+   (else ast)))
+
+;; Drops macro definitions and top-level expressions and statements,
+;; does alpha conversion, and turns the input syntax object into an
+;; AST.
 (define* (parse mod-stx)
   (define (prs stx)
     (syntax-case stx (k-app k-lambda
@@ -51,7 +64,7 @@ identifiers.
   (define (prs-lst lst)
     (filter Ast? (map prs lst)))
 
-  (prs mod-stx))
+  (filter-ast (prs mod-stx)))
 
 (define* (print-stx-with-bindings stx)
   (define lst (syntax->list stx))

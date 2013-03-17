@@ -61,5 +61,3 @@ For more compact printing, we do not make annotations transparent.
 
 (define* (Var-from-stx id-stx)
   (new-Var id-stx (syntax-e id-stx)))
-
-  
