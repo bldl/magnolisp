@@ -35,6 +35,12 @@
        (define-syntax-rule (name rest ...) body)
        (provide name)))))
 
+(define-syntax-rule*
+  (define-values* (n ...) vals)
+  (begin
+    (define-values (n ...) vals)
+    (provide n ...)))
+
 ;; Note that 'struct*' is already defined in 'racket'.
 (define-syntax-rule*
   (define-struct* nm rest ...)
