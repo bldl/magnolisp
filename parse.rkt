@@ -2,37 +2,18 @@
 
 #|
 
-Have thus far been unable to get free-identifier=? check to match for
-#%app, despite a variety of attempts.
-
-      ((app more ...)
-       (begin
-         (let ((x (car (syntax-e stx))))
-           (writeln (list x (identifier? x)
-                          (free-identifier=? x #'#%app)
-                          (identifier-binding x))))
-         (writeln #'app)
-         (writeln (identifier? #'app))
-         (writeln (free-identifier=? #'rt.#%app #'app))
-         (writeln (free-identifier=? #'#%app #'app))
-         (writeln (and (identifier? #'app)
-                       (free-identifier=? #'app #'rt.#%app)))
-         ;;(and (identifier? #'a) (free-identifier=? #'a #'rt.%core))
-         (Pass (stx-annos stx))))
-
-The same problem may exist for 'lambda'.
+Note that #%app and lambda in 'racket' are macros that probably expand
+to code containing '#%kernel versions thereof. All macros must
+'expand' to something. Something to keep in mind when comparing
+identifiers.
 
 |#
 
 (require "ast.rkt")
 (require "util.rkt")
+(require (only-in '#%kernel (#%app k-app) (lambda k-lambda)))
 (require (prefix-in rt. "runtime-compiler.rkt"))
 (require racket/list)
-
-;;(syntax-local-phase-level)
-;;(free-identifier=? #'rt.%app #'#%app)
-;;(identifier-binding #'rt.#%app)
-;;(identifier-binding #'#%app)
 
 ;; Drops macro definitions, does alpha conversion, and turns the input
 ;; syntax object into an AST.
@@ -77,3 +58,15 @@ The same problem may exist for 'lambda'.
    (lst (for-each print-stx-with-bindings lst))
    ((identifier? stx) (writeln (list stx (identifier-binding stx))))
    (else (writeln stx))))
+
+(define* (find-id-stx find-stx stx (msg #f))
+  (define (f stx)
+    (define lst (syntax->list stx))
+    (cond
+     (lst
+      (for-each f lst))
+     ((identifier? stx)
+      (when (free-identifier=? find-stx stx)
+        (writeln (list (or msg (format "~a" (syntax->datum stx)))
+                       stx (identifier-binding stx)))))))
+  (f stx))

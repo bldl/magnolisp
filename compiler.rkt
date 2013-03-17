@@ -3,8 +3,8 @@
 #|
 
 One problem here is that 'syntax-local-make-definition-context' can
-only be called at transformation time. The 'syntax/toplevel' can help
-us get a transformation going.
+only be called at transformation time. The 'syntax/toplevel' module
+can help us get a transformation going. Or we may just use 'expand'.
 
 We could choose to have a more sophisticated wrapper than 'begin' or
 'module' for the input list of syntax objects. We could use
@@ -22,6 +22,10 @@ affect it.
 See "Fully Expanded Programs" in Racket reference, as well as our
 runtime library to see what we can expect to remain in the syntax tree
 to be compiled to C++.
+
+Note that if we want the 'expand' namespace to have the same module
+instances, for sharing data or such, we must take care of appropriate
+module attaching.
 
 |#
 
@@ -45,20 +49,11 @@ to be compiled to C++.
 ;;  (namespace-syntax-introduce
 ;;   #`(%compilation-unit #,@stx-lst)))
 
-;;(module main '#%kernel body ...)
-
-;; ((m body ...)
-;;  (and (identifier? #'m)
-;;       (free-identifier=? #'m #'#%plain-module-begin)) 
-
 ;;(namespace-require '(for-syntax racket/base))
 ;;(namespace-require '"runtime-compiler.rkt")
 ;;(namespace-require '"runtime-evaluator.rkt")
 ;;(namespace-require '(only racket/base module))
 ;;(namespace-require '"runtime-compiler-lang.rkt")
-
-;; (let ((mod-id (car (syntax-e in-stx))))
-;;   (writeln (list mod-id (identifier-binding mod-id))))
 
 (define* (compile-file pn)
   (define stx-lst (load-as-syntaxes pn))
@@ -70,8 +65,12 @@ to be compiled to C++.
      #`(module main "runtime-compiler-lang.rkt"
          #,@stx-lst)))
   ;;(print-stx-with-bindings in-stx)
-  (let ((ns (make-base-empty-namespace)))
+  (let ((this-ns (current-namespace))
+        (ns (make-empty-namespace)))
+    ;; Cannot do this unless import into this-ns (possibly renamed).
+    ;;(namespace-attach-module this-ns '"runtime-compiler-lang.rkt" ns)
     (parameterize ((current-namespace ns))
+      (namespace-attach-module this-ns 'racket/base)
       (namespace-require '(only racket/base module))
       ;;(namespace-require '"runtime-compiler-lang.rkt")
       (let ((in-stx (namespace-syntax-introduce in-stx)))
