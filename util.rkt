@@ -29,6 +29,20 @@
     ((_ fn arg ...)
      (lambda rest (apply fn arg ... rest)))))
 
+;; Like 'map', but if 'f' returns a value indicating failure, then
+;; stops and returns #f. By default any false value indicates failure.
+;; Does not accept multiple list arguments.
+(define* (map-while f lst (failed? false?))
+  (let next ((res-lst '())
+             (lst lst))
+    (if (null? lst)
+        (reverse res-lst)
+        (let* ((elem (car lst))
+               (res (f elem)))
+          (if (failed? res)
+              #f
+              (next (cons res res-lst) (cdr lst)))))))
+
 #|
 
 Copyright 2009 Helsinki Institute for Information Technology (HIIT)
