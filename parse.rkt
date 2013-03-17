@@ -34,6 +34,7 @@ identifiers.
   (define (prs stx)
     (syntax-case stx (k-app k-lambda
                       #%plain-module-begin
+                      define-syntaxes
                       define-values module quote
                       rt.%core)
 
@@ -48,6 +49,9 @@ identifiers.
        (eq? 'call (syntax-e #'n))
        (new-Call stx (Var-from-stx #'id-stx)))
 
+      ((define-syntaxes . _)
+       #f)
+      
       ((define-values (n) def)
        (let ((def-stx #'def))
          (syntax-case def-stx (k-lambda quote rt.%core)
