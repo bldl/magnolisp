@@ -10,15 +10,18 @@ chains.
 Note that #%app and lambda in 'racket' are macros that probably expand
 to code containing '#%kernel versions thereof. All macros must
 'expand' to something. Something to keep in mind when comparing
-identifiers.
+identifiers. Note also the 'syntax/kerncase' module, and particularly
+'kernel-form-identifier-list'.
 
 |#
 
 (require "ast.rkt")
 (require "util.rkt")
-(require (only-in '#%kernel (#%app k-app) (lambda k-lambda)))
 (require (prefix-in rt. "runtime-compiler.rkt"))
+(require (only-in '#%kernel (#%app k-app) (lambda k-lambda)))
 (require racket/list)
+(require syntax/stx) ;; deconstructing syntax objects
+(require syntax/id-table)
 
 (define (filter-ast ast)
   (cond
@@ -28,8 +31,8 @@ identifiers.
    (else ast)))
 
 ;; Drops macro definitions and top-level expressions and statements,
-;; does alpha conversion, and turns the input syntax object into an
-;; AST.
+;; gives a unique name to all identifiers (for easier transforming),
+;; and turns the input syntax object into an AST.
 (define* (parse mod-stx)
   (define (prs stx)
     (syntax-case stx (k-app k-lambda

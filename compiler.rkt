@@ -84,4 +84,4 @@ module attaching.
 (define* (compile-module mn)
   (compile-file (resolve-module-path mn #f)))
 
-(compile-module "try-program-5.rkt")
+(compile-module "try-program-4.rkt")
