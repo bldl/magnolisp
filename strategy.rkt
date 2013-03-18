@@ -28,8 +28,8 @@ to be freely specified.
 ;;; Failure value.
 ;;; 
 
-;; In many cases we can simply use #f, by this requires #f not to be a
-;; valid term. Choosing #f good for compatibility with functions that
+;; In many cases we can simply use #f, but this requires #f not to be a
+;; valid term. Choosing #f is good for compatibility with functions that
 ;; return #f as a "non-value".
 
 (define* failed #f)
