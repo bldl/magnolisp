@@ -25,18 +25,6 @@ to be freely specified.
   (make-struct-type-property 'subterm-all))
 
 ;;; 
-;;; Failure value.
-;;; 
-
-;; In many cases we can simply use #f, but this requires #f not to be a
-;; valid term. Choosing #f is good for compatibility with functions that
-;; return #f as a "non-value".
-
-(define* failed #f)
-
-(define* failed? not)
-
-;;; 
 ;;; Strategies for lists.
 ;;; 
 
@@ -46,7 +34,7 @@ to be freely specified.
 ;; tables, for instance.
 
 (define (list-rw rw ast-lst)
-  (map-while (force rw) ast-lst failed?))
+  (map-while (force rw) ast-lst not))
 
 ;; This is an 'all' for lists, where elements are "subterms". As 'map'
 ;; in Stratego.
@@ -58,7 +46,7 @@ to be freely specified.
 ;;; Rewrites.
 ;;; 
 
-(define* (fail ast) failed)
+(define* (fail ast) #f)
 
 (define* (id ast) ast)
 
@@ -67,33 +55,24 @@ to be freely specified.
     (letrec ((again impl))
       again)))
 
+;; Note that (and e ...) defines left-to-right evaluation order, and
+;; also that (and) == #t.
 (define-syntax* seq
   (syntax-rules ()
-    ((_) identity)
-    ((_ s) s)
     ((_ s ...)
      (lambda (ast)
-       (let/ec k
-         (begin
-           (set! ast (s ast))
-           (when (failed? ast)
-             (k)))
-         ...)
-       ast))))
+       (and (begin
+              (set! ast (s ast))
+              ast) ...
+              ast)))))
 
+;; Note that (or e ...) defines left-to-right evaluation order, and
+;; also that (or) == #f.
 (define-syntax* alt
   (syntax-rules ()
-    ((_) failed)
-    ((_ s) s)
     ((_ s ...)
      (lambda (ast)
-       (let/ec k
-         (begin
-           (set! ast (s ast))
-           (unless (failed? ast)
-             (k)))
-         ...)
-       ast))))
+       (or (s ast) ...)))))
 
 (define* (try s)
   (alt s id))
@@ -119,9 +98,7 @@ to be freely specified.
 ;; Tries a rewrite but restores original term on success.
 (define* (where s)
   (lambda (ast)
-    (if (failed? (s ast))
-        failed
-        ast)))
+    (and (s ast) ast)))
 
 ;;; 
 ;;; Tree traversals.
