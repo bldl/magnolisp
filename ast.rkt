@@ -90,19 +90,3 @@ For more compact printing, we do not make annotations transparent.
 
 (define* (Var-rename ast n)
   (struct-copy Var ast (name n)))
-
-
-
-
-(let ((op
-       (bottomup ;; topdown
-        (lambda (x)
-          (if (Var? x)
-              (Var-rename x (gensym (symbol->string (Var-name x))))
-              x))))
-      (dat (Define #f (Var #f 'a) 4
-             (list (Var #f 'b)
-                   (Pass #f)
-                   (Var #f 'c)
-                   (Call #f (Var #f 'p))))))
-  (pretty-println (op dat)))

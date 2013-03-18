@@ -15,8 +15,7 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
 
 |#
 
-(require "ast.rkt")
-(require "util.rkt")
+(require "ast.rkt" "strategy.rkt" "util.rkt")
 (require (prefix-in rt. "runtime-compiler.rkt"))
 (require (only-in '#%kernel (#%app k-app) (lambda k-lambda)))
 (require racket/list)
@@ -29,6 +28,26 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
     (struct-copy Module ast
                  (body (filter Define? (Module-body ast)))))
    (else ast)))
+
+
+
+
+#;
+(let ((op
+       (bottomup ;; topdown
+        (lambda (x)
+          (if (Var? x)
+              (Var-rename x (gensym (symbol->string (Var-name x))))
+              x))))
+      (dat (Define #f (Var #f 'a) 4
+             (list (Var #f 'b)
+                   (Pass #f)
+                   (Var #f 'c)
+                   (Call #f (Var #f 'p))))))
+  (pretty-println (op dat)))
+
+
+
 
 ;; Drops macro definitions and top-level expressions and statements,
 ;; gives a unique name to all identifiers (for easier transforming),
