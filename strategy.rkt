@@ -73,14 +73,13 @@ to be freely specified.
     ((_ s) s)
     ((_ s ...)
      (lambda (ast)
-       (let ((ast ast))
-         (let/ec k
-           (begin
-             (set! ast (s ast))
-             (when (failed? ast)
-               (k)))
-           ...)
-         ast)))))
+       (let/ec k
+         (begin
+           (set! ast (s ast))
+           (when (failed? ast)
+             (k)))
+         ...)
+       ast))))
 
 (define-syntax* alt
   (syntax-rules ()
@@ -88,14 +87,13 @@ to be freely specified.
     ((_ s) s)
     ((_ s ...)
      (lambda (ast)
-       (let ((ast ast))
-         (let/ec k
-           (begin
-             (set! ast (s ast))
-             (unless (failed? ast)
-               (k)))
-           ...)
-         ast)))))
+       (let/ec k
+         (begin
+           (set! ast (s ast))
+           (unless (failed? ast)
+             (k)))
+         ...)
+       ast))))
 
 (define* (try s)
   (alt s id))
