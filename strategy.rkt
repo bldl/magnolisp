@@ -50,9 +50,9 @@ to be freely specified.
 
 ;; This is an 'all' for lists, where elements are "subterms". As 'map'
 ;; in Stratego.
-(define* (list-all rw)
+(define* (list-all s)
   (lambda (ast-lst)
-    (list-rw rw ast-lst)))
+    (list-rw s ast-lst)))
 
 ;;; 
 ;;; Rewrites.
@@ -62,24 +62,21 @@ to be freely specified.
 
 (define* (id ast) ast)
 
-(define-syntax-rule* (rec again rule)
-  (lambda (ast)
-    (let again ((ast ast))
-      (rule ast))))
+(define-syntax-rule* (rec again s impl)
+  (lambda (s)
+    (letrec ((again impl))
+      again)))
 
-(define* (seq . rws)
-  (lambda (ast)
-    (let next ((rws rws)
-               (pres ast))
-      (if (null? rws)
-          pres
-          (let* ((rw (car rws))
-                 (cres ((force rw) pres)))
-            (cond
-             ((failed? cres)
-              failed)
-             (else
-              (next (cdr rws) cres))))))))
+(define-syntax* seq
+  (syntax-rules ()
+    ((_) identity)
+    ((_ s) s)
+    ((_ s ss ...)
+     (lambda (ast)
+       (let ((r (s ast)))
+         (if (failed? r)
+             r
+             ((seq ss ...) r)))))))
 
 (define* (alt . rws)
   (lambda (ast)
@@ -94,14 +91,12 @@ to be freely specified.
              (else
               cres)))))))
 
-(define* (try rw)
-  (alt rw id))
+(define* (try s)
+  (alt s id))
 
-;; To allow for such recursive definitions lazy evaluation semantics
-;; are rather essential. Or should we define the strategies as macros,
-;; to control the evaluation of arguments, similar to 'if' or 'and'.
-(define* (repeat rw)
-  (try (seq rw (delay (repeat rw)))))
+(define* repeat
+  (rec again s
+       (try (seq s again))))
 
 ;;; 
 ;;; One-level traversals.
@@ -112,15 +107,15 @@ to be freely specified.
 
 ;; While most strategies here are generic, this one is only supported
 ;; for terms that implement the required operation.
-(define* (all rw)
+(define* (all s)
   (lambda (ast)
     (let ((all (subterm-all ast)))
-      (all rw ast))))
+      (all s ast))))
 
 ;; Tries a rewrite but restores original term on success.
-(define* (where rw)
+(define* (where s)
   (lambda (ast)
-    (let ((res ((force rw) ast)))
+    (let ((res ((force s) ast)))
       (if (failed? res)
           failed
           ast))))
@@ -129,11 +124,14 @@ to be freely specified.
 ;;; Tree traversals.
 ;;; 
 
-(define* (topdown rw)
-  (seq rw (all (delay (topdown rw)))))
+(define* topdown
+  (rec again s
+       (seq s (all again))))
 
-(define* (bottomup rw)
-  (seq (all (delay (bottomup rw))) rw))
+(define* bottomup
+  (rec again s
+       (seq (all again) s)))
 
-(define* (innermost rw)
-  (bottomup (try (seq rw (delay (innermost rw))))))
+(define* innermost
+  (rec again s
+       (bottomup (try (seq s again)))))

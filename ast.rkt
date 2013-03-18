@@ -95,7 +95,7 @@ For more compact printing, we do not make annotations transparent.
 
 
 (let ((op
-       (topdown
+       (bottomup ;; topdown
         (lambda (x)
           (if (Var? x)
               (Var-rename x (gensym (symbol->string (Var-name x))))
