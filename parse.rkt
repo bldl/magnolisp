@@ -18,7 +18,7 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
 (require "ast.rkt" "strategy.rkt" "util.rkt")
 (require (prefix-in rt. "runtime-compiler.rkt"))
 (require (only-in '#%kernel (#%app k-app) (lambda k-lambda)))
-(require racket/list)
+(require racket/function racket/list)
 (require syntax/stx) ;; deconstructing syntax objects
 (require syntax/id-table)
 
@@ -29,25 +29,23 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
                  (body (filter Define? (Module-body ast)))))
    (else ast)))
 
-
-
-
-#;
-(let ((op
-       (bottomup ;; topdown
-        (lambda (x)
-          (if (Var? x)
-              (Var-rename x (gensym (symbol->string (Var-name x))))
-              x))))
-      (dat (Define #f (Var #f 'a) 4
-             (list (Var #f 'b)
-                   (Pass #f)
-                   (Var #f 'c)
-                   (Call #f (Var #f 'p))))))
-  (pretty-println (op dat)))
-
-
-
+(define (unique-rename ast)
+  (define t (make-free-id-table))
+  (define f
+    (topdown
+     (lambda (ast)
+       (if (not (Var? ast))
+           ast
+           (let* ((annos (Ast-annos ast))
+                  (id-stx (hash-ref annos 'stx))
+                  (n (free-id-table-ref
+                      t id-stx
+                      (thunk                  
+                       (let ((n (gensym (symbol->string (Var-name ast)))))
+                         (free-id-table-set! t id-stx n)
+                         n)))))
+             (Var-rename ast n))))))
+  (f ast))
 
 ;; Drops macro definitions and top-level expressions and statements,
 ;; gives a unique name to all identifiers (for easier transforming),
@@ -90,7 +88,7 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
   (define (prs-lst lst)
     (filter Ast? (map prs lst)))
 
-  (filter-ast (prs mod-stx)))
+  (unique-rename (filter-ast (prs mod-stx))))
 
 (define* (print-stx-with-bindings stx)
   (define lst (syntax->list stx))
