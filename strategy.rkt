@@ -71,12 +71,16 @@ to be freely specified.
   (syntax-rules ()
     ((_) identity)
     ((_ s) s)
-    ((_ s ss ...)
+    ((_ s ...)
      (lambda (ast)
-       (let ((r (s ast)))
-         (if (failed? r)
-             r
-             ((seq ss ...) r)))))))
+       (let ((ast ast))
+         (let/ec k
+           (begin
+             (set! ast (s ast))
+             (when (failed? ast)
+               (k)))
+           ...)
+         ast)))))
 
 (define* (alt . rws)
   (lambda (ast)
