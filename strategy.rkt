@@ -82,18 +82,20 @@ to be freely specified.
            ...)
          ast)))))
 
-(define* (alt . rws)
-  (lambda (ast)
-    (let next ((rws rws))
-      (if (null? rws)
-          failed
-          (let* ((rw (car rws))
-                 (cres ((force rw) ast)))
-            (cond
-             ((failed? cres)
-              (next (cdr rws)))
-             (else
-              cres)))))))
+(define-syntax* alt
+  (syntax-rules ()
+    ((_) failed)
+    ((_ s) s)
+    ((_ s ...)
+     (lambda (ast)
+       (let ((ast ast))
+         (let/ec k
+           (begin
+             (set! ast (s ast))
+             (unless (failed? ast)
+               (k)))
+           ...)
+         ast)))))
 
 (define* (try s)
   (alt s id))
