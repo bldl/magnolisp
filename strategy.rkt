@@ -37,12 +37,35 @@ to be freely specified.
 (define* failed? not)
 
 ;;; 
+;;; Strategies for lists.
+;;; 
+
+;; We cannot implement custom interfaces for lists. You may invoke
+;; these subterm traversal strategies instead as required. We could
+;; later provide operations for vectors, boxes, and immutable hash
+;; tables, for instance.
+
+(define (list-rw rw ast-lst)
+  (map-while (force rw) ast-lst failed?))
+
+;; This is an 'all' for lists, where elements are "subterms". As 'map'
+;; in Stratego.
+(define* (list-all rw)
+  (lambda (ast-lst)
+    (list-rw rw ast-lst)))
+
+;;; 
 ;;; Rewrites.
 ;;; 
 
 (define* (fail ast) failed)
 
 (define* (id ast) ast)
+
+(define-syntax-rule* (rec again rule)
+  (lambda (ast)
+    (let again ((ast ast))
+      (rule ast))))
 
 (define* (seq . rws)
   (lambda (ast)
@@ -83,20 +106,6 @@ to be freely specified.
 ;;; 
 ;;; One-level traversals.
 ;;; 
-
-;; For the time being we only traverse atoms and list elements in AST
-;; node fields, as those are considered to be direct subterms. We
-;; could later expand our support to vectors, boxes, and immutable
-;; hash tables, for instance.
-
-(define (list-rw rw ast-lst)
-  (map-while (force rw) ast-lst failed?))
-
-;; This is an 'all' for lists, where elements are "subterms". As 'map'
-;; in Stratego.
-(define* (list-all rw)
-  (lambda (ast-lst)
-    (list-rw rw ast-lst)))
 
 ;; xxx one
 ;; xxx some
