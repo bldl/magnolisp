@@ -3,24 +3,33 @@
 #|
 
 This is a basic Stratego-inspired term rewriting library for
-Racket. It is intended for rewriting ASTs.
+Racket.
 
 Everything here apart from 'one', 'some', and 'all' is generic, and
 probably those can also be built on top of some generic rewrite
-subterms construct. Perhaps we should instead define this module as a
-'unit' or somesuch parameterizable construct.
+subterms construct.
 
 |#
 
-(require "ast.rkt" "util.rkt")
+(require "util.rkt")
+
+;;; 
+;;; Subterm interface.
+;;; 
+
+;; E.g. for 'struct', can say #:property prop:subterm-all identity
+(define-values* (prop:subterm-all subterm-all? subterm-all)
+  (make-struct-type-property 'subterm-all))
 
 ;;; 
 ;;; Failure value.
 ;;; 
 
-;; With AST nodes we can simply use #f, since #f is not a valid AST
-;; value. This is good for compatibility with functions that return #f
-;; as a "non-value".
+;; In many cases we can simply use #f, by this requires #f not to be a
+;; valid term. Choosing #f good for compatibility with functions that
+;; return #f as a "non-value". Perhaps we should define this module as
+;; a 'unit' or somesuch parameterizable construct to allow these
+;; operations to be specified.
 
 (define* failed #f)
 
@@ -118,16 +127,3 @@ subterms construct. Perhaps we should instead define this module as a
 
 (define* (innermost rw)
   (bottomup (try (seq rw (delay (innermost rw))))))
-
-(let ((op
-       (topdown
-        (lambda (x)
-          (if (Var? x)
-              (Var-rename x (gensym (symbol->string (Var-name x))))
-              x))))
-      (dat (Define #f (Var #f 'a) 4
-             (list (Var #f 'b)
-                   (Pass #f)
-                   (Var #f 'c)
-                   (Call #f (Var #f 'p))))))
-  (pretty-println (op dat)))

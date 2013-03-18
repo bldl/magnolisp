@@ -6,7 +6,7 @@ For more compact printing, we do not make annotations transparent.
 
 |#
 
-(require "util.rkt")
+(require "strategy.rkt" "util.rkt")
 (require (for-syntax racket/syntax))
 
 ;;; 
@@ -42,10 +42,6 @@ For more compact printing, we do not make annotations transparent.
 ;; macro expansion time must have been defined by then, but for
 ;; runtime code forward references top module-level variables are
 ;; fine.
-
-;; E.g. for 'struct', can say #:property prop:subterm-all identity
-(define-values* (prop:subterm-all subterm-all? subterm-all)
-  (make-struct-type-property 'subterm-all))
 
 (define (all-identity f ast) ast)
 
@@ -94,3 +90,19 @@ For more compact printing, we do not make annotations transparent.
 
 (define* (Var-rename ast n)
   (struct-copy Var ast (name n)))
+
+
+
+
+(let ((op
+       (topdown
+        (lambda (x)
+          (if (Var? x)
+              (Var-rename x (gensym (symbol->string (Var-name x))))
+              x))))
+      (dat (Define #f (Var #f 'a) 4
+             (list (Var #f 'b)
+                   (Pass #f)
+                   (Var #f 'c)
+                   (Call #f (Var #f 'p))))))
+  (pretty-println (op dat)))
