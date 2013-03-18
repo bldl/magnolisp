@@ -35,12 +35,36 @@ For more compact printing, we do not make annotations transparent.
     h))
 
 ;;; 
-;;; abstract node
+;;; "all" strategies
 ;;; 
+
+;; Note that ordering is delicate here. Any identifiers referenced at
+;; macro expansion time must have been defined by then, but for
+;; runtime code forward references top module-level variables are
+;; fine.
 
 ;; E.g. for 'struct', can say #:property prop:subterm-all identity
 (define-values* (prop:subterm-all subterm-all? subterm-all)
   (make-struct-type-property 'subterm-all))
+
+(define (all-identity f ast) ast)
+
+(define (Module-all f ast)
+  (let-and body (map-while f (Module-body ast))
+           (struct-copy Module ast (body body))))
+
+(define (Call-all f ast)
+  (let-and proc (f (Call-proc ast))
+           (struct-copy Call ast (proc proc))))
+
+(define (Define-all f ast)
+  (let-and name (f (Define-name ast))
+           body (map-while f (Define-body ast))
+           (struct-copy Define ast (name name) (body body))))
+
+;;; 
+;;; abstract node
+;;; 
 
 (define-struct* Ast (annos))
 
@@ -49,7 +73,7 @@ For more compact printing, we do not make annotations transparent.
     ((_ name (field ...) all-op)
      #`(begin
          (define-struct* name Ast (field ...)
-           ;;#:property prop:subterm-all all-op
+           #:property prop:subterm-all all-op
            #:transparent)
          (define* #,(format-id stx "new-~a" (syntax-e #'name))
            (lambda (stx . args)
@@ -67,23 +91,3 @@ For more compact printing, we do not make annotations transparent.
 
 (define* (Var-from-stx id-stx)
   (new-Var id-stx (syntax-e id-stx)))
-
-;;; 
-;;; "all" strategies
-;;; 
-
-(define (all-identity f ast) ast)
-
-(define (Module-all f ast)
-  (let-and body (map-while f (Module-body ast))
-           (struct-copy Module ast (body body))))
-
-(define (Call-all f ast)
-  (let-and proc (f (Call-proc ast))
-           (struct-copy Call ast (proc proc))))
-
-(define (Define-all f ast)
-  (let-and name (f (Define-name ast))
-           body (map-while f (Define-body ast))
-           (struct-copy Define ast (name name) (body body))))
-

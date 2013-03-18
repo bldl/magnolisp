@@ -1,0 +1,120 @@
+#lang racket
+
+#|
+
+This is a basic Stratego-inspired term rewriting library for
+Racket. It is intended for rewriting ASTs.
+
+Everything here apart from 'one', 'some', and 'all' is generic, and
+probably those can also be built on top of some generic rewrite
+subterms construct. Perhaps we should instead define this module as a
+'unit' or somesuch parameterizable construct.
+
+|#
+
+(require "ast.rkt" "util.rkt")
+
+;;; 
+;;; Failure value.
+;;; 
+
+;; With AST nodes we can simply use #f, since #f is not a valid AST
+;; value. This is good for compatibility with functions that return #f
+;; as a "non-value".
+
+(define* failed #f)
+
+(define* failed? not)
+
+;;; 
+;;; Rewrites.
+;;; 
+
+(define* (fail ast) failed)
+
+(define* (id ast) ast)
+
+(define* (seq . rws)
+  (lambda (ast)
+    (let next ((rws rws)
+               (pres ast))
+      (if (null? rws)
+          pres
+          (let* ((rw (car rws))
+                 (cres ((force rw) pres)))
+            (cond
+             ((failed? cres)
+              failed)
+             (else
+              (next (cdr rws) cres))))))))
+
+(define* (alt . rws)
+  (lambda (ast)
+    (let next ((rws rws))
+      (if (null? rws)
+          failed
+          (let* ((rw (car rws))
+                 (cres ((force rw) ast)))
+            (cond
+             ((failed? cres)
+              (next (cdr rws)))
+             (else
+              cres)))))))
+
+(define* (try rw)
+  (alt rw id))
+
+;; To allow for such recursive definitions lazy evaluation semantics
+;; are rather essential. Or should we define the strategies as macros,
+;; to control the evaluation of arguments, similar to 'if' or 'and'.
+(define* (repeat rw)
+  (try (seq rw (delay (repeat rw)))))
+
+;;; 
+;;; One-level traversals.
+;;; 
+
+;; For the time being we only traverse atoms and list elements in AST
+;; node fields, as those are considered to be direct subterms. We
+;; could later expand our support to vectors, boxes, and immutable
+;; hash tables, for instance.
+
+(define (list-rw rw ast-lst)
+  (map-while (force rw) ast-lst failed?))
+
+;; This is an 'all' for lists, where elements are "subterms". As 'map'
+;; in Stratego.
+(define* (list-all rw)
+  (lambda (ast-lst)
+    (list-rw rw ast-lst)))
+
+;; xxx one
+;; xxx some
+
+;; While most strategies here are generic, this one is only supported
+;; for terms that implement the required operation.
+(define* (all rw)
+  (lambda (ast)
+    (let ((all (subterm-all ast)))
+      (all rw ast))))
+
+;; Tries a rewrite but restores original term on success.
+(define* (where rw)
+  (lambda (ast)
+    (let ((res ((force rw) ast)))
+      (if (failed? res)
+          failed
+          ast))))
+
+;;; 
+;;; Tree traversals.
+;;; 
+
+(define* (topdown rw)
+  (seq rw (all (delay (topdown rw)))))
+
+(define* (bottomup rw)
+  (seq (all (delay (bottomup rw))) rw))
+
+(define* (innermost rw)
+  (bottomup (try (seq rw (delay (innermost rw))))))
