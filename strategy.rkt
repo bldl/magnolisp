@@ -118,3 +118,16 @@ subterms construct. Perhaps we should instead define this module as a
 
 (define* (innermost rw)
   (bottomup (try (seq rw (delay (innermost rw))))))
+
+(let ((op
+       (topdown
+        (lambda (x)
+          (if (Var? x)
+              (Var-rename x (gensym (symbol->string (Var-name x))))
+              x))))
+      (dat (Define #f (Var #f 'a) 4
+             (list (Var #f 'b)
+                   (Pass #f)
+                   (Var #f 'c)
+                   (Call #f (Var #f 'p))))))
+  (pretty-println (op dat)))
