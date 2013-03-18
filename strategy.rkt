@@ -81,6 +81,18 @@ to be freely specified.
   (rec again s
        (try (seq s again))))
 
+;; Tries a rewrite but restores original term on success.
+(define* (where s)
+  (lambda (ast)
+    (and (s ast) ast)))
+
+;; ((seq (where number?) (must (lambda (x) 2))) 1)   ;=> 2
+;; ((seq (where number?) (must (lambda (x) #f))) 1)  ;=> error
+(define-syntax-rule* (must s)
+  (lambda (ast)
+    (or (s ast)
+        (error "strategy did not apply" (quote s)))))
+
 ;;; 
 ;;; One-level traversals.
 ;;; 
@@ -94,11 +106,6 @@ to be freely specified.
   (lambda (ast)
     (let ((all (subterm-all ast)))
       (all s ast))))
-
-;; Tries a rewrite but restores original term on success.
-(define* (where s)
-  (lambda (ast)
-    (and (s ast) ast)))
 
 ;;; 
 ;;; Tree traversals.
