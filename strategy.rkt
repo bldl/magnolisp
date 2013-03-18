@@ -119,10 +119,9 @@ to be freely specified.
 ;; Tries a rewrite but restores original term on success.
 (define* (where s)
   (lambda (ast)
-    (let ((res ((force s) ast)))
-      (if (failed? res)
-          failed
-          ast))))
+    (if (failed? (s ast))
+        failed
+        ast)))
 
 ;;; 
 ;;; Tree traversals.
