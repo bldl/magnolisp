@@ -5,9 +5,12 @@
 This is a basic Stratego-inspired term rewriting library for
 Racket.
 
-Everything here apart from 'one', 'some', and 'all' is generic, and
-probably those can also be built on top of some generic rewrite
-subterms construct.
+Everything here apart from failure values and 'one', 'some', and 'all'
+strategies are generic, and some of those are also implemented in
+terms of interfaces. Unfortunately such interfaces cannot be defined
+for existing datatypes. Perhaps we should define this module as a
+'unit' or somesuch parameterizable construct to allow these operations
+to be freely specified.
 
 |#
 
@@ -27,9 +30,7 @@ subterms construct.
 
 ;; In many cases we can simply use #f, by this requires #f not to be a
 ;; valid term. Choosing #f good for compatibility with functions that
-;; return #f as a "non-value". Perhaps we should define this module as
-;; a 'unit' or somesuch parameterizable construct to allow these
-;; operations to be specified.
+;; return #f as a "non-value".
 
 (define* failed #f)
 
