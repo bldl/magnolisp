@@ -15,14 +15,18 @@ to be freely specified.
 |#
 
 (require "util.rkt")
+(require racket/generic)
 
 ;;; 
-;;; Subterm interface.
+;;; Subterm access interface.
 ;;; 
 
-;; E.g. for 'struct', can say #:property prop:subterm-all identity
-(define-values* (prop:subterm-all subterm-all? subterm-all)
-  (make-struct-type-property 'subterm-all))
+(define-generics strategic
+  (for-each-subterm s strategic)
+  (subterm-all s strategic))
+
+;; There seems to be no "generics-out" provide spec.
+(provide gen:strategic for-each-subterm subterm-all)
 
 ;;; 
 ;;; Strategies for lists.
@@ -143,8 +147,7 @@ to be freely specified.
 ;; for terms that implement the required operation.
 (define* (all s)
   (lambda (ast)
-    (let ((all (subterm-all ast)))
-      (all s ast))))
+    (subterm-all s ast)))
 
 ;;; 
 ;;; Tree traversals.
