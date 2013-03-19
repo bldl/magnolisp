@@ -36,25 +36,6 @@ For more compact printing, we do not make annotations transparent.
     h))
 
 ;;; 
-;;; "all" strategies
-;;; 
-
-(define (all-identity f ast) ast)
-
-(define (Module-all f ast)
-  (let-and body (map-while f (Module-body ast))
-           (struct-copy Module ast (body body))))
-
-(define (Call-all f ast)
-  (let-and proc (f (Call-proc ast))
-           (struct-copy Call ast (proc proc))))
-
-(define (Define-all f ast)
-  (let-and var (f (Define-var ast))
-           body (map-while f (Define-body ast))
-           (struct-copy Define ast (var var) (body body))))
-
-;;; 
 ;;; abstract node
 ;;; 
 
