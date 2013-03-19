@@ -31,21 +31,39 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
 
 (define (unique-rename ast)
   (define t (make-free-id-table))
-  (define f
+  (define g ;; xxx actually only require a 'visit' for this, no rewrite
     (topdown
      (lambda (ast)
-       (if (not (Var? ast))
-           ast
-           (let* ((annos (Ast-annos ast))
-                  (id-stx (hash-ref annos 'stx))
-                  (n (free-id-table-ref
-                      t id-stx
-                      (thunk                  
-                       (let ((n (gensym (symbol->string (Var-name ast)))))
-                         (free-id-table-set! t id-stx n)
-                         n)))))
-             (Var-rename ast n))))))
-  (f ast))
+       (cond
+        ((Define? ast)
+         ;; We preserve the names of all module level declarations
+         ;; that appear in the program. Amongst themselves they are
+         ;; unique. Everything else will be given a fresh symbol, and
+         ;; hence we will still be free of conflicts.
+         (let* ((var (Define-var ast))
+                (n (Var-name var))
+                (annos (Ast-annos var))
+                (id-stx (hash-ref annos 'stx)))
+           (free-id-table-set! t id-stx n)
+           ast))
+        (else ast)))))
+   (define f
+    (topdown
+     (lambda (ast)
+       (cond
+        ((Var? ast)
+         (let* ((annos (Ast-annos ast))
+                (id-stx (hash-ref annos 'stx))
+                (n (free-id-table-ref
+                    t id-stx
+                    (thunk                  
+                     (let ((n (gensym (symbol->string (Var-name ast)))))
+                       (free-id-table-set! t id-stx n)
+                       n)))))
+           (Var-rename ast n)))
+        (else ast)))))
+   (g ast)
+   (f ast))
 
 ;; Drops macro definitions and top-level expressions and statements,
 ;; gives a unique name to all identifiers (for easier transforming),

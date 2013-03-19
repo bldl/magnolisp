@@ -9,7 +9,7 @@ C++ back end.
 (require "ast.rkt" "strategy.rkt"
          "util.rkt" "util/system.rkt")
 
-;; Note quite perfect as does not appear to insert line breaks.
+;; Not quite perfect as does not appear to insert line breaks.
 ;; http://astyle.sourceforge.net/
 ;; (astyle "void main() { return; }")
 (define (astyle s)

@@ -33,14 +33,13 @@ to be freely specified.
 ;; later provide operations for vectors, boxes, and immutable hash
 ;; tables, for instance.
 
-(define (list-rw rw ast-lst)
-  (map-while (force rw) ast-lst not))
+;; xxx list-one, list-some
 
 ;; This is an 'all' for lists, where elements are "subterms". As 'map'
 ;; in Stratego.
 (define* (list-all s)
-  (lambda (ast-lst)
-    (list-rw s ast-lst)))
+  (lambda (lst)
+    (map-while s lst)))
 
 ;;; 
 ;;; Rewrites.
@@ -50,6 +49,8 @@ to be freely specified.
 
 (define* (id ast) ast)
 
+;; Note quite the Stratego 'rec', but close, and handles the common
+;; case.
 (define-syntax-rule* (rec again s impl)
   (lambda (s)
     (letrec ((again impl))

@@ -54,9 +54,9 @@ For more compact printing, we do not make annotations transparent.
            (struct-copy Call ast (proc proc))))
 
 (define (Define-all f ast)
-  (let-and name (f (Define-name ast))
+  (let-and var (f (Define-var ast))
            body (map-while f (Define-body ast))
-           (struct-copy Define ast (name name) (body body))))
+           (struct-copy Define ast (var var) (body body))))
 
 ;;; 
 ;;; abstract node
@@ -83,7 +83,7 @@ For more compact printing, we do not make annotations transparent.
 (define-ast* Module (body) Module-all)
 (define-ast* Pass () all-identity)
 (define-ast* Call (proc) Call-all)
-(define-ast* Define (name kind body) Define-all)
+(define-ast* Define (var kind body) Define-all)
 
 (define* (Var-from-stx id-stx)
   (new-Var id-stx (syntax-e id-stx)))

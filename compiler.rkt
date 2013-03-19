@@ -2,9 +2,10 @@
 
 #|
 
-One problem here is that 'syntax-local-make-definition-context' can
-only be called at transformation time. The 'syntax/toplevel' module
-can help us get a transformation going. Or we may just use 'expand'.
+Certain operations (such as 'syntax-local-make-definition-context')
+can only be called at transformation time. The 'syntax/toplevel'
+module can help us get a transformation going. Or we may just use
+'expand'.
 
 We could choose to have a more sophisticated wrapper than 'begin' or
 'module' for the input list of syntax objects. We could use
@@ -37,24 +38,6 @@ module attaching.
 (require syntax/strip-context)
 (require syntax/toplevel)
 
-;; Need to import this so that gets correct binding.
-;(require (only-in "runtime-compiler.rkt" %compilation-unit))
-
-;; cannot use unless transforming
-;(expand-import #'"util.rkt")
-
-;(resolve-module-path "util.rkt" #f)
-
-;; (expand-syntax-top-level-with-compile-time-evals
-;;  (namespace-syntax-introduce
-;;   #`(%compilation-unit #,@stx-lst)))
-
-;;(namespace-require '(for-syntax racket/base))
-;;(namespace-require '"runtime-compiler.rkt")
-;;(namespace-require '"runtime-evaluator.rkt")
-;;(namespace-require '(only racket/base module))
-;;(namespace-require '"runtime-compiler-lang.rkt")
-
 (define* (compile-file pn)
   (define stx-lst (load-as-syntaxes pn))
   (define in-stx
@@ -84,4 +67,4 @@ module attaching.
 (define* (compile-module mn)
   (compile-file (resolve-module-path mn #f)))
 
-(compile-module "try-program-4.rkt")
+(compile-module "try-program-6.rkt")
