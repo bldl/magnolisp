@@ -5,6 +5,9 @@
 
 (require "module.rkt")
 
+(define-syntax-rule* (if-not c t e)
+  (if (not c) t e))
+
 (define-syntax* if-let
   (syntax-rules ()
     ((_ n c t e)
@@ -30,6 +33,20 @@
     ((_ n v more ...)
      (let ((n v))
        (and n (let-and more ...))))))
+
+(define-syntax* lets
+  (syntax-rules (then then-if then-if-not
+                 then-let then-if-let then-if-not-let)
+    ((_ then e) e)
+    ((_ then e rest ...) (begin e (lets rest ...)))
+    ((_ then-if e) e)
+    ((_ then-if e rest ...) (and e (lets rest ...)))
+    ((_ then-if-not e) (not e))
+    ((_ then-if-not e rest ...) (and (not e) (lets rest ...)))
+    ((_ then-let n e rest ...) (let ((n e)) (lets rest ...)))
+    ((_ then-if-let n e rest ...) (let ((n e)) (and n (lets rest ...))))
+    ((_) (void))
+    ((_ rest ...) (begin rest ...))))
 
 #|
 

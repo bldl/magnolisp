@@ -6,23 +6,6 @@
 (require* "util/print.rkt")
 (require* "util/let.rkt")
 
-(define-syntax-rule* (if-not c t e)
-  (if (not c) t e))
-
-(define-syntax* lets
-  (syntax-rules (then then-if then-if-not
-                 then-let then-if-let then-if-not-let)
-    ((_ then e) e)
-    ((_ then e rest ...) (begin e (lets rest ...)))
-    ((_ then-if e) e)
-    ((_ then-if e rest ...) (and e (lets rest ...)))
-    ((_ then-if-not e) (not e))
-    ((_ then-if-not e rest ...) (and (not e) (lets rest ...)))
-    ((_ then-let n e rest ...) (let ((n e)) (lets rest ...)))
-    ((_ then-if-let n e rest ...) (let ((n e)) (and n (lets rest ...))))
-    ((_) (void))
-    ((_ rest ...) (begin rest ...))))
-
 (define-syntax* fix
   (syntax-rules ()
     ((_ fn arg ...)
