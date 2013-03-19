@@ -32,19 +32,19 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
 (define (unique-rename ast)
   (define t (make-free-id-table))
   (define g
-    (topdown-visit ;; xxx could use subtree pruning here
-     (lambda (ast)
-       (cond
-        ((Define? ast)
-         ;; We preserve the names of all module level declarations
-         ;; that appear in the program. Amongst themselves they are
-         ;; unique. Everything else will be given a fresh symbol, and
-         ;; hence we will still be free of conflicts.
-         (let* ((var (Define-var ast))
-                (n (Var-name var))
-                (annos (Ast-annos var))
-                (id-stx (hash-ref annos 'stx)))
-           (free-id-table-set! t id-stx n)))))))
+    (lambda (ast)
+      (cond
+       ((Define? ast)
+        ;; We preserve the names of all module level declarations
+        ;; that appear in the program. Amongst themselves they are
+        ;; unique. Everything else will be given a fresh symbol, and
+        ;; hence we will still be free of conflicts.
+        (let* ((var (Define-var ast))
+               (n (Var-name var))
+               (annos (Ast-annos var))
+               (id-stx (hash-ref annos 'stx)))
+          (free-id-table-set! t id-stx n)))
+       (else (for-each-subterm g ast)))))
    (define f
     (topdown
      (lambda (ast)

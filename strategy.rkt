@@ -24,6 +24,14 @@ rewriting combinators simply do not make sense. Consider 'try' or
 'alt', for example. Calling 'rec' is semantically valid as 'rec' is
 not specific to rewriting.
 
+Using topdown-visit is not suitable when wanting to prune subtrees,
+but we have no topdown-visit-prune. (Note that pruning makes no sense
+for bottom-up traversals.) We can simply instead choose the subtrees
+we do want to visit, for now, by using lower-level operations.
+Breaking is easy for visits (but not for rewrites), as one can just
+record an escape continuation for the visit. If required, it can be
+recorded in a dynamically scoped global variable.
+
 |#
 
 (require "util.rkt")
