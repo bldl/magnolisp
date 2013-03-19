@@ -88,10 +88,14 @@ to be freely specified.
 
 ;; ((seq (where number?) (must (lambda (x) 2))) 1)   ;=> 2
 ;; ((seq (where number?) (must (lambda (x) #f))) 1)  ;=> error
-(define-syntax-rule* (must s)
-  (lambda (ast)
-    (or (s ast)
-        (error "strategy did not apply" (quote s)))))
+(define-syntax* must
+  (syntax-rules ()
+    ((_ s)
+     (must s "strategy did not apply" (quote s)))
+    ((_ s msg v ...)
+     (lambda (ast)
+       (or (s ast)
+           (error msg v ...))))))
 
 ;;; 
 ;;; One-level traversals.
