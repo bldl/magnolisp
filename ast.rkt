@@ -40,7 +40,7 @@ For more compact printing, we do not make annotations transparent.
 
 ;; Note that ordering is delicate here. Any identifiers referenced at
 ;; macro expansion time must have been defined by then, but for
-;; runtime code forward references top module-level variables are
+;; runtime code forward references to module-level variables are
 ;; fine.
 
 (define (all-identity f ast) ast)
@@ -66,7 +66,7 @@ For more compact printing, we do not make annotations transparent.
 
 (define-syntax (define-ast* stx)
   (syntax-case stx ()
-    ((_ name (field ...) all-op)
+    ((_ name ((t field) ...) all-op)
      #`(begin
          (define-struct* name Ast (field ...)
            #:property prop:subterm-all all-op
@@ -79,11 +79,12 @@ For more compact printing, we do not make annotations transparent.
 ;;; concrete nodes
 ;;; 
 
-(define-ast* Var (name) all-identity)
-(define-ast* Module (body) Module-all)
+(define-ast* Var ((no-term name)) all-identity)
+(define-ast* Module ((list-of-term body)) Module-all)
 (define-ast* Pass () all-identity)
-(define-ast* Call (proc) Call-all)
-(define-ast* Define (var kind body) Define-all)
+(define-ast* Call ((term proc)) Call-all)
+(define-ast* Define ((term var) (no-term kind)
+                     (list-of-term body)) Define-all)
 
 (define* (Var-from-stx id-stx)
   (new-Var id-stx (syntax-e id-stx)))
