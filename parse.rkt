@@ -31,8 +31,8 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
 
 (define (unique-rename ast)
   (define t (make-free-id-table))
-  (define g ;; xxx actually only require a 'visit' for this, no rewrite
-    (topdown
+  (define g
+    (topdown-visit ;; xxx could use subtree pruning here
      (lambda (ast)
        (cond
         ((Define? ast)
@@ -44,9 +44,7 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
                 (n (Var-name var))
                 (annos (Ast-annos var))
                 (id-stx (hash-ref annos 'stx)))
-           (free-id-table-set! t id-stx n)
-           ast))
-        (else ast)))))
+           (free-id-table-set! t id-stx n)))))))
    (define f
     (topdown
      (lambda (ast)
