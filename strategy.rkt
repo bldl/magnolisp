@@ -12,6 +12,18 @@ for existing datatypes. Perhaps we should define this module as a
 'unit' or somesuch parameterizable construct to allow these operations
 to be freely specified.
 
+We have some additions here, such as 'must' to function as a sort of
+an assertion. If a 'must' succeed strategy fails it is an error, and
+not merely a reason to backtrack.
+
+We have 'visit' variants of applicable strategies. A visit does not
+rewrite, and is hence more efficient, as terms do not need to be
+reconstructed. No return values are checked during a visit, as a visit
+is only done for its side effects. This also means that a lot of the
+rewriting combinators simply do not make sense. Consider 'try' or
+'alt', for example. Calling 'rec' is semantically valid as 'rec' is
+not specific to rewriting.
+
 |#
 
 (require "util.rkt")
@@ -113,6 +125,12 @@ to be freely specified.
      (lambda (ast)
        (or (s ast) ...)))))
 
+;; Combines visit actions in a way that 'compose' would not.
+(define-syntax-rule* (seq-visit s ...)
+  (lambda (ast)
+    (s ast) ...
+    (void)))
+
 (define* (try s)
   (alt s id))
 
@@ -149,6 +167,10 @@ to be freely specified.
   (lambda (ast)
     (subterm-all s ast)))
 
+(define* (all-visit s)
+  (lambda (ast)
+    (for-each-subterm s ast)))
+
 ;;; 
 ;;; Tree traversals.
 ;;; 
@@ -157,9 +179,17 @@ to be freely specified.
   (rec again s
        (seq s (all again))))
 
+(define* topdown-visit
+  (rec again s
+       (seq-visit s (all-visit again))))
+
 (define* bottomup
   (rec again s
        (seq (all again) s)))
+
+(define* bottomup-visit
+  (rec again s
+       (seq-visit (all-visit again) s)))
 
 (define* innermost
   (rec again s
