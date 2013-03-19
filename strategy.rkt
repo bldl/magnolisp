@@ -29,14 +29,48 @@ to be freely specified.
 ;;; 
 
 ;; We cannot implement custom interfaces for lists. You may invoke
-;; these subterm traversal strategies instead as required. We could
-;; later provide operations for vectors, boxes, and immutable hash
-;; tables, for instance.
+;; these subterm traversal strategies instead as required, for
+;; immediate "local" traversals within terms containing list data. We
+;; could later provide operations for vectors, boxes, and immutable
+;; hash tables, for instance.
 
-;; xxx list-one, list-some
+;; (list
+;;  ((list-one number?) '())
+;;  ((list-one number?) '(x y z))
+;;  ((list-one number?) '(x 2 y 4))) ; => '(#f #f (x #t y 4))
+(define* (list-one s)
+  (lambda (lst)
+    (let loop ((r '()) (lst lst))
+      (if (null? lst)
+          #f
+          (let* ((h (car lst))
+                 (t (cdr lst))
+                 (c (s h)))
+            (if c
+                (append (reverse r) (cons c t))
+                (loop (cons h r) t)))))))
+
+;; (list
+;;  ((list-some number?) '())
+;;  ((list-some number?) '(x y z))
+;;  ((list-some number?) '(x 2 y 4))) ; => '(#f #f (x #t y #t))
+(define* (list-some s)
+  (lambda (lst)
+    (define found #f)
+    (let ((r (for/list ((x lst))
+                 (let ((y (s x)))
+                   (if y
+                       (begin (set! found #t) y)
+                       x)))))
+      (and found r))))
 
 ;; This is an 'all' for lists, where elements are "subterms". As 'map'
 ;; in Stratego.
+;;
+;; (list
+;;  ((list-all number?) '())
+;;  ((list-all number?) '(1 2 3))
+;;  ((list-all number?) '(x 2 y 4))) ; => '(() (#t #t #t) #f)
 (define* (list-all s)
   (lambda (lst)
     (map-while s lst)))
