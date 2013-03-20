@@ -39,7 +39,13 @@ module attaching.
 (require syntax/strip-context)
 (require syntax/toplevel)
 
+(define (read-file pn)
+  (call-with-input-file pn
+    (lambda (in)
+      (read-string (file-size pn) in))))
+
 (define* (compile-file pn)
+  (displayln (read-file pn))
   (define stx-lst (load-as-syntaxes pn))
   (define in-stx
     (strip-context
@@ -59,13 +65,14 @@ module attaching.
       ;;(namespace-require '"runtime-compiler-lang.rkt")
       (let ((in-stx (namespace-syntax-introduce in-stx)))
         (let ((core-stx (expand-syntax in-stx)))
-          (pretty-println (syntax->datum core-stx))
+          ;;(pretty-println (syntax->datum core-stx))
           ;;(print-stx-with-bindings core-stx)
-          (let ((core-ast (cxx-rename (parse core-stx))))
+          (let ((core-ast (parse core-stx)))
             (pretty-println core-ast)
+            (display (to-cxx-text core-ast))
             ))))))
 
 (define* (compile-module mn)
   (compile-file (resolve-module-path mn #f)))
 
-(compile-module "try-program-4.rkt")
+(compile-module "try-program-3.rkt")

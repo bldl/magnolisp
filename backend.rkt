@@ -7,7 +7,7 @@ C++ back end.
 |#
 
 (require "ast.rkt" "strategy.rkt"
-         "util.rkt" "util/system.rkt")
+         "util.rkt" "util/case.rkt" "util/system.rkt")
 
 ;; Not quite perfect as does not appear to insert line breaks.
 ;; http://astyle.sourceforge.net/
@@ -29,7 +29,7 @@ C++ back end.
 ;; The current renaming is unsafe, which we could fix by tracking
 ;; renamings using a map. Once we have locals we will also want more
 ;; "stable" naming for them.
-(define* (cxx-rename ast)
+(define (cxx-rename ast)
    (define f
     (topdown
      (lambda (ast)
@@ -43,3 +43,31 @@ C++ back end.
            (Var-rename ast n)))
         (else ast)))))
    (f ast))
+
+;; Forward declarations to be done later.
+(define* (to-cxx-text ast)
+  (define (f ast)
+    (cond
+     ((Var? ast)
+      (symbol->string (Var-name ast)))
+     ((Pass? ast)
+      "/* pass */;")
+     ((Call? ast)
+      (string-append (f (Call-proc ast)) "();"))
+     ((Module? ast)
+      (map f (Module-body ast)))
+     ((Define? ast)
+      (case-eq (Define-kind ast)
+               (procedure
+                (list "void " (f (Define-var ast))
+                      "{"
+                      (map f (Define-body ast))
+                      "}\n"))
+               (else (error "unsupported" ast))))
+     (else
+      (error "unsupported" ast))))
+  (uncrustify
+   (apply string-append
+          (add-between
+           (flatten (list (f (cxx-rename ast)))) " "))))
+
