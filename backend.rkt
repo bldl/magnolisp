@@ -44,8 +44,7 @@ C++ back end.
         (else ast)))))
    (f ast))
 
-;; Forward declarations to be done later.
-(define* (to-cxx-text ast)
+(define (to-cxx fw? ast)
   (define (f ast)
     (cond
      ((Var? ast)
@@ -59,15 +58,23 @@ C++ back end.
      ((Define? ast)
       (case-eq (Define-kind ast)
                (procedure
-                (list "void " (f (Define-var ast))
-                      "{"
-                      (map f (Define-body ast))
-                      "}\n"))
+                (list "void" (f (Define-var ast)) "()"
+                      (if fw? ";\n"
+                          (list
+                           "{\n"
+                           (map f (Define-body ast))
+                           "}\n"))))
                (else (error "unsupported" ast))))
      (else
       (error "unsupported" ast))))
-  (uncrustify
-   (apply string-append
-          (add-between
-           (flatten (list (f (cxx-rename ast)))) " "))))
+  (f ast))
+
+(define* (to-cxx-text ast)
+  (let* ((ast (cxx-rename ast))
+         (fw (to-cxx #t ast))
+         (im (to-cxx #f ast))
+         (lst (filter identity (flatten (list fw im)))))
+    (uncrustify
+     (apply string-append
+            (add-between lst " ")))))
 
