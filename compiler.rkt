@@ -30,6 +30,7 @@ module attaching.
 
 |#
 
+(require "backend.rkt")
 (require "parse.rkt")
 (require "reader-ext.rkt")
 (require "util.rkt")
@@ -60,11 +61,11 @@ module attaching.
         (let ((core-stx (expand-syntax in-stx)))
           (pretty-println (syntax->datum core-stx))
           ;;(print-stx-with-bindings core-stx)
-          (let ((core-ast (parse core-stx)))
+          (let ((core-ast (cxx-rename (parse core-stx))))
             (pretty-println core-ast)
             ))))))
 
 (define* (compile-module mn)
   (compile-file (resolve-module-path mn #f)))
 
-(compile-module "try-program-6.rkt")
+(compile-module "try-program-4.rkt")

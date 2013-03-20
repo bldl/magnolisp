@@ -25,3 +25,21 @@ C++ back end.
 (define (uncrustify s)
   (exe-filter s '("/usr/bin/uncrustify" "-l" "cpp" "-q")))
 
+;; Turn into legal C++ names by replacing non-alphanumerics with "_".
+;; The current renaming is unsafe, which we could fix by tracking
+;; renamings using a map. Once we have locals we will also want more
+;; "stable" naming for them.
+(define* (cxx-rename ast)
+   (define f
+    (topdown
+     (lambda (ast)
+       (cond
+        ((Var? ast)
+         (let* ((o-n-sym (Var-name ast))
+                (o-n-str (symbol->string o-n-sym))
+                (re #rx"[^a-zA-Z0-9_]")
+                (s (regexp-replace* re o-n-str "_"))
+                (n (string->symbol s)))
+           (Var-rename ast n)))
+        (else ast)))))
+   (f ast))
