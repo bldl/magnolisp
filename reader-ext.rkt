@@ -2,14 +2,11 @@
 
 #|
 
-An extended "readtable" to support type and generic annotations. The
-language must implement matching macros to process any annotations
-appearing in programs.
+An extended "readtable" to support type and generic annotations.
 
 |#
 
 (require "util.rkt")
-
 (require syntax/readerr)
 
 (define read-type-anno
@@ -35,11 +32,11 @@ appearing in programs.
         `(,(make-setter-name datum) () ,(read in))
         (begin
           (unless (pair? datum)
-            (raise-read-error "expected pair or symbol to follow @"
+            (raise-read-error "expected pair or symbol to follow #^"
                               src line col pos #f))
           (let ((n (car datum)))
             (unless (symbol? n)
-              (raise-read-error "expected @(SYMBOL value ...)"
+              (raise-read-error "expected #^(SYMBOL value ...)"
                                 src line col pos #f))
             `(,(make-setter-name n) ,(cdr datum) ,(read in) ))))))
 
@@ -54,7 +51,7 @@ appearing in programs.
   (make-readtable
    (current-readtable)
    #\^ 'non-terminating-macro read-type-anno
-   #\@ 'non-terminating-macro read-generic-anno))
+   #\^ 'dispatch-macro read-generic-anno))
 
 ;; Reads all available syntax in the specified input stream. Returns a
 ;; list of syntax objects. As a special feature adjusts the syntax by
@@ -82,7 +79,7 @@ appearing in programs.
 ;;; tests
 ;;; 
 
-#;
+;#;
 (parameterize ((current-readtable magnolisp-readtable))
   (for-each
    (lambda (s)
@@ -90,11 +87,11 @@ appearing in programs.
       (read
        (open-input-string s))))
    (list
-    ;;"@5 (1 2 3)" ;; syntax error
-    ;;"@(1 2) (1 2 3)" ;; syntax error
-    "@throwing f"
-    "@(one-of Foo Bar Baz) x"
-    "@(foo bar) 1"
+    ;;"#^5 (1 2 3)" ;; syntax error
+    ;;"#^(1 2) (1 2 3)" ;; syntax error
+    "#^throwing f"
+    "#^(one-of Foo Bar Baz) x"
+    "#^(foo bar) 1"
     "(1 2 ^int 3 ^(list int) (1 2 3))"
-    "(define @(throws Exception) ^int (f ^int x) (return x))"
+    "(define #^(throws Exception) ^int (f ^int x) (return x))"
     )))
