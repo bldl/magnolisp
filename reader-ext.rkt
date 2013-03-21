@@ -55,31 +55,49 @@ An extended "readtable" to support type and generic annotations.
 ;;; generic annotations
 ;;; 
 
-(define (make-setter-name n)
-  (string->symbol
-   (string-append "set-anno:" (symbol->string n))))
-
-(define (do-read-generic-anno ch in
-                              (src "<read>") (line #f) (col #f) (pos #f))
-  (let ((datum (read in)))
-    (if (symbol? datum)
-        `(,(make-setter-name datum) () ,(read in))
-        (begin
-          (unless (pair? datum)
-            (raise-read-error "expected pair or symbol to follow #^"
-                              src line col pos #f))
-          (let ((n (car datum)))
-            (unless (symbol? n)
-              (raise-read-error "expected #^(SYMBOL value ...)"
-                                src line col pos #f))
-            `(,(make-setter-name n) ,(cdr datum) ,(read in) ))))))
-
 (define read-generic-anno
   (case-lambda
-   ((ch in) ;; trigger char and input port
-    (do-read-generic-anno ch in))
-   ((ch in src line col pos) ;; for read-syntax also location info
-    (do-read-generic-anno in src line col pos))))
+   ((ch in)
+    (begin
+      (read in) ;; skip anno datum
+      (read in) ;; produce actual datum
+      ))
+   ((ch in src line col pos)
+    (let ((s (read-syntax src in)))
+      (when (eof-object? s)
+        (raise-read-eof-error
+         "expected annotation to follow #^"
+         src line col pos #f))
+      (let ((s-dat (syntax-e s)))
+        (let-values
+            (((k v)
+              (cond
+               ((symbol? s-dat)
+                (values s-dat (datum->syntax #f #t s)))
+               ((pair? s-dat)
+                (let* ((k-stx (car s-dat))
+                       (k (syntax-e k-stx)))
+                  (unless (symbol? k)
+                    (raise-read-error
+                     (format
+                      "expected #^(name value), got ~s for name" k-stx)
+                     src line col pos #f))
+                  (let* ((v-stx (cdr s-dat)))
+                    (values k
+                            (if (stx-null? v-stx)
+                                (datum->syntax #f #t s)
+                                v-stx)))))
+               (else
+                (raise-read-error
+                 (format "expected annotation to follow #^, got ~s" s)
+                 src line col pos #f)))))
+          (let ((d (read-syntax src in)))
+            (when (eof-object? d)
+              (raise-read-eof-error
+               (format "expected datum to follow annotation ~s" s)
+               src line col pos #f))
+            (writeln (list k v))
+            (syntax-property d k v))))))))
 
 ;;; 
 ;;; reader extension
@@ -89,7 +107,7 @@ An extended "readtable" to support type and generic annotations.
   (make-readtable
    (current-readtable)
    #\^ 'non-terminating-macro read-type-anno
-;   #\^ 'dispatch-macro read-generic-anno
+   #\^ 'dispatch-macro read-generic-anno
    ))
 
 ;; Reads all available syntax in the specified input stream. Returns a
@@ -134,12 +152,21 @@ An extended "readtable" to support type and generic annotations.
              (cons k (syntax-property stx k)))
          (list (stx-loc stx))))))
    (list
+    ;; type annotation tests
     "^X x"
     "^(list Y) ys"
     ;;"^" ;; syntax error
     ;;"^5 x" ;; syntax error
     ;;"^T" ;; syntax error
 
+    ;; generic annotation tests
+    "#^throwing f"
+    "#^(throwing) f"
+    "#^(throwing #f) f"
+
+
+    ;; mixed annotation tests
+    
     ;;"#^5 (1 2 3)" ;; syntax error
     ;;"#^(1 2) (1 2 3)" ;; syntax error
     ;; "#^throwing f"
