@@ -56,7 +56,8 @@ C++ back end.
         (cond
          ((or (eq? kind 'procedure)
               (eq? kind 'primitive))
-          (list "void" (f (Define-var ast)) "()"
+          (list (and (not (Ast-anno-ref ast 'export)) "static")
+                "void" (f (Define-var ast)) "()"
                 (if fw? ";\n"
                     (list
                      "{\n"

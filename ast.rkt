@@ -32,6 +32,12 @@ For more compact printing, we do not make annotations transparent.
 
 (define-struct* Ast (annos))
 
+(define* (Ast-anno-ref ast k #:must (must #t))
+  (let* ((annos (Ast-annos ast)))
+    (if must
+        (hash-ref annos k)
+        (hash-ref annos k #f))))
+
 (define-for-syntax (make-for-each-subterm nn-stx f-stx-lst)
   (define nn-sym (syntax-e nn-stx))
   #`(define (for-each-subterm s ast)

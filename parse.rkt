@@ -113,21 +113,27 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
          #f)))
       
       ((define-values (n) def)
-       (let ((def-stx #'def))
+       (let* ((def-stx #'def)
+              (export
+               (lets then-if-let x-stx (syntax-property #'n 'export)
+                     then-let x (syntax-e x-stx)
+                     (if (boolean? x) x
+                         (error "expected boolean" `(export ,x-stx)))))
+              (annos (hash-set (stx-annos stx) 'export export)))
          (syntax-case def-stx (k-lambda quote rt.%core)
            ((k-app rt.%core (quote t) (k-lambda () body ...))
             (let ((kind (syntax-e #'t)))
               (case-eq kind
                (procedure
-                (new-Define stx (Var-from-stx #'n)
-                            'procedure
-                            (prs-lst 'stat (syntax->list #'(body ...)))))
+                (Define annos (Var-from-stx #'n)
+                  'procedure
+                  (prs-lst 'stat (syntax->list #'(body ...)))))
                
                (primitive
                 (parameterize ((in-primitive? #t))
-                  (new-Define stx (Var-from-stx #'n)
-                              'primitive
-                              (prs-lst 'stat (syntax->list #'(body ...))))))
+                  (Define annos (Var-from-stx #'n)
+                    'primitive
+                    (prs-lst 'stat (syntax->list #'(body ...))))))
                
                (else
                 (error-non-core stx)))))
