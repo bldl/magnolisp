@@ -15,7 +15,7 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
 
 |#
 
-(require "ast.rkt" "strategy.rkt" "util.rkt")
+(require "ast.rkt" "strategy.rkt" "util.rkt" "util/case.rkt")
 (require (prefix-in rt. "runtime-compiler.rkt"))
 (require (only-in '#%kernel (#%app k-app) (lambda k-lambda)))
 (require racket/function racket/list)
@@ -67,6 +67,9 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
 ;; gives a unique name to all identifiers (for easier transforming),
 ;; and turns the input syntax object into an AST.
 (define* (parse mod-stx)
+  (define (error-non-core stx)
+    (error "not core language" stx))
+  
   (define (prs stx)
     (syntax-case stx (k-app k-lambda
                       #%plain-module-begin
@@ -85,6 +88,9 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
        (eq? 'call (syntax-e #'n))
        (new-Call stx (Var-from-stx #'id-stx)))
 
+      ((k-app . _)
+       #f)
+      
       ((define-syntaxes . _)
        #f)
 
@@ -95,14 +101,25 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
        (let ((def-stx #'def))
          (syntax-case def-stx (k-lambda quote rt.%core)
            ((k-app rt.%core (quote t) (k-lambda () body ...))
-            (eq? 'procedure (syntax-e #'t))
-            (new-Define stx (Var-from-stx #'n)
-                        'procedure
-                        (prs-lst (syntax->list #'(body ...)))))
+            (let ((kind (syntax-e #'t)))
+              (case-eq kind
+               (procedure
+                (new-Define stx (Var-from-stx #'n)
+                            'procedure
+                            (prs-lst (syntax->list #'(body ...)))))
+               
+               (primitive
+                (new-Define stx (Var-from-stx #'n)
+                            'primitive
+                            (prs-lst (syntax->list #'(body ...)))))
+               
+               (else
+                (error-non-core stx)))))
+           
            (else
-            (error "not core language 'define'" stx)))))
+            (error-non-core stx)))))
 
-      (else (error "not core language" stx))))
+      (else (error-non-core stx))))
 
   (define (prs-lst lst)
     (filter Ast? (map prs lst)))
