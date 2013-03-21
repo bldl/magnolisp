@@ -45,9 +45,10 @@ An extended "readtable" to support type and generic annotations.
          (format "expected type specifier to follow ^ (got: ~s)" t)
          src line col pos #f))
       (let ((d (read-syntax src in)))
-        (when (eof-object? t)
-          (raise-read-eof-error "expected datum to follow type"
-                                src line col pos #f))
+        (when (eof-object? d)
+          (raise-read-eof-error
+           (format "expected datum to follow type ~s" t)
+           src line col pos #f))
         (syntax-property d 'type t))))))
 
 ;;; 
@@ -133,10 +134,14 @@ An extended "readtable" to support type and generic annotations.
              (cons k (syntax-property stx k)))
          (list (stx-loc stx))))))
    (list
-    ;;"#^5 (1 2 3)" ;; syntax error
-    ;;"#^(1 2) (1 2 3)" ;; syntax error
     "^X x"
     "^(list Y) ys"
+    ;;"^" ;; syntax error
+    ;;"^5 x" ;; syntax error
+    ;;"^T" ;; syntax error
+
+    ;;"#^5 (1 2 3)" ;; syntax error
+    ;;"#^(1 2) (1 2 3)" ;; syntax error
     ;; "#^throwing f"
     ;; "#^(one-of Foo Bar Baz) x"
     ;; "#^(foo bar) 1"
