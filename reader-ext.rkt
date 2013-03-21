@@ -90,7 +90,6 @@ An extended "readtable" to support type and generic annotations.
             (raise-read-eof-error
              (format "expected datum to follow annotation ~s" s)
              src line col pos #f))
-          (writeln k-v)
           (apply syntax-property d k-v)))))))
 
 ;;; 

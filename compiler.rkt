@@ -52,17 +52,17 @@ module attaching.
      ;; Initial bindings for 'module' body forms come from the
      ;; language specified here. The binding for the 'module' form
      ;; itself must come from elsewhere.
-     #`(module main "runtime-compiler-lang.rkt"
+     #`(module main "runtime-compiler.rkt"
          #,@stx-lst)))
   ;;(print-stx-with-bindings in-stx)
   (let ((this-ns (current-namespace))
         (ns (make-empty-namespace)))
     ;; Cannot do this unless import into this-ns (possibly renamed).
-    ;;(namespace-attach-module this-ns '"runtime-compiler-lang.rkt" ns)
+    ;;(namespace-attach-module this-ns '"runtime-compiler.rkt" ns)
     (parameterize ((current-namespace ns))
       (namespace-attach-module this-ns 'racket/base)
       (namespace-require '(only racket/base module))
-      ;;(namespace-require '"runtime-compiler-lang.rkt")
+      ;;(namespace-require '"runtime-compiler.rkt")
       (let ((in-stx (namespace-syntax-introduce in-stx)))
         (let ((core-stx (expand-syntax in-stx)))
           ;;(pretty-println (syntax->datum core-stx))
@@ -75,4 +75,4 @@ module attaching.
 (define* (compile-module mn)
   (compile-file (resolve-module-path mn #f)))
 
-(compile-module "try-program-3.rkt")
+(compile-module "try-program-2.rkt")
