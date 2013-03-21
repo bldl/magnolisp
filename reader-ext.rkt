@@ -82,11 +82,21 @@ An extended "readtable" to support type and generic annotations.
                      (format
                       "expected #^(name value), got ~s for name" k-stx)
                      src line col pos #f))
-                  (let* ((v-stx (cdr s-dat)))
-                    (values k
-                            (if (stx-null? v-stx)
-                                (datum->syntax #f #t s)
-                                v-stx)))))
+                  (let ((rest-stx (cdr s-dat)))
+                    (if (null? rest-stx)
+                        (values k (datum->syntax #f #t s))
+                        (let ((v-stx-lst (syntax->list rest-stx)))
+                          (unless v-stx-lst
+                            (raise-read-error
+                             (format
+                              "improper list ~s after #^" s)
+                             src line col pos #f))
+                          (unless (= (length v-stx-lst) 1)
+                            (raise-read-error
+                             (format
+                              "expected single value in annotation ~s" s)
+                             src line col pos #f))
+                          (values k (car v-stx-lst)))))))
                (else
                 (raise-read-error
                  (format "expected annotation to follow #^, got ~s" s)
@@ -111,18 +121,17 @@ An extended "readtable" to support type and generic annotations.
    ))
 
 ;; Reads all available syntax in the specified input stream. Returns a
-;; list of syntax objects. As a special feature adjusts the syntax by
-;; translating annotation setters to syntax properties. The values are
-;; stored as syntax.
+;; list of syntax objects.
 (define (read-syntaxes source-name in)
   (let* ((read (lambda (in)
                  (read-syntax source-name in))))
     (for/list ((obj (in-port read in)))
-        obj))) ;; xxx must adjust obj -- can use syntax-case -- should also study read-syntax/recursive, which may be useful for this sort of thing
+        obj)))
 
-;; Reads all Magnolisp syntax from a file. Produces a list of Racket
-;; syntax objects. Any #lang directive is ignored. Filename extension
-;; matters not.
+;; Reads all Magnolisp syntax from a file whose path is given.
+;; Produces a list of syntax objects. Any #lang directive is ignored.
+;; The path is cleansed to ensure a decent source file name for syntax
+;; objects.
 (define* (load-as-syntaxes file)
   (let* ((path (cleanse-path file)))
     (call-with-input-file path
@@ -158,6 +167,7 @@ An extended "readtable" to support type and generic annotations.
     ;;"^" ;; syntax error
     ;;"^5 x" ;; syntax error
     ;;"^T" ;; syntax error
+    "^()" ;; syntax error
 
     ;; generic annotation tests
     "#^throwing f"
