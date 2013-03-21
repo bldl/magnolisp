@@ -52,21 +52,25 @@ C++ back end.
      ((Module? ast)
       (map f (Module-body ast)))
      ((Define? ast)
-      (case-eq (Define-kind ast)
-               (procedure
-                (list "void" (f (Define-var ast)) "()"
-                      (if fw? ";\n"
-                          (list
-                           "{\n"
-                           (map f (Define-body ast))
-                           "}\n"))))
-               (else (error "unsupported" ast))))
+      (let ((kind (Define-kind ast)))
+        (cond
+         ((or (eq? kind 'procedure)
+              (eq? kind 'primitive))
+          (list "void" (f (Define-var ast)) "()"
+                (if fw? ";\n"
+                    (list
+                     "{\n"
+                     (map f (Define-body ast))
+                     "}\n"))))
+         (else (error "unsupported" ast)))))
      (fw?
       (error "unsupported" ast))
      ((Pass? ast)
       "/* pass */;")
      ((Call? ast)
       (string-append (f (Call-proc ast)) "();"))
+     ((Verbatim? ast)
+      (Verbatim-text ast))
      (else
       (error "unsupported" ast))))
   (f ast))

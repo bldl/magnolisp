@@ -1,3 +1,7 @@
+default : install
+
+-include local.mk
+
 install :
 	ln -s $(PWD)/etc/uncrustify.cfg $(HOME)/.uncrustify.cfg
 

@@ -67,10 +67,14 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
 ;; gives a unique name to all identifiers (for easier transforming),
 ;; and turns the input syntax object into an AST.
 (define* (parse mod-stx)
-  (define (error-non-core stx)
-    (error "not core language" stx))
+  (define in-primitive? (make-parameter #f))
   
-  (define (prs stx)
+  (define (error-non-core stx (ctx #f))
+    (if ctx
+        (error 'parse "not core language in context ~a: ~s" ctx stx)
+        (error 'parse "not core language: ~s" stx)))
+  
+  (define (prs ctx stx)
     (syntax-case stx (k-app k-lambda
                       #%plain-module-begin
                       define-syntaxes
@@ -78,7 +82,7 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
                       rt.%core)
 
       ((module n pn (#%plain-module-begin body ...))
-       (new-Module stx (prs-lst (syntax->list #'(body ...)))))
+       (new-Module stx (prs-lst 'mod (syntax->list #'(body ...)))))
 
       ((k-app rt.%core (quote n) _)
        (eq? 'pass (syntax-e #'n))
@@ -89,13 +93,24 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
        (new-Call stx (Var-from-stx #'id-stx)))
 
       ((k-app . _)
+       (eq? ctx 'mod)
        #f)
       
       ((define-syntaxes . _)
+       (eq? ctx 'mod)
        #f)
 
       ((quote lit)
-       (new-Literal stx #'lit))
+       (cond
+        ((eq? ctx 'expr)
+         (new-Literal stx #'lit))
+        ((and (eq? ctx 'stat) (in-primitive?))
+         (let ((d (syntax-e #'lit)))
+           (if (string? d)
+               (new-Verbatim stx d)
+               (error-non-core stx ctx))))
+        (else
+         #f)))
       
       ((define-values (n) def)
        (let ((def-stx #'def))
@@ -106,12 +121,13 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
                (procedure
                 (new-Define stx (Var-from-stx #'n)
                             'procedure
-                            (prs-lst (syntax->list #'(body ...)))))
+                            (prs-lst 'stat (syntax->list #'(body ...)))))
                
                (primitive
-                (new-Define stx (Var-from-stx #'n)
-                            'primitive
-                            (prs-lst (syntax->list #'(body ...)))))
+                (parameterize ((in-primitive? #t))
+                  (new-Define stx (Var-from-stx #'n)
+                              'primitive
+                              (prs-lst 'stat (syntax->list #'(body ...))))))
                
                (else
                 (error-non-core stx)))))
@@ -121,10 +137,10 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
 
       (else (error-non-core stx))))
 
-  (define (prs-lst lst)
-    (filter Ast? (map prs lst)))
+  (define (prs-lst ctx lst)
+    (filter Ast? (map (fix prs ctx) lst)))
 
-  (unique-rename (filter-ast (prs mod-stx))))
+  (unique-rename (filter-ast (prs 'tl mod-stx))))
 
 (define* (print-stx-with-bindings stx)
   (define lst (syntax->list stx))

@@ -10,7 +10,7 @@ If we cannot achieve a satisfactory design based on Racket facilities, perhaps d
 
 * Running
 
-  Programs written in =#lang magnolisp= can be evaluated in the usual Racket way. The compiler has no proper API yet, but can be invoked by evaluating =compiler.rkt=, specifying the program to compile. Depends on =uncrustify= as an external tool.
+  Programs written in =#lang magnolisp= can be evaluated in the usual Racket way. The compiler has no proper API yet, but can be invoked by evaluating =compiler.rkt=, specifying the program to compile. Depends on =uncrustify= as an external tool, and the tool requires a configuration file; one is installable using the provided =Makefile=.
 
 * License
 

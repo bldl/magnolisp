@@ -26,7 +26,7 @@ system related directives. Even though they trivially work here, this may not be
          define-syntax
          define-syntax-rule
          provide
-         require
+         require only-in prefix-in
          #%datum)
 
 ;;; 
@@ -36,6 +36,22 @@ system related directives. Even though they trivially work here, this may not be
 (define-syntax-rule*
   (procedure (n) body ...)
   (define (n) body ...))
+
+(define-syntax-rule*
+  (require/racket spec ...)
+  (require spec ...))
+
+(define-syntax-rule*
+  (primitive/racket (n) body ...)
+  (define (n) body ...))
+
+(define-syntax-rule*
+  (primitive/c++ (n) body ...)
+  (void))
+
+(define-syntax-rule*
+  (primitive (n) (r-body ...) (c-body ...))
+  (primitive/racket (n) r-body ...))
 
 ;;; 
 ;;; statements

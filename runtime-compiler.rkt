@@ -48,6 +48,25 @@ make sure that macros get expanded. Again, no problem, as we can use
          (%core 'procedure
                 (lambda () body ...))))))
 
+(define-syntax-rule*
+  (require/racket spec ...)
+  (void))
+
+(define-syntax-rule*
+  (primitive/racket (n) body ...)
+  (void))
+
+;; Bare literal strings appearing in the body are taken to be verbatim
+;; C++ code.
+(define-syntax-rule*
+  (primitive/c++ (n) body ...)
+  (define n (%core 'primitive
+                   (lambda () body ...))))
+
+(define-syntax-rule*
+  (primitive (n) (r-body ...) (c-body ...))
+  (primitive/c++ (n) c-body ...))
+
 ;;; 
 ;;; statements
 ;;; 
