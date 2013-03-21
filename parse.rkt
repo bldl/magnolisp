@@ -87,6 +87,9 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
 
       ((define-syntaxes . _)
        #f)
+
+      ((quote lit)
+       (new-Literal stx #'lit))
       
       ((define-values (n) def)
        (let ((def-stx #'def))

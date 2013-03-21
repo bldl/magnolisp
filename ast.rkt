@@ -127,6 +127,7 @@ For more compact printing, we do not make annotations transparent.
 ;;; 
 
 (define-ast* Var ((no-term name)))
+(define-ast* Literal ((no-term datum)))
 (define-ast* Module ((list-of-term body)))
 (define-ast* Pass ())
 (define-ast* Call ((just-term proc)))
