@@ -6,23 +6,9 @@ For more compact printing, we do not make annotations transparent.
 
 |#
 
-(require "strategy.rkt" "util.rkt")
+(require "reader-ext.rkt" "strategy.rkt" "util.rkt")
 (require racket/generic)
 (require (for-syntax racket/function racket/list racket/syntax))
-
-;;; 
-;;; location info
-;;; 
-
-(define-struct* loc (source line column position span) #:transparent)
-
-(define* (stx-loc stx)
-  (loc
-   (syntax-source stx)
-   (syntax-line stx)
-   (syntax-column stx)
-   (syntax-position stx)
-   (syntax-span stx)))
 
 ;;; 
 ;;; syntax-derived annotations

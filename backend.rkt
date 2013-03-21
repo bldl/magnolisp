@@ -49,10 +49,6 @@ C++ back end.
     (cond
      ((Var? ast)
       (symbol->string (Var-name ast)))
-     ((Pass? ast)
-      "/* pass */;")
-     ((Call? ast)
-      (string-append (f (Call-proc ast)) "();"))
      ((Module? ast)
       (map f (Module-body ast)))
      ((Define? ast)
@@ -65,6 +61,12 @@ C++ back end.
                            (map f (Define-body ast))
                            "}\n"))))
                (else (error "unsupported" ast))))
+     (fw?
+      (error "unsupported" ast))
+     ((Pass? ast)
+      "/* pass */;")
+     ((Call? ast)
+      (string-append (f (Call-proc ast)) "();"))
      (else
       (error "unsupported" ast))))
   (f ast))

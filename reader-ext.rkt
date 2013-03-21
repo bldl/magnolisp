@@ -9,6 +9,24 @@ An extended "readtable" to support type and generic annotations.
 (require "util.rkt")
 (require syntax/readerr syntax/stx)
 
+;;; 
+;;; location info
+;;; 
+
+(define-struct* loc (source line column position span) #:transparent)
+
+(define* (stx-loc stx)
+  (loc
+   (syntax-source stx)
+   (syntax-line stx)
+   (syntax-column stx)
+   (syntax-position stx)
+   (syntax-span stx)))
+
+;;; 
+;;; type annotations
+;;; 
+
 (define read-type-anno
   (case-lambda
    ((ch in)
@@ -31,6 +49,10 @@ An extended "readtable" to support type and generic annotations.
           (raise-read-eof-error "expected datum to follow type"
                                 src line col pos #f))
         (syntax-property d 'type t))))))
+
+;;; 
+;;; generic annotations
+;;; 
 
 (define (make-setter-name n)
   (string->symbol
@@ -57,6 +79,10 @@ An extended "readtable" to support type and generic annotations.
     (do-read-generic-anno ch in))
    ((ch in src line col pos) ;; for read-syntax also location info
     (do-read-generic-anno in src line col pos))))
+
+;;; 
+;;; reader extension
+;;; 
 
 (define* magnolisp-readtable
   (make-readtable
@@ -92,18 +118,20 @@ An extended "readtable" to support type and generic annotations.
 ;;; 
 
 ;#;
-(parameterize ((current-readtable magnolisp-readtable))
+(parameterize ((current-readtable magnolisp-readtable)
+               (port-count-lines-enabled #t))
   (for-each
    (lambda (s)
      (let ((stx
             (read-syntax
-             "<test>"
+             "<string s>"
              (open-input-string s))))
        (pretty-print
-        (cons
-         (syntax->datum stx)
+        (append
+         (list (syntax->datum stx))
          (for/list ((k (syntax-property-symbol-keys stx)))
-             (cons k (syntax-property stx k)))))))
+             (cons k (syntax-property stx k)))
+         (list (stx-loc stx))))))
    (list
     ;;"#^5 (1 2 3)" ;; syntax error
     ;;"#^(1 2) (1 2 3)" ;; syntax error
