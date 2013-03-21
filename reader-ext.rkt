@@ -7,19 +7,30 @@ An extended "readtable" to support type and generic annotations.
 |#
 
 (require "util.rkt")
-(require syntax/readerr)
+(require syntax/readerr syntax/stx)
 
 (define read-type-anno
   (case-lambda
-   ((ch in) ;; trigger char and input port
-    (let ((v (read in)))
-      `(set-anno:type ,v ,(read in))))
+   ((ch in)
+    (begin
+      (read in) ;; skip type anno datum
+      (read in) ;; produce actual datum
+      ))
    ((ch in src line col pos)
-    ;; Any reading we do here will get the same position into the
-    ;; syntax object. That is, annotations and their target will have
-    ;; the same source location, unless we do something to change
-    ;; that.
-    (read-type-anno ch in))))
+    (let ((t (read-syntax src in)))
+      (when (eof-object? t)
+        (raise-read-eof-error
+         "expected type to follow ^"
+         src line col pos #f))
+      (unless (or (identifier? t) (stx-pair? t))
+        (raise-read-error
+         (format "expected type specifier to follow ^ (got: ~s)" t)
+         src line col pos #f))
+      (let ((d (read-syntax src in)))
+        (when (eof-object? t)
+          (raise-read-eof-error "expected datum to follow type"
+                                src line col pos #f))
+        (syntax-property d 'type t))))))
 
 (define (make-setter-name n)
   (string->symbol
@@ -51,7 +62,8 @@ An extended "readtable" to support type and generic annotations.
   (make-readtable
    (current-readtable)
    #\^ 'non-terminating-macro read-type-anno
-   #\^ 'dispatch-macro read-generic-anno))
+;   #\^ 'dispatch-macro read-generic-anno
+   ))
 
 ;; Reads all available syntax in the specified input stream. Returns a
 ;; list of syntax objects. As a special feature adjusts the syntax by
@@ -83,15 +95,23 @@ An extended "readtable" to support type and generic annotations.
 (parameterize ((current-readtable magnolisp-readtable))
   (for-each
    (lambda (s)
-     (pretty-print
-      (read
-       (open-input-string s))))
+     (let ((stx
+            (read-syntax
+             "<test>"
+             (open-input-string s))))
+       (pretty-print
+        (cons
+         (syntax->datum stx)
+         (for/list ((k (syntax-property-symbol-keys stx)))
+             (cons k (syntax-property stx k)))))))
    (list
     ;;"#^5 (1 2 3)" ;; syntax error
     ;;"#^(1 2) (1 2 3)" ;; syntax error
-    "#^throwing f"
-    "#^(one-of Foo Bar Baz) x"
-    "#^(foo bar) 1"
-    "(1 2 ^int 3 ^(list int) (1 2 3))"
-    "(define #^(throws Exception) ^int (f ^int x) (return x))"
+    "^X x"
+    "^(list Y) ys"
+    ;; "#^throwing f"
+    ;; "#^(one-of Foo Bar Baz) x"
+    ;; "#^(foo bar) 1"
+    ;; "(1 2 ^int 3 ^(list int) (1 2 3))"
+    ;; "(define #^(throws Exception) ^int (f ^int x) (return x))"
     )))
