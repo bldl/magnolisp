@@ -68,46 +68,30 @@ An extended "readtable" to support type and generic annotations.
         (raise-read-eof-error
          "expected annotation to follow #^"
          src line col pos #f))
-      (let ((s-dat (syntax-e s)))
-        (let-values
-            (((k v)
-              (cond
-               ((symbol? s-dat)
-                (values s-dat (datum->syntax #f #t s)))
-               ((pair? s-dat)
-                (let* ((k-stx (car s-dat))
-                       (k (syntax-e k-stx)))
-                  (unless (symbol? k)
-                    (raise-read-error
-                     (format
-                      "expected #^(name value), got ~s for name" k-stx)
-                     src line col pos #f))
-                  (let ((rest-stx (cdr s-dat)))
-                    (if (null? rest-stx)
-                        (values k (datum->syntax #f #t s))
-                        (let ((v-stx-lst (syntax->list rest-stx)))
-                          (unless v-stx-lst
-                            (raise-read-error
-                             (format
-                              "improper list ~s after #^" s)
-                             src line col pos #f))
-                          (unless (= (length v-stx-lst) 1)
-                            (raise-read-error
-                             (format
-                              "expected single value in annotation ~s" s)
-                             src line col pos #f))
-                          (values k (car v-stx-lst)))))))
-               (else
-                (raise-read-error
-                 (format "expected annotation to follow #^, got ~s" s)
-                 src line col pos #f)))))
-          (let ((d (read-syntax src in)))
-            (when (eof-object? d)
-              (raise-read-eof-error
-               (format "expected datum to follow annotation ~s" s)
-               src line col pos #f))
-            (writeln (list k v))
-            (syntax-property d k v))))))))
+      (let ((k-v
+             (or (and (identifier? s)
+                      (let ((s-dat (syntax-e s)))
+                        (list s-dat (datum->syntax #f #t s))))
+                 (lets then-if-let s-lst (syntax->list s)
+                       then-let s-len (length s-lst)
+                       then-if (or (= s-len 1) (= s-len 2))
+                       then-let n-stx (first s-lst)
+                       then-if (identifier? n-stx)
+                       then-let n-sym (syntax-e n-stx)
+                       then-let v-stx (if (= s-len 1)
+                                          (datum->syntax #f #t s)
+                                          (second s-lst))
+                       (list n-sym v-stx))
+                 (raise-read-error
+                  (format "expected annotation to follow #^, got ~s" s)
+                  src line col pos #f))))
+        (let ((d (read-syntax src in)))
+          (when (eof-object? d)
+            (raise-read-eof-error
+             (format "expected datum to follow annotation ~s" s)
+             src line col pos #f))
+          (writeln k-v)
+          (apply syntax-property d k-v)))))))
 
 ;;; 
 ;;; reader extension
@@ -145,7 +129,7 @@ An extended "readtable" to support type and generic annotations.
 ;;; tests
 ;;; 
 
-;#;
+#;
 (parameterize ((current-readtable magnolisp-readtable)
                (port-count-lines-enabled #t))
   (for-each
@@ -167,21 +151,17 @@ An extended "readtable" to support type and generic annotations.
     ;;"^" ;; syntax error
     ;;"^5 x" ;; syntax error
     ;;"^T" ;; syntax error
-    "^()" ;; syntax error
+    ;;"^()" ;; syntax error
+    "(1 2 ^int 3 ^(list int) (1 2 3))"
 
     ;; generic annotation tests
     "#^throwing f"
     "#^(throwing) f"
     "#^(throwing #f) f"
-
+    ;;"#^() f" ;; syntax error
 
     ;; mixed annotation tests
-    
-    ;;"#^5 (1 2 3)" ;; syntax error
-    ;;"#^(1 2) (1 2 3)" ;; syntax error
-    ;; "#^throwing f"
-    ;; "#^(one-of Foo Bar Baz) x"
-    ;; "#^(foo bar) 1"
-    ;; "(1 2 ^int 3 ^(list int) (1 2 3))"
-    ;; "(define #^(throws Exception) ^int (f ^int x) (return x))"
+    "^T #^(x 1) #^(y 2) z"
+    "#^(one-of (Foo Bar Baz)) x"
+    "(define #^(throws Exception) (^int f ^int x) (return x))"
     )))
