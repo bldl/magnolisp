@@ -26,7 +26,8 @@ system related directives. Even though they trivially work here, this may not be
          define-syntax
          define-syntax-rule
          provide
-         require only-in prefix-in
+         require only-in prefix-in for-syntax
+         begin
          #%datum)
 
 ;;; 

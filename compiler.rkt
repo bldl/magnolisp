@@ -65,7 +65,7 @@ module attaching.
       ;;(namespace-require '"runtime-compiler.rkt")
       (let ((in-stx (namespace-syntax-introduce in-stx)))
         (let ((core-stx (expand-syntax in-stx)))
-          (pretty-println (syntax->datum core-stx))
+          ;;(pretty-println (syntax->datum core-stx))
           ;;(print-stx-with-bindings core-stx)
           (let ((core-ast (parse core-stx)))
             (pretty-println core-ast)
@@ -75,4 +75,4 @@ module attaching.
 (define* (compile-module mn)
   (compile-file (resolve-module-path mn #f)))
 
-(compile-module "try-program-6.rkt")
+(compile-module "try-program-8.rkt")

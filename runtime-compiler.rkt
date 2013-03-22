@@ -30,7 +30,8 @@ make sure that macros get expanded. Again, no problem, as we can use
          define-syntax
          define-syntax-rule
          provide
-         require
+         require for-syntax
+         begin
          #%datum)
 
 ;; Provide this so the compiler can compare syntax of ID against this
@@ -73,7 +74,7 @@ make sure that macros get expanded. Again, no problem, as we can use
 
 (define-syntax-rule*
   (pass)
-  (%core 'pass #f))
+  (%core 'pass))
 
 (define-syntax-rule*
   (call n)

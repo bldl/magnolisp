@@ -75,8 +75,9 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
         (error 'parse "not core language: ~s" stx)))
   
   (define (prs ctx stx)
+    ;;(writeln (list ctx stx))
     (syntax-case stx (k-app k-lambda
-                      #%plain-module-begin
+                      #%plain-module-begin #%require
                       define-syntaxes
                       define-values module quote
                       rt.%core)
@@ -84,7 +85,7 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
       ((module n pn (#%plain-module-begin body ...))
        (new-Module stx (prs-lst 'mod (syntax->list #'(body ...)))))
 
-      ((k-app rt.%core (quote n) _)
+      ((k-app rt.%core (quote n))
        (eq? 'pass (syntax-e #'n))
        (new-Pass stx))
 
@@ -100,6 +101,10 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
        (eq? ctx 'mod)
        #f)
 
+      ((#%require . _)
+       (eq? ctx 'mod)
+       #f)
+      
       ((quote lit)
        (cond
         ((eq? ctx 'expr)
