@@ -12,14 +12,12 @@ to syntax objects and invoking 'eval-syntax'.
 
 We should try to make sure to implement exactly the same language as
 for the compiler. We should particularly pay attention to the module
-system related directives. Even though they trivially work here, this may not be the case for the compiler.
+system related directives. Even though they trivially work here, this
+may not be the case for the compiler.
 
 |#
 
 (require "util.rkt")
-(require "runtime-common.rkt")
-
-(provide (all-from-out "runtime-common.rkt"))
 
 (provide begin-for-syntax
          define-for-syntax

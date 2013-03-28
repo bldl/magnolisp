@@ -25,10 +25,10 @@ For more compact printing, we do not make annotations transparent.
 ;;; abstract node
 ;;; 
 
-;; Note that ordering is delicate here. Any identifiers referenced at
-;; macro expansion time must have been defined by then, but for
-;; runtime code forward references to module-level variables are
-;; fine, long as no values are being accessed.
+;; Note that ordering is delicate here. Any identifiers must be
+;; defined before their values are accessed, regardless of phase
+;; level. Forward references to module-level variables (without
+;; access) are fine.
 
 (define-struct* Ast (annos))
 

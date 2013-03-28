@@ -7,15 +7,6 @@ can only be called at transformation time. The 'syntax/toplevel'
 module can help us get a transformation going. Or we may just use
 'expand'.
 
-We could choose to have a more sophisticated wrapper than 'begin' or
-'module' for the input list of syntax objects. We could use
-'syntax-local-make-definition-context', for example, to have all
-top-level names resolved for us. We could then also invoke
-'local-expand' with a stoplist specifying our core language, in
-addition to any parts of Racket that we choose to include in our core
-language. '%compilation-unit' has this idea, but we start with
-something simpler.
-
 A 'module' appears to be self-contained so that anything in outer
 scope does not affect it, and hence 'namespace-require' does not
 affect it.
