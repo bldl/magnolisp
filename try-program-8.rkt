@@ -31,3 +31,6 @@ A macro for declaring a pair of procedures.
 (call get-x)
 (call set-x)
 (call get-x)
+
+(procedure (#^export main)
+           (call set-x))
