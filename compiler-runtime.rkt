@@ -22,8 +22,6 @@ confused by our core language.
 
 (require "util.rkt")
 
-(require* "runtime-shared.rkt")
-
 ;; Yes we are providing this. If the programmer wants to hack our core
 ;; language, they may. The idea is to express core language as (%core
 ;; 'pass) or (%core 'call p) or such.

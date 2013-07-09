@@ -8,5 +8,3 @@ transformation into the Racket core language.
 |#
 
 (require "util.rkt")
-
-(require* "runtime-shared.rkt")
