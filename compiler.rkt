@@ -2,22 +2,16 @@
 
 #|
 
-Certain operations (such as 'syntax-local-make-definition-context')
-can only be called at transformation time. The 'syntax/toplevel'
-module can help us get a transformation going. Or we may just use
-'expand'.
+Implements a compiler for Magnolisp. Loads the code to be compiled
+from Racket module metadata, included as submodules by the Racket
+'magnolisp' language implementation. Only bytecode for submodules
+requires loading for compilation.
 
-A 'module' appears to be self-contained so that anything in outer
-scope does not affect it, and hence 'namespace-require' does not
-affect it.
+The compiler ignores top-level expressions, which is not the case for
+the evaluator.
 
-See "Fully Expanded Programs" in Racket reference, as well as our
-runtime library to see what we can expect to remain in the syntax tree
-to be compiled to C++.
-
-Note that if we want the 'expand' namespace to have the same module
-instances, for sharing data or such, we must take care of appropriate
-module attaching.
+The compiler requires a fully typed program (although not all types
+have to be written out explicitly -- think 'auto' in C++).
 
 |#
 
