@@ -8,3 +8,6 @@ transformation into the Racket core language.
 |#
 
 (require "util.rkt")
+
+(define-syntax-rule* (pass)
+  (void))

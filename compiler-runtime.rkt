@@ -26,3 +26,6 @@ confused by our core language.
 ;; language, they may. The idea is to express core language as (%core
 ;; 'pass) or (%core 'call p) or such.
 (define* %core list)
+
+(define-syntax-rule* (pass)
+  (%core 'pass))

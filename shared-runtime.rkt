@@ -9,3 +9,7 @@ implementations. Macros implementing such transformations belong here.
 |#
 
 (require "util.rkt")
+
+;; Evaluate twice, presumably for side effects.
+(define-syntax-rule* (twice x)
+  (begin x x))
