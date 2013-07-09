@@ -15,14 +15,44 @@ have to be written out explicitly -- think 'auto' in C++).
 
 |#
 
-(require "backend.rkt")
-(require "parse.rkt")
-(require "reader-ext.rkt")
 (require "util.rkt")
 (require racket/require-transform)
 (require syntax/modcode syntax/moddep syntax/modresolve) 
 (require syntax/strip-context)
 (require syntax/toplevel)
+
+(define (my-expand-macros/syntax stx)
+  (parameterize ([current-namespace (make-base-namespace)])
+    (expand-syntax
+     (namespace-syntax-introduce
+      (strip-context stx)))))
+
+(define (my-expand-macros/sexp sexp)
+  (parameterize ([current-namespace (make-base-namespace)])
+    (expand sexp)))
+
+(define (to-module-syntax sexp-lst)
+  (datum->syntax #f 
+                 `(module some "compiler-language.rkt"
+                    ,@sexp-lst)))
+
+(define* (compile-module mp)
+  ;; xxx we may need to specify the rel-to-path-v argument for anything that this module might depend upon
+  ;;(compile-file (resolve-module-path mp #f))
+  (define sexp-lst 
+    (dynamic-require `(submod ,mp ast) 'src-sexp-lst))
+  (define stx (to-module-syntax sexp-lst))
+  (pretty-println (syntax->datum stx))
+  (set! stx (my-expand-macros/syntax stx))
+  (pretty-println (syntax->datum stx))
+  )
+
+(compile-module "test-1.rkt")
+
+
+
+
+#|
 
 (define (read-file pn)
   (call-with-input-file pn
@@ -57,7 +87,4 @@ have to be written out explicitly -- think 'auto' in C++).
             (display (to-cxx-text core-ast))
             ))))))
 
-(define* (compile-module mn)
-  (compile-file (resolve-module-path mn #f)))
-
-(compile-module "try-program-8.rkt")
+|#
