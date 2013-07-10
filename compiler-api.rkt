@@ -13,6 +13,9 @@ the evaluator.
 The compiler requires a fully typed program (although not all types
 have to be written out explicitly -- think 'auto' in C++).
 
+The benefit of leaving macro expansion until here is that we do not
+need to find a way to persist binding information.
+
 |#
 
 (require "util.rkt")
@@ -37,7 +40,7 @@ have to be written out explicitly -- think 'auto' in C++).
                     ,@sexp-lst)))
 
 (define* (compile-module mp)
-  ;; xxx we may need to specify the rel-to-path-v argument for anything that this module might depend upon
+  ;; xxx we may need to specify the rel-to-path-v argument for anything that this module might depend upon - otherwise if things work they probably just work by accident
   ;;(compile-file (resolve-module-path mp #f))
   (define sexp-lst 
     (dynamic-require `(submod ,mp ast) 'src-sexp-lst))
