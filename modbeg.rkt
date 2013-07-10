@@ -16,25 +16,30 @@ could have the expansion itself generate code to persist the type
 information, in compile mode. It is notable that an id-table can be
 used even for local names, since identifiers are unique.
 
+Whatever we export should also have some location information. Should
+we discover errors only once we start combining modules, then we need
+to be able to still report errors properly.
+
 |#
 
 (provide my-module-begin)
 
 (begin-for-syntax
- (require "settings.rkt" "util.rkt")
+ (require "compiler-metadata.rkt" "settings.rkt" "util.rkt")
 
- (define (make-ast-submodule modbeg-stx stx-lst)
-   ;; Note that we use racket/base here as this is simply a Racket
-   ;; module containing annotations. It is not Magnolisp. The data
-   ;; structures containing the annotations will be in Racket.
-   #`(module ast racket/base
-       (provide src-sexp-lst)
-       ;; xxx otherwise good but we lose location info - should instead generate code that creates syntax objects with location information
-       (define src-sexp-lst '(#,@stx-lst)))))
+ (define (make-submodule modbeg-stx exp-stx)
+   #`(module compilation-info racket/base
+       (provide dummy)
+       (define dummy '#,exp-stx)))
+
+ ) ;; end begin-for-syntax
 
 (define-syntax (my-module-begin stx)
   (syntax-case stx ()
     ((_ x ...)
-     #`(#%module-begin
-        x ...
-        #,(make-ast-submodule stx (syntax->list #'(x ...)))))))
+     (if (not compile?)
+         #`(#%module-begin x ...)
+         (let ((exp-stx (local-expand #'(begin x ...) 'module-begin null)))
+           #`(#%plain-module-begin
+              #,exp-stx
+              #,(make-submodule stx exp-stx)))))))
