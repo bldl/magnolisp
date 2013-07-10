@@ -30,7 +30,7 @@ compiled one.
 
 (provide (except-out (all-from-out racket/base) #%module-begin))
 
-(require "evaluator-modbeg.rkt")
+(require "modbeg.rkt")
 (provide (rename-out (my-module-begin #%module-begin)))
 
 (require (for-syntax racket/base))
