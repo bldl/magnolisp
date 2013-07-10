@@ -29,3 +29,7 @@ confused by our core language.
 
 (define-syntax-rule* (pass)
   (%core 'pass))
+
+;; Evaluate twice, presumably for side effects.
+(define-syntax-rule* (twice x)
+  (begin x x))

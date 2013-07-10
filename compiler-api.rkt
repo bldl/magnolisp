@@ -1,3 +1,8 @@
+#!/bin/sh
+#| # -*- scheme -*-
+exec racket -e '(begin (putenv "COMPILE_IT" "true") (void))' -u "$0"
+|#
+
 #lang racket
 
 #|
@@ -12,9 +17,6 @@ the evaluator.
 
 The compiler requires a fully typed program (although not all types
 have to be written out explicitly -- think 'auto' in C++).
-
-The benefit of leaving macro expansion until here is that we do not
-need to find a way to persist binding information.
 
 |#
 

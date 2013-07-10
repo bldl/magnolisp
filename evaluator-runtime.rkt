@@ -11,3 +11,7 @@ transformation into the Racket core language.
 
 (define-syntax-rule* (pass)
   (void))
+
+;; Evaluate twice, presumably for side effects.
+(define-syntax-rule* (twice x)
+  (begin x x))
