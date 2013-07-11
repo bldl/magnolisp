@@ -25,6 +25,12 @@ allow our own core language, and make careful use of
 'local-expand' (or similar) to avoid the macro expander getting
 confused by our core language.
 
+To record metadata for the compiler, we use begin-for-syntax to
+produce code that runs in phase level 1. Since it lives in phase 1,
+the respective module's #%module-begin will be executed in the same
+phase, and will hence have access to the information (via the same
+variables at the same phase level).
+
 |#
 
 (require
@@ -50,11 +56,21 @@ confused by our core language.
 (define-syntax-rule* (twice x)
   (begin x x))
 
-;; xxx Needs to save type information, and must still create a Racket
-;; binding.
-#;
-(define-syntax* var
-  (syntax-rules-2 ()
-                  ((_ (n t))
-                   (define n undefined)
-                   (%core 'var n t))))
+;; This is only intended for local variable declarations.
+(define-syntax* (var stx)
+  (syntax-case stx ()
+    ((_ n v)
+     (if-not-compiling
+      #'(define n v)
+      #`(begin
+          (begin-for-syntax
+           (record-type! #'n AnyT))
+          (define n v))))
+    ((_ (n t))
+     (if-not-compiling
+      #'(define n undefined)
+      #`(begin
+          (begin-for-syntax
+           (record-type! #'n (TypeName 't)))
+          (define n undefined))))
+    ))
