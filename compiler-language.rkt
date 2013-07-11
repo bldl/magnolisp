@@ -15,5 +15,5 @@ happen, though.
 (require (for-syntax racket/base))
 (provide (for-syntax (all-from-out racket/base)))
 
-(require "compiler-runtime.rkt")
-(provide (all-from-out "compiler-runtime.rkt"))
+(require "runtime.rkt")
+(provide (all-from-out "runtime.rkt"))

@@ -36,5 +36,5 @@ compiled one.
 (require (for-syntax racket/base))
 (provide (for-syntax (all-from-out racket/base)))
 
-(require "evaluator-runtime.rkt")
-(provide (all-from-out "evaluator-runtime.rkt"))
+(require "runtime.rkt")
+(provide (all-from-out "runtime.rkt"))
