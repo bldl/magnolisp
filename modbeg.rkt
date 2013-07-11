@@ -9,6 +9,10 @@ When being required for compilation, we make sure to compute all the
 metadata it needs, storing it into a submodule. We take care to
 preserve type information.
 
+The evaluator ignores type annotations, whereas the compiler requires
+a fully typed program (although not all types have to be written out
+explicitly -- think 'auto' in C++).
+
 We have some options for preserving type information. (1) We could
 carefully control macro expansion with local-expand, and make sure to
 store type info into an id-table before it is expanded away. (2) We
@@ -19,6 +23,10 @@ used even for local names, since identifiers are unique.
 Whatever we export should also have some location information. Should
 we discover errors only once we start combining modules, then we need
 to be able to still report errors properly.
+
+When required for evaluation, we evaluate display the value of module
+level expressions, whereas otherwise we do not. This can be useful for
+testing.
 
 |#
 
