@@ -28,43 +28,13 @@ confused by our core language.
 |#
 
 (require
- (for-syntax "compiler-metadata.rkt")
- (for-syntax "settings.rkt")
- "util.rkt")
+ "define-2.rkt" "util.rkt"
+ (for-syntax "compiler-metadata.rkt" "settings.rkt")) 
 
 ;; Yes we are providing this. If the programmer wants to hack our core
 ;; language, they may. The idea is to express core language as (%core
 ;; 'pass) or (%core 'call p) or such.
 (define* %core list)
-
-(define-syntax define-syntax-rule*-2
-  (syntax-rules ()
-    ((_ (name rest ...) body-e body-c)
-     (define-syntax* (name stx)
-       (syntax-case stx ()
-         ((_ rest ...)
-          (if compile?
-              #'body-c
-              #'body-e)))))))
-
-(begin-for-syntax
- (require (for-syntax racket/base "settings.rkt"))
-
- ;; Syntax for use within a macro.
- ;; E.g.
- ;; (define-syntax m
- ;;  (syntax-rules-2 () ((_) 1 2) ((_ _) 3 4)))
- ;; (m) ; => 1
- ;; ((syntax-rules-2 () ((_) 1 2)) #'(5)) ; => #'1
- ;; ((syntax-rules-2 () ((_) 1 2) ((_ _) 3 4)) #'(5 x)) ; => #'3
- (define-syntax (syntax-rules-2 stx)
-   (syntax-case stx ()
-     ((_ (kw ...) (pat body-e body-c) ...)
-      (if compile?
-          #'(syntax-rules (kw ...) (pat body-c) ...)
-          #'(syntax-rules (kw ...) (pat body-e) ...)))))
- 
- ) ;; end begin-for-syntax
 
 (define (make-undefined)
   (define x x)
