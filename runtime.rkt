@@ -37,8 +37,7 @@ confused by our core language.
 (define* %core list)
 
 (define (make-undefined)
-  (define x x)
-  x)
+  (letrec ((x x)) x))
 
 (define undefined (make-undefined))
 
