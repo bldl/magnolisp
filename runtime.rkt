@@ -47,6 +47,31 @@ confused by our core language.
               #'body-c
               #'body-e)))))))
 
+(begin-for-syntax
+ (require (for-syntax racket/base "settings.rkt"))
+
+ ;; Syntax for use within a macro.
+ ;; E.g.
+ ;; (define-syntax m
+ ;;  (syntax-rules-2 () ((_) 1 2) ((_ _) 3 4)))
+ ;; (m) ; => 1
+ ;; ((syntax-rules-2 () ((_) 1 2)) #'(5)) ; => #'1
+ ;; ((syntax-rules-2 () ((_) 1 2) ((_ _) 3 4)) #'(5 x)) ; => #'3
+ (define-syntax (syntax-rules-2 stx)
+   (syntax-case stx ()
+     ((_ (kw ...) (pat body-e body-c) ...)
+      (if compile?
+          #'(syntax-rules (kw ...) (pat body-c) ...)
+          #'(syntax-rules (kw ...) (pat body-e) ...)))))
+ 
+ ) ;; end begin-for-syntax
+
+(define (make-undefined)
+  (define x x)
+  x)
+
+(define undefined (make-undefined))
+
 ;; Do nothing. Do not think we actually need new core language for this.
 (define-syntax-rule*-2 (pass)
   (void)
@@ -56,3 +81,11 @@ confused by our core language.
 (define-syntax-rule* (twice x)
   (begin x x))
 
+;; xxx Needs to save type information, and must still create a Racket
+;; binding.
+#;
+(define-syntax* var
+  (syntax-rules-2 ()
+                  ((_ (n t))
+                   (define n undefined)
+                   (%core 'var n t))))
