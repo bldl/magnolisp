@@ -56,9 +56,26 @@ variables at the same phase level).
 (define-syntax-rule* (twice x)
   (begin x x))
 
-;; This is only intended for local variable declarations.
+;; This is only intended for local variable declarations. As AnyT can
+;; take on any type, local type inference will be able to unify it
+;; with the value type.
 (define-syntax* (var stx)
   (syntax-case stx ()
+    ((_ (n t))
+     (if-not-compiling
+      #'(define n undefined)
+      #`(begin
+          ;; xxx begin-for-syntax can only be used at module level, and we must instead use local-begin-for-syntax
+          (begin-for-syntax
+           (record-type! #'n (TypeName 't)))
+          (define n undefined))))
+    ((_ (n t) v)
+     (if-not-compiling
+      #'(define n v)
+      #`(begin
+          (begin-for-syntax
+           (record-type! #'n (TypeName 't)))
+          (define n v))))
     ((_ n v)
      (if-not-compiling
       #'(define n v)
@@ -66,11 +83,4 @@ variables at the same phase level).
           (begin-for-syntax
            (record-type! #'n AnyT))
           (define n v))))
-    ((_ (n t))
-     (if-not-compiling
-      #'(define n undefined)
-      #`(begin
-          (begin-for-syntax
-           (record-type! #'n (TypeName 't)))
-          (define n undefined))))
     ))

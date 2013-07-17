@@ -10,6 +10,15 @@ core language is being targeted.
 (require "util.rkt"
          (for-syntax "settings.rkt"))
 
+;; begin-for-syntax cannot be used in a local context. This variant of
+;; it may be used in both local and module-level contexts.
+(define-syntax-rule*
+  (local-begin-for-syntax e ...)
+  (define-syntaxes ()
+    (begin
+      e ...
+      (values))))
+
 (define-syntax* define-syntax-rule*-2
   (syntax-rules ()
     ((_ (name rest ...) body-e body-c)

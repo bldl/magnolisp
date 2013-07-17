@@ -28,6 +28,18 @@ When required for evaluation, we evaluate display the value of module
 level expressions, whereas otherwise we do not. This can be useful for
 testing.
 
+In our my-module-begin, we must remember that we want to access
+metadata from the context of the module that uses the language (and
+not this module). From my-module-begin we can access anything within
+begin-for-syntax here, but that is not good enough. It is necessary
+for my-module-begin to generate code for the beginning module such
+that the code accesses begin-for-syntax information and emits a
+definition for a submodule. The submodule may have to refer directly
+to the outer module's for-syntax variables so as to preserve
+identities, and there for-template may be handy, although it may be
+possible to wrap the whole submodule definition into a
+begin-for-syntax.
+
 |#
 
 (provide my-module-begin)
@@ -45,9 +57,9 @@ testing.
 (define-syntax (my-module-begin stx)
   (syntax-case stx ()
     ((_ x ...)
-     (if (not compile?)
-         #`(#%module-begin x ...)
-         (let ((exp-stx (local-expand #'(begin x ...) 'module-begin null)))
-           #`(#%plain-module-begin
-              #,exp-stx
-              #,(make-submodule stx exp-stx)))))))
+     (if-not-compiling
+      #`(#%module-begin x ...)
+      (let ((exp-stx (local-expand #'(begin x ...) 'module-begin null)))
+        #`(#%plain-module-begin
+           #,exp-stx
+           #,(make-submodule stx exp-stx)))))))
