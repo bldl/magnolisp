@@ -23,7 +23,7 @@ screwy when used in compilation mode.
 (provide (except-out (all-from-out racket/base) #%module-begin))
 
 (require "modbeg.rkt")
-(provide (rename-out (my-module-begin #%module-begin)))
+(provide (rename-out (module-begin #%module-begin)))
 
 (require (for-syntax racket/base))
 (provide (for-syntax (all-from-out racket/base)))

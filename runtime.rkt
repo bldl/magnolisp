@@ -14,7 +14,8 @@ able to express foreign syntax in terms of Racket syntax, without
 using macros or runtime values. This is not really a problem since
 unique identifiers for functions can be given here, and our syntax can
 be expressed in terms of application of such functions. We use '%core'
-as our special function.
+as our special function. We can also record annotations for our
+declared names, into a separate table.
 
 We cannot do much quoting to make sure that we retain binding
 information, and to make sure that macros get expanded. Again, no
@@ -25,17 +26,27 @@ allow our own core language, and make careful use of
 'local-expand' (or similar) to avoid the macro expander getting
 confused by our core language.
 
-To record metadata for the compiler, we use begin-for-syntax to
-produce code that runs in phase level 1. Since it lives in phase 1,
-the respective module's #%module-begin will be executed in the same
-phase, and will hence have access to the information (via the same
-variables at the same phase level).
+To record metadata for the compiler, we use code that runs in phase
+level 1. Since it lives in phase 1, the respective module's
+#%module-begin will be executed in the same phase, and will hence have
+access to the information (via the same variables at the same phase
+level).
 
 |#
 
 (require
  "define-2.rkt" "util.rkt"
  (for-syntax "compiler-metadata.rkt" "settings.rkt")) 
+
+(define-syntax (begin/save-type stx)
+  (syntax-case stx ()
+    [(_ n t)
+     (record-type! #'n (TypeName (syntax->datum #'t)))
+     #'(begin)]
+    [(_ n)
+     (record-type! #'n AnyT)
+     #'(begin)]
+    ))
 
 ;; Yes we are providing this. If the programmer wants to hack our core
 ;; language, they may. The idea is to express core language as (%core
@@ -56,31 +67,27 @@ variables at the same phase level).
 (define-syntax-rule* (twice x)
   (begin x x))
 
-;; This is only intended for local variable declarations. As AnyT can
-;; take on any type, local type inference will be able to unify it
-;; with the value type.
+;; This is only intended for local variable declarations, as Magnolisp
+;; may not end up having any other kind. As AnyT can take on any type,
+;; local type inference will be able to unify it with the value type.
 (define-syntax* (var stx)
   (syntax-case stx ()
     ((_ (n t))
      (if-not-compiling
       #'(define n undefined)
-      #`(begin
-          ;; xxx begin-for-syntax can only be used at module level, and we must instead use local-begin-for-syntax
-          (begin-for-syntax
-           (record-type! #'n (TypeName 't)))
-          (define n undefined))))
+      #'(begin
+          (define n undefined)
+          (begin/save-type n t))))
     ((_ (n t) v)
      (if-not-compiling
       #'(define n v)
-      #`(begin
-          (begin-for-syntax
-           (record-type! #'n (TypeName 't)))
-          (define n v))))
+      #'(begin
+          (define n v)
+          (begin/save-type n t))))
     ((_ n v)
      (if-not-compiling
       #'(define n v)
-      #`(begin
-          (begin-for-syntax
-           (record-type! #'n AnyT))
-          (define n v))))
+      #'(begin
+          (define n v)
+          (begin/save-type n))))
     ))

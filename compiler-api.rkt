@@ -9,8 +9,7 @@ exec racket -e '(begin (putenv "COMPILE_IT" "true") (void))' -u "$0"
 
 Implements a compiler for Magnolisp. Loads the code to be compiled
 from Racket module metadata, included as submodules by the Racket
-'magnolisp' language implementation. Only bytecode for submodules
-requires loading for compilation.
+'magnolisp' language implementation.
 
 The compiler ignores top-level expressions, which is not the case for
 the evaluator.
@@ -22,6 +21,7 @@ have to be written out explicitly -- think 'auto' in C++).
 
 (require "util.rkt")
 (require racket/require-transform)
+(require syntax/id-table)
 (require syntax/modcode syntax/moddep syntax/modresolve) 
 (require syntax/strip-context)
 (require syntax/toplevel)
@@ -41,15 +41,24 @@ have to be written out explicitly -- think 'auto' in C++).
                  `(module some "compiler-language.rkt"
                     ,@sexp-lst)))
 
+(define (show-table m-tbl)
+  (writeln m-tbl)
+  (writeln (bound-id-table-count m-tbl))
+  (bound-id-table-for-each
+   m-tbl
+   (lambda (k v)
+     (writeln (list k v)))))
+
 (define* (compile-module mp)
   ;; xxx we may need to specify the rel-to-path-v argument for anything that this module might depend upon - otherwise if things work they probably just work by accident
   ;;(compile-file (resolve-module-path mp #f))
-  (define sexp-lst 
-    (dynamic-require `(submod ,mp ast) 'src-sexp-lst))
-  (define stx (to-module-syntax sexp-lst))
-  (pretty-println (syntax->datum stx))
-  (set! stx (my-expand-macros/syntax stx))
-  (pretty-println (syntax->datum stx))
+  (define types-tbl
+    (dynamic-require `(submod ,mp types) 'm-types-tbl))
+  (show-table types-tbl)
+  ;; (define stx (to-module-syntax sexp-lst))
+  ;; (pretty-println (syntax->datum stx))
+  ;; (set! stx (my-expand-macros/syntax stx))
+  ;; (pretty-println (syntax->datum stx))
   )
 
 (compile-module "test-1.rkt")

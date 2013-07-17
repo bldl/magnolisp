@@ -6,7 +6,8 @@ The intention is for this module to be always required for-syntax, as
 the information is only accessed at macro expansion time.
 
 Note quite sure if we should specify any #:phase for the identifier
-tables.
+tables, but phase 0 would seem appropriate as all Magnolisp names are
+such.
 
 |#
 
@@ -17,7 +18,7 @@ tables.
 ;;; Type annotations.
 ;;; 
 
-(define type-table (make-free-id-table))
+(define type-table (make-bound-id-table #:phase 0))
 (provide type-table)
 
 (struct Type ())
@@ -33,4 +34,4 @@ tables.
 (provide (struct-out TypeName))
 
 (define* (record-type! id-stx t)
-  (free-id-table-set! type-table id-stx t))
+  (bound-id-table-set! type-table id-stx t))
