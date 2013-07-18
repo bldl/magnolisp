@@ -116,6 +116,9 @@ commonly associated with definitions.
 
 (module* main #f
   (with-magnolisp-readtable
-   (define in (open-input-string "1 2 3 ^Int x #^throwing ^void g"))
-   (for/list ((obj (in-port read in)))
-       obj)))
+   (for ((s (list
+             "#^external ^(fn Int Int) (function (f x))"
+             )))
+       (define in (open-input-string s))
+     (for/list ((obj (in-port read in)))
+         (writeln obj)))))
