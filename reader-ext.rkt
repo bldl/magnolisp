@@ -25,10 +25,7 @@ places where they do not much hamper "parsing".
 (define read-type-anno
   (case-lambda
    ((ch in)
-    (begin
-      (read in) ;; skip type anno datum
-      (read in) ;; produce actual datum
-      ))
+    (syntax->datum (read-type-anno ch in (object-name in) #f #f #f)))
    ((ch in src line col pos)
     (let ((t (read-syntax src in)))
       (when (eof-object? t)
@@ -53,10 +50,7 @@ places where they do not much hamper "parsing".
 (define read-generic-anno
   (case-lambda
    ((ch in)
-    (begin
-      (read in) ;; skip anno datum
-      (read in) ;; produce actual datum
-      ))
+    (syntax->datum (read-generic-anno ch in (object-name in) #f #f #f)))
    ((ch in src line col pos)
     (let ((s (read-syntax src in)))
       (when (eof-object? s)
@@ -97,3 +91,21 @@ places where they do not much hamper "parsing".
    #\^ 'non-terminating-macro read-type-anno
    #\^ 'dispatch-macro read-generic-anno
    ))
+
+;;; 
+;;; helpers
+;;; 
+
+(define-syntax-rule* (with-magnolisp-readtable es ...)
+  (parameterize ((current-readtable magnolisp-readtable))
+    es ...))
+
+;;; 
+;;; tests
+;;; 
+
+(module* main #f
+  (with-magnolisp-readtable
+   (define in (open-input-string "1 2 3 ^Int x"))
+   (for/list ((obj (in-port read in)))
+       obj)))
