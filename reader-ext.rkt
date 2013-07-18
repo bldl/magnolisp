@@ -2,26 +2,21 @@
 
 #|
 
-An extended "readtable" to support type and generic annotations.
+An extended "readtable" to support type and generic annotations. We
+use the prefix ^ for the former, and #^ for the latter.
+
+Annotations are stored as syntax properties. Two problems with
+this. (1) If you read plain sexps, annotation info will get
+discarded. (2) Annotations are never subjected to macro expansion.
+
+It may be better to generate forms that are subject to macro
+expansion. Then just have to make sure that such wrappers go only in
+places where they do not much hamper "parsing".
 
 |#
 
 (require "util.rkt")
 (require syntax/readerr syntax/stx)
-
-;;; 
-;;; location info
-;;; 
-
-(define-struct* loc (source line column position span) #:transparent)
-
-(define* (stx-loc stx)
-  (loc
-   (syntax-source stx)
-   (syntax-line stx)
-   (syntax-column stx)
-   (syntax-position stx)
-   (syntax-span stx)))
 
 ;;; 
 ;;; type annotations
@@ -102,65 +97,3 @@ An extended "readtable" to support type and generic annotations.
    #\^ 'non-terminating-macro read-type-anno
    #\^ 'dispatch-macro read-generic-anno
    ))
-
-;; Reads all available syntax in the specified input stream. Returns a
-;; list of syntax objects.
-(define (read-syntaxes source-name in)
-  (let* ((read (lambda (in)
-                 (read-syntax source-name in))))
-    (for/list ((obj (in-port read in)))
-        obj)))
-
-;; Reads all Magnolisp syntax from a file whose path is given.
-;; Produces a list of syntax objects. Any #lang directive is ignored.
-;; The path is cleansed to ensure a decent source file name for syntax
-;; objects.
-(define* (load-as-syntaxes file)
-  (let* ((path (cleanse-path file)))
-    (call-with-input-file path
-      (lambda (in)
-        (parameterize ((current-readtable magnolisp-readtable))
-          (port-count-lines! in)
-          (read-language in (thunk (void)))
-          (read-syntaxes path in))))))
-
-;;; 
-;;; tests
-;;; 
-
-#;
-(parameterize ((current-readtable magnolisp-readtable)
-               (port-count-lines-enabled #t))
-  (for-each
-   (lambda (s)
-     (let ((stx
-            (read-syntax
-             "<string s>"
-             (open-input-string s))))
-       (pretty-print
-        (append
-         (list (syntax->datum stx))
-         (for/list ((k (syntax-property-symbol-keys stx)))
-             (cons k (syntax-property stx k)))
-         (list (stx-loc stx))))))
-   (list
-    ;; type annotation tests
-    "^X x"
-    "^(list Y) ys"
-    ;;"^" ;; syntax error
-    ;;"^5 x" ;; syntax error
-    ;;"^T" ;; syntax error
-    ;;"^()" ;; syntax error
-    "(1 2 ^int 3 ^(list int) (1 2 3))"
-
-    ;; generic annotation tests
-    "#^throwing f"
-    "#^(throwing) f"
-    "#^(throwing #f) f"
-    ;;"#^() f" ;; syntax error
-
-    ;; mixed annotation tests
-    "^T #^(x 1) #^(y 2) z"
-    "#^(one-of (Foo Bar Baz)) x"
-    "(define #^(throws Exception) (^int f ^int x) (return x))"
-    )))
