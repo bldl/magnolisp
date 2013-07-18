@@ -46,7 +46,9 @@ begin-for-syntax.
 (provide module-begin)
 
 (require (for-syntax syntax/id-table
-                     "compiler-metadata.rkt" "settings.rkt" "util.rkt"))
+                     "compiler-metadata.rkt"
+                     "settings.rkt"
+                     "util.rkt"))
 
 (define-syntax (compiled-module-begin stx)
   (syntax-case stx ()
@@ -67,6 +69,6 @@ begin-for-syntax.
 (define-syntax (module-begin stx)
   (syntax-case stx ()
     ((_ . ds)
-     (if-not-compiling
-      #'(#%module-begin . ds)
-      #'(compiled-module-begin . ds)))))
+     (if (not compile?)
+         #'(#%module-begin . ds)
+         #'(compiled-module-begin . ds)))))

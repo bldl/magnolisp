@@ -11,9 +11,3 @@ process.
 (require "util.rkt")
 
 (define* compile? (and (getenv "COMPILE_IT") #t))
-
-(define-syntax-rule* (if-compiling t e)
-  (if compile? t e))
-
-(define-syntax-rule* (if-not-compiling t e)
-  (if (not compile?) t e))

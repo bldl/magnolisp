@@ -11,13 +11,26 @@ core language is being targeted.
          (for-syntax "settings.rkt"))
 
 ;; begin-for-syntax cannot be used in a local context. This variant of
-;; it may be used in both local and module-level contexts.
+;; it may be used in both local and module-level contexts. Note that
+;; this probably eventually gets translated to let-syntaxes, when in a
+;; local context. This is also of limited use, as local macros do not
+;; get preserved in compiled code.
 (define-syntax-rule*
   (local-begin-for-syntax e ...)
   (define-syntaxes ()
     (begin
       e ...
       (values))))
+
+(define-syntax* (if-compiling/rt stx)
+  (syntax-case stx ()
+    ((_ t e)
+     (if compile? #'t #'e))))
+
+(define-syntax* (if-not-compiling/rt stx)
+  (syntax-case stx ()
+    ((_ t e)
+     (if (not compile?) #'t #'e))))
 
 (define-syntax* define-syntax-rule*-2
   (syntax-rules ()
@@ -33,6 +46,12 @@ core language is being targeted.
 (begin-for-syntax
  (require "util.rkt"
           (for-syntax racket/base "settings.rkt"))
+
+ (define-syntax-rule* (if-compiling t e)
+   (if compile? t e))
+
+ (define-syntax-rule* (if-not-compiling t e)
+   (if (not compile?) t e))
 
  ;; Syntax for use within a macro.
  ;; E.g.
