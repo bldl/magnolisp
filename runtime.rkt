@@ -36,7 +36,7 @@ level).
 
 (require
  "define-2.rkt" "util.rkt"
- (for-syntax "compiler-metadata.rkt" "settings.rkt")) 
+ (for-syntax "compiler-metadata.rkt" "settings.rkt" "util.rkt")) 
 
 (define-syntax (begin/save-type stx)
   (syntax-case stx ()
@@ -57,6 +57,47 @@ level).
   (letrec ((x x)) x))
 
 (define undefined (make-undefined))
+
+(begin-for-syntax
+ (require racket/contract)
+ (define (syntax-with-annos? x)
+   (and (syntax? x)
+        (let ((h (syntax-property x 'annos)))
+          (and h
+               (hash? h)
+               (immutable? h)))))
+ (provide/contract
+  [get-annos (-> syntax? (and/c hash? immutable?))]
+  [set-annos (-> syntax? (and/c hash? immutable?) syntax-with-annos?)]
+  [add-anno (->* (syntax? symbol? syntax?)
+                 (#:from syntax?) syntax-with-annos?)])
+ (define (get-annos stx)
+   (define h (syntax-property stx 'annos))
+   (cond
+    ((not h) #hasheq())
+    ((hash? h) h)
+    ;; It seems that the macro expander, in its origin tracking
+    ;; presumably, sometimes cons'es together original and new syntax
+    ;; property values. The newer one would appear to be first.
+    ((pair? h) (car h))
+    (else
+     (error 'get-annos "unexpected annos ~s" h))))
+ (define (set-annos stx h)
+   (syntax-property stx 'annos h))
+ (define (add-anno stx k v #:from (from stx))
+   (set-annos stx (hash-set (get-annos from) k v))))
+
+;; Annotated form 'e'. We collect annotations into a syntax property
+;; of the annotated form. This at least gets uninteresting unnotations
+;; out of the way. Even the annotating form could itself be annotated,
+;; and the annotations must be collated. Inner annotation takes
+;; precedence in case of conflict. Inner corresponds to later, when it
+;; comes the reader producing annotation forms.
+(define-syntax* (anno stx)
+  (syntax-case stx ()
+    ((_ n v e)
+     (identifier? #'n)
+     (add-anno #'e (syntax-e #'n) #'v #:from stx))))
 
 ;; Do nothing. Do not think we actually need new core language for this.
 (define-syntax-rule*-2 (pass)

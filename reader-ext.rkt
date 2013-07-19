@@ -116,6 +116,7 @@ identifier does not look like an identifier, for example.
   (with-magnolisp-readtable
    (for ((s (list
              "#^external ^(fn Int Int) (function (f x))"
+             "#^foo #^bar #^baz 5"
              )))
        (define in (open-input-string s))
      (for/list ((obj (in-port read in)))
