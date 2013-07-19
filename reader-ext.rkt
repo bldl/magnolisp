@@ -3,27 +3,24 @@
 #|
 
 An extended "readtable" to support type and generic annotations. We
-use the prefix ^ for the former, and #^ for the latter.
-
-If we directly stored annotations as syntax properties, there would be
-two problems. (1) If you read plain sexps, annotation info will get
-discarded. (2) Annotations are "hidden", and not implicitly subject to
-macro expansion or binding enrichment or such things.
-
-We instead generate wrapper forms that are subject to macro expansion.
-Then just have to make sure that such wrappers go only in places where
-they do not much hamper "parsing". Around definitions is probably a
-good place, as partial expansion usually occurs in such contexts
-automatically, until actual definitions are found. And annotations are
-commonly associated with definitions.
+use the prefix ^ for the former, and #^ for the latter. We follow the
+Scheme tradition by turning these into forms, namely 'anno' forms, and
+libraries can then decide on the semantics of each kind of annotation.
+Care probably must be taken in placing the annotations so that they do
+not confuse or unduly complicate the writing of macros. An annotated
+identifier does not look like an identifier, for example.
 
 |#
 
 (require "util.rkt")
-(require syntax/readerr syntax/stx)
+(require syntax/readerr syntax/strip-context syntax/stx)
 
 (define (make-loc-stx src line col pos)
   (datum->syntax #f #f (list src line col pos #f)))
+
+;; We do not need and should not have any enrichment while reading
+;; syntax.
+(define anno-id-stx (strip-context #'anno))
 
 ;;; 
 ;;; type annotations
@@ -50,7 +47,7 @@ commonly associated with definitions.
            src line col pos #f))
         ;;(syntax-property d 'type t)
         (quasisyntax/loc (make-loc-stx src line col pos)
-          (anno type (unsyntax t) (unsyntax d))))))))
+          ((unsyntax anno-id-stx) type (unsyntax t) (unsyntax d))))))))
 
 ;;; 
 ;;; generic annotations
@@ -89,7 +86,8 @@ commonly associated with definitions.
              src line col pos #f))
           ;;(apply syntax-property d k-v)
           (quasisyntax/loc (make-loc-stx src line col pos)
-            (anno (unsyntax-splicing k-v) (unsyntax d)))))))))
+            ((unsyntax anno-id-stx) (unsyntax-splicing k-v)
+             (unsyntax d)))))))))
 
 ;;; 
 ;;; reader extension
