@@ -45,8 +45,9 @@ begin-for-syntax.
 
 (provide module-begin)
 
+(require "compiler-metadata.rkt")
+
 (require (for-syntax syntax/id-table
-                     "compiler-metadata.rkt"
                      "settings.rkt"
                      "util.rkt"))
 
@@ -69,6 +70,11 @@ begin-for-syntax.
 (define-syntax (module-begin stx)
   (syntax-case stx ()
     ((_ . ds)
+     ;; To avoid unnecessary work we do not export the
+     ;; meta-information unless we are actually compiling. It is still
+     ;; okay, though, for simplicity, to have macros produce the
+     ;; information. We are just not generating submodules based on
+     ;; that information.
      (if (not compile?)
          #'(#%module-begin . ds)
          #'(compiled-module-begin . ds)))))

@@ -35,18 +35,8 @@ level).
 |#
 
 (require
- "annos.rkt" "define-2.rkt" "util.rkt"
- (for-syntax "compiler-metadata.rkt" "settings.rkt" "util.rkt")) 
-
-(define-syntax (begin/save-type stx)
-  (syntax-case stx ()
-    [(_ n t)
-     (record-type! #'n (TypeName (syntax->datum #'t)))
-     #'(begin)]
-    [(_ n)
-     (record-type! #'n AnyT)
-     #'(begin)]
-    ))
+ "annos.rkt" "compiler-metadata.rkt" "define-2.rkt" "util.rkt"
+ (for-syntax "metadata-defs.rkt" "settings.rkt" "util.rkt")) 
 
 ;; Yes we are providing this. If the programmer wants to hack our core
 ;; language, they may. The idea is to express core language as (%core
@@ -69,15 +59,6 @@ level).
     ((_ n v e)
      (identifier? #'n)
      (add-anno #'e (syntax-e #'n) #'v #:from stx))))
-
-;; Do nothing. Do not think we actually need new core language for this.
-(define-syntax-rule*-2 (pass)
-  (void)
-  (%core 'pass))
-
-;; Evaluate twice, presumably for side effects.
-(define-syntax-rule* (twice x)
-  (begin x x))
 
 ;; This is only intended for local variable declarations, as Magnolisp
 ;; may not end up having any other kind. As AnyT can take on any type,

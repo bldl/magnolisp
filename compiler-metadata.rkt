@@ -2,8 +2,8 @@
 
 #|
 
-The intention is for this module to be always required for-syntax, as
-the information is only accessed at macro expansion time.
+The definitions in this module are mostly exported for-syntax, as the
+information is only accessed at macro expansion time.
 
 Note quite sure if we should specify any #:phase for the identifier
 tables, but phase 0 would seem appropriate as all Magnolisp names are
@@ -11,27 +11,28 @@ such.
 
 |#
 
-(require "util.rkt")
-(require syntax/id-table)
+(begin-for-syntax
 
-;;; 
-;;; Type annotations.
-;;; 
+ (require "util.rkt")
+ (require syntax/id-table)
 
-(define type-table (make-bound-id-table #:phase 0))
-(provide type-table)
+ (define type-table (make-bound-id-table #:phase 0))
+ (provide type-table)
+ 
+ (define* (record-type! id-stx t)
+   (bound-id-table-set! type-table id-stx t))
 
-(struct Type ())
-(provide Type?)
+ ) ; end begin-for-syntax
 
-(define-values (struct:AnyT make-AnyT AnyT? AnyT-ref AnyT-set!)
-  (make-struct-type 'AnyT struct:Type 0 0))
-(define AnyT (make-AnyT))
-(provide AnyT AnyT?)
+(require "util.rkt"
+         (for-syntax "metadata-defs.rkt"))
 
-;; n is a symbol
-(struct TypeName Type (n) #:transparent)
-(provide (struct-out TypeName))
-
-(define* (record-type! id-stx t)
-  (bound-id-table-set! type-table id-stx t))
+(define-syntax* (begin/save-type stx)
+  (syntax-case stx ()
+    [(_ n t)
+     (record-type! #'n (TypeName (syntax->datum #'t)))
+     #'(begin)]
+    [(_ n)
+     (record-type! #'n AnyT)
+     #'(begin)]
+    ))
