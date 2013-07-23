@@ -15,12 +15,19 @@ phase 1, whereas the backend uses the values in phase 0.
 
 #|
 
+TODO We might want to record the name of the containing module, if
+any, and possibly location info for the definition. Do not know how to
+get the former. We might also want to specify what sort of thing is
+being defined.
+
 name is a symbol specifying the original name.
 
 type is a Type, or #f for untyped constructs.
 
-modifs is a list of {external, verbatim}
+defined-as is (or/c #f 'external 'verbatim)
 where
+  - #f means that there is not definition, or that it is given
+    in Magnolisp
   - 'external means an externally defined function (in C++)
   - 'verbatim means that body is foreign language (C++)
 
@@ -42,7 +49,7 @@ second (if any) is a hover help string.
 
 |#
 (struct DefInfo 
-	(name type modifs doc 
+	(name type defined-as doc 
 	      emacs-indent emacs-highlight emacs-dictionary)
 	#:transparent #:mutable)
 (provide (struct-out DefInfo))
