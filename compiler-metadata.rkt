@@ -56,6 +56,28 @@ useful.
  (define-syntax-rule (matches? e pat)
    (match e (pat #t) (_ #f)))
 
+ (define (parse-sub-type def-n stx t)
+   (match t
+     ((? symbol?) 
+      (TypeName t))
+     (else
+      (raise-anno-syntax-error def-n 'type stx t))))
+
+ ;; There are no generic types, and also no structure type specifiers,
+ ;; although it is possible to refer to a structure type by name.
+ ;; There are also no first class operations, so an operation never
+ ;; takes a operation type as an argument.
+ (define (parse-def-type def-n stx)
+   (define t (syntax->datum stx))
+   (match t
+     ((? symbol?) 
+      (TypeName t))
+     ((list ats ... rt) 
+      (let ((p (fix parse-sub-type def-n stx)))
+	(FunT (map p ats) (p rt))))
+     (else
+      (raise-anno-syntax-error def-n 'type stx t))))
+
  ;; Creates a DefInfo record by parsing any annotations in syntax
  ;; properties. Missing information is given the default value,
  ;; typically #f. Unrecognized annotations are ignored, although we
@@ -85,8 +107,11 @@ useful.
        'verbatim)
       (else #f)))
 
-   ;;xxx type - expect sexp conforming to a grammar
-   (define type #f)
+   (define type
+     (let ((stx (hash-ref h 'type #f)))
+       (cond
+	((not stx) AnyT)
+	(else (parse-def-type name stx)))))
 
    ;; For the documentation, the user might want to install the
    ;; Scribble reader. But at this point the reading has already been

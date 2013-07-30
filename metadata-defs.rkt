@@ -69,3 +69,6 @@ second (if any) is a hover help string.
 ;; n is a symbol
 (struct TypeName Type (n) #:transparent)
 (provide (struct-out TypeName))
+
+(struct FunT Type (ats rt) #:transparent)
+(provide (struct-out FunT))
