@@ -15,10 +15,8 @@ phase 1, whereas the backend uses the values in phase 0.
 
 #|
 
-TODO We might want to record the name of the containing module, if
-any, and possibly location info for the definition. Do not know how to
-get the former. We might also want to specify what sort of thing is
-being defined.
+The internal presentation of definition metadata is an immutable
+hasheq, keyed by the following symbols:
 
 name is a symbol specifying the original name.
 
@@ -47,12 +45,18 @@ emacs-dictionary is a list of (string? . (or/c string? #f)) where the
 first string is a dictionary word for auto completion, and the
 second (if any) is a hover help string.
 
+IR construction for each value type, as above, is defined by the
+functions below.
+
+TODO We might want to record the name of the containing module, if
+any, and possibly location info for the definition. Do not know how to
+get the former. We might also want to specify what sort of thing is
+being defined.
+
 |#
-(struct DefInfo 
-	(name type defined-as doc 
-	      emacs-indent emacs-highlight emacs-dictionary)
-	#:transparent #:mutable)
-(provide (struct-out DefInfo))
+
+(define* (ir-stx-new-name id-stx)
+  #`',id-stx)
 
 ;;; 
 ;;; Type annotations.

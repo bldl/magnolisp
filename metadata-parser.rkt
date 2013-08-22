@@ -84,7 +84,7 @@ useful.
      (else
       (raise-anno-syntax-error def-n 'type stx t))))
 
- ;; Creates a DefInfo record by parsing any annotations in syntax
+ ;; Creates a DefInfo hasheq by parsing any annotations in syntax
  ;; properties. Missing information is given the default value,
  ;; typically #f. Unrecognized annotations are ignored, although we
  ;; could consider storing them in the DefInfo as they are.
@@ -197,8 +197,13 @@ useful.
 	   (raise-anno-syntax-error name 'dictionary stx v
 				    "a literal boolean or list"))))))
 
-   (DefInfo name type defined-as doc 
-     emacs-indent emacs-highlight emacs-dictionary))
+   (make-hasheq `((name ,name)
+                  (type ,type)
+                  (defined-as ,defined-as)
+                  (doc ,doc)
+                  (emacs-indent ,emacs-indent)
+                  (emacs-highlight ,emacs-highlight)
+                  (emacs-dictionary ,emacs-dictionary))))
 
  ) ; end begin-for-syntax
 
