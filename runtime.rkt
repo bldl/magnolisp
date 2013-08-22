@@ -60,6 +60,14 @@ level).
      (identifier? #'n)
      (add-anno #'e (syntax-e #'n) #'v #:from stx))))
 
+(define-syntax* (function stx)
+  (syntax-case stx ()
+    ((_ (f xs ...) b ...)
+     (begin
+       (parse-record-definfo! #'f stx)
+       #'(define (f xs ...) b ...)))))
+
+;; DEPRECATED
 ;; This is only intended for local variable declarations, as Magnolisp
 ;; may not end up having any other kind. As AnyT can take on any type,
 ;; local type inference will be able to unify it with the value type.

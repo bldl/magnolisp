@@ -37,6 +37,12 @@ useful.
  (define* (record-definfo! id-stx info)
    (bound-id-table-set! definfo-table id-stx info))
 
+ (define* (parse-record-definfo! id-stx def-stx)
+   (define info (parse-definfo id-stx def-stx))
+   (when info
+     (pretty-println info)
+     (record-definfo! id-stx info)))
+
  (define (raise-anno-syntax-error def-n anno-n v-stx v [expect-s #f])
    (raise-syntax-error def-n
      (format "~a: expected ~a, got ~s" 
