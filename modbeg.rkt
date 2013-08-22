@@ -45,7 +45,7 @@ begin-for-syntax.
 
 (provide module-begin)
 
-(require "compiler-metadata.rkt")
+(require "metadata-parser.rkt")
 
 (require (for-syntax syntax/id-table
                      "settings.rkt"

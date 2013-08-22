@@ -35,7 +35,7 @@ level).
 |#
 
 (require
- "annos.rkt" "compiler-metadata.rkt" "define-2.rkt" "util.rkt"
+ "annos.rkt" "metadata-parser.rkt" "define-2.rkt" "util.rkt"
  (for-syntax "metadata-defs.rkt" "settings.rkt" "util.rkt")) 
 
 ;; Yes we are providing this. If the programmer wants to hack our core
