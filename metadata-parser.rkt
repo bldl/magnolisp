@@ -18,19 +18,41 @@ useful.
 
 |#
 
-(require "annos.rkt" "util.rkt")
+(require "annos.rkt" "util.rkt"
+         (for-syntax "metadata-defs.rkt" "util.rkt"
+                     syntax/id-table))
+
+;;; 
+;;; type recording
+;;;
 
 (begin-for-syntax
-
- (require "metadata-defs.rkt" "util.rkt")
- (require racket/match syntax/id-table)
-
  ;; DEPRECATED
  (define* type-table (make-bound-id-table #:phase 0))
  
  ;; DEPRECATED
  (define* (record-type! id-stx t)
    (bound-id-table-set! type-table id-stx t))
+ )
+
+;; DEPRECATED
+(define-syntax* (begin/save-type stx)
+  (syntax-case stx ()
+    [(_ n t)
+     (record-type! #'n (TypeName (syntax->datum #'t)))
+     #'(begin)]
+    [(_ n)
+     (record-type! #'n AnyT)
+     #'(begin)]
+    ))
+
+;;; 
+;;; DefInfo parsing and recording
+;;; 
+
+(begin-for-syntax
+
+ (require racket/match)
 
  (define* definfo-table (make-bound-id-table #:phase 0))
  
@@ -65,7 +87,7 @@ useful.
  (define (parse-sub-type def-n stx t)
    (match t
      ((? symbol?) 
-      (TypeName t))
+      #`(TypeName '#,t))
      (else
       (raise-anno-syntax-error def-n 'type stx t))))
 
@@ -77,10 +99,10 @@ useful.
    (define t (syntax->datum stx))
    (match t
      ((? symbol?) 
-      (TypeName t))
+      #`(TypeName '#,t))
      ((list ats ... rt) 
       (let ((p (fix parse-sub-type def-n stx)))
-	(FunT (map p ats) (p rt))))
+	#`(FunT (list #,@(map p ats)) #,(p rt))))
      (else
       (raise-anno-syntax-error def-n 'type stx t))))
 
@@ -116,7 +138,7 @@ useful.
    (define type
      (let ((stx (hash-ref h 'type #f)))
        (cond
-	((not stx) AnyT)
+	((not stx) #'AnyT)
 	(else (parse-def-type name stx)))))
 
    ;; For the documentation, the user might want to install the
@@ -197,23 +219,13 @@ useful.
 	   (raise-anno-syntax-error name 'dictionary stx v
 				    "a literal boolean or list"))))))
 
-   (make-hasheq `((name ,name)
-                  (type ,type)
-                  (defined-as ,defined-as)
-                  (doc ,doc)
-                  (emacs-indent ,emacs-indent)
-                  (emacs-highlight ,emacs-highlight)
-                  (emacs-dictionary ,emacs-dictionary))))
+   (make-hasheq `((name . ,#`'#,name)
+                  (type . ,type)
+                  (defined-as . ,#`'#,defined-as)
+                  (doc . ,doc)
+                  (emacs-indent . ,#`'#,emacs-indent)
+                  (emacs-highlight . ,#`'#,emacs-highlight)
+                  (emacs-dictionary . ,#`'#,emacs-dictionary))))
 
  ) ; end begin-for-syntax
 
-;; DEPRECATED
-(define-syntax* (begin/save-type stx)
-  (syntax-case stx ()
-    [(_ n t)
-     (record-type! #'n (TypeName (syntax->datum #'t)))
-     #'(begin)]
-    [(_ n)
-     (record-type! #'n AnyT)
-     #'(begin)]
-    ))
