@@ -45,11 +45,6 @@ emacs-dictionary is a list of (string? . (or/c string? #f)) where the
 first string is a dictionary word for auto completion, and the
 second (if any) is a hover help string.
 
-TODO We might want to record the name of the containing module, if
-any, and possibly location info for the definition. Do not know how to
-get the former. We might also want to specify what sort of thing is
-being defined.
-
 |#
 
 ;;; 

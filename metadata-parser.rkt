@@ -62,7 +62,7 @@ useful.
  (define* (parse-record-definfo! id-stx def-stx)
    (define info (parse-definfo id-stx def-stx))
    (when info
-     (pretty-println info)
+     ;;(pretty-println info)
      (record-definfo! id-stx info)))
 
  (define (raise-anno-syntax-error def-n anno-n v-stx v [expect-s #f])
@@ -87,7 +87,7 @@ useful.
  (define (parse-sub-type def-n stx t)
    (match t
      ((? symbol?) 
-      #`(TypeName '#,t))
+      (TypeName t))
      (else
       (raise-anno-syntax-error def-n 'type stx t))))
 
@@ -99,10 +99,10 @@ useful.
    (define t (syntax->datum stx))
    (match t
      ((? symbol?) 
-      #`(TypeName '#,t))
+      (TypeName t))
      ((list ats ... rt) 
       (let ((p (fix parse-sub-type def-n stx)))
-	#`(FunT (list #,@(map p ats)) #,(p rt))))
+	(FunT (map p ats) (p rt))))
      (else
       (raise-anno-syntax-error def-n 'type stx t))))
 
@@ -138,7 +138,7 @@ useful.
    (define type
      (let ((stx (hash-ref h 'type #f)))
        (cond
-	((not stx) #'AnyT)
+	((not stx) AnyT)
 	(else (parse-def-type name stx)))))
 
    ;; For the documentation, the user might want to install the
@@ -219,13 +219,14 @@ useful.
 	   (raise-anno-syntax-error name 'dictionary stx v
 				    "a literal boolean or list"))))))
 
-   (make-hasheq `((name . ,#`'#,name)
+   (make-hasheq `((name . ,name)
+                  ;;(stx-3d . ,AnyT) ;; test use of direct values
                   (type . ,type)
-                  (defined-as . ,#`'#,defined-as)
+                  (defined-as . ,defined-as)
                   (doc . ,doc)
-                  (emacs-indent . ,#`'#,emacs-indent)
-                  (emacs-highlight . ,#`'#,emacs-highlight)
-                  (emacs-dictionary . ,#`'#,emacs-dictionary))))
+                  (emacs-indent . ,emacs-indent)
+                  (emacs-highlight . ,emacs-highlight)
+                  (emacs-dictionary . ,emacs-dictionary))))
 
  ) ; end begin-for-syntax
 

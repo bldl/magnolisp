@@ -45,9 +45,8 @@ begin-for-syntax.
 
 (provide module-begin)
 
-(require "metadata-parser.rkt")
-
-(require (for-syntax syntax/id-table
+(require "metadata-parser.rkt"
+         (for-syntax syntax/id-table
                      "settings.rkt"
                      "util.rkt"))
 
@@ -58,13 +57,23 @@ begin-for-syntax.
                     (local-expand #'(#%module-begin . bodies)
                                  'module-begin
                                  null)])
-       (with-syntax ([((n . k) ...)
-                      (bound-id-table-map type-table cons)])
+       (with-syntax (
+                     [((d-n . d-k) ...)
+                      (bound-id-table-map definfo-table cons)]
+                     [((t-n . t-k) ...)
+                      (bound-id-table-map type-table cons)]
+                     )
+         ;;(writeln #'((d-n . d-k) ...))
          #'(mb (begin-for-syntax
+                (module* metadata #f
+                  (define re-t (make-bound-id-table #:phase 0))
+                  (bound-id-table-set! re-t #'d-n d-k) ...
+                  (provide (rename-out [re-t m-definfo-tbl])))
                 (module* types #f
                   (define re-t (make-bound-id-table #:phase 0))
-                  (bound-id-table-set! re-t #'n 'k) ...
-                  (provide (rename-out [re-t m-types-tbl]))))
+                  (bound-id-table-set! re-t #'t-n 't-k) ...
+                  (provide (rename-out [re-t m-types-tbl])))
+                )
                . bodies)))]))
 
 (define-syntax (module-begin stx)
@@ -75,6 +84,6 @@ begin-for-syntax.
      ;; okay, though, for simplicity, to have macros produce the
      ;; information. We are just not generating submodules based on
      ;; that information.
-     (if (not compile?)
+     (if (and #f (not compile?)) ;; xxx for now always include meta
          #'(#%module-begin . ds)
          #'(compiled-module-begin . ds)))))
