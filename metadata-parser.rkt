@@ -23,30 +23,6 @@ useful.
                      syntax/id-table))
 
 ;;; 
-;;; type recording
-;;;
-
-(begin-for-syntax
- ;; DEPRECATED
- (define* type-table (make-bound-id-table #:phase 0))
- 
- ;; DEPRECATED
- (define* (record-type! id-stx t)
-   (bound-id-table-set! type-table id-stx t))
- )
-
-;; DEPRECATED
-(define-syntax* (begin/save-type stx)
-  (syntax-case stx ()
-    [(_ n t)
-     (record-type! #'n (TypeName (syntax->datum #'t)))
-     #'(begin)]
-    [(_ n)
-     (record-type! #'n AnyT)
-     #'(begin)]
-    ))
-
-;;; 
 ;;; DefInfo parsing and recording
 ;;; 
 

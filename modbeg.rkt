@@ -60,8 +60,6 @@ begin-for-syntax.
        (with-syntax (
                      [((d-n . d-k) ...)
                       (bound-id-table-map definfo-table cons)]
-                     [((t-n . t-k) ...)
-                      (bound-id-table-map type-table cons)]
                      )
          ;;(writeln #'((d-n . d-k) ...))
          #'(mb (begin-for-syntax
@@ -69,10 +67,6 @@ begin-for-syntax.
                   (define re-t (make-bound-id-table #:phase 0))
                   (bound-id-table-set! re-t #'d-n d-k) ...
                   (provide (rename-out [re-t m-definfo-tbl])))
-                (module* types #f
-                  (define re-t (make-bound-id-table #:phase 0))
-                  (bound-id-table-set! re-t #'t-n 't-k) ...
-                  (provide (rename-out [re-t m-types-tbl])))
                 )
                . bodies)))]))
 

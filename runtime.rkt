@@ -66,29 +66,3 @@ level).
      (begin
        (parse-record-definfo! #'f stx)
        #'(define (f xs ...) b ...)))))
-
-;; DEPRECATED
-;; This is only intended for local variable declarations, as Magnolisp
-;; may not end up having any other kind. As AnyT can take on any type,
-;; local type inference will be able to unify it with the value type.
-(define-syntax* (var stx)
-  (syntax-case stx ()
-    ((_ (n t))
-     (if-not-compiling
-      #'(define n undefined)
-      #'(begin
-          (define n undefined)
-          (begin/save-type n t))))
-    ((_ (n t) v)
-     (if-not-compiling
-      #'(define n v)
-      #'(begin
-          (define n v)
-          (begin/save-type n t))))
-    ((_ n v)
-     (if-not-compiling
-      #'(define n v)
-      #'(begin
-          (define n v)
-          (begin/save-type n))))
-    ))
