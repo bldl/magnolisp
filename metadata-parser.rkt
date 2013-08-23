@@ -76,7 +76,7 @@ useful.
    (match t
      ((? symbol?) 
       (TypeName t))
-     ((list ats ... rt) 
+     ((list 'fn ats ... rt) 
       (let ((p (fix parse-sub-type def-n stx)))
 	(FunT (map p ats) (p rt))))
      (else
