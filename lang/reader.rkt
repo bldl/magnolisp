@@ -1,5 +1,5 @@
 #lang s-exp syntax/module-reader
-magnolisp/evaluator-language
+magnolisp/magnolisp-language
 #:wrapper1 (lambda (t)
              ;; No need to replace reader altogether, just override
              ;; readtable.

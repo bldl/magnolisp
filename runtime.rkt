@@ -3,11 +3,9 @@
 #|
 
 This runtime implements Magnolisp language, and such language is not
-meant to be used in macro programming. Hence, rather interestingly, we
-want to specialize the generated code for its intended runtime.
-
-We will want some support for declaring macros that have different
-expansion choices.
+meant to be used in macro programming. This is because the runtime
+language must be restricted enough to be easily analyzable, and
+compilable to C++.
 
 We cannot introduce new core language into Racket, and so we must be
 able to express foreign syntax in terms of Racket syntax, without
@@ -21,22 +19,11 @@ We cannot do much quoting to make sure that we retain binding
 information, and to make sure that macros get expanded. Again, no
 problem, as we can use 'lambda' as a container for code.
 
-If this approach turns out to lack sufficient power, then we must
-allow our own core language, and make careful use of
-'local-expand' (or similar) to avoid the macro expander getting
-confused by our core language.
-
-To record metadata for the compiler, we use code that runs in phase
-level 1. Since it lives in phase 1, the respective module's
-#%module-begin will be executed in the same phase, and will hence have
-access to the information (via the same variables at the same phase
-level).
-
 |#
 
 (require
- "annos.rkt" "metadata-parser.rkt" "define-2.rkt" "util.rkt"
- (for-syntax "metadata-defs.rkt" "settings.rkt" "util.rkt")) 
+ "annos.rkt" "metadata-parser.rkt" "util.rkt"
+ (for-syntax "metadata-defs.rkt" "util.rkt")) 
 
 ;; Yes we are providing this. If the programmer wants to hack our core
 ;; language, they may. The idea is to express core language as (%core
