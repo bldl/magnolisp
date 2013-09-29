@@ -2,8 +2,9 @@
 
 #|
 
-Information about definitions. The frontend creates such values in
-phase 1, whereas the backend uses the values in phase 0.
+Data types used for annotations. The frontend creates (syntax for)
+such values in phase 1, whereas the backend uses the values in phase
+0.
 
 |#
 
@@ -15,35 +16,29 @@ phase 1, whereas the backend uses the values in phase 0.
 
 #|
 
-The internal presentation of definition metadata is an immutable
-hasheq, keyed by the following symbols:
+We use a bound-id-table for storing information about identifiers. The
+key being the ID, and the value being a hasheq, keyed by the
+following:
 
-name is a symbol specifying the original name.
+  - 'type :: a Type for each declared typed construct
 
-type is a Type, or #f for untyped constructs.
+  - 'entry-point :: a #t value for each library entry point
 
-defined-as is (or/c #f 'external 'verbatim)
-where
-  - #f means that there is not definition, or that it is given
-    in Magnolisp
+The 'verbatim and 'external property of an operation body is encoded
+in the AST, and no table is required for that information. This really
+is a property of the body, and not of the signature.
+
   - 'external means an externally defined function (in C++)
+
   - 'verbatim means that body is foreign language (C++)
 
-doc is a docstring for the defined name.
+The reason we are using a /bound/ id-table is that whenever we are
+adding a metadata record it is for a freshly bound definition - we
+never add a new metadata record for the same identifier.
 
-emacs-indent is symbol? or integer?
-where
-  - a symbol? names an Emacs Lisp function, except
-    for 'defun, which is special
-(see 'scheme-indent-function in Emacs)
-
-emacs-highlight is a list of (symbol? . symbol?) where the first symbol
-is a symbol to highlight, whereas the second symbol specifies an Emacs
-highlighting style, or some abstract alias thereof.
-
-emacs-dictionary is a list of (string? . (or/c string? #f)) where the
-first string is a dictionary word for auto completion, and the
-second (if any) is a hover help string.
+Note quite sure if we should specify any #:phase for the identifier
+tables, but phase 0 would seem appropriate as all Magnolisp names are
+such.
 
 |#
 

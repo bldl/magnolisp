@@ -17,7 +17,7 @@ For more compact printing, we do not make annotations transparent.
 (define* (stx-annos stx)
   (let ((h (for/hasheq ((k (syntax-property-symbol-keys stx)))
                        (values k (syntax-property stx k)))))
-    (set! h (hash-set h 'loc (stx-loc stx)))
+    (set! h (hash-set h 'loc (stx-loc stx))) ;; xxx stx-loc
     (set! h (hash-set h 'stx stx))
     h))
 
@@ -30,7 +30,7 @@ For more compact printing, we do not make annotations transparent.
 ;; level. Forward references to module-level variables (without
 ;; access) are fine.
 
-(define-struct* Ast (annos))
+(abstract-struct* Ast (annos))
 
 (define* (Ast-anno-ref ast k #:must (must #t))
   (let* ((annos (Ast-annos ast)))
@@ -118,7 +118,7 @@ For more compact printing, we do not make annotations transparent.
   (syntax-case stx ()
     ((_ name ((t field) ...))
      #`(begin
-         (define-struct* name Ast (field ...)
+         (concrete-struct* name Ast (field ...)
            #:methods gen:strategic
            (#,@(make-strategic
                 #'name

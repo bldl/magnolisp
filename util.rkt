@@ -25,6 +25,9 @@
               #f
               (next (cons res res-lst) (cdr lst)))))))
 
+(define-syntax-rule* (matches? e pat)
+  (match e (pat #t) (_ #f)))
+
 #|
 
 Copyright 2009 Helsinki Institute for Information Technology (HIIT)

@@ -47,17 +47,13 @@ same variables at the same phase level).
     [(_ . bodies) 
      (with-syntax ([(mb . bodies)
                     (local-expand #'(#%module-begin . bodies)
-                                 'module-begin
-                                 null)])
-       (with-syntax (
-                     [((d-n . d-k) ...)
-                      (bound-id-table-map definfo-table cons)]
-                     )
+                                  'module-begin null)])
+       (with-syntax ([((d-n . d-k) ...)
+                      (bound-id-table-map definfo-table cons)])
          ;;(writeln #'((d-n . d-k) ...))
          #'(mb (begin-for-syntax
                 (module* compile-info #f
                   (define re-t (make-bound-id-table #:phase 0))
                   (bound-id-table-set! re-t #'d-n d-k) ...
-                  (provide (rename-out [re-t m-definfo-tbl])))
-                )
+                  (provide (rename-out [re-t m-definfo-tbl]))))
                . bodies)))]))

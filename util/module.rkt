@@ -41,12 +41,17 @@
     (define-values (n ...) vals)
     (provide n ...)))
 
-;; Note that 'struct*' is already defined in 'racket'.
 (define-syntax-rule*
-  (define-struct* nm rest ...)
+  (concrete-struct* nm rest ...)
   (begin
     (struct nm rest ...)
     (provide (struct-out nm))))
+
+(define-syntax-rule*
+  (abstract-struct* nm rest ...)
+  (begin
+    (struct nm rest ... #:constructor-name ctor)
+    (provide (except-out (struct-out nm) ctor))))
 
 (define-syntax-rule*
   (require* n ...)
