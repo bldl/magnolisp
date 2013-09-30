@@ -20,9 +20,11 @@ having the expansion itself generate a table as well as code to
 persist the type information. It is notable that an id-table can be
 used even for local names, since identifiers are unique.
 
-Whatever we export should also have some location information. Should
-we discover errors only once we start actual compilation or linking,
-then we need to be able to still report errors properly.
+Whatever we export should also have some location information, so we
+do our best to preserve this information for any syntax objects we
+include in our metadata. Should we discover errors only once we start
+actual compilation or linking, then we need to be able to still report
+errors properly.
 
 When required for evaluation, we display the value of module top-level
 expressions, whereas otherwise we do not. This can be useful for
@@ -42,15 +44,35 @@ same variables at the same phase level).
          (for-syntax racket/pretty syntax/id-table
                      "util.rkt"))
 
-(define-for-syntax (make-definfo-submodule)
-  (with-syntax ([((d-n . d-k) ...)
-                 (bound-id-table-map definfo-table cons)])
-    ;;(writeln #'((d-n . d-k) ...))
-    #'(begin-for-syntax
-       (module* definfo #f
-         (define re-t (make-bound-id-table #:phase 0))
-         (bound-id-table-set! re-t #'d-n d-k) ...
-         (provide (rename-out [re-t m-definfo-tbl]))))))
+(begin-for-syntax
+ ;; Given [h hash?], returns syntax for an expression that produces
+ ;; an (and/c hash? hash-eq?) value. The hash table values are
+ ;; assumed to be syntax objects, and they are preserved as such.
+ (define (syntax-for-hasheq h)
+   #`(make-hasheq
+      (list #,@(hash-map
+                h
+                (lambda (n-sym val-stx)
+                  #`(cons '#,n-sym #'#,val-stx))))))
+ 
+ ;; Given [t bound-id-table?], returns syntax for an expression that
+ ;; produces something for which the dict? predicate returns true.
+ ;; The table values are assumed to be syntax objects, and they are
+ ;; preserved as such.
+ (define (syntax-for-bound-id-table-dict t)
+   #`(list #,@(bound-id-table-map
+               t
+               (lambda (id-stx h)
+                 #`(cons #'#,id-stx #,(syntax-for-hasheq h))))))
+
+ (define (make-definfo-submodule)
+   #`(begin-for-syntax
+      (module* definfo #f
+        (define m-annos
+          (make-bound-id-table
+           #,(syntax-for-bound-id-table-dict definfo-table)
+           #:phase 0))
+        (provide m-annos)))))
 
 (define-syntax (module-begin stx)
   (syntax-case stx ()
