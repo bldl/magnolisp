@@ -65,23 +65,25 @@ same variables at the same phase level).
                (lambda (id-stx h)
                  #`(cons #'#,id-stx #,(syntax-for-hasheq h))))))
 
- (define (make-definfo-submodule)
+ (define (make-definfo-submodule ast)
    #`(begin-for-syntax
       (module* definfo #f
         (define m-annos
           (make-bound-id-table
            #,(syntax-for-bound-id-table-dict definfo-table)
            #:phase 0))
-        (provide m-annos)))))
+        (define m-ast #'#,ast)
+        (provide m-annos m-ast))))
+ ) ;; end begin-for-syntax
 
 (define-syntax (module-begin stx)
   (syntax-case stx ()
-    [(_ . bodies) 
-     (with-syntax ([(mb . bodies)
-                    (local-expand #'(#%module-begin . bodies)
-                                  'module-begin null)])
-       (with-syntax ((sm (make-definfo-submodule)))
+    ((_ . bodies)
+     (let ((ast (local-expand #'(#%module-begin . bodies)
+                              'module-begin null)))
+       (with-syntax (((mb . bodies) ast)
+                     (sm (make-definfo-submodule ast)))
          (let ((mb-stx
                 #'(mb sm . bodies)))
            ;;(pretty-print (syntax->datum mb-stx))
-           mb-stx)))]))
+           mb-stx))))))
