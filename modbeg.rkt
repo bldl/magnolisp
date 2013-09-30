@@ -7,9 +7,9 @@ we need nothing but the standard Racket behavior.
 
 For when being required for compilation, we must make sure that we
 also make available compilation-related metadata in a submodule, which
-could be called 'compile-info' or something. We take care to preserve
-type information, and put it into said module. We also want to put an
-AST in there.
+could be called 'definfo' or something. We take care to preserve type
+information, and put it into said module. We also want to put an AST
+in there.
 
 The evaluator ignores type annotations (it does not even load them),
 whereas the compiler requires a fully typed program (although not all
@@ -38,7 +38,7 @@ same variables at the same phase level).
 
 (provide module-begin)
 
-(require "metadata-parser.rkt"
+(require "definfo-store.rkt"
          (for-syntax racket/pretty syntax/id-table
                      "util.rkt"))
 
@@ -53,7 +53,7 @@ same variables at the same phase level).
          ;;(writeln #'((d-n . d-k) ...))
          (let ((mb-stx
                 #'(mb (begin-for-syntax
-                       (module* compile-info #f
+                       (module* definfo #f
                          (define re-t (make-bound-id-table #:phase 0))
                          (bound-id-table-set! re-t #'d-n d-k) ...
                          (provide (rename-out [re-t m-definfo-tbl]))))

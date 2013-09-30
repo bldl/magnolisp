@@ -22,8 +22,8 @@ problem, as we can use 'lambda' as a container for code.
 |#
 
 (require
- "annos.rkt" "metadata-parser.rkt" "util.rkt"
- (for-syntax "metadata-defs.rkt" "util.rkt")) 
+ "annos.rkt" "definfo-store.rkt" "util.rkt"
+ (for-syntax "util.rkt")) 
 
 ;; Yes we are providing this. If the programmer wants to hack our core
 ;; language, they may. The idea is to express core language as (%core
@@ -33,6 +33,7 @@ problem, as we can use 'lambda' as a container for code.
 (define (make-undefined)
   (letrec ((x x)) x))
 
+;; #<undefined>
 (define undefined (make-undefined))
 
 ;; Annotated form 'e'. We collect annotations into a syntax property
@@ -51,5 +52,5 @@ problem, as we can use 'lambda' as a container for code.
   (syntax-case stx ()
     ((_ (f xs ...) b ...)
      (begin
-       (parse-record-definfo! #'f stx)
+       (record-definfo! #'f stx)
        #'(define (f xs ...) b ...)))))

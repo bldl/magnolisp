@@ -1,6 +1,10 @@
 #lang racket
 
 #|
+
+We store all annotations into the 'annos' syntax property, as an
+immutable hasheq.
+
 |#
 
 (require "util.rkt")
