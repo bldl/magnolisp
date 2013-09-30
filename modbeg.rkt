@@ -42,21 +42,24 @@ same variables at the same phase level).
          (for-syntax racket/pretty syntax/id-table
                      "util.rkt"))
 
+(define-for-syntax (make-definfo-submodule)
+  (with-syntax ([((d-n . d-k) ...)
+                 (bound-id-table-map definfo-table cons)])
+    ;;(writeln #'((d-n . d-k) ...))
+    #'(begin-for-syntax
+       (module* definfo #f
+         (define re-t (make-bound-id-table #:phase 0))
+         (bound-id-table-set! re-t #'d-n d-k) ...
+         (provide (rename-out [re-t m-definfo-tbl]))))))
+
 (define-syntax (module-begin stx)
   (syntax-case stx ()
     [(_ . bodies) 
      (with-syntax ([(mb . bodies)
                     (local-expand #'(#%module-begin . bodies)
                                   'module-begin null)])
-       (with-syntax ([((d-n . d-k) ...)
-                      (bound-id-table-map definfo-table cons)])
-         ;;(writeln #'((d-n . d-k) ...))
+       (with-syntax ((sm (make-definfo-submodule)))
          (let ((mb-stx
-                #'(mb (begin-for-syntax
-                       (module* definfo #f
-                         (define re-t (make-bound-id-table #:phase 0))
-                         (bound-id-table-set! re-t #'d-n d-k) ...
-                         (provide (rename-out [re-t m-definfo-tbl]))))
-                      . bodies)))
+                #'(mb sm . bodies)))
            ;;(pretty-print (syntax->datum mb-stx))
            mb-stx)))]))
