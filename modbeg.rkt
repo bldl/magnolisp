@@ -39,7 +39,7 @@ same variables at the same phase level).
 (provide module-begin)
 
 (require "metadata-parser.rkt"
-         (for-syntax syntax/id-table
+         (for-syntax racket/pretty syntax/id-table
                      "util.rkt"))
 
 (define-syntax (module-begin stx)
@@ -51,9 +51,12 @@ same variables at the same phase level).
        (with-syntax ([((d-n . d-k) ...)
                       (bound-id-table-map definfo-table cons)])
          ;;(writeln #'((d-n . d-k) ...))
-         #'(mb (begin-for-syntax
-                (module* compile-info #f
-                  (define re-t (make-bound-id-table #:phase 0))
-                  (bound-id-table-set! re-t #'d-n d-k) ...
-                  (provide (rename-out [re-t m-definfo-tbl]))))
-               . bodies)))]))
+         (let ((mb-stx
+                #'(mb (begin-for-syntax
+                       (module* compile-info #f
+                         (define re-t (make-bound-id-table #:phase 0))
+                         (bound-id-table-set! re-t #'d-n d-k) ...
+                         (provide (rename-out [re-t m-definfo-tbl]))))
+                      . bodies)))
+           ;;(pretty-print (syntax->datum mb-stx))
+           mb-stx)))]))
