@@ -1,0 +1,6 @@
+#!/bin/sh
+# To install, just make sure this file is executable,
+# and then symlink it anywhere you like.
+SRCDIR=$(dirname $(readlink -f $0))
+CLIRKT=$SRCDIR/compiler-cli.rkt
+exec racket --name "$0" --require "$CLIRKT" -- ${1+"$@"}
