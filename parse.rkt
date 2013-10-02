@@ -15,7 +15,7 @@ identifiers. Note also the 'syntax/kerncase' module, and particularly
 
 |#
 
-(require "ast.rkt" "strategy.rkt" "util.rkt" "util/case.rkt")
+(require "ast-magnolisp.rkt" "strategy.rkt" "util.rkt" "util/case.rkt")
 (require (prefix-in rt. "runtime-compiler.rkt"))
 (require (only-in '#%kernel (#%app k-app) (lambda k-lambda)))
 (require racket/function racket/list)

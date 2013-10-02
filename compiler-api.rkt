@@ -48,6 +48,15 @@ external dependencies for the program/library, as well as the .cpp and
   (define mp `(file ,s))
   (compile-module st mp))
 
+(define* (write-cpp-file st cpp-file)
+  (void)) ;;xxx
+
+(define* (write-hpp-file st hpp-file)
+  (void)) ;;xxx
+
+(define* (write-mk-file st mk-file)
+  (void)) ;;xxx
+
 (module* main #f
   (define st (new-state))
   (set! st (compile-module st "test-6-prog.rkt"))

@@ -53,6 +53,17 @@
     (struct nm rest ... #:constructor-name ctor)
     (provide (except-out (struct-out nm) ctor))))
 
+(define-syntax* define-with-contract*
+  (syntax-rules ()
+    ((_ contract (name . rest) body ...)
+     (begin
+       (define (name . rest) body ...)
+       (provide/contract [name contract])))
+    ((_ contract name value)
+     (begin
+       (define name value)
+       (provide/contract [name contract])))))
+
 (define-syntax-rule*
   (require* n ...)
   (begin

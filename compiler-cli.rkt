@@ -32,7 +32,7 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
         (set! hpp-file filename))
        (("--mk") filename "generated Make include file"
         (set! mk-file filename))
-       #:args lst lst))
+       #:args filename filename))
 
     (unless (null? fn-lst)
       (set! fn-lst (map adjust-path fn-lst))

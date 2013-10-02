@@ -6,7 +6,7 @@ For more compact printing, we do not make annotations transparent.
 
 |#
 
-(require "reader-ext.rkt" "strategy.rkt" "util.rkt")
+(require "strategy.rkt" "util.rkt")
 (require racket/generic)
 (require (for-syntax racket/function racket/list racket/syntax))
 
@@ -14,29 +14,20 @@ For more compact printing, we do not make annotations transparent.
 ;;; syntax-derived annotations
 ;;; 
 
-(define* (stx-annos stx)
-  (let ((h (for/hasheq ((k (syntax-property-symbol-keys stx)))
-                       (values k (syntax-property stx k)))))
-    (set! h (hash-set h 'loc (stx-loc stx))) ;; xxx stx-loc
-    (set! h (hash-set h 'stx stx))
-    h))
+;; Creates a hasheq of the properties of the given syntax object
+;; 'stx'.
+(define* (stx-props stx)
+  (for/hasheq ((k (syntax-property-symbol-keys stx)))
+              (values k (syntax-property stx k))))
 
 ;;; 
-;;; abstract node
+;;; AST definition utilities
 ;;; 
 
 ;; Note that ordering is delicate here. Any identifiers must be
 ;; defined before their values are accessed, regardless of phase
 ;; level. Forward references to module-level variables (without
 ;; access) are fine.
-
-(abstract-struct* Ast (annos))
-
-(define* (Ast-anno-ref ast k #:must (must #t))
-  (let* ((annos (Ast-annos ast)))
-    (if must
-        (hash-ref annos k)
-        (hash-ref annos k #f))))
 
 (define-for-syntax (make-for-each-subterm nn-stx f-stx-lst)
   (define nn-sym (syntax-e nn-stx))
@@ -114,11 +105,11 @@ For more compact printing, we do not make annotations transparent.
   (list (make-for-each-subterm nn-stx f-stx-lst)
         (make-subterm-all nn-stx f-stx-lst)))
 
-(define-syntax (define-ast* stx)
+(define-syntax* (define-ast* stx)
   (syntax-case stx ()
-    ((_ name ((t field) ...))
+    ((_ name parent ((t field) ...))
      #`(begin
-         (concrete-struct* name Ast (field ...)
+         (concrete-struct* name parent (field ...)
            #:methods gen:strategic
            (#,@(make-strategic
                 #'name
@@ -126,23 +117,4 @@ For more compact printing, we do not make annotations transparent.
            #:transparent)
          (define* #,(format-id stx "new-~a" (syntax-e #'name))
            (lambda (stx . args)
-             (apply name (stx-annos stx) args)))))))
-
-;;; 
-;;; concrete nodes
-;;; 
-
-(define-ast* Var ((no-term name)))
-(define-ast* Literal ((no-term datum)))
-(define-ast* Verbatim ((no-term text)))
-(define-ast* Module ((list-of-term body)))
-(define-ast* Pass ())
-(define-ast* Call ((just-term proc)))
-(define-ast* Define ((just-term var) (no-term kind)
-                     (list-of-term body)))
-
-(define* (Var-from-stx id-stx)
-  (new-Var id-stx (syntax-e id-stx)))
-
-(define* (Var-rename ast n)
-  (struct-copy Var ast (name n)))
+             (apply name (hasheq 'stx stx) args)))))))
