@@ -12,6 +12,9 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
 ;;; command-line interface
 ;;; 
 
+(define (adjust-path path)
+  (simplify-path (expand-user-path path)))
+
 (module* main #f
   (define (do-main)
     (define hpp-file #f)
@@ -32,7 +35,21 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
        #:args lst lst))
 
     (unless (null? fn-lst)
-      (void)) ;; xxx
+      (set! fn-lst (map adjust-path fn-lst))
+      (define base-fn (first fn-lst))
+      (define-syntax-rule (set!-out-fn fn suffix)
+        (set! fn (if fn
+                     (adjust-path fn)
+                     (path-replace-suffix base-fn suffix))))
+      (set!-out-fn cpp-file ".cpp")
+      (set!-out-fn hpp-file ".hpp")
+      (set!-out-fn mk-file ".mk")
+      (define st (new-state))
+      (for ((fn fn-lst))
+        (set! st (compile-file st fn)))
+      (write-cpp-file st cpp-file)
+      (write-hpp-file st hpp-file)
+      (write-mk-file st mk-file))
     
     (void))
 
