@@ -36,16 +36,10 @@ external dependencies for the program/library, as well as the .cpp and
 (define* mp-root-path (make-parameter #f))
 
 ;;; 
-;;; other
+;;; utilities
 ;;; 
 
-;; Compilation state.
-(struct St () #:transparent)
-
-;; Returns an empty compilation state.
-(define* (new-state)
-  (St))
-
+;; mp is (or/c module-path? resolved-module-path?).
 (define (get-exports-and-imports mp)
   (define path
     (if (resolved-module-path? mp)
@@ -56,45 +50,69 @@ external dependencies for the program/library, as well as the .cpp and
     (let ((imports (module-compiled-imports c-exp)))
       (values vals stxs imports))))
 
-;; Updates compilation state with all the entry points in the
-;; specified module, and all dependencies thereof. Returns an updated
-;; compilation state.
-(define* (compile-module st mp)
-  (define-values [vals stxs imports]
-    ;; The information we get with this is not very helpful in
-    ;; resolving globals. We know what is imported, and what names
-    ;; said modules export, but require renames and such are
-    ;; presumably not accounted for. Said information may be better
-    ;; visible in the AST itself.
-    (get-exports-and-imports mp))
-  (define m-annos
-    (dynamic-require `(submod ,mp magnolisp-info) 'm-annos))
-  (define m-ast
-    (dynamic-require `(submod ,mp magnolisp-info) 'm-ast))
-  (define (resolve is)
-    (map
-     (lambda (p)
-       (define phase (car p))
-       (define mpi-lst (cdr p))
-       (map
-        (lambda (mpi)
-          (define r-mp (module-path-index-resolve mpi))
-          (list phase r-mp (apply-values list
-                            (get-exports-and-imports r-mp))))
-        mpi-lst))
-     is))
-  (pretty-print
-   (list vals stxs
-         ;;(resolve imports)
-         m-ast))
-  st)
+;;; 
+;;; other
+;;; 
 
-;; Compiles the module defined in the specified file. Returns an
-;; updated compilation state.
-(define* (compile-file st fn)
-  (define s (if (path? fn) (path->string fn) fn))
-  (define mp `(file ,s))
-  (compile-module st mp))
+;; [pt syntax?] is the parse tree, as loaded from the submodule.
+;; [annos bound-id-table?] are the annotations. A non-Magnolisp module
+;; is simply represented by the value #t, since such modules are not
+;; processed.
+(struct Mod (pt annos) #:transparent)
+
+;; (-> module-path? (or/c Mod? #t)) Loads the specified module. It is
+;; an error if the module path does not specify an existing module.
+(define (load-module mp)
+  (define annos
+    (dynamic-require `(submod ,mp magnolisp-info) 'm-annos (thunk #f)))
+  (if (not annos)
+      #t
+      (let ((pt (dynamic-require `(submod ,mp magnolisp-info) 'm-ast)))
+        (Mod pt annos))))  
+
+(define (set-entry-points! eps annos)
+  (bound-id-table-for-each
+   annos
+   (lambda (id h)
+     (void)))) ;; xxx need parsing support for entry point annotation
+
+;; Compilation state. 'mods' maps resolved module paths to Mod or #t
+;; objects. 'eps' is a bound-id-table?, with entry points as keys, and
+;; #t values.
+(struct St (mods eps) #:transparent)
+
+;; Compiles a program consisting of all the entry points in the
+;; specified modules, and all dependencies thereof.
+(define* (compile-modules . mp-lst)
+  (define mods (make-hash))
+  (define eps (make-bound-id-table #:phase 0))
+
+  ;; Load all the modules.
+  (for ((mp mp-lst))
+    (define r-mp (resolve-module-path mp (mp-root-path)))
+    (define mod (hash-ref mods r-mp #f))
+    (unless mod
+      (set! mod (load-module mp))
+      (hash-set! mods r-mp mod)
+
+      ;; Use annotations to build a set of entry points.
+      (when (Mod? mod)
+        (define annos (Mod-annos mod))
+        (set-entry-points! eps annos))))
+
+  (St mods eps))
+
+;; Compiles the modules defined in the specified files. Returns a
+;; compilation state with a full IR for the entire program.
+(define* (compile-files . fn-lst)
+  (define mp-lst
+    (map
+     (lambda (fn)
+       (define s (if (path? fn) (path->string fn) fn))
+       (define mp `(file ,s))
+       mp)
+     fn-lst))
+  (apply compile-modules mp-lst))
 
 ;;; 
 ;;; code generation
@@ -114,6 +132,4 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (new-state))
-  (set! st (compile-module st "test-6-prog.rkt"))
-  )
+  (define st (compile-modules "test-6-prog.rkt")))
