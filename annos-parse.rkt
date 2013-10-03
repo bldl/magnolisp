@@ -59,14 +59,10 @@ Routines for parsing annotation values into AST nodes.
 ;; properties. Missing information is given the default value,
 ;; typically #f. Unrecognized annotations are ignored, although we
 ;; could consider storing them in the DefInfo as they are, as syntax.
-(define* (parse-definfo id-stx def-stx h)
+(define (parse-definfo id-stx def-stx h)
   (unless (identifier? id-stx)
     (raise-syntax-error #f "definition must be named by an identifier"
                         def-stx id-stx))
-  
-  (define entry-point
-    (anno->datum h id-stx 'entry-point #f boolean?
-                 #:expect "boolean literal"))
   
   (define type
     (let ((stx (hash-ref h 'type #f)))
@@ -77,5 +73,11 @@ Routines for parsing annotation values into AST nodes.
   (make-hasheq
    `(
      (type . ,type)
-     (entry-point . ,entry-point)
      )))
+
+(define* (parse-entry-point id-stx h)
+  (define entry-point
+    (anno->datum h id-stx 'export #f boolean?
+                 #:expect "boolean literal"))
+  entry-point)
+

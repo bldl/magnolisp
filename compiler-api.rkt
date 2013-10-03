@@ -74,7 +74,9 @@ external dependencies for the program/library, as well as the .cpp and
   (bound-id-table-for-each
    annos
    (lambda (id h)
-     (void)))) ;; xxx need parsing support for entry point annotation
+     (define ep (parse-entry-point id h))
+     (when ep
+       (bound-id-table-set! eps id ep)))))
 
 ;; Compilation state. 'mods' maps resolved module paths to Mod or #t
 ;; objects. 'eps' is a bound-id-table?, with entry points as keys, and
@@ -100,6 +102,8 @@ external dependencies for the program/library, as well as the .cpp and
         (define annos (Mod-annos mod))
         (set-entry-points! eps annos))))
 
+  ;;(pretty-print (bound-id-table-map eps (compose car cons)))
+  
   (St mods eps))
 
 ;; Compiles the modules defined in the specified files. Returns a
