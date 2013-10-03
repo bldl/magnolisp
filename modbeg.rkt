@@ -40,7 +40,7 @@ same variables at the same phase level).
 
 (provide module-begin)
 
-(require "definfo-store.rkt"
+(require "annos-store.rkt"
          (for-syntax racket/pretty syntax/id-table
                      "util.rkt"))
 

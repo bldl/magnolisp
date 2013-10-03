@@ -7,7 +7,7 @@ information is only accessed at macro expansion time.
 
 |#
 
-(require "annos.rkt" "util.rkt"
+(require "annos-util.rkt" "util.rkt"
          (for-syntax "util.rkt" racket/pretty syntax/id-table))
 
 ;;; 

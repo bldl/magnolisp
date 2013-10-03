@@ -24,7 +24,7 @@ external dependencies for the program/library, as well as the .cpp and
 
 |#
 
-(require "compiler-util.rkt" "util.rkt"
+(require "annos-parse.rkt" "compiler-util.rkt" "util.rkt"
          syntax/id-table syntax/moddep)
 
 ;;; 

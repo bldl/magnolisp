@@ -22,7 +22,7 @@ problem, as we can use 'lambda' as a container for code.
 |#
 
 (require
- "annos.rkt" "definfo-store.rkt" "util.rkt"
+ "annos-util.rkt" "annos-store.rkt" "util.rkt"
  (for-syntax "util.rkt")) 
 
 ;; Yes we are providing this. If the programmer wants to hack our core
