@@ -1,5 +1,7 @@
 #lang racket/base
 
+(require racket/contract)
+
 (provide define* define-syntax*)
 
 (define-syntax define*
