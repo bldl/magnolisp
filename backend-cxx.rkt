@@ -6,8 +6,12 @@ C++ back end.
 
 |#
 
-(require "ast.rkt" "strategy.rkt"
+(require "ast-magnolisp.rkt" "strategy.rkt"
          "util.rkt" "util/case.rkt" "util/system.rkt")
+
+;;; 
+;;; reformatting
+;;; 
 
 ;; Not quite perfect as does not appear to insert line breaks.
 ;; http://astyle.sourceforge.net/
@@ -24,6 +28,8 @@ C++ back end.
 ;; (uncrustify "void main() { return; }")
 (define (uncrustify s)
   (exe-filter s '("/usr/bin/uncrustify" "-l" "cpp" "-q")))
+
+#|
 
 ;; Turn into legal C++ names by replacing non-alphanumerics with "_".
 ;; The current renaming is unsafe, which we could fix by tracking
@@ -85,3 +91,4 @@ C++ back end.
      (apply string-append
             (add-between lst " ")))))
 
+|#

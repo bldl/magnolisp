@@ -24,7 +24,7 @@ external dependencies for the program/library, as well as the .cpp and
 
 |#
 
-(require "util.rkt"
+(require "compiler-util.rkt" "util.rkt"
          syntax/id-table syntax/moddep)
 
 ;;; 
@@ -39,16 +39,6 @@ external dependencies for the program/library, as well as the .cpp and
 ;; which case the current directory is used.
 (define* mp-root-path (make-parameter #f))
 
-(define (next-gensym r sym)
-  (define num (hash-ref r sym 0))
-  (define n-sym
-    (if (= num 0)
-        sym
-        (string->symbol
-         (string-append (symbol->string sym)
-                        (number->string num)))))
-  (values (hash-set r sym (+ num 1)) n-sym))
-
 (define (string-keep-basic-chars s)
   (set! s (regexp-replace #rx"^[^a-zA-Z_]+" s ""))
   (set! s (regexp-replace* #rx"[^a-zA-Z0-9_]+" s ""))
@@ -57,9 +47,6 @@ external dependencies for the program/library, as well as the .cpp and
 (define (path-basename-only fn)
   (define-values (p f dir?) (split-path fn))
   (path-replace-suffix f ""))
-
-(define-syntax-rule (unsupported v ...)
-  (error "unsupported" v ...))
 
 (define (resolved-mp->preferred-name mp)
   (match mp
