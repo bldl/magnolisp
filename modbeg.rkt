@@ -7,7 +7,7 @@ we need nothing but the standard Racket behavior.
 
 For when being required for compilation, we must make sure that we
 also make available compilation-related metadata in a submodule, which
-could be called 'definfo' or something. We take care to preserve type
+could be called 'magnolisp-info' or something. We take care to preserve type
 information, and put it into said module. We also want to put an AST
 in there.
 
@@ -67,7 +67,7 @@ same variables at the same phase level).
 
  (define (make-definfo-submodule ast)
    #`(begin-for-syntax
-      (module* definfo #f
+      (module* magnolisp-info #f
         (define m-annos
           (make-bound-id-table
            #,(syntax-for-bound-id-table-dict definfo-table)

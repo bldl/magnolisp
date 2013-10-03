@@ -68,9 +68,9 @@ external dependencies for the program/library, as well as the .cpp and
     ;; visible in the AST itself.
     (get-exports-and-imports mp))
   (define m-annos
-    (dynamic-require `(submod ,mp definfo) 'm-annos))
+    (dynamic-require `(submod ,mp magnolisp-info) 'm-annos))
   (define m-ast
-    (dynamic-require `(submod ,mp definfo) 'm-ast))
+    (dynamic-require `(submod ,mp magnolisp-info) 'm-ast))
   (define (resolve is)
     (map
      (lambda (p)
