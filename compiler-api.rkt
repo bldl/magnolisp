@@ -32,8 +32,8 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 ;; We want to pick a name here such that it will also be suitable for
-;; use in C++. For consistency, we use lowercase names, without
-;; underscores.
+;; use in C++. For consistency, we use capitalized names. Underscores
+;; are preserved, although not typically used in Lisp.
 
 ;; Any module paths are resolved relative to this path. May be #f, in
 ;; which case the current directory is used.
@@ -143,14 +143,47 @@ external dependencies for the program/library, as well as the .cpp and
 (define* (new-state)
   (St))
 
+(define (get-exports-and-imports mp)
+  (define path
+    (if (resolved-module-path? mp)
+        (resolved-module-path-name mp)
+        (resolve-module-path mp (mp-root-path))))
+  (define c-exp (get-module-code path))
+  (let-values (((vals stxs) (module-compiled-exports c-exp)))
+    (let ((imports (module-compiled-imports c-exp)))
+      (values vals stxs imports))))
+
 ;; Updates compilation state with all the entry points in the
 ;; specified module, and all dependencies thereof. Returns an updated
 ;; compilation state.
 (define* (compile-module st mp)
+  (define-values [vals stxs imports]
+    ;; The information we get with this is not very helpful in
+    ;; resolving globals. We know what is imported, and what names
+    ;; said modules export, but require renames and such are
+    ;; presumably not accounted for. Said information may be better
+    ;; visible in the AST itself.
+    (get-exports-and-imports mp))
   (define m-annos
     (dynamic-require `(submod ,mp definfo) 'm-annos))
   (define m-ast
     (dynamic-require `(submod ,mp definfo) 'm-ast))
+  (define (resolve is)
+    (map
+     (lambda (p)
+       (define phase (car p))
+       (define mpi-lst (cdr p))
+       (map
+        (lambda (mpi)
+          (define r-mp (module-path-index-resolve mpi))
+          (list phase r-mp (apply-values list
+                            (get-exports-and-imports r-mp))))
+        mpi-lst))
+     is))
+  (pretty-print
+   (list vals stxs
+         ;;(resolve imports)
+         m-ast))
   st)
 
 ;; Compiles the module defined in the specified file. Returns an

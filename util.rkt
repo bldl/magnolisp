@@ -11,6 +11,10 @@
     ((_ fn arg ...)
      (lambda rest (apply fn arg ... rest)))))
 
+(define-syntax-rule*
+  (apply-values f-expr gen-expr)
+  (call-with-values (thunk gen-expr) f-expr))
+
 ;; Like 'map', but if 'f' returns a value indicating failure, then
 ;; stops and returns #f. By default any false value indicates failure.
 ;; Does not accept multiple list arguments.
