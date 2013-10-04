@@ -24,7 +24,8 @@ external dependencies for the program/library, as well as the .cpp and
 
 |#
 
-(require "annos-parse.rkt" "compiler-util.rkt" "util.rkt"
+(require "annos-parse.rkt" "compiler-util.rkt"
+         "parse.rkt" "util.rkt"
          syntax/id-table syntax/moddep)
 
 ;;; 
@@ -76,7 +77,7 @@ external dependencies for the program/library, as well as the .cpp and
    (lambda (id h)
      (define ep (parse-entry-point id h))
      (when ep
-       (bound-id-table-set! eps id ep)))))
+       (bound-id-table-set! eps id #t)))))
 
 ;; Compilation state. 'mods' maps resolved module paths to Mod or #t
 ;; objects. 'eps' is a bound-id-table?, with entry points as keys, and
