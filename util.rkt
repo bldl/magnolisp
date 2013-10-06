@@ -29,8 +29,18 @@
               #f
               (next (cons res res-lst) (cdr lst)))))))
 
-(define-syntax-rule* (matches? e pat)
-  (match e (pat #t) (_ #f)))
+(define-syntax-rule* (matches? e pat ...)
+  (match e (pat #t) ... (_ #f)))
+
+;; Confusingly, 'resolve-module-path' does not appear to (always)
+;; return a 'resolved-module-path?'. This predicate may be used
+;; instead. It reflects the contract for the return value of
+;; 'resolve-module-path'.
+(define* (resolve-module-path-result? x)
+  (matches? x
+   (? path?)
+   (? symbol?)
+   (list 'submod (or (? path?) (? symbol?)) (? symbol?) ...)))
 
 #|
 
