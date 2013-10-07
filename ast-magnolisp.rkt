@@ -66,14 +66,17 @@ such.
 
 ;; Any recorded annotations from definitions are put into 'annos' from
 ;; the bound-id-table.
-(define-ast* Def Ast
-  ((no-term id) ;; syntax?
-   (just-term body)
-   (no-term rmp) ;; resolved-module-path?
-   (no-term outer))) ;; (listof syntax?), IDs of outer defs
+(abstract-struct* Def Ast
+  (id ;; syntax?
+   rmp ;; resolve-module-path-result?
+   outer) ;; (listof syntax?), IDs of outer defs
+  #:transparent)
 
-;; Null body.
-(define-ast* NoBody Ast () #:singleton (#hasheq()))
+;; Variable definition.
+(define-ast* DefVar Def ((just-term body)))
+
+;; Function parameter declaration.
+(define-ast* Param Def ())
 
 ;; Sequence of statements.
 (define-ast* Begin Ast ((list-of-term body)))
@@ -83,9 +86,6 @@ such.
 
 ;; Function value.
 (define-ast* Lambda Ast ((list-of-term params) (list-of-term body)))
-
-;; Function parameter.
-(define-ast* Param Def ())
 
 ;; Assignment.
 (define-ast* Assign Ast ((just-term lv) (just-term rv)))

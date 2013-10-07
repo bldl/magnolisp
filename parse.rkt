@@ -147,7 +147,7 @@ module.
          (define ast (parse 'expr (cons #'id outer-ctx) #'e))
          (define ann-h (bound-id-table-ref annos #'id #hasheq()))
          (set! ann-h (hash-set ann-h 'stx stx))
-         (define def (Def ann-h #'id ast r-mp outer-ctx))
+         (define def (DefVar ann-h #'id r-mp outer-ctx ast))
          (bound-id-table-set! defs #'id def)
          ast))
            
@@ -178,7 +178,7 @@ module.
          (define par-ast-lst
            (map (lambda (id)
                   (check-redefinition id stx)
-                  (define ast (new-Param id id the-NoBody r-mp outer-ctx))
+                  (define ast (new-Param id id r-mp outer-ctx))
                   (bound-id-table-set! defs id ast)
                   ast)
                 par-id-lst))
