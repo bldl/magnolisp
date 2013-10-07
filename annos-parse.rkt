@@ -67,7 +67,7 @@ Routines for parsing annotation values into AST nodes.
   (define type
     (let ((stx (hash-ref h 'type #f)))
       (cond
-       ((not stx) AnyT)
+       ((not stx) the-AnyT)
        (else (parse-def-type id-stx stx)))))
 
   (make-hasheq

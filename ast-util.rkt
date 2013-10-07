@@ -107,6 +107,16 @@ For more compact printing, we do not make annotations transparent.
 
 (define-syntax* (define-ast* stx)
   (syntax-case stx ()
+    ((_ name parent ((t field) ...) #:singleton (arg ...))
+     (with-syntax ((the-name
+                    (format-id stx "the-~a" (syntax-e #'name))))
+       #`(singleton-struct*
+          name (the-name arg ...) parent (field ...)
+          #:methods gen:strategic
+          (#,@(make-strategic
+               #'name
+               (syntax->list #'((t field) ...))))
+          #:transparent)))
     ((_ name parent ((t field) ...))
      #`(begin
          (concrete-struct* name parent (field ...)
@@ -117,4 +127,5 @@ For more compact printing, we do not make annotations transparent.
            #:transparent)
          (define* #,(format-id stx "new-~a" (syntax-e #'name))
            (lambda (stx . args)
-             (apply name (hasheq 'stx stx) args)))))))
+             (apply name (hasheq 'stx stx) args)))))
+    ))

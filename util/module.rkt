@@ -55,6 +55,13 @@
     (struct nm rest ... #:constructor-name ctor)
     (provide (except-out (struct-out nm) ctor))))
 
+(define-syntax-rule*
+  (singleton-struct* nm (the-nm e ...) rest ...)
+  (begin
+    (struct nm rest ... #:constructor-name ctor)
+    (define the-nm (ctor e ...))
+    (provide (except-out (struct-out nm) ctor) the-nm)))
+
 (define-syntax* define-with-contract*
   (syntax-rules ()
     ((_ contract (name . rest) body ...)

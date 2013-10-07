@@ -52,10 +52,7 @@ such.
 
 (abstract-struct* Type Ast ())
 
-(define-values (struct:AnyT make-AnyT AnyT? AnyT-ref AnyT-set!)
-  (make-struct-type 'AnyT struct:Type 0 0))
-(define AnyT (make-AnyT #hasheq()))
-(provide AnyT AnyT?)
+(define-ast* AnyT Type () #:singleton (#hasheq()))
 
 ;; 'name' is a symbol
 (define-ast* TypeName Type ((no-term name)))
@@ -75,9 +72,8 @@ such.
    (no-term rmp) ;; resolved-module-path?
    (no-term outer))) ;; (listof syntax?), IDs of outer defs
 
-;; Null body.  xxx could use a convenience for defining singleton Ast nodes
-(define-ast* NoBody Ast ())
-(define* the-NoBody (NoBody #hasheq()))
+;; Null body.
+(define-ast* NoBody Ast () #:singleton (#hasheq()))
 
 ;; Sequence of statements.
 (define-ast* Begin Ast ((list-of-term body)))
