@@ -102,7 +102,7 @@ would have done. Still retains correct scoping and evaluation order.
   ;; this point of analysis. We could record 'ctx', though, for each
   ;; definition, as that would tell us which are 'top-level
   ;; definitions.
-  (define (make-DefVar stx id-stx e-stx ctx outer-ctx)
+  (define (make-DefVar ctx outer-ctx stx id-stx e-stx)
     (check-redefinition id-stx stx)
     (define e-ctx (if (eq? ctx 'top-level)
                       (cons id-stx outer-ctx) outer-ctx))
@@ -113,6 +113,22 @@ would have done. Still retains correct scoping and evaluation order.
     (bound-id-table-set! defs id-stx def)
     def)
 
+  (define (make-Let ctx outer-ctx stx
+                    ctor binds-stx exprs-stx)
+    (define i-e-lst (syntax->list binds-stx))
+    (define b-ast-lst (map
+                       (lambda (i-e)
+                         (syntax-case i-e ()
+                           ;; TODO multiple (or zero) binding case
+                           (((id) e)
+                            (identifier? #'id)
+                            (make-DefVar ctx outer-ctx stx #'id #'e))
+                           (_ (unsupported i-e))))
+                       i-e-lst))
+    (define e-stx-lst (syntax->list exprs-stx))
+    (define e-ast-lst (map (fix parse ctx outer-ctx) e-stx-lst))
+    (ctor stx b-ast-lst e-ast-lst))
+  
   ;; 'ctx' is a symbolic name of the context that the 'stx' being
   ;; parsed is in. 'outer-ctx' is the outer context as a list of IDs
   ;; of surrounding definitions, with innermost ID first. Inserts
@@ -163,7 +179,7 @@ would have done. Still retains correct scoping and evaluation order.
       ;; TODO multiple (or zero) binding case
       ((define-values (id) e)
        (identifier? #'id)
-       (make-DefVar stx #'id #'e ctx outer-ctx))
+       (make-DefVar ctx outer-ctx stx #'id #'e))
            
       ((define-syntaxes . _)
        (eq? ctx 'module-level)
@@ -210,23 +226,15 @@ would have done. Still retains correct scoping and evaluation order.
       
       ;; xxx (#%plain-app expr ...+)
 
-      ;; xxx (let-values ([(id ...) expr] ...) expr ...+)
+      ((let-values binds . exprs)
+       (when (eq? ctx 'expr)
+         (make-Let ctx outer-ctx stx
+                   new-Let #'binds #'exprs)))
       
       ((letrec-values binds . exprs)
        (when (eq? ctx 'expr)
-         (define i-e-lst (syntax->list #'binds))
-         (define b-ast-lst (map
-                            (lambda (i-e)
-                              (syntax-case i-e ()
-                                ;; TODO multiple (or zero) binding case
-                                (((id) e)
-                                 (identifier? #'id)
-                                 (make-DefVar stx #'id #'e ctx outer-ctx))
-                                (_ (unsupported i-e))))
-                            i-e-lst))
-         (define e-stx-lst (syntax->list #'exprs))
-         (define e-ast-lst (map (fix parse ctx outer-ctx) e-stx-lst))
-         (new-Letrec stx b-ast-lst e-ast-lst)))
+         (make-Let ctx outer-ctx stx
+                   new-Letrec #'binds #'exprs)))
 
       ((set! id expr)
        (identifier? #'id)
