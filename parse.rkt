@@ -31,6 +31,12 @@ will tell us if an ID is local, module-level, or something else. For
 module bindings it also tells us the original name, plus the defining
 module.
 
+Note that letrec-syntaxes+values does not appear in fully expanded
+programs, but it can appear in the result of a local-expand, which
+means that it can appear here. We can just translate to a kernel
+letrec-syntaxes, although that may not quite correspond to what Racket
+would have done. Still retains correct scoping and evaluation order.
+
 |#
 
 (require "ast-magnolisp.rkt"
@@ -91,7 +97,22 @@ module.
   (define (check-redefinition id new-stx)
     (when-let old-def (bound-id-table-ref defs id #f)
               (redefinition id old-def new-stx)))
-  
+
+  ;; xxx We do not really know when outer-ctx should be added to at
+  ;; this point of analysis. We could record 'ctx', though, for each
+  ;; definition, as that would tell us which are 'top-level
+  ;; definitions.
+  (define (make-DefVar stx id-stx e-stx ctx outer-ctx)
+    (check-redefinition id-stx stx)
+    (define e-ctx (if (eq? ctx 'top-level)
+                      (cons id-stx outer-ctx) outer-ctx))
+    (define ast (parse 'expr e-ctx e-stx))
+    (define ann-h (bound-id-table-ref annos id-stx #hasheq()))
+    (set! ann-h (hash-set ann-h 'stx stx))
+    (define def (DefVar ann-h id-stx r-mp outer-ctx ast))
+    (bound-id-table-set! defs id-stx def)
+    def)
+
   ;; 'ctx' is a symbolic name of the context that the 'stx' being
   ;; parsed is in. 'outer-ctx' is the outer context as a list of IDs
   ;; of surrounding definitions, with innermost ID first. Inserts
@@ -142,14 +163,7 @@ module.
       ;; TODO multiple (or zero) binding case
       ((define-values (id) e)
        (identifier? #'id)
-       (let ()
-         (check-redefinition #'id stx)
-         (define ast (parse 'expr (cons #'id outer-ctx) #'e))
-         (define ann-h (bound-id-table-ref annos #'id #hasheq()))
-         (set! ann-h (hash-set ann-h 'stx stx))
-         (define def (DefVar ann-h #'id r-mp outer-ctx ast))
-         (bound-id-table-set! defs #'id def)
-         ast))
+       (make-DefVar stx #'id #'e ctx outer-ctx))
            
       ((define-syntaxes . _)
        (eq? ctx 'module-level)
@@ -194,12 +208,26 @@ module.
                      (parse ctx outer-ctx #'t)
                      (parse ctx outer-ctx #'e))))
       
+      ;; xxx (#%plain-app expr ...+)
+
       ;; xxx (let-values ([(id ...) expr] ...) expr ...+)
       
-      ;; xxx (letrec-values ([(id ...) expr] ...) expr ...+)
+      ((letrec-values binds . exprs)
+       (when (eq? ctx 'expr)
+         (define i-e-lst (syntax->list #'binds))
+         (define b-ast-lst (map
+                            (lambda (i-e)
+                              (syntax-case i-e ()
+                                ;; TODO multiple (or zero) binding case
+                                (((id) e)
+                                 (identifier? #'id)
+                                 (make-DefVar stx #'id #'e ctx outer-ctx))
+                                (_ (unsupported i-e))))
+                            i-e-lst))
+         (define e-stx-lst (syntax->list #'exprs))
+         (define e-ast-lst (map (fix parse ctx outer-ctx) e-stx-lst))
+         (new-Letrec stx b-ast-lst e-ast-lst)))
 
-      ;; xxx letrec-syntaxes+values
-      
       ((set! id expr)
        (identifier? #'id)
        (when (eq? ctx 'expr)
@@ -219,8 +247,6 @@ module.
       ;;   (else
       ;;    #f)))
       
-      ;; xxx (#%plain-app expr ...+)
-
       ((#%top . id) ;; module-level variable
        (identifier? #'id)
        (new-Var stx #'id))
@@ -249,6 +275,21 @@ module.
       
       ((#%variable-reference)
        (not-magnolisp stx))
+      
+      ;; local-expand result language
+      
+      ;; The letrec-syntaxes+values ID we get here is either top-level
+      ;; or unbound, according to identifier-binding.
+      ((lsv _ v-binds body ...)
+       (module-or-top-identifier=? #'lsv #'letrec-syntaxes+values)
+       (when (eq? ctx 'expr)
+         (parse ctx outer-ctx
+                ;; letrec-values might not be the kernel one, but we
+                ;; risk it here.
+                (syntax/loc stx (letrec-values v-binds body ...)))
+         ))
+
+      ;; unrecognized language
       
       (_ (error 'parse-defs-from-module
                 "unsupported syntax in ~a context: ~s: ~s"

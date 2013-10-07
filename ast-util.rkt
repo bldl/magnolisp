@@ -2,8 +2,6 @@
 
 #|
 
-For more compact printing, we do not make annotations transparent.
-
 |#
 
 (require "strategy.rkt" "util.rkt")

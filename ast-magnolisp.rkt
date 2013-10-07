@@ -38,6 +38,7 @@ such.
 ;;; abstract node
 ;;; 
 
+;; For more compact printing, we do not make annotations transparent.
 (abstract-struct* Ast (annos))
 
 (define* (Ast-anno-ref ast k #:must (must #t))
@@ -77,6 +78,14 @@ such.
 
 ;; Function parameter declaration.
 (define-ast* Param Def ())
+
+;; 'defs' contains DefVar terms. Said bindings are not visible in
+;; DefVar bodies.
+(define-ast* Let Ast ((list-of-term defs) (list-of-term body)))
+
+;; 'defs' contains DefVar terms. Said bindings are visible in DefVar
+;; bodies.
+(define-ast* Letrec Ast ((list-of-term defs) (list-of-term body)))
 
 ;; Sequence of statements.
 (define-ast* Begin Ast ((list-of-term body)))
