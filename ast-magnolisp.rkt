@@ -102,9 +102,11 @@ such.
 ;; If expression.
 (define-ast* IfExpr Ast ((just-term c) (just-term t) (just-term e)))
 
+;; A literal datum.
+(define-ast* Literal Ast ((no-term datum)))
+
 #|
 
-(define-ast* Literal Ast ((no-term datum)))
 (define-ast* Verbatim Ast ((no-term text)))
 (define-ast* Pass Ast ())
 (define-ast* Call Ast ((just-term proc)))

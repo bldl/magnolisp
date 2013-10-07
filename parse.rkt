@@ -75,6 +75,13 @@ would have done. Still retains correct scoping and evaluation order.
                        stx (identifier-binding stx)))))))
   (f stx))
 
+(define (stx-binding-info stx)
+  (define p (syntax-e stx))
+  (and (pair? p)
+       (let ((id (car p)))
+         (and (identifier? id)
+              (identifier-binding id)))))
+
 ;;; 
 ;;; parsing
 ;;; 
@@ -98,10 +105,6 @@ would have done. Still retains correct scoping and evaluation order.
     (when-let old-def (bound-id-table-ref defs id #f)
               (redefinition id old-def new-stx)))
 
-  ;; xxx We do not really know when outer-ctx should be added to at
-  ;; this point of analysis. We could record 'ctx', though, for each
-  ;; definition, as that would tell us which are 'top-level
-  ;; definitions.
   (define (make-DefVar ctx outer-ctx stx id-stx e-stx)
     (check-redefinition id-stx stx)
     (define e-ctx (if (eq? ctx 'top-level)
@@ -241,19 +244,11 @@ would have done. Still retains correct scoping and evaluation order.
        (when (eq? ctx 'expr)
          (new-Assign #'id (parse ctx outer-ctx #'expr))))
 
-      ;; xxx (quote datum)
-
-      ;; ((quote lit)
-      ;;  (cond
-      ;;   ((eq? ctx 'expr)
-      ;;    (new-Literal stx #'lit))
-      ;;   ((and (eq? ctx 'stat) (in-primitive?))
-      ;;    (let ((d (syntax-e #'lit)))
-      ;;      (if (string? d)
-      ;;          (new-Verbatim stx d)
-      ;;          (error-non-core stx ctx))))
-      ;;   (else
-      ;;    #f)))
+      ;; 'quote', as it comes in, appears to be unbound for us.
+      ((q lit)
+       (module-or-top-identifier=? #'q #'quote)
+       (when (eq? ctx 'expr)
+         (new-Literal stx #'lit)))
       
       ((#%top . id) ;; module-level variable
        (identifier? #'id)
@@ -300,8 +295,9 @@ would have done. Still retains correct scoping and evaluation order.
       ;; unrecognized language
       
       (_ (error 'parse-defs-from-module
-                "unsupported syntax in ~a context: ~s: ~s"
-                ctx stx (syntax->datum stx)))))
+                "unsupported syntax in ~a context: ~s ~s: ~s"
+                ctx stx (or (stx-binding-info stx) '(unbound))
+                (syntax->datum stx)))))
 
   (parse 'module-begin null modbeg-stx)
   defs)
