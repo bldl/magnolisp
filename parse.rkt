@@ -227,7 +227,14 @@ would have done. Still retains correct scoping and evaluation order.
                      (parse ctx outer-ctx #'t)
                      (parse ctx outer-ctx #'e))))
       
-      ;; xxx (#%plain-app expr ...+)
+      ((#%plain-app p-expr . a-expr)
+       (when (eq? ctx 'expr)
+         (new-Apply
+          stx
+          (parse ctx outer-ctx #'p-expr)
+          (map
+           (fix parse ctx outer-ctx)
+           (syntax->list #'a-expr)))))
 
       ((let-values binds . exprs)
        (when (eq? ctx 'expr)
