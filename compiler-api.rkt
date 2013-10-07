@@ -58,8 +58,9 @@ external dependencies for the program/library, as well as the .cpp and
 ;; [pt syntax?] is the parse tree, as loaded from the submodule.
 ;; [annos bound-id-table?] are the annotations. A non-Magnolisp module
 ;; is simply represented by the value #t, since such modules are not
-;; processed.
-(struct Mod (pt annos) #:transparent)
+;; processed. [defs (or/c bound-id-table? #f)] contains Def objects
+;; for parsed modules.
+(struct Mod (pt annos defs) #:transparent)
 
 ;; (-> module-path? (or/c Mod? #t)) Loads the specified module. It is
 ;; an error if the module path does not specify an existing module.
@@ -69,15 +70,27 @@ external dependencies for the program/library, as well as the .cpp and
   (if (not annos)
       #t
       (let ((pt (dynamic-require `(submod ,mp magnolisp-info) 'm-ast)))
-        (Mod pt annos))))  
+        (Mod pt annos #f))))
 
-(define (set-entry-points! eps annos)
+(define (list-entry-points annos)
+  (define lst null)
   (bound-id-table-for-each
    annos
    (lambda (id h)
      (define ep (parse-entry-point id h))
      (when ep
-       (bound-id-table-set! eps id #t)))))
+       (set! lst (cons id lst)))))
+  lst)
+
+(define (bound-id-table-merge! t s-t)
+  (bound-id-table-for-each
+   s-t
+   (lambda (id v)
+     (bound-id-table-set! t id v))))
+
+(define (bound-id-table-add-lst! t lst)
+  (for ((id lst))
+    (bound-id-table-set! t id #t)))
 
 ;; Compilation state. 'mods' maps resolved module paths to Mod or #t
 ;; objects. 'eps' is a bound-id-table?, with entry points as keys, and
@@ -96,12 +109,22 @@ external dependencies for the program/library, as well as the .cpp and
     (define mod (hash-ref mods r-mp #f))
     (unless mod
       (set! mod (load-module mp))
-      (hash-set! mods r-mp mod)
 
       ;; Use annotations to build a set of entry points.
       (when (Mod? mod)
         (define annos (Mod-annos mod))
-        (set-entry-points! eps annos))))
+        (define eps-lst (list-entry-points annos))
+        (unless (null? eps-lst)
+          (bound-id-table-add-lst! eps eps-lst)
+
+          ;; Any modules with entry points will need to be parsed and
+          ;; analyzed.
+          (define pt (Mod-pt mod))
+          (define defs (parse-defs-from-module pt annos r-mp))
+          (pretty-print (bound-id-table-map defs cons))
+          (set! mod (struct-copy Mod mod (defs defs)))))
+
+      (hash-set! mods r-mp mod)))
 
   ;;(pretty-print (bound-id-table-map eps (compose car cons)))
   

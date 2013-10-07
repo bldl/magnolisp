@@ -74,19 +74,93 @@ module.
 ;;; 
 
 (define-with-contract*
-  (->* (syntax? bound-id-table?) void?)
-  (parse-defs-from-syntax! mod-stx defs)
+  (-> syntax? bound-id-table? resolve-module-path-result?
+      bound-id-table?)
+  (parse-defs-from-module modbeg-stx annos r-mp)
 
+  (define defs (make-bound-id-table #:phase 0))
+
+  (define (not-magnolisp stx)
+    (error 'parse-defs-from-module "not Magnolisp: ~a" stx))
+
+  (define (redefinition id old-def new-stx)
+    (error 'parse-defs-from-module
+           "redefinition of ~a: ~a and ~a"
+           id (Ast-anno-ref old-def 'stx) new-stx))
+
+  (define (check-redefinition id new-stx)
+    (when-let old-def (bound-id-table-ref defs id #f)
+              (redefinition id old-def new-stx)))
+  
   ;; 'ctx' is a symbolic name of the context that the 'stx' being
   ;; parsed is in. 'outer-ctx' is the outer context as a list of IDs
-  ;; of surrounding definitions, with innermost ID first.
-  (define (prs ctx outer-ctx stx)
+  ;; of surrounding definitions, with innermost ID first. Inserts
+  ;; bindings into 'defs' as a side effect. Returns an Ast object for
+  ;; non top-level things.
+  (define (parse ctx outer-ctx stx)
     ;;(writeln (list ctx stx))
     
     (kernel-syntax-case* stx #f (%core)
-      ;; ((module n pn (#%plain-module-begin body ...))
-      ;;  (new-Module stx (prs-lst 'mod (syntax->list #'(body ...)))))
 
+      ((#%module-begin . bs)
+       (eq? ctx 'module-begin)
+       (for-each (fix parse 'module-level outer-ctx)
+                 (syntax->list #'bs)))
+
+      ;; top-level-form non-terminal
+      
+      ((#%expression _)
+       (eq? ctx 'module-level)
+       (void))
+
+      ((module . _)
+       (eq? ctx 'module-level)
+       (void))
+
+      ((begin . bs)
+       (Begin (map (fix parse ctx outer-ctx)
+                   (syntax->list #'bs))))
+      
+      ((begin-for-syntax . _)
+       (eq? ctx 'module-level)
+       (void))
+
+      ;; module-level-form non-terminal
+
+      ((#%provide . _)
+       (eq? ctx 'module-level)
+       (void))
+
+      ;; submodule-form non-terminal
+
+      ((module* . _)
+       (eq? ctx 'module-level)
+       (void))
+      
+      ;; general-top-level-form non-terminal
+
+      ;; TODO multiple (or zero) binding case
+      ((define-values (id) e)
+       (identifier? #'id)
+       (let ()
+         (check-redefinition #'id stx)
+         (define ast (parse 'expr (cons #'id outer-ctx) #'e))
+         (define ann-h (bound-id-table-ref annos #'id #hasheq()))
+         (set! ann-h (hash-set ann-h 'stx stx))
+         (define def (Def ann-h #'id ast r-mp outer-ctx))
+         (bound-id-table-set! defs #'id def)
+         ast))
+           
+      ((define-syntaxes . _)
+       (eq? ctx 'module-level)
+       (void))
+
+      ((#%require . _)
+       (eq? ctx 'module-level)
+       (void))
+
+      ;; %core language
+      
       ;; ((k-app rt.%core (quote n))
       ;;  (eq? 'pass (syntax-e #'n))
       ;;  (new-Pass stx))
@@ -95,18 +169,44 @@ module.
       ;;  (eq? 'call (syntax-e #'n))
       ;;  (new-Call stx (Var-from-stx #'id-stx)))
 
-      ;; ((k-app . _)
-      ;;  (eq? ctx 'mod)
-      ;;  #f)
-      
-      ;; ((define-syntaxes . _)
-      ;;  (eq? ctx 'mod)
-      ;;  #f)
+      ;; expr non-terminal
 
-      ;; ((#%require . _)
-      ;;  (eq? ctx 'mod)
-      ;;  #f)
+      ((#%plain-lambda formals . exprs)
+       (when (eq? ctx 'expr)
+         (define par-id-lst (syntax->list #'formals))
+         (define e-stx-lst (syntax->list #'exprs))
+         (define par-ast-lst
+           (map (lambda (id)
+                  (check-redefinition id stx)
+                  (define ast (new-Param id id the-NoBody r-mp outer-ctx))
+                  (bound-id-table-set! defs id ast)
+                  ast)
+                par-id-lst))
+         (define e-ast-lst
+           (map (lambda (e-stx)
+                  (parse 'expr outer-ctx e-stx)) e-stx-lst))
+         (new-Lambda stx par-ast-lst (Begin #'exprs e-ast-lst))))
       
+      ((if c t e)
+       (when (eq? ctx 'expr)
+         (new-IfExpr stx
+                     (parse ctx outer-ctx #'c)
+                     (parse ctx outer-ctx #'t)
+                     (parse ctx outer-ctx #'e))))
+      
+      ;; xxx (let-values ([(id ...) expr] ...) expr ...+)
+      
+      ;; xxx (letrec-values ([(id ...) expr] ...) expr ...+)
+
+      ;; xxx letrec-syntaxes+values
+      
+      ((set! id expr)
+       (identifier? #'id)
+       (when (eq? ctx 'expr)
+         (new-Assign #'id (parse ctx outer-ctx #'expr))))
+
+      ;; xxx (quote datum)
+
       ;; ((quote lit)
       ;;  (cond
       ;;   ((eq? ctx 'expr)
@@ -119,32 +219,40 @@ module.
       ;;   (else
       ;;    #f)))
       
-      ;; ((define-values (n) def)
-      ;;  (let* ((def-stx #'def)
-      ;;         (export
-      ;;          (lets then-if-let x-stx (syntax-property #'n 'export)
-      ;;                then-let x (syntax-e x-stx)
-      ;;                (if (boolean? x) x
-      ;;                    (error "expected boolean" `(export ,x-stx)))))
-      ;;         (annos (hash-set (stx-annos stx) 'export export)))
-      ;;    (syntax-case def-stx (k-lambda quote rt.%core)
-      ;;      ((k-app rt.%core (quote t) (k-lambda () body ...))
-      ;;       (let ((kind (syntax-e #'t)))
-      ;;         (case-eq kind
-      ;;          (procedure
-      ;;           (Define annos (Var-from-stx #'n)
-      ;;             'procedure
-      ;;             (prs-lst 'stat (syntax->list #'(body ...)))))
-               
-      ;;          (primitive
-      ;;           (parameterize ((in-primitive? #t))
-      ;;             (Define annos (Var-from-stx #'n)
-      ;;               'primitive
-      ;;               (prs-lst 'stat (syntax->list #'(body ...))))))
-               
-      ;;          (else
-      ;;           (error-non-core stx)))))
-           
-      (_ (unsupported ctx stx))))
+      ;; xxx (#%plain-app expr ...+)
 
-  (prs 'module null mod-stx))
+      ((#%top . id) ;; module-level variable
+       (identifier? #'id)
+       (new-Var stx #'id))
+      
+      (id
+       (identifier? #'id)
+       (new-Var stx #'id))
+
+      ((quote-syntax datum)
+       (not-magnolisp stx))
+
+      ((case-lambda (f b ...) ...)
+       (not-magnolisp stx))
+
+      ((begin0 v-e e ...)
+       (not-magnolisp stx))
+      
+      ((with-continuation-mark expr1 expr2 expr3)
+       (not-magnolisp stx))
+      
+      ((#%variable-reference (#%top . id))
+       (not-magnolisp stx))
+      
+      ((#%variable-reference id)
+       (not-magnolisp stx))
+      
+      ((#%variable-reference)
+       (not-magnolisp stx))
+      
+      (_ (error 'parse-defs-from-module
+                "unsupported syntax in ~a context: ~s: ~s"
+                ctx stx (syntax->datum stx)))))
+
+  (parse 'module-begin null modbeg-stx)
+  defs)

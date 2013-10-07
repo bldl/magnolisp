@@ -67,17 +67,47 @@ such.
 ;;; others
 ;;; 
 
-(define-ast* Var Ast ((no-term name)))
+;; Any recorded annotations from definitions are put into 'annos' from
+;; the bound-id-table.
+(define-ast* Def Ast
+  ((no-term id) ;; syntax?
+   (just-term body)
+   (no-term rmp) ;; resolved-module-path?
+   (no-term outer))) ;; (listof syntax?), IDs of outer defs
+
+;; Null body.  xxx could use a convenience for defining singleton Ast nodes
+(define-ast* NoBody Ast ())
+(define* the-NoBody (NoBody #hasheq()))
+
+;; Sequence of statements.
+(define-ast* Begin Ast ((list-of-term body)))
+
+;; Variable reference.
+(define-ast* Var Ast ((no-term id)))
+
+;; Function value.
+(define-ast* Lambda Ast ((list-of-term params) (list-of-term body)))
+
+;; Function parameter.
+(define-ast* Param Def ())
+
+;; Assignment.
+(define-ast* Assign Ast ((just-term lv) (just-term rv)))
+
+;; If expression.
+(define-ast* IfExpr Ast ((just-term c) (just-term t) (just-term e)))
+
+#|
+
 (define-ast* Literal Ast ((no-term datum)))
 (define-ast* Verbatim Ast ((no-term text)))
-(define-ast* Module Ast ((list-of-term body)))
 (define-ast* Pass Ast ())
 (define-ast* Call Ast ((just-term proc)))
-(define-ast* Define Ast ((just-term var) (no-term kind)
-                         (list-of-term body)))
 
 (define* (Var-from-stx id-stx)
   (new-Var id-stx (syntax-e id-stx)))
 
 (define* (Var-rename ast n)
   (struct-copy Var ast (name n)))
+
+|#
