@@ -218,7 +218,7 @@ would have done. Still retains correct scoping and evaluation order.
          (define e-ast-lst
            (map (lambda (e-stx)
                   (parse 'expr outer-ctx e-stx)) e-stx-lst))
-         (new-Lambda stx par-ast-lst (Begin #'exprs e-ast-lst))))
+         (new-Lambda stx par-ast-lst e-ast-lst)))
       
       ((if c t e)
        (when (eq? ctx 'expr)

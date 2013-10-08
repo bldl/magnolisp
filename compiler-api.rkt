@@ -24,8 +24,8 @@ external dependencies for the program/library, as well as the .cpp and
 
 |#
 
-(require "annos-parse.rkt" "compiler-util.rkt"
-         "parse.rkt" "util.rkt"
+(require "annos-parse.rkt" "ast-magnolisp.rkt" "compiler-util.rkt"
+         "parse.rkt" "strategy.rkt" "util.rkt"
          syntax/id-table syntax/moddep)
 
 ;;; 
@@ -97,6 +97,20 @@ external dependencies for the program/library, as well as the .cpp and
 ;; #t values.
 (struct St (mods eps) #:transparent)
 
+;; For debugging.
+(define (mods-display-Var-bindings mods)
+  (for (((r-mp mod) mods))
+    (define defs (Mod-defs mod))
+    (bound-id-table-for-each
+     defs
+     (lambda (id def)
+       ((topdown-visit
+         (lambda (ast)
+           (when (Var? ast)
+             (define var-id (Var-id ast))
+             (writeln (list ast (identifier-binding var-id))))))
+        def)))))
+
 ;; Compiles a program consisting of all the entry points in the
 ;; specified modules, and all dependencies thereof.
 (define* (compile-modules . mp-lst)
@@ -126,6 +140,7 @@ external dependencies for the program/library, as well as the .cpp and
 
       (hash-set! mods r-mp mod)))
 
+  (mods-display-Var-bindings mods)
   ;;(pretty-print (bound-id-table-map eps (compose car cons)))
   
   (St mods eps))

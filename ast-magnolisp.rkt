@@ -105,6 +105,10 @@ such.
 ;; A literal datum.
 (define-ast* Literal Ast ((no-term datum)))
 
+;; Function application, with function expression, and argument
+;; expressions.
+(define-ast* Apply Ast ((just-term f) (list-of-term args)))
+
 #|
 
 (define-ast* Verbatim Ast ((no-term text)))
