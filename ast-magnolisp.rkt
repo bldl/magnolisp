@@ -66,11 +66,10 @@ such.
 ;;; 
 
 ;; Any recorded annotations from definitions are put into 'annos' from
-;; the bound-id-table.
+;; the bound-id-table. All global defs (and only them) have an [r-mp
+;; resolve-module-path-result?] annotation.
 (abstract-struct* Def Ast
-  (id ;; syntax?
-   rmp ;; resolve-module-path-result?
-   outer) ;; (listof syntax?), IDs of outer defs
+  (id) ;; syntax?
   #:transparent)
 
 ;; Variable definition.

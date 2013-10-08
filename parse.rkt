@@ -107,12 +107,13 @@ would have done. Still retains correct scoping and evaluation order.
 
   (define (make-DefVar ctx outer-ctx stx id-stx e-stx)
     (check-redefinition id-stx stx)
-    (define e-ctx (if (eq? ctx 'top-level)
-                      (cons id-stx outer-ctx) outer-ctx))
-    (define ast (parse 'expr e-ctx e-stx))
+    (define global? (eq? ctx 'top-level))
+    (define ast (parse 'expr outer-ctx e-stx))
     (define ann-h (bound-id-table-ref annos id-stx #hasheq()))
     (set! ann-h (hash-set ann-h 'stx stx))
-    (define def (DefVar ann-h id-stx r-mp outer-ctx ast))
+    (when global?
+      (set! ann-h (hash-set ann-h 'r-mp r-mp)))
+    (define def (DefVar ann-h id-stx ast))
     (bound-id-table-set! defs id-stx def)
     def)
 
@@ -211,7 +212,7 @@ would have done. Still retains correct scoping and evaluation order.
          (define par-ast-lst
            (map (lambda (id)
                   (check-redefinition id stx)
-                  (define ast (new-Param id id r-mp outer-ctx))
+                  (define ast (new-Param id id))
                   (bound-id-table-set! defs id ast)
                   ast)
                 par-id-lst))
