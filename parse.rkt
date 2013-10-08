@@ -105,10 +105,10 @@ would have done. Still retains correct scoping and evaluation order.
     (when-let old-def (bound-id-table-ref defs id #f)
               (redefinition id old-def new-stx)))
 
-  (define (make-DefVar ctx outer-ctx stx id-stx e-stx)
+  (define (make-DefVar ctx stx id-stx e-stx)
     (check-redefinition id-stx stx)
     (define global? (eq? ctx 'top-level))
-    (define ast (parse 'expr outer-ctx e-stx))
+    (define ast (parse 'expr e-stx))
     (define ann-h (bound-id-table-ref annos id-stx #hasheq()))
     (set! ann-h (hash-set ann-h 'stx stx))
     (when global?
@@ -117,7 +117,7 @@ would have done. Still retains correct scoping and evaluation order.
     (bound-id-table-set! defs id-stx def)
     def)
 
-  (define (make-Let ctx outer-ctx stx
+  (define (make-Let ctx stx
                     ctor binds-stx exprs-stx)
     (define i-e-lst (syntax->list binds-stx))
     (define b-ast-lst (map
@@ -126,26 +126,24 @@ would have done. Still retains correct scoping and evaluation order.
                            ;; TODO multiple (or zero) binding case
                            (((id) e)
                             (identifier? #'id)
-                            (make-DefVar ctx outer-ctx stx #'id #'e))
+                            (make-DefVar ctx stx #'id #'e))
                            (_ (unsupported i-e))))
                        i-e-lst))
     (define e-stx-lst (syntax->list exprs-stx))
-    (define e-ast-lst (map (fix parse ctx outer-ctx) e-stx-lst))
+    (define e-ast-lst (map (fix parse ctx) e-stx-lst))
     (ctor stx b-ast-lst e-ast-lst))
   
   ;; 'ctx' is a symbolic name of the context that the 'stx' being
-  ;; parsed is in. 'outer-ctx' is the outer context as a list of IDs
-  ;; of surrounding definitions, with innermost ID first. Inserts
-  ;; bindings into 'defs' as a side effect. Returns an Ast object for
-  ;; non top-level things.
-  (define (parse ctx outer-ctx stx)
+  ;; parsed is in. Inserts bindings into 'defs' as a side effect.
+  ;; Returns an Ast object for non top-level things.
+  (define (parse ctx stx)
     ;;(writeln (list ctx stx))
     
     (kernel-syntax-case* stx #f (%core)
 
       ((#%module-begin . bs)
        (eq? ctx 'module-begin)
-       (for-each (fix parse 'module-level outer-ctx)
+       (for-each (fix parse 'module-level)
                  (syntax->list #'bs)))
 
       ;; top-level-form non-terminal
@@ -159,7 +157,7 @@ would have done. Still retains correct scoping and evaluation order.
        (void))
 
       ((begin . bs)
-       (Begin (map (fix parse ctx outer-ctx)
+       (Begin (map (fix parse ctx)
                    (syntax->list #'bs))))
       
       ((begin-for-syntax . _)
@@ -183,7 +181,7 @@ would have done. Still retains correct scoping and evaluation order.
       ;; TODO multiple (or zero) binding case
       ((define-values (id) e)
        (identifier? #'id)
-       (make-DefVar ctx outer-ctx stx #'id #'e))
+       (make-DefVar ctx stx #'id #'e))
            
       ((define-syntaxes . _)
        (eq? ctx 'module-level)
@@ -218,39 +216,39 @@ would have done. Still retains correct scoping and evaluation order.
                 par-id-lst))
          (define e-ast-lst
            (map (lambda (e-stx)
-                  (parse 'expr outer-ctx e-stx)) e-stx-lst))
+                  (parse 'expr e-stx)) e-stx-lst))
          (new-Lambda stx par-ast-lst e-ast-lst)))
       
       ((if c t e)
        (when (eq? ctx 'expr)
          (new-IfExpr stx
-                     (parse ctx outer-ctx #'c)
-                     (parse ctx outer-ctx #'t)
-                     (parse ctx outer-ctx #'e))))
+                     (parse ctx #'c)
+                     (parse ctx #'t)
+                     (parse ctx #'e))))
       
       ((#%plain-app p-expr . a-expr)
        (when (eq? ctx 'expr)
          (new-Apply
           stx
-          (parse ctx outer-ctx #'p-expr)
+          (parse ctx #'p-expr)
           (map
-           (fix parse ctx outer-ctx)
+           (fix parse ctx)
            (syntax->list #'a-expr)))))
 
       ((let-values binds . exprs)
        (when (eq? ctx 'expr)
-         (make-Let ctx outer-ctx stx
+         (make-Let ctx stx
                    new-Let #'binds #'exprs)))
       
       ((letrec-values binds . exprs)
        (when (eq? ctx 'expr)
-         (make-Let ctx outer-ctx stx
+         (make-Let ctx stx
                    new-Letrec #'binds #'exprs)))
 
       ((set! id expr)
        (identifier? #'id)
        (when (eq? ctx 'expr)
-         (new-Assign #'id (parse ctx outer-ctx #'expr))))
+         (new-Assign #'id (parse ctx #'expr))))
 
       ;; 'quote', as it comes in, appears to be unbound for us.
       ((q lit)
@@ -294,7 +292,7 @@ would have done. Still retains correct scoping and evaluation order.
       ((lsv _ v-binds body ...)
        (module-or-top-identifier=? #'lsv #'letrec-syntaxes+values)
        (when (eq? ctx 'expr)
-         (parse ctx outer-ctx
+         (parse ctx
                 ;; letrec-values might not be the kernel one, but we
                 ;; risk it here.
                 (syntax/loc stx (letrec-values v-binds body ...)))
@@ -307,5 +305,5 @@ would have done. Still retains correct scoping and evaluation order.
                 ctx stx (or (stx-binding-info stx) '(unbound))
                 (syntax->datum stx)))))
 
-  (parse 'module-begin null modbeg-stx)
+  (parse 'module-begin modbeg-stx)
   defs)
