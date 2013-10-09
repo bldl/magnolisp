@@ -107,15 +107,24 @@ would have done. Still retains correct scoping and evaluation order.
 
 (define-with-contract*
   (-> syntax? bound-id-table? resolve-module-path-result?
-      (values bound-id-table? free-id-table?))
+      (values bound-id-table? free-id-table? (listof syntax?)))
   (parse-defs-from-module modbeg-stx annos r-mp)
 
   (define defs (make-bound-id-table #:phase 0))
   (define prov-lst null)
+  (define req-lst null)
 
   (define (provide! stx-lst)
     (set! prov-lst (append prov-lst stx-lst)))
 
+  ;; Records #%require specs, which may look like:
+  ;;   (just-meta 0 (rename "test-6-lib.rkt" h six))
+  ;;   (just-meta 0 (rename "test-6-lib.rkt" seven seven))
+  ;;   (only "test-6-lib.rkt")
+  (define (require! stx-lst)
+    ;;(for-each (compose writeln syntax->datum) stx-lst)
+    (set! req-lst (append req-lst stx-lst)))
+  
   (define (not-magnolisp stx)
     (error 'parse-defs-from-module "not Magnolisp: ~a" stx))
 
@@ -210,9 +219,9 @@ would have done. Still retains correct scoping and evaluation order.
        (eq? ctx 'module-level)
        (void))
 
-      ((#%require . _)
+      ((#%require . specs)
        (eq? ctx 'module-level)
-       (void))
+       (require! (syntax->list #'specs)))
 
       ;; %core language
       
@@ -332,4 +341,4 @@ would have done. Still retains correct scoping and evaluation order.
   (parse 'module-begin modbeg-stx)
   (define prov-h (resolve-provides prov-lst))
   ;;(pretty-print (dict-map prov-h list))
-  (values defs prov-h))
+  (values defs prov-h req-lst))

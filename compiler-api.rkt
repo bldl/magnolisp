@@ -134,7 +134,7 @@ external dependencies for the program/library, as well as the .cpp and
           ;; Any modules with entry points will need to be parsed and
           ;; analyzed.
           (define pt (Mod-pt mod))
-          (define-values (defs provs)
+          (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
           (pretty-print (bound-id-table-map defs cons))
           (set! mod (struct-copy Mod mod (defs defs)))))
