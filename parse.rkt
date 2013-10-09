@@ -252,7 +252,7 @@ would have done. Still retains correct scoping and evaluation order.
 
       ;; 'quote', as it comes in, appears to be unbound for us.
       ((q lit)
-       (module-or-top-identifier=? #'q #'quote)
+       (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote))
        (when (eq? ctx 'expr)
          (new-Literal stx #'lit)))
       
@@ -290,7 +290,8 @@ would have done. Still retains correct scoping and evaluation order.
       ;; The letrec-syntaxes+values ID we get here is either top-level
       ;; or unbound, according to identifier-binding.
       ((lsv _ v-binds body ...)
-       (module-or-top-identifier=? #'lsv #'letrec-syntaxes+values)
+       (and (identifier? #'lsv)
+            (module-or-top-identifier=? #'lsv #'letrec-syntaxes+values))
        (when (eq? ctx 'expr)
          (parse ctx
                 ;; letrec-values might not be the kernel one, but we

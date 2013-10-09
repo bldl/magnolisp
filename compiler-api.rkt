@@ -56,10 +56,10 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 ;; [pt syntax?] is the parse tree, as loaded from the submodule.
-;; [annos bound-id-table?] are the annotations. A non-Magnolisp module
-;; is simply represented by the value #t, since such modules are not
-;; processed. [defs (or/c bound-id-table? #f)] contains Def objects
-;; for parsed modules.
+;; [annos bound-id-table?] are the annotations, as loaded from the
+;; submodule. A non-Magnolisp module is simply represented by the
+;; value #t, since such modules are not processed. [defs (or/c
+;; bound-id-table? #f)] contains Def objects for parsed modules.
 (struct Mod (pt annos defs) #:transparent)
 
 ;; (-> module-path? (or/c Mod? #t)) Loads the specified module. It is

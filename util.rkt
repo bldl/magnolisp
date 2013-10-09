@@ -42,6 +42,9 @@
    (? symbol?)
    (list 'submod (or (? path?) (? symbol?)) (? symbol?) ...)))
 
+(define* (symbolic-identifier=? a b)
+  (eq? (syntax-e a) (syntax-e b)))
+
 #|
 
 Copyright 2009 Helsinki Institute for Information Technology (HIIT)

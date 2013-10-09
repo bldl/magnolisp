@@ -41,8 +41,10 @@ same variables at the same phase level).
 (provide module-begin)
 
 (require "annos-store.rkt"
-         (for-syntax racket/pretty syntax/id-table
-                     "util.rkt"))
+         (for-syntax
+          racket/pretty syntax/id-table
+          typed-racket/utils/disarm ;; probably considered internal
+          "util.rkt"))
 
 (begin-for-syntax
  ;; Given [h hash?], returns syntax for an expression that produces
@@ -66,6 +68,11 @@ same variables at the same phase level).
                  #`(cons #'#,id-stx #,(syntax-for-hasheq h))))))
 
  (define (make-definfo-submodule ast)
+   (set! ast (disarm* ast))
+   ;;(set! ast (syntax-disarm ast (current-code-inspector)))
+   ;;(writeln (syntax-tainted? ast))
+   ;;(set! ast (strip-phase-1+ ast))
+   ;;(pretty-print (syntax->datum ast))
    #`(begin-for-syntax
       (module* magnolisp-info #f
         (define m-annos
