@@ -42,14 +42,17 @@ would have done. Still retains correct scoping and evaluation order.
 (require "ast-magnolisp.rkt"
          "compiler-util.rkt"
          (only-in "runtime.rkt" %core)
-         "strategy.rkt"
+         (rename-in "strategy.rkt" [id id-rw])
          "util.rkt"
          "util/case.rkt"
          racket/contract
+         racket/dict
          racket/function
          racket/list
+         racket/pretty
          syntax/id-table
          syntax/kerncase
+         syntax/parse
          syntax/stx)
 
 ;;; 
@@ -86,12 +89,32 @@ would have done. Still retains correct scoping and evaluation order.
 ;;; parsing
 ;;; 
 
+;; Reference: Typed Racket implementation of same.
+(define (resolve-provides prov-lst)
+  (define provide-tbl
+    (for/fold
+        ([h (make-immutable-free-id-table)])
+        ([p (in-list prov-lst)])
+      (syntax-parse p
+        [in-out:id
+         (dict-update h #'in-out (fix cons #'in-out) null)]
+        [((~datum rename) in out)
+         (dict-update h #'in (fix cons #'out) null)]
+        [_
+         (error 'resolve-provides
+                "unsupported #%provide form: ~s" p)])))
+  provide-tbl)
+
 (define-with-contract*
   (-> syntax? bound-id-table? resolve-module-path-result?
-      bound-id-table?)
+      (values bound-id-table? free-id-table?))
   (parse-defs-from-module modbeg-stx annos r-mp)
 
   (define defs (make-bound-id-table #:phase 0))
+  (define prov-lst null)
+
+  (define (provide! stx-lst)
+    (set! prov-lst (append prov-lst stx-lst)))
 
   (define (not-magnolisp stx)
     (error 'parse-defs-from-module "not Magnolisp: ~a" stx))
@@ -166,9 +189,9 @@ would have done. Still retains correct scoping and evaluation order.
 
       ;; module-level-form non-terminal
 
-      ((#%provide . _)
+      ((#%provide . specs)
        (eq? ctx 'module-level)
-       (void))
+       (provide! (syntax->list #'specs)))
 
       ;; submodule-form non-terminal
 
@@ -307,4 +330,6 @@ would have done. Still retains correct scoping and evaluation order.
                 (syntax->datum stx)))))
 
   (parse 'module-begin modbeg-stx)
-  defs)
+  (define prov-h (resolve-provides prov-lst))
+  ;;(pretty-print (dict-map prov-h list))
+  (values defs prov-h))
