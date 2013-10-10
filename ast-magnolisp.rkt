@@ -66,8 +66,10 @@ such.
 ;;; 
 
 ;; Any recorded annotations from definitions are put into 'annos' from
-;; the bound-id-table. All global defs (and only them) have an [r-mp
-;; resolve-module-path-result?] annotation.
+;; the bound-id-table. All defs have an [r-mp
+;; resolve-module-path-result?] annotation, specifying the defining
+;; module. At least all the global defs have a [top boolean?]
+;; annotation, which specifies whether a definition is top-level.
 (abstract-struct* Def Ast
   (id) ;; syntax?
   #:transparent)

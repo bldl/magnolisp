@@ -197,14 +197,16 @@ would have done. Still retains correct scoping and evaluation order.
     (when-let old-def (bound-id-table-ref defs id #f)
               (redefinition id old-def new-stx)))
 
+  (define (mk-annos ctx stx id-stx)
+    (define global? (eq? ctx 'top-level))
+    (define ann-h (bound-id-table-ref annos id-stx #hasheq()))
+    (set! ann-h (hash-set* ann-h 'stx stx 'r-mp r-mp 'top global?))
+    ann-h)
+  
   (define (make-DefVar ctx stx id-stx e-stx)
     (check-redefinition id-stx stx)
-    (define global? (eq? ctx 'top-level))
     (define ast (parse 'expr e-stx))
-    (define ann-h (bound-id-table-ref annos id-stx #hasheq()))
-    (set! ann-h (hash-set ann-h 'stx stx))
-    (when global?
-      (set! ann-h (hash-set ann-h 'r-mp r-mp)))
+    (define ann-h (mk-annos ctx stx id-stx))
     (define def (DefVar ann-h id-stx ast))
     (bound-id-table-set! defs id-stx def)
     def)
@@ -302,7 +304,11 @@ would have done. Still retains correct scoping and evaluation order.
          (define par-ast-lst
            (map (lambda (id)
                   (check-redefinition id stx)
-                  (define ast (new-Param id id))
+                  ;; Annotations would probably have to be propagated
+                  ;; from any binding whose value this lambda is, but
+                  ;; that must wait until later.
+                  (define ann-h (mk-annos ctx stx id))
+                  (define ast (Param ann-h id))
                   (bound-id-table-set! defs id ast)
                   ast)
                 par-id-lst))
