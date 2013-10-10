@@ -137,6 +137,8 @@ external dependencies for the program/library, as well as the .cpp and
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
           (pretty-print (bound-id-table-map defs cons))
+          (pretty-print (list 'raw-module-paths
+                              (req-specs->module-paths reqs)))
           (set! mod (struct-copy Mod mod (defs defs)))))
 
       (hash-set! mods r-mp mod)))

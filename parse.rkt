@@ -105,6 +105,64 @@ would have done. Still retains correct scoping and evaluation order.
                 "unsupported #%provide form: ~s" p)])))
   provide-tbl)
 
+(define-syntax-class phase-level
+  (pattern lv:exact-integer)
+  (pattern (~and lv (~datum #f))))
+
+(define (for-runtime-require? stx)
+  ;; 'just-meta' forms cannot nest, and the other raw-require-spec
+  ;; non-terminals can only contain phaseless-spec non-terminals.
+  ;; Also, presumably all of the 'for-*' forms have been translated to
+  ;; 'just-meta' forms in full expansion. See documentation for the
+  ;; #%require form.
+  (syntax-parse stx
+    (((~or (~datum for-syntax) (~datum for-template)
+           (~datum for-label)) . _)
+     #f)
+    (((~or (~datum for-meta) (~datum just-meta))
+      lv:phase-level . _)
+     (equal? (syntax-e #'lv.lv) 0))
+    (_
+     #t)))
+
+;; Assumes that 'req-lst' has raw-require-spec syntax objects.
+;; Produces a list of syntax for raw-module-path forms.
+(define-with-contract*
+  (-> (listof syntax?) (listof syntax?))
+  (req-specs->module-paths req-lst)
+  (define require-lst null)
+  (define (raw-module-path! mp)
+    (set! require-lst (cons mp require-lst)))
+  ;; We would be able to quite easily pass around the phase level
+  ;; (recursively), and support all the raw-require-spec forms.
+  (define (parse-raw-require-spec stx)
+    (syntax-parse stx
+      [((~or (~datum for-syntax) (~datum for-template)
+             (~datum for-label) (~datum for-meta)) . _)
+       (unsupported stx)]
+      [((~datum just-meta) lv:phase-level . specs)
+       (for ((spec (syntax->list #'specs)))
+         (parse-raw-require-spec spec))]
+      [phaseless-spec
+       (parse-phaseless-spec #'phaseless-spec)]))
+  (define (parse-phaseless-spec stx)
+    (syntax-parse stx
+      [((~datum only) raw-mp . _)
+       (raw-module-path! #'raw-mp)]
+      [((~datum prefix) pfx raw-mp)
+       (raw-module-path! #'raw-mp)]
+      [((~datum all-except) raw-mp . _)
+       (raw-module-path! #'raw-mp)]
+      [((~datum prefix-all-except) pfx raw-mp . _)
+       (raw-module-path! #'raw-mp)]
+      [((~datum rename) raw-mp . _)
+       (raw-module-path! #'raw-mp)]
+      [raw-mp
+       (raw-module-path! #'raw-mp)]))
+  (for ((stx req-lst))
+    (parse-raw-require-spec stx))
+  (reverse require-lst))
+
 (define-with-contract*
   (-> syntax? bound-id-table? resolve-module-path-result?
       (values bound-id-table? free-id-table? (listof syntax?)))
@@ -123,7 +181,9 @@ would have done. Still retains correct scoping and evaluation order.
   ;;   (only "test-6-lib.rkt")
   (define (require! stx-lst)
     ;;(for-each (compose writeln syntax->datum) stx-lst)
-    (set! req-lst (append req-lst stx-lst)))
+    (set! req-lst
+          (append req-lst
+                  (filter for-runtime-require? stx-lst))))
   
   (define (not-magnolisp stx)
     (error 'parse-defs-from-module "not Magnolisp: ~a" stx))
