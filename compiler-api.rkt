@@ -60,7 +60,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;; submodule. A non-Magnolisp module is simply represented by the
 ;; value #t, since such modules are not processed. [defs (or/c
 ;; bound-id-table? #f)] contains Def objects for parsed modules.
-(struct Mod (pt annos defs) #:transparent)
+(struct Mod (pt annos defs provs reqs) #:transparent)
 
 ;; (-> module-path? (or/c Mod? #t)) Loads the specified module. It is
 ;; an error if the module path does not specify an existing module.
@@ -70,7 +70,7 @@ external dependencies for the program/library, as well as the .cpp and
   (if (not annos)
       #t
       (let ((pt (dynamic-require `(submod ,mp magnolisp-info) 'm-ast)))
-        (Mod pt annos #f))))
+        (Mod pt annos #f #f #f))))
 
 (define (list-entry-points annos)
   (define lst null)
@@ -113,38 +113,62 @@ external dependencies for the program/library, as well as the .cpp and
 
 ;; Compiles a program consisting of all the entry points in the
 ;; specified modules, and all dependencies thereof.
-(define* (compile-modules . mp-lst)
-  (define mods (make-hash))
+(define* (compile-modules . ep-mp-lst)
+  (define mods (make-hash)) ;; r-mp -> Mod
   (define eps (make-bound-id-table #:phase 0))
+  (define dep-q null) ;; deps queued for loading
 
-  ;; Load all the modules.
-  (for ((mp mp-lst))
+  (define (load mp ep?)
     (define r-mp (resolve-module-path mp (mp-root-path)))
     (define mod (hash-ref mods r-mp #f))
-    (unless mod
+    (unless mod ;; not yet loaded
       (set! mod (load-module mp))
 
-      ;; Use annotations to build a set of entry points.
-      (when (Mod? mod)
+      (when (Mod? mod) ;; is a Magnolisp module
         (define annos (Mod-annos mod))
-        (define eps-lst (list-entry-points annos))
-        (unless (null? eps-lst)
-          (bound-id-table-add-lst! eps eps-lst)
 
-          ;; Any modules with entry points will need to be parsed and
-          ;; analyzed.
-          (define pt (Mod-pt mod))
+        ;; For entry point modules, use annotations to build a set of
+        ;; entry points. Add these to program entry points.
+        (define eps-lst null)
+        (when ep?
+          (set! eps-lst (list-entry-points annos))
+          (bound-id-table-add-lst! eps eps-lst))
+
+        ;; If a module has entry points, or if it is a dependency,
+        ;; then collect further information from it.
+        (when (or (not ep?) (and ep? (not (null? eps-lst))))
+          (define pt (Mod-pt mod)) ;; parse tree
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
-          (pretty-print (bound-id-table-map defs cons))
-          (pretty-print (list 'raw-module-paths
-                              (req-specs->module-paths reqs)))
-          (set! mod (struct-copy Mod mod (defs defs)))))
+          (set! mod
+                (struct-copy Mod mod
+                             (defs defs) (provs provs) (reqs reqs)))
+          (define raw-mp-lst
+            (req-specs->module-paths reqs))
+          ;;(pretty-print (bound-id-table-map defs cons))
+          ;;(pretty-print (list 'provided-ids (dict-map provs list)))
+          ;;(pretty-print (list 'raw-module-paths raw-mp-lst))
+          (set! dep-q (append dep-q (map syntax->datum raw-mp-lst)))))
 
       (hash-set! mods r-mp mod)))
 
-  (mods-display-Var-bindings mods)
+  ;; Load all the "entry" modules.
+  (for ((mp ep-mp-lst))
+    (load mp #t))
+
+  ;; Keep loading dependencies until all loaded.
+  (let loop ()
+    (unless (null? dep-q)
+      (define mp-lst dep-q)
+      (set! dep-q null)
+      (for ((mp mp-lst))
+        (load mp #f))
+      (loop)))
+
+  ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (bound-id-table-map eps (compose car cons)))
+
+  (for (([k v] mods)) (pretty-print (list 'loaded k v)))
   
   (St mods eps))
 
