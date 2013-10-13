@@ -45,6 +45,10 @@
 (define* (symbolic-identifier=? a b)
   (eq? (syntax-e a) (syntax-e b)))
 
+(define-syntax-rule* (assert e)
+  (unless e
+    (error 'assert "assertion ~s failed" (quote e))))
+
 #|
 
 Copyright 2009 Helsinki Institute for Information Technology (HIIT)

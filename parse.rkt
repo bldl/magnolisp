@@ -163,6 +163,47 @@ would have done. Still retains correct scoping and evaluation order.
     (parse-raw-require-spec stx))
   (reverse require-lst))
 
+;; Parses passed require specs, returning a hash. The hash maps each
+;; module path into a list of elements, each of which is one of: 'all,
+;; (listof ID), or (cons/c local-ID exported-ID).
+(define-with-contract*
+  (-> (listof syntax?) hash?)
+  (req-specs->reqs-per-mp req-lst)
+  (define raw-mp-h (make-hash))
+  (define (add! mp x)
+    (hash-update! raw-mp-h mp (fix cons x) null))
+  (define (parse-phaseless-spec stx)
+    (syntax-parse stx
+      [((~datum only) raw-mp . ids)
+       (define id-lst (syntax->list #'ids))
+       (unless (null? id-lst)
+         (add! (syntax->datum #'raw-mp) id-lst))]
+      [((~datum rename) raw-mp local-id exported-id)
+       (add! (syntax->datum #'raw-mp)
+             (cons #'local-id #'exported-id))]
+      [((~datum prefix) pfx raw-mp)
+       (unsupported stx)]
+      [((~datum all-except) raw-mp . _)
+       (unsupported stx)]
+      [((~datum prefix-all-except) pfx raw-mp . _)
+       (unsupported stx)]
+      [raw-mp
+       (add! (syntax->datum #'raw-mp) 'all)]))
+  (define (parse-raw-require-spec stx)
+    (syntax-parse stx
+      [((~or (~datum for-syntax) (~datum for-template)
+             (~datum for-label) (~datum for-meta)) . _)
+       (unsupported stx)]
+      [((~datum just-meta) lv:phase-level . specs)
+       (assert (equal? (syntax-e #'lv) 0))
+       (for ((spec (syntax->list #'specs)))
+         (parse-raw-require-spec spec))]
+      [phaseless-spec
+       (parse-phaseless-spec #'phaseless-spec)]))
+  (for ((stx req-lst))
+    (parse-raw-require-spec stx))
+  raw-mp-h)
+
 (define-with-contract*
   (-> syntax? bound-id-table? resolve-module-path-result?
       (values bound-id-table? free-id-table? (listof syntax?)))
@@ -173,6 +214,7 @@ would have done. Still retains correct scoping and evaluation order.
   (define req-lst null)
 
   (define (provide! stx-lst)
+    ;;(pretty-print (list r-mp 'provide! stx-lst))
     (set! prov-lst (append prov-lst stx-lst)))
 
   ;; Records #%require specs, which may look like:
@@ -198,7 +240,8 @@ would have done. Still retains correct scoping and evaluation order.
               (redefinition id old-def new-stx)))
 
   (define (mk-annos ctx stx id-stx)
-    (define global? (eq? ctx 'top-level))
+    (define global? (eq? ctx 'module-level))
+    ;;(writeln `(global ,global?))
     (define ann-h (bound-id-table-ref annos id-stx #hasheq()))
     (set! ann-h (hash-set* ann-h 'stx stx 'r-mp r-mp 'top global?))
     ann-h)
@@ -211,6 +254,20 @@ would have done. Still retains correct scoping and evaluation order.
     (bound-id-table-set! defs id-stx def)
     def)
 
+  (define (make-DefStx ctx stx id-stx)
+    (check-redefinition id-stx stx)
+    (define ann-h (mk-annos ctx stx id-stx))
+    (define def (DefStx ann-h id-stx))
+    (bound-id-table-set! defs id-stx def)
+    def)
+
+  (define (make-Param ctx stx id-stx)
+    (check-redefinition id-stx stx)
+    (define ann-h (mk-annos ctx stx id-stx))
+    (define def (Param ann-h id-stx))
+    (bound-id-table-set! defs id-stx def)
+    def)
+  
   (define (make-Let ctx stx
                     ctor binds-stx exprs-stx)
     (define i-e-lst (syntax->list binds-stx))
@@ -277,9 +334,13 @@ would have done. Still retains correct scoping and evaluation order.
        (identifier? #'id)
        (make-DefVar ctx stx #'id #'e))
            
-      ((define-syntaxes . _)
-       (eq? ctx 'module-level)
-       (void))
+      ((define-syntaxes (id ...) _)
+       (begin
+         (assert (eq? ctx 'module-level))
+         (define id-lst (syntax->list #'(id ...)))
+         (assert (andmap identifier? id-lst))
+         (for ((id id-lst))
+           (make-DefStx ctx stx id))))
 
       ((#%require . specs)
        (eq? ctx 'module-level)
@@ -303,14 +364,10 @@ would have done. Still retains correct scoping and evaluation order.
          (define e-stx-lst (syntax->list #'exprs))
          (define par-ast-lst
            (map (lambda (id)
-                  (check-redefinition id stx)
                   ;; Annotations would probably have to be propagated
                   ;; from any binding whose value this lambda is, but
                   ;; that must wait until later.
-                  (define ann-h (mk-annos ctx stx id))
-                  (define ast (Param ann-h id))
-                  (bound-id-table-set! defs id ast)
-                  ast)
+                  (make-Param ctx stx id))
                 par-id-lst))
          (define e-ast-lst
            (map (lambda (e-stx)

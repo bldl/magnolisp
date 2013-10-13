@@ -35,6 +35,20 @@ such.
 (require "ast-util.rkt" "util.rkt")
 
 ;;; 
+;;; module
+;;; 
+
+;; [pt syntax?] is the parse tree, as loaded from the submodule.
+;; [annos bound-id-table?] are the annotations, as loaded from the
+;; submodule. A non-Magnolisp module is simply represented by the
+;; value #t, since such modules are not processed. [defs (or/c
+;; bound-id-table? #f)] contains Def objects for parsed modules.
+;; [provs (or/c free-id-table? #f)] maps each internally bound ID to a
+;; list of exported IDs. [reqs (or/c (listof syntax?) #f)] is a list
+;; of #%require specs.
+(concrete-struct* Mod (pt annos defs provs reqs syms) #:transparent)
+
+;;; 
 ;;; abstract node
 ;;; 
 
@@ -76,6 +90,9 @@ such.
 
 ;; Variable definition.
 (define-ast* DefVar Def ((just-term body)))
+
+;; Syntax definition.
+(define-ast* DefStx Def ())
 
 ;; Function parameter declaration.
 (define-ast* Param Def ())
