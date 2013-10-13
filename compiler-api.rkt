@@ -215,7 +215,7 @@ external dependencies for the program/library, as well as the .cpp and
         (define i-syms (get-syms-for-mod! req-r-mp))
         (define i-def (hash-ref i-syms i-sym))
         (set! l-to-def (hash-set l-to-def l-sym i-def))))
-    (pretty-print (list 'syms-for-mod r-mp l-to-def))
+    ;;(pretty-print (list 'syms-for-mod r-mp l-to-def))
     l-to-def)
 
   ;; Sets 'syms-for-mods' for the specified module, and possibly also
@@ -230,9 +230,9 @@ external dependencies for the program/library, as well as the .cpp and
   (for ((r-mp (hash-keys mods)))
     (get-syms-for-mod! r-mp))
 
-  ;; xxx result to be stored into 'mods'
-  
-  mods)
+  (for/hash (([r-mp mod] mods))
+    (define syms (hash-ref syms-for-mods r-mp))
+    (values r-mp (struct-copy Mod mod (syms syms)))))
   
 ;; Compiles a program consisting of all the entry points in the
 ;; specified modules, and all dependencies thereof.
@@ -288,12 +288,12 @@ external dependencies for the program/library, as well as the .cpp and
         (load mp #f))
       (loop)))
 
+  (set! mods (mods-fill-in-syms mods))
+  
   ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (bound-id-table-map eps (compose car cons)))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
-  (set! mods (mods-fill-in-syms mods))
-  
   (St mods eps))
 
 ;; Compiles the modules defined in the specified files. Returns a
@@ -326,4 +326,4 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-7-prog.rkt")))
+  (define st (compile-modules "test-6-prog.rkt")))
