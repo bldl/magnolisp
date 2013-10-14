@@ -55,15 +55,25 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; other
 ;;; 
 
+(define-syntax-rule (may-fail b ...)
+  (with-handlers
+      ((exn:fail? (lambda (e) #f)))
+    b ...))
+
 ;; (-> module-path? (or/c Mod? #t)) Loads the specified module. It is
 ;; an error if the module path does not specify an existing module.
+;; Only sets 'pt' and 'annos' fields.
 (define (load-mod-from-submod mp)
   (define annos
-    (dynamic-require `(submod ,mp magnolisp-info) 'm-annos (thunk #f)))
-  (if (not annos)
-      #t
-      (let ((pt (dynamic-require `(submod ,mp magnolisp-info) 'm-ast)))
-        (Mod pt annos #f #f #f #f))))
+    (may-fail
+     (dynamic-require `(submod ,mp magnolisp-info) 'm-annos (thunk #f))))
+  (define pt
+    (if annos
+        (dynamic-require `(submod ,mp magnolisp-info) 'm-ast)
+        #'(#%module-begin)))
+  (unless annos
+    (set! annos (make-immutable-bound-id-table #:phase 0)))
+  (Mod pt annos #f #f #f #f))
 
 (define (list-entry-points annos)
   (define lst null)
@@ -93,6 +103,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;; For debugging.
 (define (mods-display-Var-bindings mods)
   (for (((r-mp mod) mods))
+    (writeln `(Vars ,r-mp))
     (define defs (Mod-defs mod))
     (bound-id-table-for-each
      defs
@@ -290,9 +301,9 @@ external dependencies for the program/library, as well as the .cpp and
 
   (set! mods (mods-fill-in-syms mods))
   
-  ;;(mods-display-Var-bindings mods)
+  (mods-display-Var-bindings mods)
   ;;(pretty-print (bound-id-table-map eps (compose car cons)))
-  ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
+  (for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
   (St mods eps))
 
@@ -326,4 +337,4 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-6-prog.rkt")))
+  (define st (compile-modules "test-8-prog.rkt")))

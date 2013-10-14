@@ -40,12 +40,12 @@ such.
 
 ;; [pt syntax?] is the parse tree, as loaded from the submodule.
 ;; [annos bound-id-table?] are the annotations, as loaded from the
-;; submodule. A non-Magnolisp module is simply represented by the
-;; value #t, since such modules are not processed. [defs (or/c
-;; bound-id-table? #f)] contains Def objects for parsed modules.
-;; [provs (or/c free-id-table? #f)] maps each internally bound ID to a
-;; list of exported IDs. [reqs (or/c (listof syntax?) #f)] is a list
-;; of #%require specs.
+;; submodule. A non-Magnolisp module simply gets null values for the
+;; above. [defs bound-id-table?] contains Def objects for parsed
+;; modules. [provs free-id-table?] maps each internally bound ID to a
+;; list of exported IDs. [reqs (listof syntax?)] is a list of
+;; #%require specs. [syms (hash/c symbol? Def?)] maps top-level names
+;; to definitions.
 (concrete-struct* Mod (pt annos defs provs reqs syms) #:transparent)
 
 ;;; 
