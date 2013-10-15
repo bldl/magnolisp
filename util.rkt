@@ -49,6 +49,26 @@
   (unless e
     (error 'assert "assertion ~s failed" (quote e))))
 
+(require (for-syntax syntax/for-body))
+
+;; Different syntax from 'for' in that 'empty-expr' is an extra
+;; expression for constructing an empty dictionary. This is required a
+;; dictionary is an abstract concept.
+(define-syntax* (for/dict stx)
+  (syntax-case stx ()
+    ((_ empty-expr (clause ...) . body)
+     (with-syntax ((original stx)
+                   ([(pre-body ...) post-body]
+                    (split-for-body stx #'body)))
+       (syntax/loc stx
+         (for/fold/derived
+          original
+          ((d empty-expr))
+          (clause ...)
+          pre-body ...
+          (let-values (([k v] (begin . post-body)))
+            (dict-set d k v))))))))
+
 #|
 
 Copyright 2009 Helsinki Institute for Information Technology (HIIT)

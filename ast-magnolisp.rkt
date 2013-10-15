@@ -61,6 +61,11 @@ such.
         (hash-ref annos k)
         (hash-ref annos k #f))))
 
+(define* (Ast-anno-set ast k v)
+  (define old-annos (Ast-annos ast))
+  (define new-annos (hash-set old-annos k v))
+  (struct-copy Ast ast (annos new-annos)))  
+
 ;;; 
 ;;; type expressions
 ;;; 

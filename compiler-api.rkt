@@ -128,6 +128,104 @@ external dependencies for the program/library, as well as the .cpp and
              (writeln (list ast (identifier-binding var-id))))))
         def)))))
 
+(define (syntax-source-resolve-module stx)
+  (define src (syntax-source-module stx #f))
+  (cond
+   ((not src) #f)
+   ((resolved-module-path? src) (resolved-module-path-name src))
+   ((symbol? src) src)
+   ((path? src) src)
+   ((module-path-index? src)
+    (resolved-module-path-name (module-path-index-resolve src)))
+   (else
+    (error 'syntax-source-resolve-module
+           "unexpected syntax-source-module ~s for ~s" src stx))))
+
+(define (defs-resolve-Vars defs mods)
+  (pretty-print mods)
+  
+  (define (rw-def def)
+    (define (get-mod)
+      (define r-mp (Ast-anno-ref def 'r-mp))
+      (values r-mp (hash-ref mods r-mp)))
+
+    (define (get-mod-for-id stx)
+      (define r-mp (syntax-source-resolve-module stx))
+      (writeln r-mp)
+      (if r-mp
+          (values r-mp (hash-ref mods r-mp #f))
+          (get-mod)))
+
+    (define (rw-var ast)
+      (define id (Var-id ast))
+      ;; If 'lexical, we can look up by ID from containing Mod. If #f,
+      ;; we should be able to look up by name from source Mod.
+      ;; Otherwise there is a module binding, and we can say look it
+      ;; up by ID. If the lookup fails for a 'lexical or unbound ID,
+      ;; it is an error. If it fails for a module binding, then the ID
+      ;; should identify a known builtin that the compiler supports
+      ;; (that will be checked later).
+      (define b (identifier-binding id))
+      (define def-id #f)
+      (cond
+       ((not b)
+        (define-values [mp mod] (get-mod-for-id id))
+        (unless mod
+          (error 'defs-resolve-Vars
+                 "cannot determine module for unbound variable: ~s" id))
+        (define syms (Mod-syms mod))
+        (define def (hash-ref syms (syntax-e id) #f))
+        (unless def
+          (error 'defs-resolve-Vars
+                 "no definition in ~a for unbound variable: ~s" mp id))
+        (set! def-id (Def-id def)))
+       ((eq? b 'lexical)
+        (define def (dict-ref defs id #f))
+        (unless def
+          (error 'defs-resolve-Vars
+                 "undefined lexical variable reference: ~s" id))
+        (set! def-id (Def-id def))
+        (assert (free-identifier=? id def-id)))
+       ((list? b)
+        (define mpi (first b))
+        (define r-mp 
+          (resolved-module-path-name
+           (module-path-index-resolve mpi)))
+        (define mod (hash-ref mods r-mp #f))
+        (when mod
+          (define sym (second b))
+          (define syms (Mod-syms mod))
+          (define def (hash-ref syms sym #f))
+          (unless def
+            (error 'defs-resolve-Vars
+                   "no definition in ~a for module-level variable ~a: ~s"
+                   r-mp sym id))
+          (set! def-id (Def-id def))
+          (assert (free-identifier=? id def-id))))
+       (else
+        (error 'defs-resolve-Vars
+               "unexpected identifier-binding: ~s" b)))
+      (writeln (list 'resolved-var
+                     ast
+                     'reference id
+                     'binding b
+                     'module (syntax-source-module id)
+                     'bound-to def-id))
+      ;; xxx add def-id annotation
+      ast)
+  
+    (define rw
+      (topdown
+       (lambda (ast)
+         (if (Var? ast) (rw-var ast) ast))))
+
+    (rw def))
+  
+  (for/dict
+   (make-immutable-free-id-table #:phase 0)
+   (([id def] (in-dict defs)))
+   (values id (rw-def def))))
+
 ;; Returns (and/c hash? hash-eq? immutable?).
 (define (build-sym-def-for-mod mod)
   (define defs (Mod-defs mod))
@@ -315,6 +413,7 @@ external dependencies for the program/library, as well as the .cpp and
   (set! mods (mods-fill-in-syms mods))
 
   (define all-defs (merge-defs mods))
+  (set! all-defs (defs-resolve-Vars all-defs mods))
   
   ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (bound-id-table-map eps (compose car cons)))
