@@ -95,10 +95,23 @@ external dependencies for the program/library, as well as the .cpp and
   (for ((id lst))
     (bound-id-table-set! t id #t)))
 
-;; Compilation state. 'mods' maps resolved module paths to Mod or #t
-;; objects. 'eps' is a bound-id-table?, with entry points as keys, and
-;; #t values.
-(struct St (mods eps) #:transparent)
+;; Compilation state. [mods hash?] maps resolved module paths to Mod
+;; objects. [eps bound-id-table?] has entry points as keys, and #t
+;; values.
+(struct St (mods defs eps) #:transparent)
+
+(define (merge-defs mods)
+  (define all-defs (make-free-id-table #:phase 0))
+  (for (([r-mp mod] mods))
+    (define defs (Mod-defs mod))
+    (dict-for-each
+     defs
+     (lambda (id def)
+       (when (dict-has-key? all-defs id)
+         (error 'merge-defs
+                "ID ~s bound (for runtime) in more than one module" id))
+       (dict-set! all-defs id def))))
+  all-defs)
 
 ;; For debugging.
 (define (mods-display-Var-bindings mods)
@@ -178,7 +191,7 @@ external dependencies for the program/library, as well as the .cpp and
                            (syntax-e (cdr req)))))
          (else (assert #f)))))
     (hash-set! l-to-mp-i-for-mods r-mp l-to-mp-i))
-  l-to-mp-i-for-mods)  
+  l-to-mp-i-for-mods)
 
 ;; 'mods' is a (hash/c resolve-module-path-result? Mod?) of all the
 ;; modules under consideration. From them we extract all the 'reqs',
@@ -244,7 +257,7 @@ external dependencies for the program/library, as well as the .cpp and
   (for/hash (([r-mp mod] mods))
     (define syms (hash-ref syms-for-mods r-mp))
     (values r-mp (struct-copy Mod mod (syms syms)))))
-  
+
 ;; Compiles a program consisting of all the entry points in the
 ;; specified modules, and all dependencies thereof.
 (define* (compile-modules . ep-mp-lst)
@@ -300,12 +313,15 @@ external dependencies for the program/library, as well as the .cpp and
       (loop)))
 
   (set! mods (mods-fill-in-syms mods))
-  
-  (mods-display-Var-bindings mods)
-  ;;(pretty-print (bound-id-table-map eps (compose car cons)))
-  (for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
-  (St mods eps))
+  (define all-defs (merge-defs mods))
+  
+  ;;(mods-display-Var-bindings mods)
+  ;;(pretty-print (bound-id-table-map eps (compose car cons)))
+  (pretty-print (dict-map all-defs (lambda (x y) y)))
+  ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
+
+  (St mods all-defs eps))
 
 ;; Compiles the modules defined in the specified files. Returns a
 ;; compilation state with a full IR for the entire program.
@@ -337,4 +353,4 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-8-prog.rkt")))
+  (define st (compile-modules "test-6-prog.rkt")))
