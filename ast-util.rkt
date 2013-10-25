@@ -2,10 +2,13 @@
 
 #|
 
+All AST node types must be defined as #:transparent. You will probably
+want to define the base node type using the provided macro.
+
 |#
 
-(require "strategy.rkt" "util.rkt")
-(require racket/generic)
+(require "strategy.rkt" "util.rkt" "util/struct.rkt")
+(require racket/generic unstable/struct)
 (require (for-syntax racket/function racket/list racket/syntax))
 
 ;;; 
@@ -18,8 +21,38 @@
   (for/hasheq ((k (syntax-property-symbol-keys stx)))
               (values k (syntax-property stx k))))
 
+;;;
+;;; base AST node definition
+;;;
+
+(define (ast-write v out mode)
+  (define n (struct-symbol v))
+  (define fvs (cdr (struct->list v)))
+  (write (cons n fvs) out))
+
+(define-syntax-rule* (define-ast-base* n more ...)
+  (abstract-struct* n (annos)
+                    #:property prop:custom-write ast-write
+                    #:transparent
+                    more ...))
+
+(define* (ast-get-annos v)
+  (car (struct->list v)))
+
+(define* (ast-get-fields v)
+  (cdr (struct->list v)))
+
+(define* (ast-set-annos v a)
+  (define ctor (struct-make-constructor v))
+  (apply ctor a (ast-get-fields v)))
+
+(define-syntax-rule* (preserve-annos v b ...)
+  (let ((a (ast-get-annos v)))
+    (let ((v (begin b ...)))
+      (ast-set-annos v a))))
+
 ;;; 
-;;; AST definition utilities
+;;; concrete AST node definition
 ;;; 
 
 ;; Note that ordering is delicate here. Any identifiers must be

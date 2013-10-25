@@ -52,8 +52,7 @@ such.
 ;;; abstract node
 ;;; 
 
-;; For more compact printing, we do not make annotations transparent.
-(abstract-struct* Ast (annos))
+(define-ast-base* Ast)
 
 (define* (Ast-anno-ref ast k #:must (must #t))
   (let* ((annos (Ast-annos ast)))
