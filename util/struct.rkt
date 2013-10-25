@@ -55,7 +55,7 @@
       (unless (ormap (lambda (act-id)
                        (free-identifier=? act-id id)) actuals)
         (error 'dynamic-struct-copy
-               "no such accessor: ~a" id))))
+               "no accessor named ~a: ~a" id stx))))
   (syntax-parse stx
     ((_ bt e:expr f+v:fv ...)
      (let ()
