@@ -113,6 +113,15 @@ external dependencies for the program/library, as well as the .cpp and
        (dict-set! all-defs id def))))
   all-defs)
 
+(define (def-display-Var-bindings def)
+  ((topdown-visit
+    (lambda (ast)
+      (when (Var? ast)
+        (define var-id (Var-id ast))
+        (define def-id (Ast-anno-ref ast 'def-id #:must #f))
+        (writeln (list ast (identifier-binding var-id) def-id)))))
+   def)) 
+
 ;; For debugging.
 (define (mods-display-Var-bindings mods)
   (for (((r-mp mod) mods))
@@ -121,12 +130,14 @@ external dependencies for the program/library, as well as the .cpp and
     (bound-id-table-for-each
      defs
      (lambda (id def)
-       ((topdown-visit
-         (lambda (ast)
-           (when (Var? ast)
-             (define var-id (Var-id ast))
-             (writeln (list ast (identifier-binding var-id))))))
-        def)))))
+       (def-display-Var-bindings def)))))
+
+;; For debugging.
+(define (all-defs-display-Var-bindings all-defs)
+  (free-id-table-for-each
+   all-defs
+   (lambda (id def)
+     (def-display-Var-bindings def))))
 
 (define (syntax-source-resolve-module stx)
   (define src (syntax-source-module stx #f))
@@ -142,7 +153,7 @@ external dependencies for the program/library, as well as the .cpp and
            "unexpected syntax-source-module ~s for ~s" src stx))))
 
 (define (defs-resolve-Vars defs mods)
-  (pretty-print mods)
+  ;;(pretty-print mods)
   
   (define (rw-def def)
     (define (get-mod)
@@ -151,7 +162,7 @@ external dependencies for the program/library, as well as the .cpp and
 
     (define (get-mod-for-id stx)
       (define r-mp (syntax-source-resolve-module stx))
-      (writeln r-mp)
+      ;;(writeln r-mp)
       (if r-mp
           (values r-mp (hash-ref mods r-mp #f))
           (get-mod)))
@@ -205,13 +216,11 @@ external dependencies for the program/library, as well as the .cpp and
        (else
         (error 'defs-resolve-Vars
                "unexpected identifier-binding: ~s" b)))
-      (writeln (list 'resolved-var
-                     ast
-                     'reference id
-                     'binding b
-                     'module (syntax-source-module id)
-                     'bound-to def-id))
-      ;; xxx add def-id annotation
+      ;;(writeln (list 'resolved-var ast 'reference id 'binding b 'module (syntax-source-module id) 'bound-to def-id))
+      (when def-id
+        (set! ast (Ast-anno-set ast 'def-id def-id))
+        ;;(writeln `(def-id ,(Ast-anno-ref ast 'def-id)))
+        )
       ast)
   
     (define rw
@@ -414,10 +423,11 @@ external dependencies for the program/library, as well as the .cpp and
 
   (define all-defs (merge-defs mods))
   (set! all-defs (defs-resolve-Vars all-defs mods))
-  
+
+  (all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (bound-id-table-map eps (compose car cons)))
-  (pretty-print (dict-map all-defs (lambda (x y) y)))
+  ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
   (St mods all-defs eps))

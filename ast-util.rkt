@@ -46,6 +46,10 @@ want to define the base node type using the provided macro.
   (define ctor (struct-make-constructor v))
   (apply ctor a (ast-get-fields v)))
 
+(define* (ast-add-anno ast k v)
+  (define annos (ast-get-annos ast))
+  (ast-set-annos ast (hash-set annos k v)))
+
 (define-syntax-rule* (preserve-annos v b ...)
   (let ((a (ast-get-annos v)))
     (let ((v (begin b ...)))
