@@ -122,6 +122,19 @@ external dependencies for the program/library, as well as the .cpp and
         (writeln (list ast (identifier-binding var-id) def-id)))))
    def)) 
 
+;; Currently only supports references to variable names, not to type
+;; names.
+(define (Def-all-referred-def-ids def)
+  (define defs (make-free-id-table #:phase 0))
+  ((topdown-visit
+    (lambda (ast)
+      (when (Var? ast)
+        (define def-id (Ast-anno-ref ast 'def-id #:must #f))
+        (when def-id
+          (dict-set! defs def-id #t)))))
+   def)
+  (dict-keys defs))
+
 ;; For debugging.
 (define (mods-display-Var-bindings mods)
   (for (((r-mp mod) mods))
@@ -234,6 +247,26 @@ external dependencies for the program/library, as well as the .cpp and
    (make-immutable-free-id-table #:phase 0)
    (([id def] (in-dict defs)))
    (values id (rw-def def))))
+
+;; Drops all bindings from 'all-defs' that are not reachable via at
+;; least one of the entry points in 'eps'. This relies variable
+;; references (within the codebase) having been resolved. (Type
+;; references are not supported for the moment.) Returns the trimmed
+;; down definitions.
+(define (defs-drop-unreachable all-defs eps)
+  (define processed-defs (make-free-id-table #:phase 0))
+  (let loop ((ids-to-process (dict-keys eps)))
+    (unless (null? ids-to-process)
+      (define id (car ids-to-process))
+      (set! ids-to-process (cdr ids-to-process))
+      (unless (dict-has-key? processed-defs id)
+        (define def (dict-ref all-defs id))
+        (dict-set! processed-defs id def)
+        (define refs-in-def (Def-all-referred-def-ids def))
+        (set! ids-to-process
+              (append ids-to-process refs-in-def)))
+      (loop ids-to-process)))
+  processed-defs)
 
 ;; Returns (and/c hash? hash-eq? immutable?).
 (define (build-sym-def-for-mod mod)
@@ -423,11 +456,12 @@ external dependencies for the program/library, as well as the .cpp and
 
   (define all-defs (merge-defs mods))
   (set! all-defs (defs-resolve-Vars all-defs mods))
+  (set! all-defs (defs-drop-unreachable all-defs eps))
 
-  (all-defs-display-Var-bindings all-defs)
+  ;;(all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
-  ;;(pretty-print (bound-id-table-map eps (compose car cons)))
-  ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
+  ;;(pretty-print (list 'entry-points (bound-id-table-map eps (compose car cons))))
+  (pretty-print (dict-map all-defs (lambda (x y) y)))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
   (St mods all-defs eps))
