@@ -440,6 +440,11 @@ would have done. Still retains correct scoping and evaluation order.
       ((#%variable-reference)
        (not-magnolisp stx))
       
+      ;; These do appear as well.
+      ((#%expression e)
+       (eq? ctx 'expr)
+       (parse ctx #'e))
+
       ;; local-expand result language
       
       ;; The letrec-syntaxes+values ID we get here is either top-level
