@@ -32,7 +32,7 @@ such.
 
 |#
 
-(require "ast-util.rkt" "util.rkt")
+(require "ast-util.rkt" "compiler-util.rkt" "util.rkt")
 
 ;;; 
 ;;; module
@@ -67,32 +67,31 @@ such.
 
 (define-with-contract*
   (-> Ast? (or/c syntax? #f))
-  (Ast-origin-stx ast)
+  (Ast-stx ast)
   (define stx (Ast-anno-ref ast 'stx #:must #f))
-  ;; xxx can we track origin?
+  ;;(when stx (writeln `(origin ,stx ,(syntax-property stx 'origin))))
   stx)
 
 (define-with-contract*
   (-> Ast? (or/c syntax? Ast?))
   (Ast-displayable ast)
-  (or (Ast-origin-stx ast) ast))
+  (or (Ast-stx ast) ast))
 
-;; xxx may need something like this for semantic errors also
 (define-with-contract*
   (->* ((or/c symbol? #f) string?)
        ((or/c Ast? syntax? #f) (or/c Ast? syntax? #f)
         (listof (or/c Ast? syntax?)))
        any)
-  (raise-syntax-error/ast name message
-                          [ast #f]
-                          [sub-ast #f]
-                          [extra-sources null])
-  ;; We assume here that raise-syntax-error really accepts any/c as
-  ;; expr and sub-expr, and not just (or/c syntax? #f).
+  (raise-language-error/ast name message
+                            [ast #f]
+                            [sub-ast #f]
+                            [extra-sources null])
   (define expr (Ast-displayable ast))
   (define sub-expr (Ast-displayable sub-ast))
-  (define extras (filter values (map Ast-origin-stx extra-sources)))
-  (raise-syntax-error name message expr sub-expr extras))
+  (define extras (filter values (map Ast-stx extra-sources)))
+  (raise-language-error name message
+                        expr sub-expr extras
+                        #:continued "incorrect Magnolisp"))
 
 ;;; 
 ;;; type expressions

@@ -64,20 +64,16 @@ external dependencies for the program/library, as well as the .cpp and
      (lambda (ast)
        (match ast
          ((Apply _ e _)
-          (unless (Var? e)
-            ;; xxx would like to show original syntax, if available
-            (error 'de-racketize
-                   "expected by-name function reference, got ~a: ~a"
-                   (Ast-displayable e)
-                   (Ast-displayable ast)))
+          (assert (Var? e))
           (define id (Var-id e))
           (define def (dict-ref defs id #f))
           ;; Base namespace names may be unresolved.
           (when def
             (unless (matches? def (DefVar _ _ (? Lambda?)))
-              (error 'de-racketize
-                     "name ~a resolved to a non-function ~a: ~a"
-                     id (Ast-displayable def) (Ast-displayable ast))))
+              (raise-language-error/ast
+               #f
+               "application target does not name a function"
+               ast e)))
           ast)
 
          ;; xxx Lambda decl to Defun
