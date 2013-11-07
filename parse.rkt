@@ -383,6 +383,10 @@ would have done. Still retains correct scoping and evaluation order.
       
       ((#%plain-app p-expr . a-expr)
        (when (eq? ctx 'expr)
+         (unless (identifier? #'p-expr)
+           ;; No first-class functions in Magnolisp.
+           (raise-syntax-error #f "expected identifier"
+                               stx #'p-expr))
          (new-Apply
           stx
           (parse ctx #'p-expr)
