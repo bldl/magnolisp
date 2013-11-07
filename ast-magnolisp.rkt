@@ -65,6 +65,35 @@ such.
   (define new-annos (hash-set old-annos k v))
   (ast-set-annos ast new-annos))
 
+(define-with-contract*
+  (-> Ast? (or/c syntax? #f))
+  (Ast-origin-stx ast)
+  (define stx (Ast-anno-ref ast 'stx #:must #f))
+  ;; xxx can we track origin?
+  stx)
+
+(define-with-contract*
+  (-> Ast? (or/c syntax? Ast?))
+  (Ast-displayable ast)
+  (or (Ast-origin-stx ast) ast))
+
+;; xxx may need something like this for semantic errors also
+(define-with-contract*
+  (->* ((or/c symbol? #f) string?)
+       ((or/c Ast? syntax? #f) (or/c Ast? syntax? #f)
+        (listof (or/c Ast? syntax?)))
+       any)
+  (raise-syntax-error/ast name message
+                          [ast #f]
+                          [sub-ast #f]
+                          [extra-sources null])
+  ;; We assume here that raise-syntax-error really accepts any/c as
+  ;; expr and sub-expr, and not just (or/c syntax? #f).
+  (define expr (Ast-displayable ast))
+  (define sub-expr (Ast-displayable sub-ast))
+  (define extras (filter values (map Ast-origin-stx extra-sources)))
+  (raise-syntax-error name message expr sub-expr extras))
+
 ;;; 
 ;;; type expressions
 ;;; 
@@ -100,6 +129,9 @@ such.
 
 ;; Function parameter declaration.
 (define-ast* Param Def ())
+
+;; Function declaration.
+(define-ast* Defun Def ((list-of-term params) (list-of-term body)))
 
 ;; 'defs' contains DefVar terms. Said bindings are not visible in
 ;; DefVar bodies.

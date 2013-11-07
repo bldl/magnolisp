@@ -40,25 +40,57 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; utilities
 ;;; 
 
-;; mp is (or/c module-path? resolved-module-path?).
-(define (get-exports-and-imports mp)
-  (define path
-    (if (resolved-module-path? mp)
-        (resolved-module-path-name mp)
-        (resolve-module-path mp (mp-root-path))))
-  (define c-exp (get-module-code path))
-  (let-values (((vals stxs) (module-compiled-exports c-exp)))
-    (let ((imports (module-compiled-imports c-exp)))
-      (values vals stxs imports))))
-
-;;; 
-;;; other
-;;; 
-
 (define-syntax-rule (may-fail b ...)
   (with-handlers
       ((exn:fail? (lambda (e) #f)))
     b ...))
+
+;;;
+;;; de-Racketization
+;;;
+
+;; A combinator that applies the rewrite 'rw' to each definition in
+;; the passed set of definitions.
+(define (make-for-all-defs rw)
+  (lambda (defs)
+    (for/dict
+     (make-immutable-free-id-table #:phase 0)
+     (([id def] (in-dict defs)))
+     (values id (rw def)))))
+
+(define (de-racketize defs ast)
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         ((Apply _ e _)
+          (unless (Var? e)
+            ;; xxx would like to show original syntax, if available
+            (error 'de-racketize
+                   "expected by-name function reference, got ~a: ~a"
+                   (Ast-displayable e)
+                   (Ast-displayable ast)))
+          (define id (Var-id e))
+          (define def (dict-ref defs id #f))
+          ;; Base namespace names may be unresolved.
+          (when def
+            (unless (matches? def (DefVar _ _ (? Lambda?)))
+              (error 'de-racketize
+                     "name ~a resolved to a non-function ~a: ~a"
+                     id (Ast-displayable def) (Ast-displayable ast))))
+          ast)
+
+         ;; xxx Lambda decl to Defun
+         
+         (_ ast)))))
+  (rw ast))
+
+(define (all-defs-de-racketize defs)
+  ((make-for-all-defs (fix de-racketize defs)) defs))
+
+;;; 
+;;; import resolution
+;;; 
 
 ;; (-> module-path? (or/c Mod? #t)) Loads the specified module. It is
 ;; an error if the module path does not specify an existing module.
@@ -398,6 +430,10 @@ external dependencies for the program/library, as well as the .cpp and
     (define syms (hash-ref syms-for-mods r-mp))
     (values r-mp (struct-copy Mod mod (syms syms)))))
 
+;;; 
+;;; compilation
+;;;
+
 ;; Compiles a program consisting of all the entry points in the
 ;; specified modules, and all dependencies thereof.
 (define* (compile-modules . ep-mp-lst)
@@ -457,7 +493,8 @@ external dependencies for the program/library, as well as the .cpp and
   (define all-defs (merge-defs mods))
   (set! all-defs (defs-resolve-Vars all-defs mods))
   (set! all-defs (defs-drop-unreachable all-defs eps))
-
+  (set! all-defs (all-defs-de-racketize all-defs))
+  
   ;;(all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (list 'entry-points (bound-id-table-map eps (compose car cons))))
