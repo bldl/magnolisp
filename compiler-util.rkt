@@ -22,10 +22,15 @@
 ;; objects. It is a (listof any/c).
 (concrete-struct* exn:fail:language exn:fail (exprs) #:transparent)
 
+(define field/c
+  (let ([option/c (or/c 'value 'multi 'maybe)])
+    (or/c string? (cons/c string? (listof option/c)))))
+
 (define-with-contract*
   (->* ((or/c symbol? #f) string?)
        (any/c any/c (listof any/c)
-              #:continued (or/c string? (listof string?)))
+              #:continued (or/c string? (listof string?))
+              #:fields (listof (list/c field/c any/c)))
        any)
   ;; The 'name' symbol here has different semantics compared to
   ;; raise-syntax-error, as it is only used as the fallback value if
@@ -34,7 +39,8 @@
                         [expr #f]
                         [sub-expr #f]
                         [extra-exprs null]
-                        #:continued [continued "incorrect language"])
+                        #:continued [continued null]
+                        #:fields [more-fields null])
   (define (get-sym x)
     (and (syntax? x)
          (if (identifier? x)
@@ -60,7 +66,7 @@
                                 (syntax-e id) id)) orig))))
         (list s e)))
   (define fields
-    (append (mk "at" sub-expr) (mk "in" expr)))
+    (apply append (mk "at" sub-expr) (mk "in" expr) more-fields))
   (apply raise-misc-error n message fields
          #:continued continued
          #:constructor (lambda (s cs)

@@ -78,6 +78,9 @@ such.
   (Ast-displayable ast)
   (or (Ast-stx ast) ast))
 
+(define* not-magnolisp-message
+  "incorrect Magnolisp")
+
 (define-with-contract*
   (->* (string?)
        ((or/c Ast? syntax? #f) (or/c Ast? syntax? #f)
@@ -97,7 +100,7 @@ such.
   (define extras (filter values (map Ast-stx extra-sources)))
   (raise-language-error name message
                         expr sub-expr extras
-                        #:continued "incorrect Magnolisp"))
+                        #:continued not-magnolisp-message))
 
 ;;; 
 ;;; type expressions

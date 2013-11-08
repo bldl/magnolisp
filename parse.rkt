@@ -308,8 +308,8 @@ would have done. Still retains correct scoping and evaluation order.
        (void))
 
       ((begin . bs)
-       (Begin (map (fix parse ctx)
-                   (syntax->list #'bs))))
+       (new-Begin stx (map (fix parse ctx)
+                           (syntax->list #'bs))))
       
       ((begin-for-syntax . _)
        (eq? ctx 'module-level)
@@ -329,11 +329,50 @@ would have done. Still retains correct scoping and evaluation order.
       
       ;; general-top-level-form non-terminal
 
-      ;; TODO multiple (or zero) binding case
+      ;; TODO multiple (or zero) binding case (in the general case)
       ((define-values (id) e)
-       (identifier? #'id)
-       (make-DefVar ctx stx #'id #'e))
-           
+       (begin
+         (assert (identifier? #'id))
+         (make-DefVar ctx stx #'id #'e)))
+
+      ;; We only support splitting of module top-level define-values,
+      ;; for now. We do not support any top-level computation, so we
+      ;; expect a direct (values v ...) expression.
+      ((define-values (id ...) e)
+       (eq? ctx 'module-level)
+       (let ()
+         (define ids (syntax->list #'(id ...)))
+         (unless (null? ids) ;; (void) result otherwise
+           (assert (> (length ids) 1))
+           (define e-stx #'e)
+           (kernel-syntax-case e-stx #f
+             ((#%plain-app values v ...)
+              (let ()
+                (define vs (syntax->list #'(v ...)))
+                (unless (= (length vs) (length ids))
+                  (raise-language-error
+                   #f
+                   (format "expected ~a values" (length ids))
+                   stx e-stx
+                   #:continued not-magnolisp-message))
+                (define def-lst
+                  (map
+                   (lambda (id-stx v-stx)
+                     (syntax-track-origin
+                      (quasisyntax/loc stx
+                        (define-values (#,id-stx) #,v-stx))
+                      stx (car (syntax-e stx))))
+                   ids vs))
+                (parse
+                 ctx
+                 (quasisyntax/loc stx
+                   (begin #,@def-lst)))))
+             (_
+              (raise-language-error
+               #f "expected (values v ...) expression"
+               stx e-stx
+               #:continued not-magnolisp-message))))))
+      
       ((define-syntaxes (id ...) _)
        (begin
          (assert (eq? ctx 'module-level))
