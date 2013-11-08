@@ -466,10 +466,10 @@ would have done. Still retains correct scoping and evaluation order.
 
       ;; unrecognized language
       
-      (_ (error 'parse-defs-from-module
-                "unsupported syntax in ~a context: ~s ~s: ~s"
-                ctx stx (or (stx-binding-info stx) '(unbound))
-                (syntax->datum stx)))))
+      (_ (raise-language-error
+          #f (format "unsupported syntax in ~a context" ctx) stx
+          #:fields `(("binding"
+                      ,(or (stx-binding-info stx) 'unbound)))))))
 
   (parse 'module-begin modbeg-stx)
   (define prov-h (resolve-provides prov-lst))
