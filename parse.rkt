@@ -460,8 +460,9 @@ would have done. Still retains correct scoping and evaluation order.
          (parse ctx
                 ;; letrec-values might not be the kernel one, but we
                 ;; risk it here.
-                (syntax/loc stx (letrec-values v-binds body ...)))
-         ))
+                (syntax-track-origin
+                 (syntax/loc stx (letrec-values v-binds body ...))
+                 stx #'lsv))))
 
       ;; unrecognized language
       
