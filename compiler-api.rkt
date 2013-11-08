@@ -76,7 +76,12 @@ external dependencies for the program/library, as well as the .cpp and
                ast e)))
           ast)
 
-         ;; xxx Lambda decl to Defun
+         ((DefVar a1 n (Lambda a2 a b))
+          ;; Retain annos from the binding, which has any information
+          ;; associated with the binding. It should also have the
+          ;; declaration syntax corresponding to the function
+          ;; definition.
+          (Defun a1 n a b))
          
          (_ ast)))))
   (rw ast))
