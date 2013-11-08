@@ -32,7 +32,8 @@ such.
 
 |#
 
-(require "ast-util.rkt" "compiler-util.rkt" "util.rkt")
+(require "ast-util.rkt" "compiler-util.rkt"
+         "util.rkt" "util/struct.rkt")
 
 ;;; 
 ;;; module
@@ -78,14 +79,19 @@ such.
   (or (Ast-stx ast) ast))
 
 (define-with-contract*
-  (->* ((or/c symbol? #f) string?)
+  (->* (string?)
        ((or/c Ast? syntax? #f) (or/c Ast? syntax? #f)
-        (listof (or/c Ast? syntax?)))
+        (listof (or/c Ast? syntax?))
+        #:name (or/c symbol? #f))
        any)
-  (raise-language-error/ast name message
+  (raise-language-error/ast message
                             [ast #f]
                             [sub-ast #f]
-                            [extra-sources null])
+                            [extra-sources null]
+                            #:name [fallback-name #f])
+  (define name (or (and (Ast? ast) (struct-symbol ast))
+                   (and (Ast? sub-ast) (struct-symbol sub-ast))
+                   fallback-name))
   (define expr (Ast-displayable ast))
   (define sub-expr (Ast-displayable sub-ast))
   (define extras (filter values (map Ast-stx extra-sources)))

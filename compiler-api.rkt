@@ -71,7 +71,6 @@ external dependencies for the program/library, as well as the .cpp and
           (when def
             (unless (matches? def (DefVar _ _ (? Lambda?)))
               (raise-language-error/ast
-               #f
                "application target does not name a function"
                ast e)))
           ast)
