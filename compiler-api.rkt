@@ -498,7 +498,8 @@ external dependencies for the program/library, as well as the .cpp and
   ;;(all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (list 'entry-points (bound-id-table-map eps (compose car cons))))
-  (pretty-print (dict-map all-defs (lambda (x y) y)))
+  ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
+  (pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
   (St mods all-defs eps))

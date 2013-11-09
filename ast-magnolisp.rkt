@@ -184,3 +184,54 @@ such.
   (struct-copy Var ast (name n)))
 
 |#
+
+;;; 
+;;; sexp dumping
+;;; 
+
+(define (->symbol x)
+  (cond
+   ((symbol? x) x)
+   ((identifier? x) (syntax-e x))
+   (else (unsupported x))))
+
+(define* (ast->sexp ast)
+  (match ast
+    ((DefVar _ id v)
+     `(var ,(->symbol id) ,(ast->sexp v)))
+    ((DefStx _ id)
+     `(define-syntax ,(->symbol id)))
+    ((Param _ id)
+     (->symbol id))
+    ((Defun a id ps bs)
+     (define export? (hash-ref a 'export #f))
+     (define n (if export? 'function/export 'function))
+     `(,n ,(->symbol id)
+          (,@(map ast->sexp ps))
+          ,@(map ast->sexp bs)))
+    ((or (Let a ds bs)
+         (Letrec a ds bs))
+     (define n (if (Let? ast) 'let 'letrec))
+     `(,n (,@(map ast->sexp ds))
+          ,@(map ast->sexp bs)))
+    ((Begin _ bs)
+     `(begin ,@(map ast->sexp bs)))
+    ((Var _ id)
+     (->symbol id))
+    ((Lambda _ ps bs)
+     `(lambda 
+          (,@(map ast->sexp ps))
+        ,@(map ast->sexp bs)))
+    ((Assign _ lv rv)
+     `(set! ,(ast->sexp lv) ,(ast->sexp rv)))
+    ((IfExpr _ c t e)
+     `(if ,(ast->sexp c) ,(ast->sexp t) ,(ast->sexp e)))
+    ((Literal _ d)
+     (syntax->datum d))
+    ((Apply _ f as)
+     `(,(ast->sexp f) ,@(map ast->sexp as)))
+    (_
+     (unsupported ast))))
+
+(define* (ast-pp ast)
+  (pretty-print (ast->sexp ast)))
