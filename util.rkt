@@ -49,6 +49,18 @@
   (unless e
     (error 'assert "assertion ~s failed" (quote e))))
 
+(define* (hash-merge! h . others)
+  (for ((other others))
+    (for (([k v] other))
+      (hash-set! h k v)))
+  (void))
+
+(define* (hash-merge h . others)
+  (for ((other others))
+    (for (([k v] other))
+      (set! h (hash-set h k v))))
+  h)
+
 (require (for-syntax syntax/for-body))
 
 ;; Different syntax from 'for' in that 'empty-expr' is an extra

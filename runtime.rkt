@@ -48,6 +48,17 @@ problem, as we can use 'lambda' as a container for code.
      (identifier? #'n)
      (add-anno #'e (syntax-e #'n) #'v #:from stx))))
 
+;; This is to support annotation metaprogramming. You might want to
+;; define macros that emit (anno! ...) forms for explicitly setting
+;; annotations for some associated binding.
+(define-syntax* (anno! stx)
+  (syntax-case stx ()
+    ((_ id k v)
+     (and (identifier? #'id) (identifier? #'k))
+     (begin
+       (definfo! #'id (syntax-e #'k) #'v)
+       (syntax/loc stx (void))))))
+
 (define-syntax* (function stx)
   (syntax-case stx ()
     ((_ (f xs ...) b ...)
