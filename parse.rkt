@@ -209,7 +209,7 @@ would have done. Still retains correct scoping and evaluation order.
       (values bound-id-table? free-id-table? (listof syntax?)))
   (parse-defs-from-module modbeg-stx annos r-mp)
 
-  (define defs (make-bound-id-table #:phase 0))
+  (define defs-in-mod (make-bound-id-table #:phase 0))
   (define prov-lst null)
   (define req-lst null)
 
@@ -236,7 +236,7 @@ would have done. Still retains correct scoping and evaluation order.
            id (Ast-anno-ref old-def 'stx) new-stx))
 
   (define (check-redefinition id new-stx)
-    (when-let old-def (bound-id-table-ref defs id #f)
+    (when-let old-def (bound-id-table-ref defs-in-mod id #f)
               (redefinition id old-def new-stx)))
 
   (define (mk-annos ctx stx id-stx)
@@ -251,21 +251,21 @@ would have done. Still retains correct scoping and evaluation order.
     (define ast (parse 'expr e-stx))
     (define ann-h (mk-annos ctx stx id-stx))
     (define def (DefVar ann-h id-stx ast))
-    (bound-id-table-set! defs id-stx def)
+    (bound-id-table-set! defs-in-mod id-stx def)
     def)
 
   (define (make-DefStx ctx stx id-stx)
     (check-redefinition id-stx stx)
     (define ann-h (mk-annos ctx stx id-stx))
     (define def (DefStx ann-h id-stx))
-    (bound-id-table-set! defs id-stx def)
+    (bound-id-table-set! defs-in-mod id-stx def)
     def)
 
   (define (make-Param ctx stx id-stx)
     (check-redefinition id-stx stx)
     (define ann-h (mk-annos ctx stx id-stx))
     (define def (Param ann-h id-stx))
-    (bound-id-table-set! defs id-stx def)
+    (bound-id-table-set! defs-in-mod id-stx def)
     def)
   
   (define (make-Let ctx stx
@@ -285,7 +285,7 @@ would have done. Still retains correct scoping and evaluation order.
     (ctor stx b-ast-lst e-ast-lst))
   
   ;; 'ctx' is a symbolic name of the context that the 'stx' being
-  ;; parsed is in. Inserts bindings into 'defs' as a side effect.
+  ;; parsed is in. Inserts bindings into 'defs-in-mod' as a side effect.
   ;; Returns an Ast object for non top-level things.
   (define (parse ctx stx)
     ;;(writeln (list ctx stx))
@@ -513,4 +513,4 @@ would have done. Still retains correct scoping and evaluation order.
   (parse 'module-begin modbeg-stx)
   (define prov-h (resolve-provides prov-lst))
   ;;(pretty-print (dict-map prov-h list))
-  (values defs prov-h req-lst))
+  (values defs-in-mod prov-h req-lst))
