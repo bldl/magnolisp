@@ -206,13 +206,19 @@ would have done. Still retains correct scoping and evaluation order.
 
 (define-with-contract*
   (-> syntax? bound-id-table? resolve-module-path-result?
-      (values bound-id-table? free-id-table? (listof syntax?)))
+      (values immutable-free-id-table? free-id-table? (listof syntax?)))
   (parse-defs-from-module modbeg-stx annos r-mp)
 
-  (define defs-in-mod (make-bound-id-table #:phase 0))
+  (define defs-in-mod (make-immutable-free-id-table #:phase 0))
   (define prov-lst null)
   (define req-lst null)
 
+  (define (get-def-in-mod id)
+    (dict-ref defs-in-mod id #f))
+
+  (define (set-def-in-mod! id def)
+    (set! defs-in-mod (dict-set defs-in-mod id def)))
+  
   (define (provide! stx-lst)
     ;;(pretty-print (list r-mp 'provide! stx-lst))
     (set! prov-lst (append prov-lst stx-lst)))
@@ -236,7 +242,7 @@ would have done. Still retains correct scoping and evaluation order.
            id (Ast-anno-ref old-def 'stx) new-stx))
 
   (define (check-redefinition id new-stx)
-    (when-let old-def (bound-id-table-ref defs-in-mod id #f)
+    (when-let old-def (get-def-in-mod id)
               (redefinition id old-def new-stx)))
 
   (define (mk-annos ctx stx id-stx)
@@ -251,21 +257,21 @@ would have done. Still retains correct scoping and evaluation order.
     (define ast (parse 'expr e-stx))
     (define ann-h (mk-annos ctx stx id-stx))
     (define def (DefVar ann-h id-stx ast))
-    (bound-id-table-set! defs-in-mod id-stx def)
+    (set-def-in-mod! id-stx def)
     def)
 
   (define (make-DefStx ctx stx id-stx)
     (check-redefinition id-stx stx)
     (define ann-h (mk-annos ctx stx id-stx))
     (define def (DefStx ann-h id-stx))
-    (bound-id-table-set! defs-in-mod id-stx def)
+    (set-def-in-mod! id-stx def)
     def)
 
   (define (make-Param ctx stx id-stx)
     (check-redefinition id-stx stx)
     (define ann-h (mk-annos ctx stx id-stx))
     (define def (Param ann-h id-stx))
-    (bound-id-table-set! defs-in-mod id-stx def)
+    (set-def-in-mod! id-stx def)
     def)
   
   (define (make-Let ctx stx
