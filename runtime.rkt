@@ -36,32 +36,50 @@ problem, as we can use 'lambda' as a container for code.
 ;; #<undefined>
 (define undefined (make-undefined))
 
-;; Annotated form 'e'. We collect annotations into a syntax property
-;; of the annotated form. This at least gets uninteresting unnotations
-;; out of the way. Even the annotating form could itself be annotated,
-;; and the annotations must be collated. Inner annotation takes
-;; precedence in case of conflict. Inner corresponds to later, when it
-;; comes the reader producing annotation forms.
+;; A form that cooperates with the reader extension.
 (define-syntax* (anno stx)
   (syntax-case stx ()
     ((_ n v e)
      (identifier? #'n)
      (add-anno #'e (syntax-e #'n) #'v #:from stx))))
 
+;; Does a superficial parse of an annotation key and value, returning
+;; a key and syntax for the value.
+(define-for-syntax* (anno->pair stx)
+  (syntax-case stx ()
+    (k
+     (identifier? #'k)
+     (values (syntax-e #'k) (syntax/loc stx #t)))
+    ((k)
+     (identifier? #'k)
+     (values (syntax-e #'k) (syntax/loc stx #t)))
+    ((k v)
+     (identifier? #'k)
+     (values (syntax-e #'k) #'v))
+    ((k v ...)
+     (identifier? #'k)
+     (values (syntax-e #'k) #'(v ...)))))
+
 ;; This is to support annotation metaprogramming. You might want to
-;; define macros that emit (anno! ...) forms for explicitly setting
+;; define macros that emit (anno! ...) forms for explicitly recording
 ;; annotations for some associated binding.
 (define-syntax* (anno! stx)
   (syntax-case stx ()
-    ((_ id k v)
+    ((_ id k v ...)
      (and (identifier? #'id) (identifier? #'k))
-     (begin
-       (definfo! #'id (syntax-e #'k) #'v)
-       (syntax/loc stx (void))))))
+     (let-values (((k-sym v-stx) (anno->pair #'(k v ...))))
+       (set-definfo! #'id k-sym v-stx)
+       (syntax/loc stx (void))))
+    ((_ id (k v ...))
+     #'(anno! id k v ...))))
 
-(define-syntax* (function stx)
-  (syntax-case stx ()
-    ((_ (f xs ...) b ...)
-     (begin
-       (record-definfo! #'f stx)
-       #'(define (f xs ...) b ...)))))
+;; A macro for recording a sequence of annotations for a single
+;; binding. This can be useful within definition forms.
+(define-syntax-rule* (anno-seq! id (a ...))
+  (begin (anno! id a) ...))
+
+(define-syntax-rule*
+  (function as f (p ...) b ...)
+  (begin
+    (anno-seq! f as)
+    (define (f p ...) b ...)))

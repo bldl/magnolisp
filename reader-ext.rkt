@@ -45,7 +45,6 @@ identifier does not look like an identifier, for example.
           (raise-read-eof-error
            (format "expected datum to follow type ~s" t)
            src line col pos #f))
-        ;;(syntax-property d 'type t)
         (quasisyntax/loc (make-loc-stx src line col pos)
           ((unsyntax anno-id-stx) type (unsyntax t) (unsyntax d))))))))
 

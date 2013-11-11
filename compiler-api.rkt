@@ -534,4 +534,4 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-6-prog.rkt")))
+  (define st (compile-modules "test-5-prog.rkt")))

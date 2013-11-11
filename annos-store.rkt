@@ -22,7 +22,7 @@ information is only accessed at macro expansion time.
  ;; Copies definition annotations from the syntax properties of the
  ;; given syntax object. If not provided, the annotations are taken
  ;; from the identifier itself.
- (define* (record-definfo! id-stx [def-stx id-stx])
+ (define* (set-definfo-from-stx! id-stx [def-stx id-stx])
    ;; hasheq(name-symbol -> value-syntax)
    (define info (get-annos def-stx))
    (dict-update! definfo-table id-stx
@@ -31,8 +31,8 @@ information is only accessed at macro expansion time.
 
  ;; Adds the specified annotations for the specified binding.
  ;; The keys must be symbols, and the values must be syntax.
- ;; E.g., (definfo! #'x 'a #'1 'b #'2)
- (define* (definfo! id-stx . k-v)
+ ;; E.g., (set-definfo! #'x 'a #'1 'b #'2)
+ (define* (set-definfo! id-stx . k-v)
    (dict-update! definfo-table id-stx
                  (lambda (h)
                    (apply hash-set* h k-v)) #hasheq()))
