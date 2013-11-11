@@ -1,8 +1,8 @@
 #lang racket/base
 
-(require racket/contract)
+(require racket/contract (for-syntax racket/base))
 
-(provide define* define-syntax*)
+(provide define* define-for-syntax* define-syntax*)
 
 (define-syntax define*
   (syntax-rules ()
@@ -16,6 +16,21 @@
        (provide name)))
     ((_ name body ...)
      (begin
+       (define name body ...)
+       (provide name)))))
+
+(define-syntax define-for-syntax*
+  (syntax-rules ()
+    ((_ (name arg ... . rest) body ...)
+     (begin-for-syntax
+       (define (name arg ... . rest) body ...)
+       (provide name)))
+    ((_ (name arg ...) body ...)
+     (begin-for-syntax
+       (define (name arg ...) body ...)
+       (provide name)))
+    ((_ name body ...)
+     (begin-for-syntax
        (define name body ...)
        (provide name)))))
 
