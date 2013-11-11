@@ -2,13 +2,14 @@
 
 #|
 
-An extended "readtable" to support type and generic annotations. We
-use the prefix ^ for the former, and #^ for the latter. We follow the
-Scheme tradition by turning these into forms, namely 'anno' forms, and
+A reader extension to support generic annotations preceding arbitrary
+forms. We currently use the crazy syntax #an (generic) or #at (type),
+but these are not currently used, anyway. We follow the Scheme
+tradition by turning these into forms, namely 'anno' forms, and
 libraries can then decide on the semantics of each kind of annotation.
-Care probably must be taken in placing the annotations so that they do
-not confuse or unduly complicate the writing of macros. An annotated
-identifier does not look like an identifier, for example.
+
+The reader extension also implements a shorthand for (type T), namely
+^T.
 
 |#
 
@@ -28,17 +29,35 @@ identifier does not look like an identifier, for example.
 
 (define read-type-anno
   (case-lambda
-   ((ch in)
-    (syntax->datum (read-type-anno ch in (object-name in) #f #f #f)))
-   ((ch in src line col pos)
+    ((ch in)
+     (syntax->datum (read-type-anno ch in (object-name in) #f #f #f)))
+    ((ch in src line col pos)
+     (let ((t (read-syntax src in)))
+       (when (eof-object? t)
+         (raise-read-eof-error
+          "expected type expression to follow ^"
+          src line col pos #f))
+       (unless (or (identifier? t) (stx-pair? t))
+         (raise-read-error
+          (format "expected type expression to follow ^ (got: ~s)" t)
+          src line col pos #f))
+         (quasisyntax/loc (make-loc-stx src line col pos)
+           (type (unsyntax t)))))))
+
+;;; 
+;;; form-preceding annotations
+;;; 
+
+(define read-preceding-type
+  (lambda (ch in src line col pos)
     (let ((t (read-syntax src in)))
       (when (eof-object? t)
         (raise-read-eof-error
-         "expected type to follow ^"
+         "expected type expression to follow #at"
          src line col pos #f))
       (unless (or (identifier? t) (stx-pair? t))
         (raise-read-error
-         (format "expected type specifier to follow ^ (got: ~s)" t)
+         (format "expected type expression to follow #at (got: ~s)" t)
          src line col pos #f))
       (let ((d (read-syntax src in)))
         (when (eof-object? d)
@@ -46,21 +65,14 @@ identifier does not look like an identifier, for example.
            (format "expected datum to follow type ~s" t)
            src line col pos #f))
         (quasisyntax/loc (make-loc-stx src line col pos)
-          ((unsyntax anno-id-stx) type (unsyntax t) (unsyntax d))))))))
+          ((unsyntax anno-id-stx) type (unsyntax t) (unsyntax d)))))))
 
-;;; 
-;;; generic annotations
-;;; 
-
-(define read-generic-anno
-  (case-lambda
-   ((ch in)
-    (syntax->datum (read-generic-anno ch in (object-name in) #f #f #f)))
-   ((ch in src line col pos)
+(define read-preceding-generic
+  (lambda (ch in src line col pos)
     (let ((s (read-syntax src in)))
       (when (eof-object? s)
         (raise-read-eof-error
-         "expected annotation to follow #^"
+         "expected annotation to follow #an"
          src line col pos #f))
       (let ((k-v
              (or (and (identifier? s)
@@ -76,17 +88,39 @@ identifier does not look like an identifier, for example.
                                           (second s-lst))
                        (list n-stx v-stx))
                  (raise-read-error
-                  (format "expected annotation to follow #^, got ~s" s)
+                  (format "expected annotation to follow #an, got ~s" s)
                   src line col pos #f))))
         (let ((d (read-syntax src in)))
           (when (eof-object? d)
             (raise-read-eof-error
              (format "expected datum to follow annotation ~s" s)
              src line col pos #f))
-          ;;(apply syntax-property d k-v)
           (quasisyntax/loc (make-loc-stx src line col pos)
             ((unsyntax anno-id-stx) (unsyntax-splicing k-v)
-             (unsyntax d)))))))))
+             (unsyntax d))))))))
+
+(define read-form-with-anno
+  (case-lambda
+    ((ch in)
+     (syntax->datum (read-form-with-anno ch in (object-name in) #f #f #f)))
+    ((ch in src line col pos)
+     (let ((kind-ch (read-char in)))
+       (when (eof-object? kind-ch)
+         (raise-read-eof-error
+          "expected 't' or 'n' to follow #a"
+          src line col pos #f))
+       (define read-preceding
+         (cond
+          ((eqv? kind-ch #\t) read-preceding-type)
+          ((eqv? kind-ch #\n) read-preceding-generic)
+          (else
+           (raise-read-error
+            (format "expected 't' or 'n' to follow #a, got ~s" kind-ch)
+            src line col pos #f))))
+       ;; See also 'port-next-location'.
+       (when col (set! col (+ col 1)))
+       (when pos (set! pos (+ pos 1)))
+       (read-preceding kind-ch in src line col pos)))))
 
 ;;; 
 ;;; reader extension
@@ -96,7 +130,7 @@ identifier does not look like an identifier, for example.
   (make-readtable
    (current-readtable)
    #\^ 'non-terminating-macro read-type-anno
-   #\^ 'dispatch-macro read-generic-anno
+   #\a 'dispatch-macro read-form-with-anno
    ))
 
 ;;; 
@@ -114,8 +148,9 @@ identifier does not look like an identifier, for example.
 (module* main #f
   (with-magnolisp-readtable
    (for ((s (list
-             "#^external ^(fn Int Int) (function (f x))"
-             "#^foo #^bar #^baz 5"
+             "#anexternal #at(fn Int Int) (function (f x))"
+             "#anfoo #anbar #anbaz 5"
+             "(quote ^T)"
              )))
        (define in (open-input-string s))
      (for/list ((obj (in-port read in)))
