@@ -69,7 +69,7 @@ problem, as we can use 'lambda' as a container for code.
      (and (identifier? #'id) (identifier? #'k))
      (let-values (((k-sym v-stx) (anno->pair #'(k v ...))))
        (set-definfo! #'id k-sym v-stx)
-       (syntax/loc stx (void))))
+       (syntax/loc stx (begin))))
     ((_ id (k v ...))
      #'(anno! id k v ...))))
 
