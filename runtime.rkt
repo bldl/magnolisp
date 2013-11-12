@@ -49,37 +49,32 @@ problem, as we can use 'lambda' as a container for code.
   (syntax-case stx ()
     (k
      (identifier? #'k)
-     (values (syntax-e #'k) (syntax/loc stx #t)))
+     (cons (syntax-e #'k) (syntax/loc stx #t)))
     ((k)
      (identifier? #'k)
-     (values (syntax-e #'k) (syntax/loc stx #t)))
+     (cons (syntax-e #'k) (syntax/loc stx #t)))
     ((k v)
      (identifier? #'k)
-     (values (syntax-e #'k) #'v))
+     (cons (syntax-e #'k) #'v))
     ((k v ...)
      (identifier? #'k)
-     (values (syntax-e #'k) #'(v ...)))))
+     (cons (syntax-e #'k) #'(v ...)))))
 
 ;; This is to support annotation metaprogramming. You might want to
 ;; define macros that emit (anno! ...) forms for explicitly recording
 ;; annotations for some associated binding.
 (define-syntax* (anno! stx)
   (syntax-case stx ()
-    ((_ id k v ...)
-     (and (identifier? #'id) (identifier? #'k))
-     (let-values (((k-sym v-stx) (anno->pair #'(k v ...))))
-       (set-definfo! #'id k-sym v-stx)
-       (syntax/loc stx (begin))))
-    ((_ id (k v ...))
-     #'(anno! id k v ...))))
-
-;; A macro for recording a sequence of annotations for a single
-;; binding. This can be useful within definition forms.
-(define-syntax-rule* (anno-seq! id (a ...))
-  (begin (anno! id a) ...))
+    ((_ id a ...)
+     (identifier? #'id)
+     (let ()
+       (define as (map anno->pair (syntax->list #'(a ...))))
+       (unless (null? as) (set-definfo! #'id as))
+       (syntax/loc stx (begin))))))
 
 (define-syntax-rule*
-  (function as f (p ...) b ...)
+  (function (a ...) f (p ...) b ...)
   (begin
-    (anno-seq! f as)
-    (define (f p ...) b ...)))
+    (define (f p ...) b ...)
+    (anno! f a ...)
+    ))

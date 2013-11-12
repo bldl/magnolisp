@@ -31,10 +31,13 @@ information is only accessed at macro expansion time.
 
  ;; Adds the specified annotations for the specified binding.
  ;; The keys must be symbols, and the values must be syntax.
- ;; E.g., (set-definfo! #'x 'a #'1 'b #'2)
- (define* (set-definfo! id-stx . k-v)
+ ;; E.g., (set-definfo! #'x `((a . ,#'1) (b . ,#'2)))
+ (define* (set-definfo! id-stx assocs)
    (dict-update! definfo-table id-stx
                  (lambda (h)
-                   (apply hash-set* h k-v)) #hasheq()))
- 
+                   (if h
+                       (hash-set/assocs h assocs)
+                       (make-hasheq assocs)))
+                 #f))
+
  ) ; end begin-for-syntax
