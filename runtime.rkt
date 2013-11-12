@@ -19,6 +19,9 @@ We cannot do much quoting to make sure that we retain binding
 information, and to make sure that macros get expanded. Again, no
 problem, as we can use 'lambda' as a container for code.
 
+Be mindful of not using the Magnolisp reader extensions here, since
+this code is not in Magnolisp, only for Magnolisp.
+
 |#
 
 (require

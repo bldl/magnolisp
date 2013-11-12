@@ -18,6 +18,7 @@ immutable hasheq.
         (let ((h (syntax-property x 'annos)))
           (and h
                (hash? h)
+               (hash-eq? h)
                (immutable? h)))))
 
  (define (get-annos stx)
@@ -43,8 +44,8 @@ immutable hasheq.
 
  (provide/contract
   [syntax-with-annos? (-> any/c boolean?)]
-  [get-annos (-> syntax? (and/c hash? immutable?))]
-  [set-annos (-> syntax? (and/c hash? immutable?) syntax-with-annos?)]
+  [get-annos (-> syntax? (and/c hash? hash-eq? immutable?))]
+  [set-annos (-> syntax? (and/c hash? hash-eq? immutable?) syntax-with-annos?)]
   [add-anno (->* (syntax? symbol? syntax?)
                  (#:from syntax?) syntax-with-annos?)])
 

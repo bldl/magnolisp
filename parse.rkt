@@ -205,8 +205,8 @@ would have done. Still retains correct scoping and evaluation order.
   raw-mp-h)
 
 (define-with-contract*
-  (-> syntax? bound-id-table? resolve-module-path-result?
-      (values immutable-free-id-table? free-id-table? (listof syntax?)))
+  (-> syntax? immutable-id-table? resolve-module-path-result?
+      (values immutable-id-table? id-table? (listof syntax?)))
   (parse-defs-from-module modbeg-stx annos r-mp)
 
   (define defs-in-mod (make-immutable-free-id-table #:phase 0))
@@ -247,9 +247,10 @@ would have done. Still retains correct scoping and evaluation order.
 
   (define (mk-annos ctx stx id-stx)
     (define global? (eq? ctx 'module-level))
-    ;;(writeln `(global ,global?))
-    (define ann-h (bound-id-table-ref annos id-stx #hasheq()))
+    (define ann-h (dict-ref annos id-stx #hasheq()))
+    ;;(writeln (list 'annos ann-h (hash? ann-h) (immutable? ann-h)))
     (set! ann-h (hash-set* ann-h 'stx stx 'r-mp r-mp 'top global?))
+    ;;(writeln `(annos for ,id-stx ,(hash-count ann-h)))
     ann-h)
   
   (define (make-DefVar ctx stx id-stx e-stx)

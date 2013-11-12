@@ -3,7 +3,7 @@
 #|
 |#
 
-(require "util.rkt" syntax/stx unstable/error)
+(require "util.rkt" syntax/id-table syntax/stx unstable/error)
 
 (define* (next-gensym r sym)
   (define num (hash-ref r sym 0))
@@ -17,6 +17,29 @@
 
 (define-syntax-rule* (unsupported v ...)
   (error "unsupported" v ...))
+
+(define* (id-table? x)
+  (or (free-id-table? x)
+      (bound-id-table? x)))
+
+(define* (immutable-id-table? x)
+  (or (immutable-free-id-table? x)
+      (immutable-bound-id-table? x)))
+
+(define* (pretty-print-id-table d)
+  (pretty-print (dict-map d cons)))
+
+(define* (show-matches-in-id-table id-stx d)
+  (writeln
+   (cons
+    `(looking-for ,(syntax-e id-stx))
+    (dict-map
+     d
+     (lambda (k v)
+       (cond
+        ((bound-identifier=? k id-stx 0) `(bound ,(syntax-e k)))
+        ((free-identifier=? k id-stx 0 0) `(free ,(syntax-e k)))
+        (else #f)))))))
 
 ;; Unlike with exn:fail:syntax, 'exprs' need not contain syntax
 ;; objects. It is a (listof any/c).

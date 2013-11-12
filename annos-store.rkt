@@ -37,7 +37,7 @@ information is only accessed at macro expansion time.
                  (lambda (h)
                    (if h
                        (hash-set/assocs h assocs)
-                       (make-hasheq assocs)))
+                       (make-immutable-hasheq assocs)))
                  #f))
 
  ) ; end begin-for-syntax

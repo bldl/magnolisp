@@ -93,13 +93,12 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 ;; [pt syntax?] is the parse tree, as loaded from the submodule.
-;; [annos bound-id-table?] are the annotations, as loaded from the
+;; [annos id-table?] are the annotations, as loaded from the
 ;; submodule. A non-Magnolisp module simply gets null values for the
-;; above. [defs bound-id-table?] contains Def objects for parsed
-;; modules. [provs free-id-table?] maps each internally bound ID to a
-;; list of exported IDs. [reqs (listof syntax?)] is a list of
-;; #%require specs. [syms (hash/c symbol? Def?)] maps top-level names
-;; to definitions.
+;; above. [defs id-table?] contains Def objects for parsed modules.
+;; [provs id-table?] maps each internally bound ID to a list of
+;; exported IDs. [reqs (listof syntax?)] is a list of #%require specs.
+;; [syms (hash/c symbol? Def?)] maps top-level names to definitions.
 (concrete-struct* Mod (pt annos defs provs reqs syms) #:transparent)
 
 ;;; 
@@ -113,17 +112,24 @@ external dependencies for the program/library, as well as the .cpp and
   (define annos
     (may-fail
      (dynamic-require `(submod ,mp magnolisp-info) 'm-annos (thunk #f))))
+  (when annos
+    (define original
+      (dynamic-require `(submod ,mp magnolisp-info) 'm-id-count))
+    (define current (dict-count annos))
+    (unless (= original current)
+      (error 'load-mod-from-submod
+             "count mismatch (~a): ~a != ~a" mp original current)))
   (define pt
     (if annos
         (dynamic-require `(submod ,mp magnolisp-info) 'm-ast)
         #'(#%module-begin)))
   (unless annos
-    (set! annos (make-immutable-bound-id-table #:phase 0)))
+    (set! annos (make-immutable-free-id-table #:phase 0)))
   (Mod pt annos #f #f #f #f))
 
 (define (list-entry-points annos)
   (define lst null)
-  (bound-id-table-for-each
+  (dict-for-each
    annos
    (lambda (id h)
      (define ep (parse-entry-point id h))
@@ -131,19 +137,12 @@ external dependencies for the program/library, as well as the .cpp and
        (set! lst (cons id lst)))))
   lst)
 
-(define (bound-id-table-merge! t s-t)
-  (bound-id-table-for-each
-   s-t
-   (lambda (id v)
-     (bound-id-table-set! t id v))))
-
-(define (bound-id-table-add-lst! t lst)
+(define (id-table-add-lst! t lst)
   (for ((id lst))
-    (bound-id-table-set! t id #t)))
+    (dict-set! t id #t)))
 
 ;; Compilation state. [mods hash?] maps resolved module paths to Mod
-;; objects. [eps bound-id-table?] has entry points as keys, and #t
-;; values.
+;; objects. [eps id-table?] has entry points as keys, and #t values.
 (struct St (mods defs eps) #:transparent)
 
 (define (merge-defs mods)
@@ -186,14 +185,14 @@ external dependencies for the program/library, as well as the .cpp and
   (for (((r-mp mod) mods))
     (writeln `(Vars ,r-mp))
     (define defs (Mod-defs mod))
-    (bound-id-table-for-each
+    (dict-for-each
      defs
      (lambda (id def)
        (def-display-Var-bindings def)))))
 
 ;; For debugging.
 (define (all-defs-display-Var-bindings all-defs)
-  (free-id-table-for-each
+  (dict-for-each
    all-defs
    (lambda (id def)
      (def-display-Var-bindings def))))
@@ -452,7 +451,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;; specified modules, and all dependencies thereof.
 (define* (compile-modules . ep-mp-lst)
   (define mods (make-hash)) ;; r-mp -> Mod
-  (define eps (make-bound-id-table #:phase 0))
+  (define eps (make-free-id-table #:phase 0))
   (define dep-q null) ;; deps queued for loading
 
   (define (load mp ep?)
@@ -463,18 +462,20 @@ external dependencies for the program/library, as well as the .cpp and
 
       (when (Mod? mod) ;; is a Magnolisp module
         (define annos (Mod-annos mod))
+        (pretty-print-id-table annos)
 
         ;; For entry point modules, use annotations to build a set of
         ;; entry points. Add these to program entry points.
         (define eps-lst null)
         (when ep?
           (set! eps-lst (list-entry-points annos))
-          (bound-id-table-add-lst! eps eps-lst))
+          (id-table-add-lst! eps eps-lst))
 
         ;; If a module has entry points, or if it is a dependency,
         ;; then collect further information from it.
         (when (or (not ep?) (and ep? (not (null? eps-lst))))
           (define pt (Mod-pt mod)) ;; parse tree
+          ;;(pretty-print (syntax->datum pt))
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
           (set! mod
@@ -482,7 +483,7 @@ external dependencies for the program/library, as well as the .cpp and
                              (defs defs) (provs provs) (reqs reqs)))
           (define raw-mp-lst
             (req-specs->module-paths reqs))
-          ;;(pretty-print (bound-id-table-map defs cons))
+          ;;(pretty-print (dict-map defs cons))
           ;;(pretty-print (list 'provided-ids (dict-map provs list)))
           ;;(pretty-print (list 'raw-module-paths raw-mp-lst))
           (set! dep-q (append dep-q (map syntax->datum raw-mp-lst)))))
@@ -511,7 +512,7 @@ external dependencies for the program/library, as well as the .cpp and
   
   ;;(all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
-  ;;(pretty-print (list 'entry-points (bound-id-table-map eps (compose car cons))))
+  ;;(pretty-print (list 'entry-points (dict-map eps (compose car cons))))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
   (pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
@@ -548,4 +549,4 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-5-prog.rkt")))
+  (define st (compile-modules "test-6-prog.rkt")))

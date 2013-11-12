@@ -42,27 +42,27 @@ same variables at the same phase level).
 
 (require "annos-store.rkt"
          (for-syntax
-          racket/pretty syntax/id-table
+          racket/dict racket/pretty syntax/id-table
           typed-racket/utils/disarm ;; probably considered internal
           "util.rkt"))
 
 (begin-for-syntax
- ;; Given [h hash?], returns syntax for an expression that produces
- ;; an (and/c hash? hash-eq?) value. The hash table values are
+ ;; Given [h hash?], returns syntax for an expression that produces an
+ ;; (and/c hash? hash-eq? immutable?) value. The hash table values are
  ;; assumed to be syntax objects, and they are preserved as such.
  (define (syntax-for-hasheq h)
-   #`(make-hasheq
+   #`(make-immutable-hasheq
       (list #,@(hash-map
                 h
                 (lambda (n-sym val-stx)
                   #`(cons '#,n-sym #'#,val-stx))))))
  
- ;; Given [t bound-id-table?], returns syntax for an expression that
- ;; produces something for which the dict? predicate returns true.
- ;; The table values are assumed to be syntax objects, and they are
+ ;; Given an id-table [t dict?], returns syntax for an expression that
+ ;; produces something for which the dict? predicate returns true. The
+ ;; table values are assumed to be syntax objects, and they are
  ;; preserved as such.
- (define (syntax-for-bound-id-table-dict t)
-   #`(list #,@(bound-id-table-map
+ (define (syntax-for-id-table-dict t)
+   #`(list #,@(dict-map
                t
                (lambda (id-stx h)
                  #`(cons #'#,id-stx #,(syntax-for-hasheq h))))))
@@ -75,12 +75,13 @@ same variables at the same phase level).
    ;;(pretty-print (syntax->datum ast))
    #`(begin-for-syntax
       (module* magnolisp-info #f
+        (define m-id-count #,(dict-count definfo-table))
         (define m-annos
-          (make-bound-id-table
-           #,(syntax-for-bound-id-table-dict definfo-table)
+          (make-immutable-free-id-table
+           #,(syntax-for-id-table-dict definfo-table)
            #:phase 0))
         (define m-ast #'#,ast)
-        (provide m-annos m-ast))))
+        (provide m-id-count m-annos m-ast))))
  ) ;; end begin-for-syntax
 
 (define-syntax (module-begin stx)
