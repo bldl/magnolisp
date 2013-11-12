@@ -80,7 +80,7 @@ same variables at the same phase level).
           (make-immutable-free-id-table
            #,(syntax-for-id-table-dict definfo-table)
            #:phase 0))
-        (define m-ast #'#,ast)
+        (define m-ast (quote-syntax #,ast))
         (provide m-id-count m-annos m-ast))))
  ) ;; end begin-for-syntax
 
