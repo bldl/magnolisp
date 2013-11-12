@@ -61,6 +61,11 @@
       (set! h (hash-set h k v))))
   h)
 
+(define* (hash-set/assocs h assocs)
+  (for ((p assocs))
+    (set! h (hash-set h (car p) (cdr p))))
+  h)
+
 (require (for-syntax syntax/for-body))
 
 ;; Different syntax from 'for' in that 'empty-expr' is an extra
