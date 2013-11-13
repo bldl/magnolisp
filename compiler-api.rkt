@@ -99,7 +99,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;; [provs id-table?] maps each internally bound ID to a list of
 ;; exported IDs. [reqs (listof syntax?)] is a list of #%require specs.
 ;; [syms (hash/c symbol? Def?)] maps top-level names to definitions.
-(concrete-struct* Mod (pt annos defs provs reqs syms) #:transparent)
+(struct Mod (pt annos defs provs reqs syms) #:transparent)
 
 ;;; 
 ;;; import resolution
@@ -311,6 +311,7 @@ external dependencies for the program/library, as well as the .cpp and
         (set! ids-to-process
               (append ids-to-process refs-in-def)))
       (loop ids-to-process)))
+  ;;(pretty-print `(original-defs ,(dict-count all-defs) ,(dict-keys all-defs) retained-defs ,(dict-count processed-defs) ,(dict-keys processed-defs)))
   processed-defs)
 
 ;; Returns (and/c hash? hash-eq? immutable?).
@@ -520,7 +521,8 @@ external dependencies for the program/library, as well as the .cpp and
   (St mods all-defs eps))
 
 ;; Compiles the modules defined in the specified files. Returns a
-;; compilation state with a full IR for the entire program.
+;; compilation state with a full IR for the entire program. The
+;; returned program is still in a backend-agnostic form.
 (define* (compile-files . fn-lst)
   (define mp-lst
     (map
@@ -535,13 +537,16 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; code generation
 ;;; 
 
-(define* (write-cpp-file st cpp-file)
-  (void)) ;;xxx
-
-(define* (write-hpp-file st hpp-file)
-  (void)) ;;xxx
-
-(define* (write-mk-file st mk-file)
+(define-with-contract*
+  (->* (St? (hash/c symbol? (set/c symbol? #:cmp 'eq)))
+       (#:basename path-string?
+        #:stdout boolean?
+        #:banner boolean?)
+       void?)
+  (generate-files st backends
+                  #:basename [out-basename "output"]
+                  #:stdout [stdout? #t]
+                  #:banner [banner? #t])
   (void)) ;;xxx
 
 ;;; 
@@ -549,4 +554,4 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-6-prog.rkt")))
+  (define st (compile-modules "test-3-prog.rkt")))

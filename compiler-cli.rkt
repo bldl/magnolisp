@@ -17,39 +17,57 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
 
 (module* main #f
   (define (do-main)
-    (define hpp-file #f)
-    (define cpp-file #f)
-    (define mk-file #f)
+    (define out-basename #f)
+    (define stdout? #f)
+    (define banner? #f)
+    (define cxx? #f)
+    (define tools (seteq))
+    (define supported-tools '(c gnu-make qmake ruby))
 
     (define fn-lst
       (command-line
        #:once-each
+       (("--banner" "-n") ("display filename banners"
+                           "(only meaningful with --stdout)")
+        (set! banner? #t))
+       (("--basename" "-b") basename
+        ("for naming generated files"
+         "(default: basename of first source file)")
+        (unless (path-string? basename)
+          (error 'command-line
+                 "expected file basename as --basename, got ~s" basename))
+        (set! out-basename (adjust-path basename)))
        (("--chdir") dirname "change to directory"
         (current-directory (expand-user-path dirname)))
-       (("--cpp") filename "generated C++ implementation"
-        (set! cpp-file filename))
-       (("--hpp") filename "generated C++ header"
-        (set! hpp-file filename))
-       (("--mk") filename "generated Make include file"
-        (set! mk-file filename))
+       (("--cxx" "-c") "generate C++ implementation"
+        (set! cxx? #t))
+       (("--stdout" "-s") "output to stdout"
+        (set! stdout? #t))
+       #:multi
+       (("--build" "-m") kind ("generate build include file of kind"
+                               (format "(kind is one of: ~a)"
+                                       (string-join
+                                        (map symbol->string supported-tools)
+                                        ", ")))
+        (define k (string->symbol kind))
+        (unless (memq k supported-tools)
+          (error 'command-line
+                 "one of ~a as build include file, got ~s"
+                 supported-tools kind))
+        (set! tools (hash-set tools k)))
        #:args filename filename))
 
     (unless (null? fn-lst)
       (set! fn-lst (map adjust-path fn-lst))
-      (define base-fn (first fn-lst))
-      (define-syntax-rule (set!-out-fn fn suffix)
-        (set! fn (if fn
-                     (adjust-path fn)
-                     (path-replace-suffix base-fn suffix))))
-      (set!-out-fn cpp-file ".cpp")
-      (set!-out-fn hpp-file ".hpp")
-      (set!-out-fn mk-file ".mk")
-      (define st (new-state))
-      (for ((fn fn-lst))
-        (set! st (compile-file st fn)))
-      (write-cpp-file st cpp-file)
-      (write-hpp-file st hpp-file)
-      (write-mk-file st mk-file))
+      (unless out-basename
+        (set! out-basename (path-replace-suffix (first fn-lst) "")))
+      (define st (apply compile-files fn-lst))
+      (generate-files st
+                      (hasheq 'cxx (seteq 'cc 'hh)
+                              'build tools)
+                      #:basename out-basename
+                      #:stdout stdout?
+                      #:banner banner?))
     
     (void))
 
