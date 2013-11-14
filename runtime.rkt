@@ -26,7 +26,7 @@ this code is not in Magnolisp, only for Magnolisp.
 
 (require
  "annos-util.rkt" "annos-store.rkt" "util.rkt"
- (for-syntax "util.rkt")) 
+ (for-syntax "util.rkt" racket/syntax)) 
 
 ;; Yes we are providing this. If the programmer wants to hack our core
 ;; language, they may. The idea is to express core language as (%core
@@ -58,9 +58,31 @@ this code is not in Magnolisp, only for Magnolisp.
        (unless (null? as) (set-definfo! #'id as))
        (syntax/loc stx (begin))))))
 
-(define-syntax-rule*
-  (function (a ...) f (p ...) b ...)
+(define-for-syntax (decl-for-id id)
+  (with-syntax ((impl-id (format-id id "~a-impl" (syntax-e id)))
+                (id id))
+    #'(define-syntax* id
+        (syntax-rules ()
+          ((_ n #:annos a b (... ...))
+           (impl-id n a b (... ...)))
+          ((_ n b (... ...))
+           (impl-id n () b (... ...)))))))
+
+;; For each passed ID, defines syntax with an optional #:annos
+;; specifier. Each ID must have an -impl binding, which expects a
+;; compulsory annotation listing at the same position.
+(define-syntax* (define-annos-wrapper* stx)
+  (syntax-case stx ()
+    ((_ ids ...)
+     (let ()
+       (define id-lst (syntax->list #'(ids ...)))
+       #`(begin #,@(map decl-for-id id-lst))))))
+
+(define-syntax-rule
+  (function-impl (f p ...) (a ...) b ...)
   (begin
     (define (f p ...) b ...)
     (anno! f a ...)
     ))
+
+(define-annos-wrapper* function)
