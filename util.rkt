@@ -11,6 +11,18 @@
     ((_ fn arg ...)
      (lambda rest (apply fn arg ... rest)))))
 
+;; True iff any of the specified predicates matches the specified
+;; datum. Implemented using a macro for efficiency.
+(define-syntax-rule*
+  (any-pred-holds p ... x)
+  (or (p x) ...))
+
+;; True iff all of the specified predicates match the specified
+;; datum. Implemented using a macro for efficiency.
+(define-syntax-rule*
+  (every-pred-holds p ... x)
+  (and (p x) ...))
+
 (define-syntax-rule*
   (apply-values f-expr gen-expr)
   (call-with-values (thunk gen-expr) f-expr))

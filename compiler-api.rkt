@@ -89,6 +89,23 @@ external dependencies for the program/library, as well as the .cpp and
   ((make-for-all-defs (fix de-racketize defs)) defs))
 
 ;;; 
+;;; build options
+;;; 
+
+(define (defs-collect-build-annos defs)
+  (define lst null)
+
+  (define (add! id-stx build-stx)
+    (set! lst (cons (list id-stx build-stx) lst)))
+  
+  (for (((id def) (in-dict defs)))
+    (assert (Def? def))
+    (define b (Ast-anno-ref def 'build #:must #f))
+    (when b (add! id b)))
+  
+  lst)
+
+;;; 
 ;;; module
 ;;; 
 
@@ -537,6 +554,8 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; code generation
 ;;; 
 
+(require "backend-build.rkt")
+
 (define-with-contract*
   (->* (St? (hash/c symbol? (set/c symbol? #:cmp 'eq)))
        (#:basename path-string?
@@ -547,11 +566,26 @@ external dependencies for the program/library, as well as the .cpp and
                   #:basename [out-basename "output"]
                   #:stdout [stdout? #t]
                   #:banner [banner? #t])
-  (void)) ;;xxx
+
+  ;; xxx C++ generation
+
+  (let ((kinds (hash-ref backends 'build #f)))
+    (when (and kinds (not (set-empty? kinds)))
+      (define defs (St-defs st))
+      (define opts-lst (defs-collect-build-annos defs))
+      (define opts-h (parse-analyze-build-annos opts-lst))
+      (pretty-print (dict-map opts-h cons))
+      (set-for-each
+       kinds
+       (lambda (kind)
+         (void))))) ;; xxx generate output text
+  
+  (void))
 
 ;;; 
 ;;; testing
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-3-prog.rkt")))
+  (define st (compile-modules "test-6-prog.rkt"))
+  (generate-files st (hasheq 'build (seteq 'gnu-make))))

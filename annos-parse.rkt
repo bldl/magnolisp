@@ -8,6 +8,10 @@ Routines for parsing annotation values into AST nodes.
 
 (require "ast-magnolisp.rkt" "util.rkt")
 
+;;; 
+;;; utilities
+;;; 
+
 (define (raise-anno-syntax-error id-stx anno-name v-expr
                                  #:sub-expr [sub-expr #f]
                                  #:expect [expect-s #f])
@@ -30,6 +34,10 @@ Routines for parsing annotation values into AST nodes.
     (unless (pred? v)
       (raise-anno-syntax-error id-stx anno-name v-stx #:expect expect-s)))
   v)
+
+;;; 
+;;; type expression parsing
+;;; 
 
 (define (parse-sub-type id-stx stx t)
   (match t
@@ -73,7 +81,11 @@ Routines for parsing annotation values into AST nodes.
   (make-hasheq
    `(
      (type . ,type)
-     )))
+     ))) ;; xxx not presently used
+
+;;; 
+;;; entry point flag
+;;; 
 
 (define* (parse-entry-point id-stx h)
   (define entry-point
