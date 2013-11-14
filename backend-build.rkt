@@ -6,7 +6,8 @@ Routines for parsing and collecting 'build annotations.
 
 |#
 
-(require "util.rkt" data/order data/splay-tree)
+(require "compiler-util.rkt" "util.rkt"
+         data/order data/splay-tree)
 
 (define number-order
   (order 'number-order number? = <))
@@ -66,7 +67,7 @@ Routines for parsing and collecting 'build annotations.
 (define-with-contract*
   (-> (listof (list/c identifier? syntax?))
       ordered-dict?)
-  (parse-analyze-build-annos opts-lst)
+  (parse-analyze-build-annos build-lst)
   
   (define h (make-splay-tree string-order
                              #:key-contract valid-opt-name?
@@ -132,9 +133,9 @@ Routines for parsing and collecting 'build annotations.
       (dict-set! v-h v #t))
     (dict-set! h n (cons type-p? v-h)))
 
-  (define (parse-opt! id-stx opt-stx)
+  (define (parse-opt! id-stx build-stx opt-stx)
     (syntax-case opt-stx ()
-      ((n)
+      (n
        (identifier? #'n)
        (set-value-opt! id-stx #'n #'#t))
       ((n v)
@@ -143,20 +144,32 @@ Routines for parsing and collecting 'build annotations.
       ((p n v more-v ...)
        (and (eq? '+= (syntax-e #'p)) (identifier? #'n))
        (set-set-opt! id-stx opt-stx #'n
-                     (syntax->list #'(v more-v ...))))))
+                     (syntax->list #'(v more-v ...))))
+      (_
+       (raise-language-error
+        'build
+        "illegal (build ...) annotation sub-form"
+        build-stx
+        opt-stx
+        #:continued
+        (format "(for declaration ~a)" (syntax-e id-stx))))))
 
-  (define (parse-opts! id-stx anno-v-stx)
-    (syntax-case anno-v-stx ()
-      (n
-       (identifier? #'n)
-       (set-value-opt! id-stx #'n #'#t))
-      ((opt ...)
+  (define (parse-build! id-stx build-stx)
+    (syntax-case build-stx ()
+      ((_ . opt)
        (for-each
-        (fix parse-opt! id-stx)
-        (syntax->list #'(opt ...))))))
+        (fix parse-opt! id-stx build-stx)
+        (syntax->list #'opt)))
+      (_
+       (raise-language-error
+        'build
+        "illegal (build ...) annotation form"
+        build-stx
+        #:continued
+        (format "(for declaration ~a)" (syntax-e id-stx))))))
   
-  (for ((opts opts-lst))
-    (define-values (id-stx anno-v-stx) (apply values opts))
-    (parse-opts! id-stx anno-v-stx))
+  (for ((build build-lst))
+    (define-values (id-stx build-stx) (apply values build))
+    (parse-build! id-stx build-stx))
     
   h)

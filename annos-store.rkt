@@ -43,9 +43,8 @@ information is only accessed at macro expansion time.
                      (define n (form-get-name stx))
                      (unless n
                        (raise-language-error
-                        'set-definfo!
-                        (format "no name in annotation form of ~a"
-                                (syntax-e id-stx))
+                        (syntax-e id-stx)
+                        "no name in annotation form"
                         stx))
                      (cons n stx))
                    stx-lst))

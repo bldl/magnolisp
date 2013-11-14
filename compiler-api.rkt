@@ -588,5 +588,5 @@ external dependencies for the program/library, as well as the .cpp and
 
 (module* main #f
   (define st (compile-modules "test-6-prog.rkt"))
-  ;(generate-files st (hasheq 'build (seteq 'gnu-make)))
+  (generate-files st (hasheq 'build (seteq 'gnu-make)))
   )

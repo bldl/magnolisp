@@ -36,11 +36,6 @@ Routines for parsing annotation values into AST nodes.
          (begin
            (assert (eq? anno-name (syntax-e #'n)))
            #t))
-        ((n)
-         (identifier? #'n)
-         (begin
-           (assert (eq? anno-name (syntax-e #'n)))
-           #t))
         ((_ v-pat)
          (begin
            (define v-stx #'v-pat)
