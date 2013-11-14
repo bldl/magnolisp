@@ -480,7 +480,7 @@ external dependencies for the program/library, as well as the .cpp and
 
       (when (Mod? mod) ;; is a Magnolisp module
         (define annos (Mod-annos mod))
-        (pretty-print-id-table annos)
+        ;;(pretty-print-id-table annos)
 
         ;; For entry point modules, use annotations to build a set of
         ;; entry points. Add these to program entry points.
@@ -587,6 +587,6 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-8-prog.rkt"))
+  (define st (compile-modules "test-6-prog.rkt"))
   (generate-files st (hasheq 'build (seteq 'gnu-make)))
   )
