@@ -46,23 +46,6 @@ this code is not in Magnolisp, only for Magnolisp.
      (identifier? #'n)
      (add-anno #'e (syntax-e #'n) #'v #:from stx))))
 
-;; Does a superficial parse of an annotation key and value, returning
-;; a key and syntax for the value.
-(define-for-syntax* (anno->pair stx)
-  (syntax-case stx ()
-    (k
-     (identifier? #'k)
-     (cons (syntax-e #'k) (syntax/loc stx #t)))
-    ((k)
-     (identifier? #'k)
-     (cons (syntax-e #'k) (syntax/loc stx #t)))
-    ((k v)
-     (identifier? #'k)
-     (cons (syntax-e #'k) #'v))
-    ((k v ...)
-     (identifier? #'k)
-     (cons (syntax-e #'k) #'(v ...)))))
-
 ;; This is to support annotation metaprogramming. You might want to
 ;; define macros that emit (anno! ...) forms for explicitly recording
 ;; annotations for some associated binding.
@@ -71,7 +54,7 @@ this code is not in Magnolisp, only for Magnolisp.
     ((_ id a ...)
      (identifier? #'id)
      (let ()
-       (define as (map anno->pair (syntax->list #'(a ...))))
+       (define as (syntax->list #'(a ...)))
        (unless (null? as) (set-definfo! #'id as))
        (syntax/loc stx (begin))))))
 

@@ -8,8 +8,9 @@ information is only accessed at macro expansion time.
 |#
 
 (require "annos-util.rkt" "util.rkt"
-         (for-syntax "util.rkt"
-                     racket/dict racket/pretty syntax/id-table))
+         (for-syntax "compiler-util.rkt" "util.rkt"
+                     racket/contract racket/dict racket/pretty
+                     syntax/id-table))
 
 ;;; 
 ;;; DefInfo recording
@@ -29,10 +30,25 @@ information is only accessed at macro expansion time.
                  (lambda (h)
                    (if h (hash-merge h info) info)) #f))
 
- ;; Adds the specified annotations for the specified binding.
- ;; The keys must be symbols, and the values must be syntax.
- ;; E.g., (set-definfo! #'x `((a . ,#'1) (b . ,#'2)))
- (define* (set-definfo! id-stx assocs)
+ ;; Adds the specified annotations for the specified binding. Full
+ ;; annotation forms must be given. The name of each annotation must
+ ;; be extractable from the respective form.
+ ;;
+ ;; E.g., (set-definfo! #'x (list #'(a 1) #'(b 2 3)))
+ (define-with-contract*
+   (-> identifier? (listof syntax?) void?)
+   (set-definfo! id-stx stx-lst)
+   (define assocs (map
+                   (lambda (stx)
+                     (define n (form-get-name stx))
+                     (unless n
+                       (raise-language-error
+                        'set-definfo!
+                        (format "no name in annotation form of ~a"
+                                (syntax-e id-stx))
+                        stx))
+                     (cons n stx))
+                   stx-lst))
    (dict-update! definfo-table id-stx
                  (lambda (h)
                    (if h

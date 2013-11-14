@@ -41,6 +41,15 @@
         ((free-identifier=? k id-stx 0 0) `(free ,(syntax-e k)))
         (else #f)))))))
 
+(define* (form-get-name stx)
+  (define x (syntax-e stx))
+  (cond
+   ((symbol? x) x)
+   ((pair? x)
+    (define y (syntax-e (car x)))
+    (and (symbol? y) y))
+   (else #f)))
+
 ;; Unlike with exn:fail:syntax, 'exprs' need not contain syntax
 ;; objects. It is a (listof any/c).
 (concrete-struct* exn:fail:language exn:fail (exprs) #:transparent)
