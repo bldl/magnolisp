@@ -3,13 +3,11 @@
 #|
 |#
 
-(require "class-attr.rkt")
-(require "util.rkt")
-(require "variant.rkt")
+(require "compiler-util.rkt" "util.rkt")
 
-;; --------------------------------------------------
-;; generic utilities
-;; --------------------------------------------------
+;;;
+;;; generic utilities
+;;;
 
 (define-syntax on-fail
   (syntax-rules ()
@@ -32,9 +30,7 @@
   ;; (open-input-string s))) and then compare to file input.
   (on-fail #t (not (equal? (file-read file) s))))
 
-;;(write-nl (file-changed? configure-script (file-read configure-script)))
-
-(define* (write-changed-file file s)
+(define (write-changed-file file s)
   (when (file-changed? file s)
     (call-with-output-file*
      file
@@ -49,12 +45,12 @@
       (f))
     (get-output-string output)))
 
-(define-syntax* capture
+(define-syntax capture
   (syntax-rules ()
     ((_ body ...)
      (capture-output (lambda () body ...)))))
 
-(define* (space-join l)
+(define (space-join l)
   (string-join l " "))
 
 (define (for-each-sep elemact sepact lst)
@@ -67,9 +63,9 @@
      (when elemact (elemact elem)))
    lst))
 
-;; --------------------------------------------------
-;; local utilities
-;; --------------------------------------------------
+;;;
+;;; local utilities
+;;;
 
 (define (disp . args)
   (display (apply format args)))
@@ -77,15 +73,23 @@
 (define (disp-nl . args)
   (apply disp args) (newline))
 
-;; --------------------------------------------------
-;; pretty printing
-;; --------------------------------------------------
+;;; 
+;;; special values 
+;;;
+
+(concrete-struct* hexnum (num) #:transparent)
+(singleton-struct* attr-defined (the-attr-defined) ())
+(singleton-struct* attr-undefined (the-attr-undefined) ())
+
+;;;
+;;; pretty printing
+;;;
 
 (define* (display-generated-notice pfx)
   (display pfx)
   (displayln " generated -- do not edit"))
 
-(define* (write-scheme-symlink file target)
+(define (write-scheme-symlink file target)
   (write-changed-file
    file
    (capture
@@ -96,7 +100,7 @@
 
 (define path-censor-re #rx"[-.]")
 
-(define* (path-h-ifdefy p)
+(define (path-h-ifdefy p)
   (string-append
    "__"
    (string-downcase
@@ -106,7 +110,7 @@
 
 (define ident-censor-re #rx"[-]")
 
-(define* (name-to-c sym)
+(define (name-to-c sym)
   (string->symbol
    (string-append
     ;;"__"
@@ -115,7 +119,7 @@
     ;;"__"
     )))
 
-(define* (name-to-ruby sym)
+(define (name-to-ruby sym)
   (string->symbol
    (string-append
     "$"
@@ -123,14 +127,14 @@
      (regexp-replace* ident-censor-re (symbol->string sym) "_"))
     )))
 
-(define* (name-to-gmake sym)
+(define (name-to-gmake sym)
   (string->symbol
    (string-append
     (string-upcase
      (regexp-replace* ident-censor-re (symbol->string sym) "_"))
     )))
 
-(define* (name-to-gmake/negate sym)
+(define (name-to-gmake/negate sym)
   (string->symbol
    (string-append
     "NOT__"
@@ -161,7 +165,7 @@
        ((if value name-to-gmake name-to-gmake/negate) name)))
    (filter bool-attr? attrs)))
 
-(define* (display/c value)
+(define (display/c value)
   (cond
    ((or (attr-defined? value) (eqv? value #t))
     (display "1"))
@@ -184,7 +188,7 @@
     (error "cannot display as C" value))
    ))
 
-(define* (display-attr/c name value)
+(define (display-attr/c name value)
   (cond
    ((attr-undefined? value)
     (void))
@@ -195,7 +199,7 @@
       (newline)))
    ))
 
-(define* (display/ruby value)
+(define (display/ruby value)
   (cond
    ((or (attr-defined? value) (eqv? value #t))
     (display "true"))
@@ -218,7 +222,7 @@
     (error "cannot display as Ruby" value))
    ))
 
-(define* (display-attr/ruby name value)
+(define (display-attr/ruby name value)
   (cond
    ((attr-undefined? value)
     (void))
@@ -230,7 +234,7 @@
       (newline)))
    ))
 
-(define* (display/gmake value)
+(define (display/gmake value)
   (cond
    ((or (attr-defined? value) (eqv? value #t))
     (display "true"))
@@ -246,7 +250,7 @@
     (error "cannot display as GNU Make" value))
    ))
 
-(define* (display-attr/gmake name value)
+(define (display-attr/gmake name value)
   (set! name (name-to-gmake name))
   (cond
    ((attr-undefined? value)
@@ -270,7 +274,7 @@
       (newline)))
    ))
 
-(define* (display-attr/qmake name value)
+(define (display-attr/qmake name value)
   (set! name (name-to-gmake name))
   (cond
    ((attr-undefined? value)
