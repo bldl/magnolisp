@@ -54,6 +54,16 @@
    (? symbol?)
    (list 'submod (or (? path?) (? symbol?)) (? symbol?) ...)))
 
+(define* (path-basename fn)
+  (define-values (p f dir?) (split-path fn))
+  f)
+
+(define* (path-drop-suffix f)
+  (path-replace-suffix f ""))
+
+(define* (path-basename-only fn)
+  (path-drop-suffix (path-basename fn)))
+
 (define* (symbolic-identifier=? a b)
   (eq? (syntax-e a) (syntax-e b)))
 

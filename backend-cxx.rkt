@@ -46,10 +46,6 @@ C++ back end.
   (set! s (regexp-replace* #rx"[^a-zA-Z0-9_]+" s ""))
   s)
 
-(define (path-basename-only fn)
-  (define-values (p f dir?) (split-path fn))
-  (path-replace-suffix f ""))
-
 (define (resolved-mp->preferred-name mp)
   (match mp
     ((? path?)

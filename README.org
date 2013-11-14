@@ -1,16 +1,14 @@
 This is a work-in-progress implementation of /Magnolisp/, an experimental variant of the likewise experimental programming language [[http://magnolia-lang.org/][Magnolia]]. This strives to be a practical (non-academic) implementation of a Magnolia-like language, with practical in this case meaning lightweight and easy to integrate with tools that people actually use.
 
-Magnolisp's component-level language shall come from Magnolia, algebraic language can include anything "C++ symbiotic" (i.e., anything naturally and efficiently mappable to C++). An evaluator for the language is implemented in Racket, and Racket does provide the module and macro systems.
+Magnolisp's component-level language shall come from Magnolia, whereas algorithmic language can include anything "C++ symbiotic" (i.e., anything naturally and efficiently mappable to C++). Racket provides the module and macro systems.
 
-The idea is for the language to be configurable based on =current.var.rkt= variant spec, so that the language (both front and back ends) can be adapted to the needs of specific project configurations. We also want to be able to annotate any (surface) syntax definitions with information about editor indentation levels for Emacs.
+The implementation has both an evaluator (implemented in the usual way as a [[http://racket-lang.org/][Racket]] =#lang=) and a source-to-source compiler targeting C++. The motivation for an evaluator is to act as a fast testing facility, a simulator of sorts, whereas for real-world deployment onto interesting platforms C++ source code is required.
 
-The implementation has both an evaluator (implemented in the usual way as a [[http://racket-lang.org/][Racket]] =#lang=) and a source-to-source compiler targeting C++. The motivation for an evaluator is to act as a fast testing facility, a simulator of sorts, whereas for deployment onto interesting platforms C++ source code is required.
-
-The core language for the evaluator is Racket, naturally, but the core language for targeting C++ can be different; we can use =local-expand= with a stop list to ensure that expansion does not touch Magnolisp core forms.
+The core language for the evaluator is Racket, naturally, but the core language for targeting C++ can be different; we express C++ specific language as either annotations or calls to a supposed =%core= Racket function, which is not actually invoked.
 
 * Running
 
-  Programs written in =#lang magnolisp= can be evaluated in the usual Racket way. The compiler has no proper API yet, but can be invoked by evaluating =compiler.rkt=, specifying the program to compile. Depends on =uncrustify= as an external tool, and the tool requires a configuration file; one is installable using the provided =Makefile=.
+  Programs written in =#lang magnolisp= can be evaluated in the usual Racket way. The compiler API is provided by the =compiler-api.rkt= module, and can also be invoked via the =mglcc= command-line tool, specifying the program to compile. The C++ backend depends on =uncrustify= as an external tool, and the tool requires a configuration file; one is installable using the provided =Makefile=.
 
 * License
 
