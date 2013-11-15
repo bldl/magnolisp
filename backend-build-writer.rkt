@@ -83,13 +83,14 @@
 ;;; pretty printing
 ;;;
 
-(define (display-divider n [pfx #f])
-  (set! pfx (if pfx (string-append pfx " ") ""))
-  (define pfx-len (string-length pfx))
+(define (display-divider n [pfx #f] #:cols [cols #f])
+  (define margin (if pfx (+ (string-length pfx) 1) 0))
   (define s-lst
-    (for/list ((i (in-range (+ pfx-len 1) (+ n 1))))
-      (format "~a" (modulo i 10))))
-  (displayln (apply string-append pfx s-lst)))
+    (for/list ((i (in-range margin (+ n 1))))
+      (if cols (format "~a" (modulo i 10)) "-")))
+  (when pfx
+    (display pfx) (display " "))
+  (displayln (apply string-append s-lst)))
 
 (define (display-banner pfx filename)
   (define n (let ((col (pretty-print-columns)))
@@ -99,56 +100,43 @@
   (display pfx)
   (display " ")
   (displayln filename)
-  (display-divider n pfx)
-  (displayln ""))
+  (display-divider n pfx #:cols #t))
 
 (define (display-generated-notice pfx)
   (display pfx)
   (displayln " generated -- do not edit"))
 
-(define path-censor-re #rx"[-.]")
+(define path-censor-re #rx"[^a-z0-9_]")
 
 (define-with-contract*
   (-> path-string? string?)
   (path-h-ifdefy p)
   (string-append
    "__"
-   (string-downcase
-    (regexp-replace* path-censor-re
-                     (path-basename-as-string p) "_"))
+   (regexp-replace* path-censor-re
+                    (string-downcase (path-basename-as-string p)) "_")
    "__"))
 
-(define ident-censor-re #rx"[-]")
+(define (string-underscorify s)
+  (regexp-replace* #rx"[-]" s "_"))
 
-(define (name-to-c sym)
-  (string->symbol
-   (string-append
-    (string-upcase
-     (regexp-replace* ident-censor-re (symbol->string sym) "_"))
-    )))
+(define (name-to-c s)
+  (string-upcase (string-underscorify s)))
 
-(define (name-to-ruby sym)
-  (string->symbol
-   (string-append
-    "$"
-    (string-upcase
-     (regexp-replace* ident-censor-re (symbol->string sym) "_"))
-    )))
+(define (name-to-ruby s)
+  (string-append
+   "$"
+   (string-upcase
+    (string-underscorify s))))
 
-(define (name-to-gmake sym)
-  (string->symbol
-   (string-append
-    (string-upcase
-     (regexp-replace* ident-censor-re (symbol->string sym) "_"))
-    )))
+(define (name-to-gmake s)
+  (string-upcase (string-underscorify s)))
 
-(define (name-to-gmake/negate sym)
-  (string->symbol
-   (string-append
+(define (name-to-gmake/negate s)
+  (string-append
     "NOT__"
-    (string-upcase
-     (regexp-replace* ident-censor-re (symbol->string sym) "_"))
-    )))
+   (string-upcase
+    (string-underscorify s))))
 
 (define (bool-attr? attr)
   (boolean? (second attr)))
