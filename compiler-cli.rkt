@@ -36,7 +36,9 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
         (unless (path-string? basename)
           (error 'command-line
                  "expected file basename as --basename, got ~s" basename))
-        (set! out-basename (adjust-path basename)))
+        (set! out-basename
+              (path->string
+               (path-basename-only (adjust-path basename)))))
        (("--chdir") dirname "change to directory"
         (current-directory (expand-user-path dirname)))
        (("--cxx" "-c") "generate C++ implementation"
@@ -60,7 +62,9 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
     (unless (null? fn-lst)
       (set! fn-lst (map adjust-path fn-lst))
       (unless out-basename
-        (set! out-basename (path-replace-suffix (first fn-lst) "")))
+        (set! out-basename
+              (path->string
+               (path-basename-only (first fn-lst)))))
       (define st (apply compile-files fn-lst))
       (generate-files st
                       (hasheq 'cxx (seteq 'cc 'hh)
