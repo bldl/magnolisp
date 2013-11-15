@@ -129,10 +129,10 @@
    (string-upcase
     (string-underscorify s))))
 
-(define (name-to-gmake s)
+(define (name-to-make s)
   (string-upcase (string-underscorify s)))
 
-(define (name-to-gmake/negate s)
+(define (name-to-make/negate s)
   (string-append
     "NOT__"
    (string-upcase
@@ -149,7 +149,7 @@
   (map
    (lambda (entry)
      (let ((name (first entry)))
-       (name-to-gmake name)))
+       (name-to-make name)))
    (filter true-attr? attrs)))
 
 ;; Returns a list of symbols.
@@ -158,8 +158,13 @@
    (lambda (entry)
      (let ((name (first entry))
            (value (second entry)))
-       ((if value name-to-gmake name-to-gmake/negate) name)))
+       ((if value name-to-make name-to-make/negate) name)))
    (filter bool-attr? attrs)))
+
+(define (cannot-display kind value)
+  (error 'generate-build-file
+         "cannot display as ~a: ~s"
+         kind value))
 
 (define (display/c value)
   (cond
@@ -203,11 +208,11 @@
     (write value))
    ((symbol? value)
     (display ":")
-    (display value))
+    (display (string-underscorify (symbol->string value))))
    ((list? value)
     (begin
       (display "[")
-      (for-each-sep display/c (thunk (display ", ")) value)
+      (for-each-sep display/ruby (thunk (display ", ")) value)
       (display "]")))
    (else
     (error "cannot display as Ruby" value))
@@ -219,62 +224,46 @@
   (display/ruby value)
   (newline))
 
-(define (display/gmake value)
+(define (display/make kind value)
   (cond
-   ((eqv? value #t)
-    (display "true"))
    ((number? value)
     (write value))
    ((string? value)
     (display value))
    ((symbol? value)
-    (display/gmake (symbol->string value)))
+    (display value))
    ((list? value)
-    (for-each-sep display/gmake (thunk (display " ")) value))
+    (for-each-sep (fix display/make kind) (thunk (display " ")) value))
    (else
-    (error "cannot display as GNU Make" value))
-   ))
+    (cannot-display kind value))))
 
-(define (display-attr/gmake name value)
-  (set! name (name-to-gmake name))
+(define (valid-value/gmake? v)
+  (cond
+   ;; Cannot really express a list with boolean values, since only the
+   ;; empty string is false.
+   ((and (list? v) (ormap boolean? v)) #f)
+   ;; FIXME Do not know which strings are safe to output.
+   (else #t)))
+
+(define (display-attr/make name value kind)
+  (define assign (if (eq? kind 'gnu-make) " := " " = "))
+  (set! name (name-to-make name))
   (cond
    ((eqv? value #t)
-    (disp-nl "~a := true" name))
+    (display name) (display assign) (display "true") (newline))
    ((eqv? value #f)
-    (disp-nl "~a :=" name))
+    (display name) (display assign) (newline))
    ((hexnum? value)
-    (disp-nl "~a__DEC := ~s" name (hexnum-num value))
-    (disp-nl "~a__HEX := ~a"
-             name (number->string (hexnum-num value) 16)))
-   (else
+    (define dec-name (format "~a__DEC" name))
+    (define hex-name (format "~a__HEX" name))
+    (display dec-name) (display assign) (writeln (hexnum-num value))
+    (display hex-name) (display assign)
+    (displayln (number->string (hexnum-num value) 16)))
+   ((valid-value/gmake? value)
     (display name)
-    (display " := ")
-    (display/gmake value)
+    (display assign)
+    (display/make kind value)
     (newline))))
-
-(define (display-attr/qmake name value)
-  (set! name (name-to-gmake name))
-  (cond
-   ((eqv? value #t)
-    (begin (disp-nl "~a = true" name)
-           ;;(disp-nl "NOT__~a =" name)
-           ))
-   ((eqv? value #f)
-    (begin (disp-nl "~a =" name)
-           ;;(disp-nl "NOT__~a = true" name)
-           ))
-   ((hexnum? value)
-    (begin
-      (disp-nl "~a__DEC = ~s" name (hexnum-num value))
-      (disp-nl "~a__HEX = ~a"
-               name (number->string (hexnum-num value) 16))))
-   (else
-    (begin
-      (display name)
-      (display " = ")
-      (display/gmake value)
-      (newline)))
-   ))
 
 ;;; 
 ;;; language-specific writers
@@ -308,7 +297,7 @@
    (lambda (entry)
      (let ((name (first entry))
            (value (second entry)))
-       (display-attr/gmake name value)))
+       (display-attr/make name value 'gnu-make)))
    attrs))
 
 (define (write-qmake-file file attrs)
@@ -317,7 +306,7 @@
    (lambda (entry)
      (let ((name (first entry))
            (value (second entry)))
-       (display-attr/qmake name value)))
+       (display-attr/make name value 'qmake)))
    attrs)
   ;; For convenience, we add all boolean variables (or their
   ;; negations) to the CONFIG variable with the += operator.
