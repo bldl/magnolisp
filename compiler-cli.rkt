@@ -17,6 +17,7 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
 
 (module* main #f
   (define (do-main)
+    (define out-dir #f)
     (define out-basename #f)
     (define stdout? #f)
     (define banner? #f)
@@ -33,16 +34,13 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
        (("--basename" "-b") basename
         ("for naming generated files"
          "(default: basename of first source file)")
-        (unless (path-string? basename)
-          (error 'command-line
-                 "expected file basename as --basename, got ~s" basename))
-        (set! out-basename
-              (path->string
-               (path-basename-only (adjust-path basename)))))
+        (set! out-basename basename))
        (("--chdir") dirname "change to directory"
         (current-directory (expand-user-path dirname)))
        (("--cxx" "-c") "generate C++ implementation"
         (set! cxx? #t))
+       (("--outdir" "-o") dirname "output directory"
+        (set! out-dir (path->directory-path (adjust-path dirname))))
        (("--stdout" "-s") "output to stdout"
         (set! stdout? #t))
        #:multi
@@ -63,12 +61,12 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
       (set! fn-lst (map adjust-path fn-lst))
       (unless out-basename
         (set! out-basename
-              (path->string
-               (path-basename-only (first fn-lst)))))
+              (path-basename-only-as-string (first fn-lst))))
       (define st (apply compile-files fn-lst))
       (generate-files st
                       (hasheq 'cxx (seteq 'cc 'hh)
                               'build tools)
+                      #:outdir (or out-dir (current-directory))
                       #:basename out-basename
                       #:stdout stdout?
                       #:banner banner?))

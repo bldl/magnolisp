@@ -557,16 +557,27 @@ external dependencies for the program/library, as well as the .cpp and
 (require "backend-build-parser.rkt")
 (require "backend-build-writer.rkt")
 
+(define (string-file-id? s)
+  (regexp-match? #rx"^[a-zA-Z][a-zA-Z0-9_-]*$" s))
+
 (define-with-contract*
   (->* (St? (hash/c symbol? (set/c symbol? #:cmp 'eq)))
-       (#:basename string?
+       (#:outdir path-string?
+        #:basename string?
         #:stdout boolean?
         #:banner boolean?)
        void?)
   (generate-files st backends
+                  #:outdir [outdir (current-directory)]
                   #:basename [basename "output"]
                   #:stdout [stdout? #t]
                   #:banner [banner? #t])
+
+  (unless (string-file-id? basename)
+    (raise-argument-error
+     'generate-files
+     "file basename of non-zero length, without exotic characters"
+     basename))
 
   ;; xxx C++ generation
 
@@ -575,11 +586,12 @@ external dependencies for the program/library, as well as the .cpp and
       (define defs (St-defs st))
       (define opts-stx (defs-collect-build-annos defs))
       (define opts-lst (parse-analyze-build-annos opts-stx))
+      (define path-stem (build-path outdir basename))
       (pretty-print opts-lst)
       (set-for-each
        kinds
        (lambda (kind)
-         (generate-build-file kind opts-lst basename stdout? banner?)))))
+         (generate-build-file kind opts-lst path-stem stdout? banner?)))))
   
   (void))
 
