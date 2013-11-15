@@ -94,15 +94,6 @@
   (display pfx)
   (displayln " generated -- do not edit"))
 
-(define (write-scheme-symlink file target)
-  (write-changed-file
-   file
-   (capture
-    (display-generated-notice ";;")
-    (displayln "#lang racket")
-    (disp-nl "(require ~s)" target)
-    (disp-nl "(provide (all-from-out ~s))" target))))
-
 (define path-censor-re #rx"[-.]")
 
 (define-with-contract*
@@ -112,7 +103,7 @@
    "__"
    (string-downcase
     (regexp-replace* path-censor-re
-                     (path->string (path-basename p)) "_"))
+                     (path-basename-as-string p) "_"))
    "__"))
 
 (define ident-censor-re #rx"[-]")
@@ -120,10 +111,8 @@
 (define (name-to-c sym)
   (string->symbol
    (string-append
-    ;;"__"
     (string-upcase
      (regexp-replace* ident-censor-re (symbol->string sym) "_"))
-    ;;"__"
     )))
 
 (define (name-to-ruby sym)
@@ -213,7 +202,8 @@
    ((string? value)
     (write value))
    ((symbol? value)
-    (display/ruby (symbol->string value)))
+    (display ":")
+    (display value))
    ((list? value)
     (begin
       (display "[")
@@ -355,26 +345,27 @@
   (assert p)
   (values (second p) (third p) (fourth p)))
 
-(define (write-generated-output filename stdout? writer)
+(define (write-generated-output path stdout? writer)
   (if stdout?
       (writer)
       (write-changed-file
-       filename
+       path
        (capture-output writer))))
 
 (define-with-contract*
-  (-> symbol? list? string? boolean? boolean? void?)
-  (generate-build-file kind attrs basename stdout? banner?)
+  (-> symbol? list? path-string? boolean? boolean? void?)
+  (generate-build-file kind attrs path-stem stdout? banner?)
 
   (define-values (writer sfx pfx) (get-writer-etc kind))
-  (define filename (string-append basename sfx))
-
+  (define path (path-add-suffix path-stem sfx))
+  (define filename (path-basename-as-string path))
+  
   (write-generated-output
    filename stdout?
    (thunk
     (when banner?
       (display-banner pfx filename))
-    (writer filename attrs)))
+    (writer path attrs)))
 
   (void))
   

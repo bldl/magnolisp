@@ -58,11 +58,17 @@
   (define-values (p f dir?) (split-path fn))
   f)
 
+(define* (path-basename-as-string fn)
+  (path->string (path-basename fn)))
+
 (define* (path-drop-suffix f)
   (path-replace-suffix f ""))
 
 (define* (path-basename-only fn)
   (path-drop-suffix (path-basename fn)))
+
+(define* (path-basename-only-as-string fn)
+  (path->string (path-basename-only fn)))
 
 (define* (symbolic-identifier=? a b)
   (eq? (syntax-e a) (syntax-e b)))
