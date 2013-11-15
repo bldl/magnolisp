@@ -83,12 +83,24 @@
 ;;; pretty printing
 ;;;
 
+(define (display-divider n [pfx #f])
+  (set! pfx (if pfx (string-append pfx " ") ""))
+  (define pfx-len (string-length pfx))
+  (define s-lst
+    (for/list ((i (in-range (+ pfx-len 1) (+ n 1))))
+      (format "~a" (modulo i 10))))
+  (displayln (apply string-append pfx s-lst)))
+
 (define (display-banner pfx filename)
-  (displayln pfx)
+  (define n (let ((col (pretty-print-columns)))
+              (if (exact-positive-integer? col)
+                  col 40)))
+  (display-divider n pfx)
   (display pfx)
   (display " ")
   (displayln filename)
-  (displayln pfx))
+  (display-divider n pfx)
+  (displayln ""))
 
 (define (display-generated-notice pfx)
   (display pfx)
