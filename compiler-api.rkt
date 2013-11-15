@@ -554,7 +554,8 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; code generation
 ;;; 
 
-(require "backend-build.rkt")
+(require "backend-build-parser.rkt")
+(require "backend-build-writer.rkt")
 
 (define-with-contract*
   (->* (St? (hash/c symbol? (set/c symbol? #:cmp 'eq)))
