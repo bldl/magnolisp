@@ -239,23 +239,18 @@
   (set! name (name-to-gmake name))
   (cond
    ((eqv? value #t)
-    (begin (disp-nl "~a := true" name)
-           (disp-nl "NOT__~a :=" name)))
+    (disp-nl "~a := true" name))
    ((eqv? value #f)
-    (begin (disp-nl "~a :=" name)
-           (disp-nl "NOT__~a := true" name)))
+    (disp-nl "~a :=" name))
    ((hexnum? value)
-    (begin
-      (disp-nl "~a__DEC := ~s" name (hexnum-num value))
-      (disp-nl "~a__HEX := ~a"
-               name (number->string (hexnum-num value) 16))))
+    (disp-nl "~a__DEC := ~s" name (hexnum-num value))
+    (disp-nl "~a__HEX := ~a"
+             name (number->string (hexnum-num value) 16)))
    (else
-    (begin
-      (display name)
-      (display " := ")
-      (display/gmake value)
-      (newline)))
-   ))
+    (display name)
+    (display " := ")
+    (display/gmake value)
+    (newline))))
 
 (define (display-attr/qmake name value)
   (set! name (name-to-gmake name))
