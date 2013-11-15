@@ -3,7 +3,7 @@
 #|
 |#
 
-(require "compiler-util.rkt" "util.rkt")
+(require "util.rkt")
 
 ;;;
 ;;; generic utilities
@@ -78,8 +78,6 @@
 ;;;
 
 (concrete-struct* hexnum (num) #:transparent)
-(singleton-struct* attr-defined (the-attr-defined) ())
-(singleton-struct* attr-undefined (the-attr-undefined) ())
 
 ;;;
 ;;; pretty printing
@@ -167,7 +165,7 @@
 
 (define (display/c value)
   (cond
-   ((or (attr-defined? value) (eqv? value #t))
+   ((eqv? value #t)
     (display "1"))
    ((eqv? value #f)
     (display "0"))
@@ -189,19 +187,13 @@
    ))
 
 (define (display-attr/c name value)
-  (cond
-   ((attr-undefined? value)
-    (void))
-   (else
-    (begin
-      (disp "#define ~a " (name-to-c name))
-      (display/c value)
-      (newline)))
-   ))
+  (disp "#define ~a " (name-to-c name))
+  (display/c value)
+  (newline))
 
 (define (display/ruby value)
   (cond
-   ((or (attr-defined? value) (eqv? value #t))
+   ((eqv? value #t)
     (display "true"))
    ((eqv? value #f)
     (display "false"))
@@ -223,20 +215,14 @@
    ))
 
 (define (display-attr/ruby name value)
-  (cond
-   ((attr-undefined? value)
-    (void))
-   (else
-    (begin
-      (display (name-to-ruby name))
-      (display " = ")
-      (display/ruby value)
-      (newline)))
-   ))
+  (display (name-to-ruby name))
+  (display " = ")
+  (display/ruby value)
+  (newline))
 
 (define (display/gmake value)
   (cond
-   ((or (attr-defined? value) (eqv? value #t))
+   ((eqv? value #t)
     (display "true"))
    ((number? value)
     (write value))
@@ -253,8 +239,6 @@
 (define (display-attr/gmake name value)
   (set! name (name-to-gmake name))
   (cond
-   ((attr-undefined? value)
-    (void))
    ((eqv? value #t)
     (begin (disp-nl "~a := true" name)
            (disp-nl "NOT__~a :=" name)))
@@ -277,8 +261,6 @@
 (define (display-attr/qmake name value)
   (set! name (name-to-gmake name))
   (cond
-   ((attr-undefined? value)
-    (void))
    ((eqv? value #t)
     (begin (disp-nl "~a = true" name)
            ;;(disp-nl "NOT__~a =" name)
