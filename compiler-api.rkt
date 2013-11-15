@@ -573,9 +573,9 @@ external dependencies for the program/library, as well as the .cpp and
   (let ((kinds (hash-ref backends 'build #f)))
     (when (and kinds (not (set-empty? kinds)))
       (define defs (St-defs st))
-      (define opts-lst (defs-collect-build-annos defs))
-      (define opts-h (parse-analyze-build-annos opts-lst))
-      (pretty-print (dict-map opts-h cons))
+      (define opts-stx (defs-collect-build-annos defs))
+      (define opts-lst (parse-analyze-build-annos opts-stx))
+      (pretty-print opts-lst)
       (set-for-each
        kinds
        (lambda (kind)

@@ -14,19 +14,19 @@ code for them.
 ;;; parsing
 ;;; 
 
-(define (valid-opt-name? s)
+(define (opt-name? s)
   (regexp-match? #rx"^[a-z][a-z0-9-]*$" s))
 
-(define (valid-opt-value? v)
+(define (opt-value-atom? v)
   (any-pred-holds boolean? exact-integer? string? symbol? v))
 
-(define (opt-value-pred v)
+(define (opt-value-atom-pred v)
   (ormap
    (lambda (p?)
      (and (p? v) p?))
    (list boolean? exact-integer? string? symbol?)))
 
-(define (make-order-for-value v)
+(define (order-for-opt-value-atom v)
   (cond
    ((boolean? v) boolean-order)
    ((exact-integer? v) number-order)
@@ -37,26 +37,29 @@ code for them.
 (define opt-value-set/c
   (cons/c predicate/c ordered-dict?))
 
+(define ir-opt-value/c
+  (or/c opt-value-atom? opt-value-set/c))
+
 (define opt-value/c
-  (or/c valid-opt-value? opt-value-set/c))
+  (or/c opt-value-atom? list?))
 
 ;; The returned dictionary has Lispy, all lowercase strings as keys,
-;; i.e., valid-opt-name? holds for the keys. The opt-value/c contract
+;; i.e., opt-name? holds for the keys. The ir-opt-value/c contract
 ;; holds for the values, which may be either atoms or sets of values.
 ;; Set elements are also ordered, and must all be of the same value
 ;; type.
 (define-with-contract*
   (-> (listof (list/c identifier? syntax?))
       ordered-dict?)
-  (parse-analyze-build-annos build-lst)
+  (parse-analyze-build-annos/ir build-lst)
   
   (define h (make-splay-tree string-order
-                             #:key-contract valid-opt-name?
-                             #:value-contract opt-value/c))
+                             #:key-contract opt-name?
+                             #:value-contract ir-opt-value/c))
 
   (define (to-name id-stx n-stx)
     (define s (symbol->string (syntax-e n-stx)))
-    (unless (valid-opt-name? s)
+    (unless (opt-name? s)
       (raise-syntax-error
        #f
        (format "illegal build option name for definition ~a"
@@ -66,7 +69,7 @@ code for them.
 
   (define (to-value id-stx n-stx v-stx)
     (define v (syntax->datum v-stx))
-    (define p? (opt-value-pred v))
+    (define p? (opt-value-atom-pred v))
     (unless p?
       (raise-syntax-error
        #f
@@ -110,7 +113,7 @@ code for them.
              stx v-stx))
           (set!-values
            (type-p? v-h)
-           (values p? (make-splay-tree (make-order-for-value v)))))
+           (values p? (make-splay-tree (order-for-opt-value-atom v)))))
       (dict-set! v-h v #t))
     (dict-set! h n (cons type-p? v-h)))
 
@@ -155,7 +158,19 @@ code for them.
     
   h)
 
-;;; 
-;;; code generation
-;;; 
+;; Any returned lists are sorted. The (list/c string? opt-value/c)
+;; part of the signature could be more accurately given as (list/c
+;; opt-name? (or/c opt-value-atom? (listof opt-value-atom?))).
+(define-with-contract*
+  (-> (listof (list/c identifier? syntax?))
+      (listof (list/c string? opt-value/c)))
+  (parse-analyze-build-annos build-lst)
 
+  (define (mk-lst v)
+    (define h (cdr v))
+    (for/list (((k v) (in-dict h)))
+      k))
+  
+  (define h (parse-analyze-build-annos/ir build-lst))
+  (for/list (((n v) (in-dict h)))
+    (list n (if (pair? v) (mk-lst v) v))))
