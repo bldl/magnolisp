@@ -17,7 +17,10 @@ code for them.
 (define (opt-name? s)
   (regexp-match? #rx"^[a-z][a-z0-9-]*$" s))
 
-(define (opt-value-atom? v)
+(define (allowed-symbol? sym)
+  (opt-name? (symbol->string sym)))
+
+(define (opt-value-atom/c v)
   (any-pred-holds boolean? exact-integer? string? symbol? v))
 
 (define (opt-value-atom-pred v)
@@ -38,10 +41,10 @@ code for them.
   (cons/c predicate/c ordered-dict?))
 
 (define ir-opt-value/c
-  (or/c opt-value-atom? opt-value-set/c))
+  (or/c opt-value-atom/c opt-value-set/c))
 
 (define opt-value/c
-  (or/c opt-value-atom? list?))
+  (or/c opt-value-atom/c list?))
 
 ;; The returned dictionary has Lispy, all lowercase strings as keys,
 ;; i.e., opt-name? holds for the keys. The ir-opt-value/c contract
@@ -67,20 +70,30 @@ code for them.
        n-stx))
     s)
 
-  (define (to-value id-stx n-stx v-stx)
+  (define (to-value id-stx opt-stx v-stx)
     (define v (syntax->datum v-stx))
     (define p? (opt-value-atom-pred v))
     (unless p?
-      (raise-syntax-error
+      (raise-language-error
        #f
-       (format "illegal value for build option ~a of definition ~a"
-               (syntax-e n-stx) (syntax-e id-stx))
-       v-stx))
+       "illegal value for build option"
+       opt-stx
+       v-stx
+       #:continued
+       (format "(for declaration ~a)" (syntax-e id-stx))))
+    (when (and (symbol? v) (not (allowed-symbol? v)))
+      (raise-language-error
+       #f
+       "too exotic a symbol for build option"
+       opt-stx
+       v-stx
+       #:continued
+       (format "(for declaration ~a)" (syntax-e id-stx))))
     (values p? v))
   
-  (define (set-value-opt! id-stx n-stx v-stx)
+  (define (set-value-opt! id-stx opt-stx n-stx v-stx)
     (define n (to-name id-stx n-stx))
-    (define-values (p? v) (to-value id-stx n-stx v-stx))
+    (define-values (p? v) (to-value id-stx opt-stx v-stx))
     (if (dict-has-key? h n)
         (let ()
           (define x-v (dict-ref h n))
@@ -90,7 +103,7 @@ code for them.
                    n (syntax-e id-stx) x-v v-stx)))
         (dict-set! h n v)))
 
-  (define (set-set-opt! id-stx stx n-stx v-stx-lst)
+  (define (set-set-opt! id-stx opt-stx n-stx v-stx-lst)
     (assert (not (null? v-stx-lst)))
     (define n (to-name id-stx n-stx))
     (define-values (type-p? v-h)
@@ -100,17 +113,17 @@ code for them.
             (unless (ordered-dict? v-h)
               (error 'parse-analyze-build-annos
                      "conflicting use of operator += with build option ~a for definition ~a (previously defined as non-set ~s): ~s"
-                     n (syntax-e id-stx) v-h stx))
+                     n (syntax-e id-stx) v-h opt-stx))
             (values type-p? v-h))
           (values #f #f)))
     (for ((v-stx v-stx-lst))
-      (define-values (p? v) (to-value id-stx n-stx v-stx))
+      (define-values (p? v) (to-value id-stx opt-stx v-stx))
       (if type-p?
           (unless (type-p? v)
             (raise-syntax-error
              #f
              (format "type mismatch for definition ~a build option ~a value (expected ~a)" (syntax-e id-stx) n (object-name type-p?))
-             stx v-stx))
+             opt-stx v-stx))
           (set!-values
            (type-p? v-h)
            (values p? (make-splay-tree (order-for-opt-value-atom v)))))
@@ -121,10 +134,10 @@ code for them.
     (syntax-case opt-stx ()
       (n
        (identifier? #'n)
-       (set-value-opt! id-stx #'n #'#t))
+       (set-value-opt! id-stx opt-stx #'n #'#t))
       ((n v)
        (identifier? #'n)
-       (set-value-opt! id-stx #'n #'v))
+       (set-value-opt! id-stx opt-stx #'n #'v))
       ((p n v more-v ...)
        (and (eq? '+= (syntax-e #'p)) (identifier? #'n))
        (set-set-opt! id-stx opt-stx #'n
@@ -160,7 +173,7 @@ code for them.
 
 ;; Any returned lists are sorted. The (list/c string? opt-value/c)
 ;; part of the signature could be more accurately given as (list/c
-;; opt-name? (or/c opt-value-atom? (listof opt-value-atom?))).
+;; opt-name? (or/c opt-value-atom/c (listof opt-value-atom/c))).
 (define-with-contract*
   (-> (listof (list/c identifier? syntax?))
       (listof (list/c string? opt-value/c)))
