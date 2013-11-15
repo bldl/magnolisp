@@ -559,12 +559,12 @@ external dependencies for the program/library, as well as the .cpp and
 
 (define-with-contract*
   (->* (St? (hash/c symbol? (set/c symbol? #:cmp 'eq)))
-       (#:basename path-string?
+       (#:basename string?
         #:stdout boolean?
         #:banner boolean?)
        void?)
   (generate-files st backends
-                  #:basename [out-basename "output"]
+                  #:basename [basename "output"]
                   #:stdout [stdout? #t]
                   #:banner [banner? #t])
 
@@ -579,7 +579,7 @@ external dependencies for the program/library, as well as the .cpp and
       (set-for-each
        kinds
        (lambda (kind)
-         (void))))) ;; xxx generate output text
+         (generate-build-file kind opts-lst basename stdout? banner?)))))
   
   (void))
 

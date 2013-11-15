@@ -83,7 +83,14 @@
 ;;; pretty printing
 ;;;
 
-(define* (display-generated-notice pfx)
+(define (display-banner pfx filename)
+  (displayln pfx)
+  (display pfx)
+  (display " ")
+  (displayln filename)
+  (displayln pfx))
+
+(define (display-generated-notice pfx)
   (display pfx)
   (displayln " generated -- do not edit"))
 
@@ -98,13 +105,15 @@
 
 (define path-censor-re #rx"[-.]")
 
-(define (path-h-ifdefy p)
+(define-with-contract*
+  (-> path-string? string?)
+  (path-h-ifdefy p)
   (string-append
    "__"
    (string-downcase
-    (regexp-replace* path-censor-re (path->string (path-basename p)) "_"))
-   "__"
-   ))
+    (regexp-replace* path-censor-re
+                     (path->string (path-basename p)) "_"))
+   "__"))
 
 (define ident-censor-re #rx"[-]")
 
@@ -282,76 +291,93 @@
       (newline)))
    ))
 
-(define* (write-c-file file attrs)
+;;; 
+;;; language-specific writers
+;;;
+
+(define (write-c-file file attrs)
   (let ((harness-name (path-h-ifdefy file)))
-    (write-changed-file
-     file
-     (capture
-      (display-generated-notice "//")
-      (disp-nl "#ifndef ~a" harness-name)
-      (disp-nl "#define ~a" harness-name)
-      (for-each
-       (lambda (entry)
-         (let ((name (first entry))
-               (value (second entry)))
-           (display-attr/c name value)
-           ))
-       attrs)
-      (disp-nl "#endif // ~a" harness-name)
-      ))))
+    (display-generated-notice "//")
+    (disp-nl "#ifndef ~a" harness-name)
+    (disp-nl "#define ~a" harness-name)
+    (for-each
+     (lambda (entry)
+       (let ((name (first entry))
+             (value (second entry)))
+         (display-attr/c name value)))
+     attrs)
+    (disp-nl "#endif // ~a" harness-name)))
 
-(define* (write-ruby-file file attrs)
+(define (write-ruby-file file attrs)
+  (display-generated-notice "#")
+  (for-each
+   (lambda (entry)
+     (let ((name (first entry))
+           (value (second entry)))
+       (display-attr/ruby name value)))
+   attrs))
+
+(define (write-gmake-file file attrs)
+  (display-generated-notice "#")
+  (for-each
+   (lambda (entry)
+     (let ((name (first entry))
+           (value (second entry)))
+       (display-attr/gmake name value)))
+   attrs))
+
+(define (write-qmake-file file attrs)
+  (display-generated-notice "#")
+  (for-each
+   (lambda (entry)
+     (let ((name (first entry))
+           (value (second entry)))
+       (display-attr/qmake name value)))
+   attrs)
+  ;; For convenience, we add all boolean variables (or their
+  ;; negations) to the CONFIG variable with the += operator.
   (begin
-    (write-changed-file
-     file
-     (capture
-      (display-generated-notice "#")
-      (for-each
-       (lambda (entry)
-         (let ((name (first entry))
-               (value (second entry)))
-           (display-attr/ruby name value)
-           ))
-       attrs)
-      ))))
+    (display "CONFIG += ")
+    (for-each-sep display (thunk (display " "))
+                  (bool-attrs-to-qmake-list attrs))
+    (newline)))
 
-(define* (write-gmake-file file attrs)
-  (begin
-    (write-changed-file
-     file
-     (capture
-      (display-generated-notice "#")
-      (for-each
-       (lambda (entry)
-         (let ((name (first entry))
-               (value (second entry)))
-           (display-attr/gmake name value)
-           ))
-       attrs)
-      ))))
+;;; 
+;;; driver routines
+;;;
 
-(define* (write-qmake-file file attrs)
-  (begin
-    (write-changed-file
-     file
-     (capture
-      (display-generated-notice "#")
-      (for-each
-       (lambda (entry)
-         (let ((name (first entry))
-               (value (second entry)))
-           (display-attr/qmake name value)
-           ))
-       attrs)
-      ;; For convenience, we add all boolean variables (or their
-      ;; negations) to the CONFIG variable with the += operator.
-      (begin
-        (display "CONFIG += ")
-        (for-each-sep display (thunk (display " "))
-                      (bool-attrs-to-qmake-list attrs))
-        (newline))
-      ))))
+(define (get-writer-etc kind)
+  (define tbl `((c ,write-c-file ".h" "//")
+                (gnu-make ,write-gmake-file ".mk" "#")
+                (qmake ,write-qmake-file ".pri" "#")
+                (ruby ,write-ruby-file ".rb" "#")))
+  (define p (assq kind tbl))
+  (assert p)
+  (values (second p) (third p) (fourth p)))
 
+(define (write-generated-output filename stdout? writer)
+  (if stdout?
+      (writer)
+      (write-changed-file
+       filename
+       (capture-output writer))))
+
+(define-with-contract*
+  (-> symbol? list? string? boolean? boolean? void?)
+  (generate-build-file kind attrs basename stdout? banner?)
+
+  (define-values (writer sfx pfx) (get-writer-etc kind))
+  (define filename (string-append basename sfx))
+
+  (write-generated-output
+   filename stdout?
+   (thunk
+    (when banner?
+      (display-banner pfx filename))
+    (writer filename attrs)))
+
+  (void))
+  
 #|
 
 Copyright 2009 Helsinki Institute for Information Technology (HIIT)
