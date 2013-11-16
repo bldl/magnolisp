@@ -3,7 +3,7 @@
 #|
 |#
 
-(require "util.rkt")
+(require "backend-build-parser.rkt" "util.rkt")
 
 ;;;
 ;;; generic utilities
@@ -72,12 +72,6 @@
 
 (define (disp-nl . args)
   (apply disp args) (newline))
-
-;;; 
-;;; special values 
-;;;
-
-(concrete-struct* hexnum (num) #:transparent)
 
 ;;;
 ;;; pretty printing

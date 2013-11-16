@@ -11,6 +11,12 @@ code for them.
          data/order data/splay-tree)
 
 ;;; 
+;;; special values 
+;;;
+
+(concrete-struct* hexnum (num) #:transparent)
+
+;;; 
 ;;; parsing
 ;;; 
 
@@ -20,19 +26,38 @@ code for them.
 (define (allowed-symbol? sym)
   (opt-name? (symbol->string sym)))
 
+(define (opt-value-number? v)
+  (any-pred-holds exact-integer? hexnum? v))
+
 (define (opt-value-atom/c v)
-  (any-pred-holds boolean? exact-integer? string? symbol? v))
+  (any-pred-holds boolean? opt-value-number? string? symbol? v))
 
 (define (opt-value-atom-pred v)
   (ormap
    (lambda (p?)
      (and (p? v) p?))
-   (list boolean? exact-integer? string? symbol?)))
+   (list boolean? opt-value-number? string? symbol?)))
+
+(define (opt-value-number->number v)
+  (if (hexnum? v) (hexnum-num v) v))
+
+(define (opt-value-number-comparator x y)
+  (define x-n (opt-value-number->number x))
+  (define y-n (opt-value-number->number y))
+  (cond
+   ((= x-n y-n) '=)
+   ((< x-n y-n) '<)
+   (else '>)))
+
+(define opt-value-number-order
+  (order 'number-order
+         opt-value-number?
+         opt-value-number-comparator))
 
 (define (order-for-opt-value-atom v)
   (cond
    ((boolean? v) boolean-order)
-   ((exact-integer? v) number-order)
+   ((opt-value-number? v) opt-value-number-order)
    ((string? v) string-order)
    ((symbol? v) symbol-order)
    (else (assert #f))))
@@ -71,7 +96,13 @@ code for them.
     s)
 
   (define (to-value id-stx opt-stx v-stx)
-    (define v (syntax->datum v-stx))
+    (define v
+      (syntax-case v-stx ()
+        ((#:hex h-v)
+         (exact-integer? (syntax-e #'h-v))
+         (hexnum (syntax->datum #'h-v)))
+        (_
+         (syntax->datum v-stx))))
     (define p? (opt-value-atom-pred v))
     (unless p?
       (raise-language-error
