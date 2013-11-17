@@ -1,56 +1,48 @@
-#lang racket
+#lang racket/base
 
 #|
 
-'define' with 'return' support.
-
-E.g.
-
-  (define/r (f x)
-    (when (= x 0) (return x))
-    (+ x 1))
-
-  (define/r (g x y)
-    (when (= x 0) (return x y))
-    (values (+ x 1) (+ y 1)))
-
-  (f 0) ; => 0
-  (f 1) ; => 2
-  (g 0 5) ; => 0 5
-  (g 1 5) ; => 2 6
+A 'block-expr' expression/statement with 'return' support. Any
+value(s) produced by a block must always be returned. In a statement
+context, no values should be returned, and fall-through is OK. In an
+expression context, the number of values returned should match the
+context.
 
 |#
 
-(require "module.rkt")
-
 (require racket/stxparam)
+
+(provide block-expr return)
 
 (define-syntax-parameter return
   (syntax-rules ()))
-(provide return)
 
-(define-syntax* define/r
-  (syntax-rules ()
-    ((define/r sig body ...)
-     (define sig
-       (let/cc k
-               (syntax-parameterize
-                ((return (syntax-rules ()
-                           ((_ . rest)
-                            (k . rest)))))
-                body ...))))))
+(define-syntax-rule
+  (block-expr body ...)
+  (let/ec k
+    (syntax-parameterize
+     ((return (syntax-rules ()
+                ((_ . rest)
+                 (k . rest)))))
+     body ...
+     (values))))
 
-(define-syntax* define*/r
-  (syntax-rules ()
-    ((_ (name arg ... . rest) body ...)
-     (begin
-       (define/r (name arg ... . rest) body ...)
-       (provide name)))
-    ((_ (name arg ...) body ...)
-     (begin
-       (define/r (name arg ...) body ...)
-       (provide name)))
-    ))
+(module+ main
+  (block-expr) ;; statement
+  (block-expr (return) 1) ;; statement
+  (define-values () (block-expr)) ;; expression, 0 values
+  (define-values () (block-expr (return))) ;; expression, 0 values
+  (block-expr (return 1)) ;; expression, 1 value
+  (block-expr (return 1 2)) ;; expression, 2 values
+  (define (f x)
+    (block-expr
+     (when x
+       (return 'true))
+     (unless x
+       (return 'false))))
+  (f #t)
+  (f #f)
+  )
 
 #|
 

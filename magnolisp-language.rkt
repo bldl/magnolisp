@@ -20,10 +20,13 @@ screwy when used in compilation mode.
 
 |#
 
-(provide (except-out (all-from-out racket/base) #%module-begin))
+(provide (except-out (all-from-out racket/base) #%module-begin do))
 
 (require "modbeg.rkt")
 (provide (rename-out (module-begin #%module-begin)))
+
+(require "util/return.rkt")
+(provide (rename-out [block-expr do]) return)
 
 (require (for-syntax racket/base))
 (provide (for-syntax (all-from-out racket/base)))
