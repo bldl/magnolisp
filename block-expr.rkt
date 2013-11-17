@@ -10,9 +10,9 @@ context.
 
 |#
 
-(require racket/stxparam)
+(require racket/stxparam (for-syntax racket/base))
 
-(provide block-expr return)
+(provide block-expr return return-values)
 
 (define-syntax-parameter return
   (syntax-rules ()))
@@ -21,11 +21,13 @@ context.
   (block-expr body ...)
   (let/ec k
     (syntax-parameterize
-     ((return (syntax-rules ()
-                ((_ . rest)
-                 (k . rest)))))
+     ((return (make-rename-transformer #'k)))
      body ...
      (values))))
+
+(define-syntax-rule
+  (return-values generator ...)
+  (call-with-values (lambda () generator ...) return))
 
 (module+ main
   (block-expr) ;; statement
@@ -42,6 +44,9 @@ context.
        (return 'false))))
   (f #t)
   (f #f)
+  (block-expr (return (block-expr (return 4))))
+  (block-expr (return-values (values 1 2)))
+  (block-expr (return-values (block-expr (return 11 12))))
   )
 
 #|
