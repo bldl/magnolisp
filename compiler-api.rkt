@@ -556,9 +556,10 @@ external dependencies for the program/library, as well as the .cpp and
 
 (require "backend-build-parser.rkt")
 (require "backend-build-writer.rkt")
+(require "backend-cxx-main.rkt")
 
 (define (string-file-id? s)
-  (regexp-match? #rx"^[a-zA-Z][a-zA-Z0-9_-]*$" s))
+  (regexp-match? #rx"^[a-zA-Z0-9_][a-zA-Z0-9_-]*$" s))
 
 (define-with-contract*
   (->* (St? (hash/c symbol? (set/c symbol? #:cmp 'eq)))
@@ -579,6 +580,8 @@ external dependencies for the program/library, as well as the .cpp and
      "file basename of non-zero length, without exotic characters"
      basename))
 
+  (define path-stem (build-path outdir basename))
+  
   ;; xxx C++ generation
 
   (let ((kinds (hash-ref backends 'build #f)))
@@ -586,8 +589,7 @@ external dependencies for the program/library, as well as the .cpp and
       (define defs (St-defs st))
       (define opts-stx (defs-collect-build-annos defs))
       (define opts-lst (parse-analyze-build-annos opts-stx))
-      (define path-stem (build-path outdir basename))
-      (pretty-print opts-lst)
+      ;;(pretty-print opts-lst)
       (set-for-each
        kinds
        (lambda (kind)
