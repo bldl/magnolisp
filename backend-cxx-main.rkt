@@ -6,8 +6,20 @@ C++ back end.
 
 |#
 
-(require "ast-magnolisp.rkt" "compiler-util.rkt" "strategy.rkt"
-         "util.rkt" "util/case.rkt" "util/system.rkt")
+(require "ast-magnolisp.rkt" "backend-cxx-print.rkt"
+         "compiler-util.rkt" "strategy.rkt"
+         "util.rkt" "util/case.rkt" "util/system.rkt"
+         compatibility/mlist)
+
+;;; 
+;;; Scheme compatibility
+;;; 
+
+;; A recursive version of list->mlist.
+(define (list->mlist/rec x)
+  (if (list? x)
+      (apply mlist (map list->mlist/rec x))
+      x))
 
 ;;; 
 ;;; reformatting
