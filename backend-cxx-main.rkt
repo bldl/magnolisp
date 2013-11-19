@@ -6,7 +6,7 @@ C++ back end.
 
 |#
 
-(require "ast-magnolisp.rkt" "backend-cxx-print.rkt"
+(require "ast-magnolisp.rkt" "backend-cxx-print.rkt" "backend-util.rkt"
          "compiler-util.rkt" "strategy.rkt"
          "util.rkt" "util/case.rkt" "util/system.rkt"
          compatibility/mlist)
@@ -20,6 +20,13 @@ C++ back end.
   (if (list? x)
       (apply mlist (map list->mlist/rec x))
       x))
+
+;;; 
+;;; Elegant Weapons translation
+;;; 
+
+(define (defs->ew defs)
+  (void)) ;;xxx
 
 ;;; 
 ;;; reformatting
@@ -42,3 +49,36 @@ C++ back end.
 (define-with-contract*
   (-> string? string?) (uncrustify s)
   (exe-filter s '("/usr/bin/uncrustify" "-l" "cpp" "-q")))
+
+;;; 
+;;; driver routines
+;;; 
+
+(define (get-suffix kind)
+  (define tbl `((cc ".cpp")
+                (hh ".hpp")))
+  (define p (assq kind tbl))
+  (unless p
+    (raise-argument-error 'get-suffix
+                          "either 'cc or 'hh" kind))
+  (values (second p)))
+
+(define* (generate-cxx-file kinds defs path-stem stdout? banner?)
+  (set-for-each
+   kinds
+   (lambda (kind)
+     (when (eq? kind 'cc)
+       (define msexp (list->mlist/rec (defs->ew defs)))
+       (define s (format-c msexp))
+       ;; xxx uncrustify
+       (define sfx (get-suffix kind))
+       (define path (path-add-suffix path-stem sfx))
+       (define filename (path-basename-as-string path))
+       
+       (write-generated-output
+        path stdout?
+        (thunk
+         (when banner?
+           (display-banner "//" filename))
+         (display s))))))
+  (void))

@@ -580,15 +580,18 @@ external dependencies for the program/library, as well as the .cpp and
      "file basename of non-zero length, without exotic characters"
      basename))
 
-  (define path-stem (build-path outdir basename))
-  
-  ;; xxx C++ generation
+  (let ((kinds (hash-ref backends 'cxx #f)))
+    (when (and kinds (not (set-empty? kinds)))
+      (define defs (St-defs st))
+      (define path-stem (build-path outdir basename))
+      (generate-cxx-file kinds defs path-stem stdout? banner?)))
 
   (let ((kinds (hash-ref backends 'build #f)))
     (when (and kinds (not (set-empty? kinds)))
       (define defs (St-defs st))
       (define opts-stx (defs-collect-build-annos defs))
       (define opts-lst (parse-analyze-build-annos opts-stx))
+      (define path-stem (build-path outdir (string-append basename "_build")))
       ;;(pretty-print opts-lst)
       (set-for-each
        kinds
