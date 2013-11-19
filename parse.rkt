@@ -408,6 +408,11 @@ would have done. Still retains correct scoping and evaluation order.
        (when (eq? ctx 'expr)
          (define par-id-lst (syntax->list #'formals))
          (define e-stx-lst (syntax->list #'exprs))
+         (when (> (length e-stx-lst) 1)
+           (raise-syntax-error
+            #f
+            "function body must be a single expression"
+            stx))
          (define par-ast-lst
            (map (lambda (id)
                   ;; Annotations would probably have to be propagated
@@ -415,10 +420,9 @@ would have done. Still retains correct scoping and evaluation order.
                   ;; that must wait until later.
                   (make-Param ctx stx id))
                 par-id-lst))
-         (define e-ast-lst
-           (map (lambda (e-stx)
-                  (parse 'expr e-stx)) e-stx-lst))
-         (new-Lambda stx par-ast-lst e-ast-lst)))
+         (define e-stx (first e-stx-lst))
+         (define e-ast (parse 'expr e-stx))
+         (new-Lambda stx par-ast-lst e-ast)))
       
       ((if c t e)
        (when (eq? ctx 'expr)

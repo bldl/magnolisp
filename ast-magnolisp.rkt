@@ -14,9 +14,7 @@ hasheq, keyed by the following:
 
   - 'entry-point :: a #t value for each library entry point
 
-The 'verbatim and 'external property of an operation body is encoded
-in the AST, and no table is required for that information. This really
-is a property of the body, and not of the signature.
+The 'verbatim and 'external property:
 
   - 'external means an externally defined function (in C++)
 
@@ -103,7 +101,7 @@ such.
 (define-ast* FunT Type ((list-of-term ats) (just-term rt)))
 
 ;;; 
-;;; others
+;;; definitions
 ;;; 
 
 ;; Any recorded annotations from definitions are put into 'annos' from
@@ -125,7 +123,11 @@ such.
 (define-ast* Param Def ())
 
 ;; Function declaration.
-(define-ast* Defun Def ((list-of-term params) (list-of-term body)))
+(define-ast* Defun Def ((list-of-term params) (just-term body)))
+
+;;; 
+;;; others
+;;; 
 
 ;; 'defs' contains DefVar terms. Said bindings are not visible in
 ;; DefVar bodies.
@@ -135,14 +137,14 @@ such.
 ;; bodies.
 (define-ast* Letrec Ast ((list-of-term defs) (list-of-term body)))
 
-;; Sequence of statements.
+;; Sequence of expressions (as in Racket).
 (define-ast* Begin Ast ((list-of-term body)))
 
 ;; Variable reference.
 (define-ast* Var Ast ((no-term id)))
 
 ;; Function value.
-(define-ast* Lambda Ast ((list-of-term params) (list-of-term body)))
+(define-ast* Lambda Ast ((list-of-term params) (just-term body)))
 
 ;; Assignment.
 (define-ast* Assign Ast ((just-term lv) (just-term rv)))
@@ -153,15 +155,23 @@ such.
 ;; A literal datum.
 (define-ast* Literal Ast ((no-term datum)))
 
-;; Function application, with function expression, and argument
-;; expressions.
+;; Function (or predicate) application, with function expression, and
+;; argument expressions.
 (define-ast* Apply Ast ((just-term f) (list-of-term args)))
 
-#|
+;; Procedure call.
+(define-ast* Call Ast ((just-term f) (list-of-term args)))
 
-(define-ast* Verbatim Ast ((no-term text)))
+;; Nil statement.
 (define-ast* Pass Ast ())
-(define-ast* Call Ast ((just-term proc)))
+
+;; Return statement.
+(define-ast* Return Ast ((list-of-term es)))
+
+;; Parenthesized expression.
+(define-ast* Parens Ast ((just-term e)))
+
+#|
 
 (define* (Var-from-stx id-stx)
   (new-Var id-stx (syntax-e id-stx)))
@@ -189,11 +199,11 @@ such.
      `(define-syntax ,(->symbol id)))
     ((Param _ id)
      (->symbol id))
-    ((Defun a id ps bs)
+    ((Defun a id ps b)
      (define export? (hash-ref a 'export #f))
      (define n (if export? 'function/export 'function))
      `(,n (,(->symbol id) ,@(map ast->sexp ps))
-          ,@(map ast->sexp bs)))
+          ,(ast->sexp b)))
     ((or (Let a ds bs)
          (Letrec a ds bs))
      (define n (if (Let? ast) 'let 'letrec))
@@ -203,10 +213,10 @@ such.
      `(begin ,@(map ast->sexp bs)))
     ((Var _ id)
      (->symbol id))
-    ((Lambda _ ps bs)
+    ((Lambda _ ps b)
      `(lambda 
           (,@(map ast->sexp ps))
-        ,@(map ast->sexp bs)))
+        ,(ast->sexp b)))
     ((Assign _ lv rv)
      `(set! ,(ast->sexp lv) ,(ast->sexp rv)))
     ((IfExpr _ c t e)
