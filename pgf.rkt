@@ -3,6 +3,7 @@
 #|
 
 A pretty printer library derived from code in Pretty Good Formatter.
+Based on Wadler's algorithm, with some extensions.
 
 https://github.com/nuthatchery/pgf
 
@@ -40,10 +41,6 @@ https://github.com/nuthatchery/pgf
 (define-token* Union l r) ;; choice
 (define-token* Width w) ;; 'w' is a rational
 (define-token* Flush) ;; forces flushing of buffers
-
-(define* Flush-instance (Flush))
-(define* Line-instance (Line))
-(define* LvPop-instance (Nest (LvPop)))
 
 ;;; 
 ;;; token sequences
@@ -93,8 +90,17 @@ https://github.com/nuthatchery/pgf
    ((null? s) (dq e))
    (else (dq s e))))
 
+(define (tseq-put* s . es)
+  (for/fold ((s s)) ((e es)) (tseq-put s e)))
+
 (define-syntax-rule* (tseq/lazy s ...)
   (tseq (lazy s) ...))
+
+(define-syntax-rule* (tseq-cons/lazy e s)
+  (tseq-cons (lazy e) (lazy s)))
+
+(define-syntax-rule* (tseq-put/lazy s e)
+  (tseq-put (lazy s) (lazy e)))
 
 ;; Must account for all tseq constructors.
 (define* (tseq-get s)
@@ -163,6 +169,278 @@ https://github.com/nuthatchery/pgf
            (if (tseq-null? t)
                h
                (tseq h e (next t))))))))
+
+;;; 
+;;; formatting state
+;;;
+
+(concrete-struct* FmtSt
+                  (
+                   cw ;; specified page width (integer, constant)
+                   w ;; page width (rational)
+                   outDoc ;; formatted document (tseq of Token)
+                   inDoc ;; unread input (tseq of Token)
+                   k ;; current column (integer)
+                   lvStack ;; nesting stack (list of string)
+                   bt ;; backtracking state (FmtSt or #f; can be chained)
+                   ) #:transparent)
+
+;;; 
+;;; stack
+;;; 
+
+(define (spush st t)
+  (cons t st))
+
+;;; 
+;;; indentation
+;;; 
+
+(define (spaces n)
+  (make-string n #\space))
+
+(define (string-chop-n n s)
+  (let* ((len (string-length s))
+         (nlen (+ len n)))
+    (if (> nlen 0)
+        (substring s 0 nlen)
+        "")))
+
+;; st:: old indentation state (stack of string)
+;; k:: current column (integer)
+;; lv:: level specification (Lv)
+;; Returns:: new indentation state (stack of string)
+(define (margin st k lv)
+  (cond
+   ((LvInc? lv)
+    (spush st
+           (let ((s (car st))
+                 (n (LvInc-n lv)))
+             (if (>= n 0)
+                 (string-append s (spaces n))
+                 (string-chop-n n s)))))
+   ((LvStr? lv)
+    (spush st
+           (string-append (car st) (LvStr-s lv))))
+   ((LvAbs? lv)
+    (spush st
+           (let ((n (LvAbs-n lv)))
+             (if (> n 0) (spaces n) ""))))
+   ((LvRel? lv)
+    (margin st k (LvAbs (+ k (LvRel-n lv)))))
+   ((LvPop? lv)
+    ;; Stack must remain non-empty.
+    (if (or (null? st) (null? (cdr st)))
+        (error "margin: LvPop without matching Lv push")
+        (cdr st)))
+   (else (error "margin: unexpected" lv))))
+
+;;; 
+;;; formatting algorithm
+;;; 
+
+;; w:: page width (integer)
+;; inDoc:: unread input (tseq of Token, optional)
+(define* (new-FmtSt w (inDoc tseq-null))
+  (FmtSt w w tseq-null inDoc 0 '("") #f))
+
+;; Flushes buffered documents, committing decisions made thus far.
+;; After this it is safe to consume all of 'outDoc'. Note that this
+;; just resets state, you'll want to ensure that 'inDoc' contents have
+;; already been processed.
+(define* (FmtSt-flush st) ;; FmtSt -> FmtSt
+  (struct-copy FmtSt st (bt #f)))
+
+;; Prepends input 's' into state.
+;;
+;; st:: current state (FmtSt)
+;; s:: stream to prepend to inDoc (tseq)
+;; Returns:: new state (FmtSt)
+(define (FmtSt-cons st s)
+  (let ((inDoc (FmtSt-inDoc st)))
+    (struct-copy FmtSt st (inDoc (tseq-cons s inDoc)))))
+
+;; Before calling this function ensure that all state (except for the
+;; argument token) is consistent and in 'st'.
+;;
+;; st:: current state (FmtSt)
+;; d:: token to process (Token)
+;; Returns:: new state (FmtSt)
+(define (process-token/algo st d)
+  (let ((k (FmtSt-k st))
+        (w (FmtSt-w st))
+        (outDoc (FmtSt-outDoc st))
+        (i (car (FmtSt-lvStack st))))
+    (cond
+     ((Nest? d)
+      (struct-copy FmtSt st
+                   (lvStack
+                    (margin (FmtSt-lvStack st) k (Nest-lv d)))))
+     ((Text? d)
+      ;; Here we must check whether the text still fits. If it
+      ;; doesn't, we'll only continue if we don't have a way back.
+      (let ((s (Text-s d)))
+        (let ((k (+ k (string-length s)))
+              (bt (FmtSt-bt st)))
+          (if (and bt (> k w))
+              bt ;; backtrack
+              (struct-copy FmtSt st
+                           (k k) (outDoc (tseq-put outDoc d)))))))
+     ((Line? d)
+      ;; A break always fits, and then we're committed, and
+      ;; won't backtrack from here.
+      (struct-copy FmtSt st
+                   (k (string-length i))
+                   (bt #f)
+                   (outDoc
+                    (tseq-put* outDoc (Text "\n") (Text i)))))
+     ((Union? d)
+      ;; Pick left option, leave right for backtracking.
+      (let ((l (Union-l d))
+            (r (Union-r d)))
+        (let ((r-st (FmtSt-cons st r)))
+          (FmtSt-cons 
+           (struct-copy FmtSt st (bt r-st))
+           l))))
+     ((Width? d)
+      ;; May be used to change page width 'w'. The default (constant)
+      ;; width 'cw' never changes.
+      (struct-copy FmtSt st (w (Width-w d))))
+     ((Flush? d)
+      (FmtSt-flush st))
+     (else
+      (error "process-token/algo: unexpected" d)))))
+
+;; st:: current state (FmtSt)
+;; Returns:: new state (FmtSt)
+(define (process-token st)
+  (let-values (((d inDoc) (tseq-get (FmtSt-inDoc st))))
+    (if (not d)
+        st
+        (let ((st (struct-copy FmtSt st (inDoc inDoc))))
+          (process-token/algo st d)))))
+
+;; Whether the state has any data to be processed.
+(define* (FmtSt-pending? st) ;; FmtSt -> boolean
+  (not (tseq-null? (FmtSt-inDoc st))))
+
+;; Adds a tseq to input.
+(define* (FmtSt-write st s) ;; FmtSt, tseq of Token -> St
+  (struct-copy FmtSt st (inDoc (tseq (FmtSt-inDoc st) s))))
+
+;; Processes tokens for as long as there is input.
+(define* (FmtSt-run st) ;; FmtSt -> FmtSt
+  (let loop ((st st))
+    (if (FmtSt-pending? st)
+        (loop (process-token st))
+        st)))
+
+;;; 
+;;; text output
+;;; 
+
+;; d:: formatted token
+;; Returns:: pretty-printed string
+(define (f-token->string d) ;; Token -> string
+  (cond
+   ((Text? d)
+    (Text-s d))
+   (else
+    (error "f-token->string: unexpected" d))))
+
+;; ts:: formatted document
+;; Returns:: pretty-printed string
+(define (f-tseq->string ts) ;; tseq of Token -> string
+  (apply string-append
+         (for/list ((t (in-tseq ts)))
+                   (f-token->string t))))
+
+;; Process all input and return the result as a string. Effectively
+;; does a flush.
+(define* (FmtSt->string st) ;; FmtSt -> string
+  (f-tseq->string
+   (FmtSt-outDoc
+    (FmtSt-run st))))
+
+;; Clears output buffer by printing it all out.
+(define (b-FmtSt-print st (out (current-output-port)))
+  (for ((t (in-tseq (FmtSt-outDoc st))))
+       (display (f-token->string t) out))
+  (struct-copy FmtSt st (outDoc tseq-null)))
+
+;; Processes as much input as is available, and prints as much as
+;; safely can. Works incrementally so that printing happens as soon as
+;; there is text ready for output.
+(define* (pgf-print/st/safe st (out (current-output-port)))
+  (let loop ()
+    (unless (FmtSt-bt st)
+      (set! st (b-FmtSt-print st out)))
+    (set! st (process-token st))
+    (if (FmtSt-pending? st) (loop) st)))
+
+;; ts:: unformatted token sequence (tseq)
+;; w:: page width
+;; out:: output port
+;; flush?:: whether to flush
+;; newline?:: whether to append newline (implies flush?)
+(define* (pgf-print ts
+                    #:width [w (pretty-print-columns)]
+                    #:out [out (current-output-port)]
+                    #:flush [flush? #t]
+                    #:newline [newline? #f])
+  (define st (pgf-print/st/safe (new-FmtSt w ts) out))
+  (when (or newline? flush?)
+    (b-FmtSt-print (FmtSt-flush st) out))
+  (when newline?
+    (newline out)))
+
+;; ts:: unformatted token sequence (tseq)
+;; w:: page width
+;; Returns:: pretty-printed string
+(define* (pgf-string ts #:width [w (pretty-print-columns)])
+  (FmtSt->string (new-FmtSt w ts)))
+
+;;; 
+;;; common constructions
+;;; 
+
+;; l:: left choice (tseq of Token)
+;; r:: right choice (tseq of Token)
+;; Returns:: tseq of Token
+(define* (union l r)
+  (Union l r))
+
+;; Behaves lazily.
+(define* (flatten s) ;; tseq of Token -> tseq of Token
+  (let-values (((t ts) (tseq-get s)))
+    (if (not t)
+        s
+        (cond
+         ((Line? t)
+          (tseq-cons/lazy (Text " ") (flatten ts)))
+         ((Union? t)
+          (flatten (tseq/lazy (Union-l t) ts)))
+         (else
+          (tseq-cons/lazy t (flatten ts)))))))
+
+ ;; tseq of Token -> tseq of Token
+(define* (group ts)
+  (union (flatten ts) ts))
+
+;;; 
+;;; conveniences
+;;; 
+
+(define* br (Line))
+(define* nbsp (Text " "))
+(define* sp (union nbsp br))
+
+(define* indent0 (Nest (LvAbs 0)))
+(define* align (Nest (LvRel 0)))
+(define* dedent (Nest (LvPop)))
+(define* (indent n) (Nest (LvInc n)))
+(define* (exdent n) (Nest (LvInc (- n))))
+
 
 #|
 
