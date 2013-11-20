@@ -87,7 +87,7 @@ concatenation and iteration.
   (define* (f q p ... [default
                        (thunk (raise-argument-error
                                (quote f)
-                               "expected non-empty dq" q))])
+                               "non-empty dq" q))])
     (define (fail)
       (if (procedure? default)
           (default)
