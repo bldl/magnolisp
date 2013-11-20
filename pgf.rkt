@@ -59,8 +59,39 @@ https://github.com/nuthatchery/pgf
 
 (define* tseq-null dq-null)
 
-;; Heavy use of this may result in an inefficient data structure.
-(define* tseq dq)
+;; Optimizes for the common, performance critical case, namely
+;; prepending or appending a token into a sequence using the
+;; constructor.
+(define* tseq
+  (case-lambda
+    [() tseq-null]
+    [(s) (dq s)]
+    [(s1 s2) (cond
+              ((and (dq? s1) (dq? s2))
+               (dq-append s1 s2))
+              ((dq? s1)
+               (dq-cons-r s1 s2))
+              ((dq? s2)
+               (dq-cons-f s2 s1))
+              ((null? s1)
+               (dq s2))
+              ((null? s2)
+               (dq s1))
+              (else
+               (dq s1 s2)))]
+    [ss (apply dq ss)]))
+
+(define* (tseq-cons e s)
+  (cond
+   ((dq? s) (dq-cons-f s e))
+   ((null? s) (dq e))
+   (else (dq e s))))
+
+(define* (tseq-put s e)
+  (cond
+   ((dq? s) (dq-cons-r s e))
+   ((null? s) (dq e))
+   (else (dq s e))))
 
 (define-syntax-rule* (tseq/lazy s ...)
   (tseq (lazy s) ...))
@@ -98,18 +129,6 @@ https://github.com/nuthatchery/pgf
 
 (define* (tseq-null? s)
   (not (tseq-first s)))
-
-(define* (tseq-cons e s)
-  (cond
-   ((dq? s) (dq-cons-f s e))
-   ((null? s) (dq e))
-   (else (dq e s))))
-
-(define* (tseq-put s e)
-  (cond
-   ((dq? s) (dq-cons-r s e))
-   ((null? s) (dq e))
-   (else (dq s e))))
 
 (define* (tseq->list s)
   (let loop ((r '()) (s s))
