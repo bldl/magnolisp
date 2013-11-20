@@ -1,343 +1,298 @@
-#!r6rs
-(library
-  (magnolisp backend-cxx-print)
-  (export
-    indent-more
-    format-c
-    print-c
-    format-decl
-    format-stmt
-    format-expr
-    format-ident
-    format-type
-    format-args
-    format-call-args
-    format-arg
-    format-binop
-    format-relop
-    decl-fns
-    stmt-fns
-    expr-fns
-    ident-fns
-    type-fns
-    arg-fns
-    binop-fns
-    relop-fns
-    call-with-fns)
-  (import
-    (rnrs)
-    (elegant-weapons match)
-    (elegant-weapons compat)
-    (elegant-weapons helpers))
+#lang racket
 
-  (define indent (make-parameter 0))
-  (define (push-indent) (indent (+ (indent) 1)))
-  (define (pop-indent) (indent (- (indent) 1)))
+#|
+|#
 
-  (define-syntax indent-more
-    (syntax-rules ()
-      ((_ expr)
-       (parameterize ((indent (+ 1 (indent)))) expr))))
+(require "pgf.rkt" "util.rkt")
 
-  (define (indent-before str)
-    (let loop ((i (indent)))
-      (if (zero? i) str (string-append "    " (loop (- i 1))))))
+(define (join sep lst)
+  (string-join lst sep))
 
-  (define (format-sexp param)
-    (lambda (x)
-      (let loop ((x x) (fns (param)))
-        ((car fns) x (lambda (ft) (loop ft (cdr fns)))))))
+(define (ew-error sym msg v)
+  (error sym (string-append msg ": ~s") v))
 
-  (define-syntax call-with-fns
-    (syntax-rules ()
-      ((_ ((param fn) ...) body ...)
-       (parameterize ((param (cons fn (param))) ...)
-         body ...))))
+(define-match-expander produces
+  (syntax-rules ()
+    ((_ f pat)
+     (app f (and (? values) pat)))))
 
-  (define (print-c decl*)
-    (display (format-c decl*)))
+(define ew-indent (make-parameter 0))
 
-  (define (format-c decl*)
-    (let ((decl* (map format-decl decl*)))
-      (string-append (join "\n\n" decl*) "\n")))
-  
-  (define (format-decl-default decl _)
-    (match decl
-      ((include ,header)
-       (string-append "#include \"" header "\"\n\n"))
-      ((global ,type ,name ,args ...)
-       (string-append
-         (format-type type) " " (format-ident name)
-         (if (null? args)
-             ""
-             (string-append "(" (format-call-args args) ")"))
-         ";"))
-      ((func ,[format-type -> type] ,[format-ident -> name]
-         ,[format-args -> args] ,stmt* ...)
-       (string-append type " " name "(" args ")"
-                      (if (null? stmt*)
-                          ";\n"
-                          (string-append
-                           " {\n"
-                           (join "\n" (indent-more (map format-stmt stmt*)))
-                           "\n}\n"))))
-      ((extern ,[format-type -> type] ,[format-ident -> name]
-         (,[format-type -> args] ...))
-       (string-append type " " name "(" (join ", " args) ");\n"))
-      ((typedef ,[format-ident -> name] ,[format-type -> type])
-       (string-append "typedef " type " " name " ;\n"))
-      (,else (error 'format-decl "could not format" else))))
-  (define decl-fns (make-parameter `(,format-decl-default)))
-  (define format-decl (format-sexp decl-fns))
-  
-  (define (format-stmt-default stmt _)
-    (match stmt
-      ((begin ,stmt* ...)
-       (string-append
-         (indent-before "{\n")
-         (join "\n" (indent-more (map format-stmt stmt*)))
-         "\n"
-         (indent-before "}")))
-      ((let ,[format-ident -> ident] (fixed-array ,[format-type -> type] ,i)
-            ,[format-expr -> expr])
-       (indent-before
-        (string-append type " " ident "[" (number->string i) "] = " expr ";")))
-      ((let ,[format-ident -> ident] ,[format-type -> type]
-            ,[format-expr -> expr])
-       (indent-before
-         (string-append type " " ident " = " expr ";")))
-      ((let ,[format-ident -> ident] ,[format-type -> type])
-       (indent-before
-        (string-append type " " ident ";")))
-      ((if ,[format-expr -> test] ,conseq)
-       (string-append
-         (indent-before (string-append "if(" test ")\n"))
-         (indent-more (format-stmt conseq))))
-      ((if ,[format-expr -> test] ,conseq ,alt)
-       (string-append
-         (indent-before (string-append "if(" test ")\n"))
-         (indent-more (format-stmt conseq))
-         "\n"
-         (indent-before "else\n")
-         (indent-more (format-stmt alt))))
-      ((return)
-       (indent-before (string-append "return;")))
-      ((return ,[format-expr -> expr])
-       (indent-before (string-append "return " expr ";")))
-      ((print ,[format-expr -> expr])
-       (indent-before (string-append "print(" expr ");")))
-      ((print ,[format-expr -> e] ,[format-expr -> op])
-       (indent-before (string-append "print(" e ", " op ");")))
-      ((set! ,[format-expr -> x] ,[format-expr -> v])
-       (indent-before
-         (string-append x " = " v ";")))
-      ((vector-set! ,[format-expr -> vec-expr]
-         ,[format-expr -> i-expr] ,[format-expr -> val-expr])
-       (indent-before
-         (string-append vec-expr "[" i-expr "] = " val-expr ";")))
-      ((goto ,name)
-       (indent-before (string-append "goto " (format-ident name) ";")))
-      ((label ,name)
-       (indent-before (string-append (format-ident name) ":")))
-      ((while ,[format-expr -> expr] ,stmt)
-       (string-append
-         (indent-before (string-append "while(" expr ")\n"))
-         (indent-more (format-stmt stmt))))
-      ((for (,[format-ident -> i]
-             ,[format-expr -> start]
-             ,[format-expr -> end])
-         ,stmt)
-       (string-append
-         (indent-before
-           (string-append
-             "for(int " i " = " start "; " i " < " end "; ++" i ")\n"))
-         (indent-more (format-stmt stmt))))
-      ((for (,[format-ident -> i]
-             ,[format-expr -> start]
-             ,[format-expr -> end]
-             ,[format-expr -> step])
-         ,stmt)
-       (string-append
-         (indent-before
-           (string-append
-             "for(int " i " = " start "; " i " < " end "; " i "= (" i " + " step "))\n"))
-         (indent-more (format-stmt stmt))))
-      ((do ,[format-expr -> e])
-       (indent-before (string-append e ";")))
-      (,else (error 'format-stmt "could not format" else))))
-  (define stmt-fns (make-parameter `(,format-stmt-default)))
-  (define format-stmt (format-sexp stmt-fns))
+(define (push-indent) (ew-indent (+ (ew-indent) 1)))
+(define (pop-indent) (ew-indent (- (ew-indent) 1)))
 
-  (define (format-expr-default expr _)
-    (match expr
-      ((empty-struct) "{0}")
-      ((field ,[obj] ,x)
-       (string-append obj "." (format-ident x)))
-      ((field ,[obj] ,x ,[format-type -> t])
-       (string-append obj "." (format-ident x) "<" t ">"))
-      ((if ,[format-expr -> test]
-           ,[format-expr -> conseq]
-           ,[format-expr -> alt])
-       (string-append "(" test ") ? (" conseq ") : (" alt ")"))
-      ((vector-ref ,[format-expr -> v]
-         ,[format-expr -> i])
-       (string-append v "[" i "]"))
-      ((sizeof ,[format-type -> t])
-       (string-append "sizeof(" t ")"))
-      ((deref ,[format-expr -> p])
-       (string-append "*" p))
-      ((cast ,[format-type -> t] ,[e])
-       (string-append "((" t ")(" e "))"))
-      ((addressof ,[format-expr -> e])
-       (string-append "(&(" e "))"))
-      ((,op ,[format-expr -> lhs] ,[format-expr -> rhs])
-       (guard (binop? op))
-       (string-append "(" lhs ") " (format-binop op) " (" rhs ")"))
-      ((,op ,[format-expr -> lhs] ,[format-expr -> rhs])
-       (guard (relop? op))
-       (string-append "(" lhs ") " (format-relop op) " (" rhs ")"))
-      ((not ,[format-expr -> lhs])
-       (string-append "!(" lhs ")"))
-      ((assert ,[format-expr -> expr])
-       (string-append "assert(" expr ")"))
-      ((bool ,b) (if (not b) "false" "true"))
-      ((var ,var) (format-ident var))
-      ((char ,c) (format-char-literal c))
-      ((int ,n) (number->string n))
-      ((u64 ,n) (number->string n))
-      ((str ,s) (string-append "\"" (escape-string-literal s) "\""))
-      ((float ,f) (number->string f))
-      ((c-expr ,x) (symbol->string x))
-      ((call ,[format-expr -> f] . ,[format-call-args -> args])
-       (string-append f "(" args ")"))
-      (,else (error 'format-expr "could not format" else))))
-  (define expr-fns (make-parameter `(,format-expr-default)))
-  (define format-expr (format-sexp expr-fns))
+(define-syntax indent-more
+  (syntax-rules ()
+    ((_ expr)
+     (parameterize ((ew-indent (+ 1 (ew-indent)))) expr))))
 
-  (define (mangle-ident x)
-    (let ((y ""))
-      (define (push c)
-        (set! y (string-append y c)))
-      (string-for-each
-       (lambda (c)
-         (case c
-           ((#\-) (push "$"))
-           ((#\$) (push "$$"))
-           ((#\.) (push "$_"))
-           ((#\$) (push "$$$"))
-           ((#\>) (push "$v"))
-           ((#\!) (push "$b"))
-           (else (push (string c)))))
-       x)
-      y))
-  
-  (define (format-ident-default ident _)
-    (unless (symbol? ident)
-      (error 'format-ident "could not format" ident))
-    (let ((reserved-words '(complex)))
-      (if (memq ident reserved-words)
-          (string-append "$$" (symbol->string ident))
-          (mangle-ident (symbol->string ident)))))
-  
-  (define ident-fns (make-parameter `(,format-ident-default)))
-  (define format-ident (format-sexp ident-fns))
+(define (indent-before str)
+  (let loop ((i (ew-indent)))
+    (if (zero? i) str (string-append "  " (loop (- i 1))))))
 
-  (define (format-type-default t _)
-    (match t
-      (u64 "uint64_t")
-      ((ptr ,[t])
-       (string-append t " __global *"))
-      ((ref ,[t])
-       (string-append t " &"))
-      ((const-ptr ,[t])
-       (string-append t " __global const *"))
-      ((fixed-array ,t ,i)
-       (error 'format-type-default
-              "Directly formatting fixed-size arrays is a bad idea."
-              `(fixed-array ,t ,i)))
-      ((struct (,[format-ident -> x] ,[t]) ...)
-       (string-append "struct {\n"
-                      (indent-more
-                       (join "" (map (lambda (x t)
-                                       (indent-before
-                                        (string-append t " " x ";\n")))
-                                     x t)))
-                      "}"))
-      ((union (,[format-ident -> x] ,[t]) ...)
-       (string-append "union {\n"
-                      (indent-more
-                       (join "" (map (lambda (x t)
-                                       (indent-before
-                                        (string-append t " " x ";\n")))
-                                     x t)))
-                      "}"))
-      ((,[t] ,[t*] ...)
-       (if (null? t*)
-           t
-           (string-append t "< " (join ", " t*) " >")))
-      (,x (guard (symbol? x))
-          (format-ident x))
-      (,else (error 'format-type "could not format" else))))
-  (define type-fns (make-parameter `(,format-type-default)))
-  (define format-type (format-sexp type-fns))
+(define* (format-c decl*)
+  (let ((decl* (map format-decl decl*)))
+    (string-append (join "\n\n" decl*) "\n")))
 
-  (define (format-args args)
-    (join ", " (map format-arg args)))
+(define (format-decl decl)
+  (match decl
+    ;; ((include ,header)
+    ;;  (string-append "#include \"" header "\"\n\n"))
+    ;; ((global ,type ,name ,args ...)
+    ;;  (string-append
+    ;;   (format-type type) " " (format-ident name)
+    ;;   (if (null? args)
+    ;;       ""
+    ;;       (string-append "(" (format-call-args args) ")"))
+    ;;   ";"))
+    ;; ((func ,[format-type . produces . type] ,[format-ident . produces . name]
+    ;;        ,[format-args . produces . args] ,stmt* ...)
+    ;;  (string-append type " " name "(" args ")"
+    ;;                 (if (null? stmt*)
+    ;;                     ";\n"
+    ;;                     (string-append
+    ;;                      " {\n"
+    ;;                      (join "\n" (indent-more (map format-stmt stmt*)))
+    ;;                      "\n}\n"))))
+    ;; ((extern ,[format-type . produces . type] ,[format-ident . produces . name]
+    ;;          (,[format-type . produces . args] ...))
+    ;;  (string-append type " " name "(" (join ", " args) ");\n"))
+    ;; ((typedef ,[format-ident . produces . name] ,[format-type . produces . type])
+    ;;  (string-append "typedef " type " " name " ;\n"))
+    (else (ew-error 'format-decl "could not format" else))))
 
-  (define (format-call-args args)
-    (join ", " (map format-expr args)))
-  
-  (define (format-arg-default arg _)
-    (match arg
-      ((,[format-ident -> x] ,[format-type -> t])
-       (string-append t " " x))
-      (,else (error 'format-arg "could not format" else))))
-  (define arg-fns (make-parameter `(,format-arg-default)))
-  (define format-arg (format-sexp arg-fns))
+(define (format-stmt stmt)
+  (match stmt
+    ;; ((begin ,stmt* ...)
+    ;;  (string-append
+    ;;   (indent-before "{\n")
+    ;;   (join "\n" (indent-more (map format-stmt stmt*)))
+    ;;   "\n"
+    ;;   (indent-before "}")))
+    ;; ((let ,[format-ident . produces . ident] (fixed-array ,[format-type . produces . type] ,i)
+    ;;       ,[format-expr . produces . expr])
+    ;;  (indent-before
+    ;;   (string-append type " " ident "[" (number->string i) "] = " expr ";")))
+    ;; ((let ,[format-ident . produces . ident] ,[format-type . produces . type]
+    ;;       ,[format-expr . produces . expr])
+    ;;  (indent-before
+    ;;   (string-append type " " ident " = " expr ";")))
+    ;; ((let ,[format-ident . produces . ident] ,[format-type . produces . type])
+    ;;  (indent-before
+    ;;   (string-append type " " ident ";")))
+    ;; ((if ,[format-expr . produces . test] ,conseq)
+    ;;  (string-append
+    ;;   (indent-before (string-append "if(" test ")\n"))
+    ;;   (indent-more (format-stmt conseq))))
+    ;; ((if ,[format-expr . produces . test] ,conseq ,alt)
+    ;;  (string-append
+    ;;   (indent-before (string-append "if(" test ")\n"))
+    ;;   (indent-more (format-stmt conseq))
+    ;;   "\n"
+    ;;   (indent-before "else\n")
+    ;;   (indent-more (format-stmt alt))))
+    ;; ((return)
+    ;;  (indent-before (string-append "return;")))
+    ;; ((return ,[format-expr . produces . expr])
+    ;;  (indent-before (string-append "return " expr ";")))
+    ;; ((print ,[format-expr . produces . expr])
+    ;;  (indent-before (string-append "print(" expr ");")))
+    ;; ((print ,[format-expr . produces . e] ,[format-expr . produces . op])
+    ;;  (indent-before (string-append "print(" e ", " op ");")))
+    ;; ((set! ,[format-expr . produces . x] ,[format-expr . produces . v])
+    ;;  (indent-before
+    ;;   (string-append x " = " v ";")))
+    ;; ((vector-set! ,[format-expr . produces . vec-expr]
+    ;;               ,[format-expr . produces . i-expr] ,[format-expr . produces . val-expr])
+    ;;  (indent-before
+    ;;   (string-append vec-expr "[" i-expr "] = " val-expr ";")))
+    ;; ((goto ,name)
+    ;;  (indent-before (string-append "goto " (format-ident name) ";")))
+    ;; ((label ,name)
+    ;;  (indent-before (string-append (format-ident name) ":")))
+    ;; ((while ,[format-expr . produces . expr] ,stmt)
+    ;;  (string-append
+    ;;   (indent-before (string-append "while(" expr ")\n"))
+    ;;   (indent-more (format-stmt stmt))))
+    ;; ((for (,[format-ident . produces . i]
+    ;;        ,[format-expr . produces . start]
+    ;;        ,[format-expr . produces . end])
+    ;;    ,stmt)
+    ;;  (string-append
+    ;;   (indent-before
+    ;;    (string-append
+    ;;     "for(int " i " = " start "; " i " < " end "; ++" i ")\n"))
+    ;;   (indent-more (format-stmt stmt))))
+    ;; ((for (,[format-ident . produces . i]
+    ;;        ,[format-expr . produces . start]
+    ;;        ,[format-expr . produces . end]
+    ;;        ,[format-expr . produces . step])
+    ;;    ,stmt)
+    ;;  (string-append
+    ;;   (indent-before
+    ;;    (string-append
+    ;;     "for(int " i " = " start "; " i " < " end "; " i "= (" i " + " step "))\n"))
+    ;;   (indent-more (format-stmt stmt))))
+    ;; ((do ,[format-expr . produces . e])
+    ;;  (indent-before (string-append e ";")))
+    (else (ew-error 'format-stmt "could not format" else))))
 
-  (define (format-binop-default op _)
-    (case op
-      ((bitwise-or) "|")
-      ((+) "+")
-      ((*) "*")
-      ((-) "-")
-      ((/) "/")
-      ((mod) "%")
-      (else (error 'format-binop "could not format" op))))
-  (define binop-fns (make-parameter `(,format-binop-default)))
-  (define format-binop (format-sexp binop-fns))
-  
-  (define (format-relop-default op _)
-    (case op
-      ((== =) "==")
-      ((<) "<")
-      ((>) ">")
-      ((<=) "<=")
-      ((>=) ">=")
-      (else (error 'format-relop "could not format" op))))
-  (define relop-fns (make-parameter `(,format-relop-default)))
-  (define format-relop (format-sexp relop-fns))
+(define (format-expr expr)
+  (match expr
+    ;; ((empty-struct) "{0}")
+    ;; ((field ,[obj] ,x)
+    ;;  (string-append obj "." (format-ident x)))
+    ;; ((field ,[obj] ,x ,[format-type . produces . t])
+    ;;  (string-append obj "." (format-ident x) "<" t ">"))
+    ;; ((if ,[format-expr . produces . test]
+    ;;      ,[format-expr . produces . conseq]
+    ;;      ,[format-expr . produces . alt])
+    ;;  (string-append "(" test ") ? (" conseq ") : (" alt ")"))
+    ;; ((vector-ref ,[format-expr . produces . v]
+    ;;              ,[format-expr . produces . i])
+    ;;  (string-append v "[" i "]"))
+    ;; ((sizeof ,[format-type . produces . t])
+    ;;  (string-append "sizeof(" t ")"))
+    ;; ((deref ,[format-expr . produces . p])
+    ;;  (string-append "*" p))
+    ;; ((cast ,[format-type . produces . t] ,[e])
+    ;;  (string-append "((" t ")(" e "))"))
+    ;; ((addressof ,[format-expr . produces . e])
+    ;;  (string-append "(&(" e "))"))
+    ;; ((,op ,[format-expr . produces . lhs] ,[format-expr . produces . rhs])
+    ;;  (guard (binop? op))
+    ;;  (string-append "(" lhs ") " (format-binop op) " (" rhs ")"))
+    ;; ((,op ,[format-expr . produces . lhs] ,[format-expr . produces . rhs])
+    ;;  (guard (relop? op))
+    ;;  (string-append "(" lhs ") " (format-relop op) " (" rhs ")"))
+    ;; ((not ,[format-expr . produces . lhs])
+    ;;  (string-append "!(" lhs ")"))
+    ;; ((assert ,[format-expr . produces . expr])
+    ;;  (string-append "assert(" expr ")"))
+    ;; ((bool ,b) (if (not b) "false" "true"))
+    ;; ((var ,var) (format-ident var))
+    ;; ((char ,c) (format-char-literal c))
+    ;; ((int ,n) (number->string n))
+    ;; ((u64 ,n) (number->string n))
+    ;; ((str ,s) (string-append "\"" (escape-string-literal s) "\""))
+    ;; ((float ,f) (number->string f))
+    ;; ((c-expr ,x) (symbol->string x))
+    ;; ((call ,[format-expr . produces . f] . ,[format-call-args . produces . args])
+    ;;  (string-append f "(" args ")"))
+    (else (ew-error 'format-expr "could not format" else))))
 
-  (define escape-string-literal
-    (lambda (s)
-      (if (zero? (string-length s))
-          ""
-          (string-append
-            (case (string-ref s 0)
-              ((#\newline) "\\n\"\n\"")
-              ((#\") "\\\"")
-              (else (string (string-ref s 0))))
-            (escape-string-literal
-              (substring s 1 (string-length s)))))))
+(require (only-in rnrs/base-6 string-for-each))
 
-  (define (format-char-literal c)
-    (string-append "'"
-                   (case c
-                     ((#\nul) "\\0")
-                     (else (string c)))
-                   "'"))
-  
-)
+(define (mangle-ident x)
+  (let ((y ""))
+    (define (push c)
+      (set! y (string-append y c)))
+    (string-for-each
+     (lambda (c)
+       (case c
+         ((#\-) (push "$"))
+         ((#\$) (push "$$"))
+         ((#\.) (push "$_"))
+         ((#\$) (push "$$$"))
+         ((#\>) (push "$v"))
+         ((#\!) (push "$b"))
+         (else (push (string c)))))
+     x)
+    y))
+
+(define (format-ident ident)
+  (unless (symbol? ident)
+    (ew-error 'format-ident "could not format" ident))
+  (let ((reserved-words '(complex)))
+    (if (memq ident reserved-words)
+        (string-append "$$" (symbol->string ident))
+        (mangle-ident (symbol->string ident)))))
+
+(define (format-type t)
+  (match t
+    ;; (u64 "uint64_t")
+    ;; ((ptr ,[t])
+    ;;  (string-append t " __global *"))
+    ;; ((ref ,[t])
+    ;;  (string-append t " &"))
+    ;; ((const-ptr ,[t])
+    ;;  (string-append t " __global const *"))
+    ;; ((fixed-array ,t ,i)
+    ;;  (ew-error 'format-type
+    ;;         "Directly formatting fixed-size arrays is a bad idea."
+    ;;         `(fixed-array ,t ,i)))
+    ;; ((struct (,[format-ident . produces . x] ,[t]) ...)
+    ;;  (string-append "struct {\n"
+    ;;                 (indent-more
+    ;;                  (join "" (map (lambda (x t)
+    ;;                                  (indent-before
+    ;;                                   (string-append t " " x ";\n")))
+    ;;                                x t)))
+    ;;                 "}"))
+    ;; ((union (,[format-ident . produces . x] ,[t]) ...)
+    ;;  (string-append "union {\n"
+    ;;                 (indent-more
+    ;;                  (join "" (map (lambda (x t)
+    ;;                                  (indent-before
+    ;;                                   (string-append t " " x ";\n")))
+    ;;                                x t)))
+    ;;                 "}"))
+    ;; ((,[t] ,[t*] ...)
+    ;;  (if (null? t*)
+    ;;      t
+    ;;      (string-append t "< " (join ", " t*) " >")))
+    ;; (,x (guard (symbol? x))
+    ;;     (format-ident x))
+    (else (ew-error 'format-type "could not format" else))))
+
+(define (format-args args)
+  (join ", " (map format-arg args)))
+
+(define (format-call-args args)
+  (join ", " (map format-expr args)))
+
+(define (format-arg arg)
+  (match arg
+    ;; ((,[format-ident . produces . x] ,[format-type . produces . t])
+    ;;  (string-append t " " x))
+    (else (ew-error 'format-arg "could not format" else))))
+
+(define (format-binop op)
+  (case op
+    ((bitwise-or) "|")
+    ((+) "+")
+    ((*) "*")
+    ((-) "-")
+    ((/) "/")
+    ((mod) "%")
+    (else (ew-error 'format-binop "could not format" op))))
+
+(define (format-relop op)
+  (case op
+    ((== =) "==")
+    ((<) "<")
+    ((>) ">")
+    ((<=) "<=")
+    ((>=) ">=")
+    (else (ew-error 'format-relop "could not format" op))))
+
+(define (escape-string-literal s)
+  (if (zero? (string-length s))
+      ""
+      (string-append
+       (case (string-ref s 0)
+         ((#\newline) "\\n\"\n\"")
+         ((#\") "\\\"")
+         (else (string (string-ref s 0))))
+       (escape-string-literal
+        (substring s 1 (string-length s))))))
+
+(define (format-char-literal c)
+  (string-append "'"
+                 (case c
+                   ((#\nul) "\\0")
+                   (else (string c)))
+                 "'"))
 
 #|
 
@@ -345,6 +300,8 @@ The contents of this file are derived from the print-c.scm file of
 Elegant Weapons. Any changes to this file are copyright University of
 Bergen and the authors, and the following license applies to this
 file.
+
+Copyright (c) 2013      University of Bergen
 
 Copyright (c) 2011-2013 The Trustees of Indiana University and Indiana
                         University Research and Technology
