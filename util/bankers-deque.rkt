@@ -77,18 +77,31 @@ concatenation and iteration.
   (check (Deque-lenf q) (Deque-f q) 
 	 (+ (Deque-lenr q) 1) (cons e (Deque-r q))))
 
+;; Push two elements, first to front, second to rear.
 (define* (dq-cons-f-r q e-f e-r)
   (check (+ (Deque-lenf q) 1) (cons e-f (Deque-f q))
 	 (+ (Deque-lenr q) 1) (cons e-r (Deque-r q))))
 
+(define-syntax-rule*
+  (define-with-default* (f q p ...) fail b ...)
+  (define* (f q p ... [default
+                       (thunk (raise-argument-error
+                               (quote f)
+                               "expected non-empty dq" q))])
+    (define (fail)
+      (if (procedure? default)
+          (default)
+          default))
+    b ...))
+
 ;; Returns the first element from the front, or failure-result if
 ;; none.
-(define* (dq-peek-f q (failure-result #f))
+(define-with-default* (dq-car-f q) was-empty
   (let ((lenf (Deque-lenf q))
         (lenr (Deque-lenr q)))
     (cond
      ((and (= lenf 0) (= lenr 0))
-      failure-result)
+      (was-empty))
 
      ;; Note that the invariant guarantees that both 'f' and 'r' are
      ;; non-empty if there are at least two elements in the queue. It
@@ -102,12 +115,12 @@ concatenation and iteration.
       (first (Deque-f q))))))
 
 ;; Returns the first element from the rear, or failure-result if none.
-(define* (dq-peek-r q (failure-result #f))
+(define-with-default* (dq-car-r q) was-empty
   (let ((lenf (Deque-lenf q))
         (lenr (Deque-lenr q)))
     (cond
      ((and (= lenf 0) (= lenr 0))
-      failure-result)
+      (was-empty))
 
      ((= lenr 0) 
       (first (Deque-f q)))
@@ -115,35 +128,34 @@ concatenation and iteration.
      (else 
       (first (Deque-r q))))))
 
-;; Drops the first element from the front. Does nothing if there isn't
-;; one.
-(define* (dq-tail-f q)
+;; Drops the first element from the front.
+(define-with-default* (dq-cdr-f q) was-empty
   (let ((lenf (Deque-lenf q))
         (lenr (Deque-lenr q)))
     (cond
-     ((and (= lenf 0) (= lenr 0)) q)
+     ((and (= lenf 0) (= lenr 0)) (was-empty))
      ((= lenr 0) dq-null)
      (else (check (- lenf 1) (rest (Deque-f q)) lenr (Deque-r q))))))
 
-;; Drops the first element from the rear. Does nothing if there isn't
-;; one.
-(define* (dq-tail-r q)
+;; Drops the first element from the rear.
+(define-with-default* (dq-cdr-r q) was-empty
   (let ((lenf (Deque-lenf q))
         (lenr (Deque-lenr q)))
     (cond
-     ((and (= lenf 0) (= lenr 0)) q)
+     ((and (= lenf 0) (= lenr 0)) (was-empty))
      ((= lenf 0) dq-null)
      (else (check lenf (Deque-f q) (- lenr 1) (rest (Deque-r q)))))))
 
 ;; Return first element from the front, plus all but the first element
-;; from the front. Same semantics as for (values (dq-peek-f q)
-;; (dq-tail-f q)), but more efficient.
-(define* (dq-pop-f q (failure-result #f))
+;; from the front. Roughly the same semantics as for (values
+;; (dq-car-f q) (dq-cdr-f q)), but more efficient. Note that here
+;; the failure result should be two values.
+(define-with-default* (dq-pop-f q) was-empty
   (let ((lenf (Deque-lenf q))
         (lenr (Deque-lenr q)))
     (cond
      ((and (= lenf 0) (= lenr 0)) 
-      (values failure-result q))
+      (was-empty))
      ((= lenf 0) 
       (values (first (Deque-r q)) dq-null))
      (else 
@@ -152,14 +164,13 @@ concatenation and iteration.
 		(check (- lenf 1) (rest f) lenr (Deque-r q))))))))
 
 ;; Return first element from the rear, plus all but the first element
-;; from the rear. Same semantics as for (values (dq-peek-r q)
-;; (dq-tail-r q)), but more efficient.
-(define* (dq-pop-r q (failure-result #f))
+;; from the rear.
+(define-with-default* (dq-pop-r q) was-empty
   (let ((lenf (Deque-lenf q))
         (lenr (Deque-lenr q)))
     (cond
      ((and (= lenf 0) (= lenr 0)) 
-      (values failure-result q))
+      (was-empty))
      ((= lenr 0) 
       (values (first (Deque-f q)) dq-null))
      (else 
