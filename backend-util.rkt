@@ -25,6 +25,12 @@
 (define* (string-underscorify s)
   (regexp-replace* #rx"[-]" s "_"))
 
+(define* (display-as-string x)
+  (format "~a" x))
+
+(define* (write-as-string x)
+  (format "~s" x))
+
 ;;; 
 ;;; IO
 ;;; 
