@@ -7,8 +7,10 @@ C++ back end.
 |#
 
 (require "ast-magnolisp.rkt"
+         "backend-util.rkt"
          "compiler-util.rkt" "strategy.rkt"
-         "util.rkt" "util/case.rkt")
+         "util.rkt" "util/case.rkt"
+         syntax/id-table)
 
 ;;; 
 ;;; reformatting
@@ -35,18 +37,118 @@ C++ back end.
   (exe-filter s '("/usr/bin/uncrustify" "-l" "cpp" "-q")))
 
 ;;; 
-;;; Elegant Weapons translation
+;;; C++ renaming
 ;;; 
 
-(require "backend-cxx-print.rkt")
+(define (string->exported-cxx-id o-s)
+  (define s o-s)
+  (set! s (regexp-replace #rx"[!?=]+$" s ""))
+  (set! s (string-underscorify s))
+  (when (or (regexp-match? #rx"^[^a-zA-Z_]" s)
+            (regexp-match? #rx"[^a-zA-Z0-9_]" s)
+            (= (string-length s) 0))
+    (error
+     'string->exported-cxx-id
+     "illegal name for a C++ export: ~s" o-s))
+  s)
+
+(define (string->internal-cxx-id s #:default [default #f])
+  (set! s (regexp-replace #rx"^[^a-zA-Z_]+" s ""))
+  (set! s (regexp-replace* #rx"[^a-zA-Z0-9_]+" s ""))
+  (if (and default (= (string-length s) 0))
+      default s))
+
+;; Renames Racket IDs to legal C++ symbols. Tracks renamings using a
+;; map. Does fairly "stable" renaming by limiting the context of
+;; locals to the function body.
+(define (cxx-rename ast-lst)
+  ;; We use (next-gensym r sym) with this to do numbering. All the
+  ;; global names are in this table. When visiting function bodies we
+  ;; update functionally.
+  (define r #hasheq())
+  ;; ID to symbol mappings are stored here. Handled similarly to the
+  ;; 'r' table.
+  (define id->sym (make-immutable-free-id-table))
+
+  ;; We must collect all top-level IDs (and decide on their C++ name)
+  ;; before renaming any locals.
+  (for-each
+   (lambda (ast)
+     (match ast
+       ((? CxxDefun?)
+        (define a (Ast-annos ast))
+        (define id (Def-id ast))
+        (assert (not (dict-has-key? id->sym id)))
+        (define export? (hash-ref a 'export #f))
+        (define orig-sym (syntax-e id))
+        (define orig-s (symbol->string orig-sym))
+        (define cand-s
+          (if export?
+              (string->exported-cxx-id orig-s)
+              (string->internal-cxx-id orig-s #:default "f")))
+        (define n-sym (string->symbol cand-s))
+        (set!-values (r n-sym) (next-gensym r n-sym))
+        (set! id->sym (dict-set id->sym id n-sym)))
+       (_ (void))))
+   ast-lst)
+
+  ;; Returns (values r ast).
+  (define (rw r ast)
+    (match ast
+      ((Var a id)
+       ;; The name for any variable reference should also have been
+       ;; decided upon. And at this late stage any references to
+       ;; built-in names should have been replaced as well.
+       (define sym (dict-ref id->sym id #f))
+       (unless sym
+         (error 'cxx-rename "unbound variable ~a (~s)"
+                (syntax-e id) id))
+       (values r (Var a sym)))
+      ((CxxDefun a id m t ps bs)
+       (define n-sym (dict-ref id->sym id))
+       (define-values (r- n-ast)
+         (rw-all r (CxxDefun a n-sym m t ps bs)))
+       (values r n-ast))
+      ((CxxParam a t id)
+       (assert (not (dict-has-key? id->sym id)))
+       (define orig-sym (syntax-e id))
+       (define orig-s (symbol->string orig-sym))
+       (define cand-s
+         (string->internal-cxx-id orig-s #:default "a"))
+       (define-values (n-r n-sym) (next-gensym r (string->symbol cand-s)))
+       (set! id->sym (dict-set id->sym id n-sym))
+       (values n-r (CxxParam a t n-sym)))
+      (else
+       (rw-all r ast))))
+
+  ;; Rewrites subterms of 'ast', updating 'r' in the process.
+  (define (rw-all r ast)
+    (let ((ast
+           (subterm-all
+            (lambda (ast)
+              (let-values (((sub-r ast) (rw r ast)))
+                (set! r sub-r)
+                ast))
+            ast)))
+      (values r ast)))
+
+  (define (rw-drop r ast)
+    (let-values (((r ast) (rw r ast)))
+      ast))
+  
+  (map (fix rw-drop r) ast-lst))
+
+;;; 
+;;; C++ translation
+;;; 
 
 (define (def-type ast)
   (annoless TypeName "int"))
 
 (define (id->ew id)
-  (symbol->string (syntax-e id)))
+  id)
 
-(define (ast->ew ast)
+(define (ast->cxx ast)
   ;;(writeln ast)
   (match ast
     ((Defun a id ps b)
@@ -55,22 +157,22 @@ C++ back end.
      (define modif (if export? "MGL_API" "MGLI_FUNC"))
      (CxxDefun a (id->ew id)
                (list modif) (def-type ast)
-               (map ast->ew ps)
-               (list (annoless CxxReturnOne (ast->ew b)))))
+               (map ast->cxx ps)
+               (list (annoless CxxReturnOne (ast->cxx b)))))
     ((Param a id)
      (CxxParam a (def-type ast) (id->ew id)))
     ((Var a id)
      (Var a (id->ew id)))
     ((Apply a (Var va f) es) ;; xxx need to deal with operators and parenthesization
-     (Apply a (Var va (id->ew f)) (map ast->ew es)))
+     (Apply a (Var va (id->ew f)) (map ast->cxx es)))
     ((Literal a d)
      (Literal a (syntax->datum d)))
     (else
      (unsupported ast))))
 
-(define (defs->ew defs)
+(define (defs->cxx defs)
   (map
-   ast->ew
+   ast->cxx
    (filter
     (negate Param?)
     (dict-values defs))))
@@ -79,7 +181,7 @@ C++ back end.
 ;;; driver routines
 ;;; 
 
-(require "backend-util.rkt")
+(require "backend-cxx-print.rkt")
 
 (define (get-suffix kind)
   (define tbl `((cc ".cpp")
@@ -101,8 +203,9 @@ C++ back end.
        (define filename (path-basename-as-string path))
        (define basename (path-basename-only-as-string filename))
        (define incl (annoless Include 'user (string-append basename "_config.hpp"))) ;; xxx for now, until we infer required includes
-       (define c-unit (cons incl (defs->ew defs))) ;; xxx not this simple, we actually also need type decl and prototype sections also
+       (define c-unit (cons incl (defs->cxx defs))) ;; xxx not this simple, we actually also need type decl and prototype sections also
        ;;(for-each writeln c-unit) (exit)
+       (set! c-unit (cxx-rename c-unit))
        (define s (format-c c-unit))
        ;; xxx uncrustify
        (write-generated-output

@@ -11,7 +11,7 @@
     (if (= num 0)
         sym
         (string->symbol
-         (string-append (symbol->string sym)
+         (string-append (symbol->string sym) "_"
                         (number->string num)))))
   (values (hash-set r sym (+ num 1)) n-sym))
 

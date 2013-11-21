@@ -54,7 +54,7 @@
                [format-type . produces . type]
                [format-params . produces . args] stmt*)
      (string-append (space-join (append modifs (list type)))
-                    " " name "(" args ")"
+                    " " (symbol->string name) "(" args ")"
                     (if (null? stmt*)
                         ";\n"
                         (string-append
@@ -176,7 +176,7 @@
     ;;  (string-append "!(" lhs ")"))
     ;; ((assert ,[format-expr . produces . expr])
     ;;  (string-append "assert(" expr ")"))
-    ((Var _ var) var)
+    ((Var _ var) (symbol->string var))
     ;; ((char ,c) (format-char-literal c))
     ((Literal _ (? number? n))
      (number->string n))
@@ -185,8 +185,8 @@
     ((Literal _ (? string? s))
      (string-append "\"" (escape-string-literal s) "\""))
     ;; ((c-expr ,x) (symbol->string x))
-    ((Apply _ (Var _ f) [format-args . produces . args])
-     (string-append f "(" args ")"))
+    ((Apply _ f [format-args . produces . args])
+     (string-append (format-expr f) "(" args ")"))
     (else (ew-error 'format-expr "could not format" else))))
 
 (require (only-in rnrs/base-6 string-for-each))
@@ -263,7 +263,7 @@
 (define (format-param arg)
   (match arg
     ((CxxParam _ [format-type . produces . t] x)
-     (string-append t " " x))
+     (string-append t " " (symbol->string x)))
     (else (ew-error 'format-param "could not format" else))))
 
 (define (format-binop op)
