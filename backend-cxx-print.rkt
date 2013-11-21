@@ -3,7 +3,8 @@
 #|
 |#
 
-(require "pgf.rkt" "util.rkt")
+(require "ast-magnolisp.rkt" "backend-util.rkt"
+         "pgf.rkt" "util.rkt")
 
 (define (join sep lst)
   (string-join lst sep))
@@ -36,24 +37,30 @@
 
 (define (format-decl decl)
   (match decl
-    ;; ((include ,header)
-    ;;  (string-append "#include \"" header "\"\n\n"))
+    ((struct* Include ([kind kind] [s header]))
+     (define-values (lq rq)
+       (if (eq? kind 'user)
+           (values "\"" "\"")
+           (values "<" ">")))
+     (string-append "#include " lq header rq "\n\n"))
     ;; ((global ,type ,name ,args ...)
     ;;  (string-append
     ;;   (format-type type) " " (format-ident name)
     ;;   (if (null? args)
     ;;       ""
-    ;;       (string-append "(" (format-call-args args) ")"))
+    ;;       (string-append "(" (format-params args) ")"))
     ;;   ";"))
-    ;; ((func ,[format-type . produces . type] ,[format-ident . produces . name]
-    ;;        ,[format-args . produces . args] ,stmt* ...)
-    ;;  (string-append type " " name "(" args ")"
-    ;;                 (if (null? stmt*)
-    ;;                     ";\n"
-    ;;                     (string-append
-    ;;                      " {\n"
-    ;;                      (join "\n" (indent-more (map format-stmt stmt*)))
-    ;;                      "\n}\n"))))
+    ((CxxDefun _ name modifs
+               [format-type . produces . type]
+               [format-params . produces . args] stmt*)
+     (string-append (space-join (append modifs (list type)))
+                    " " name "(" args ")"
+                    (if (null? stmt*)
+                        ";\n"
+                        (string-append
+                         " {\n"
+                         (join "\n" (indent-more (map format-stat stmt*)))
+                         "\n}\n"))))
     ;; ((extern ,[format-type . produces . type] ,[format-ident . produces . name]
     ;;          (,[format-type . produces . args] ...))
     ;;  (string-append type " " name "(" (join ", " args) ");\n"))
@@ -61,12 +68,12 @@
     ;;  (string-append "typedef " type " " name " ;\n"))
     (else (ew-error 'format-decl "could not format" else))))
 
-(define (format-stmt stmt)
+(define (format-stat stmt)
   (match stmt
     ;; ((begin ,stmt* ...)
     ;;  (string-append
     ;;   (indent-before "{\n")
-    ;;   (join "\n" (indent-more (map format-stmt stmt*)))
+    ;;   (join "\n" (indent-more (map format-stat stmt*)))
     ;;   "\n"
     ;;   (indent-before "}")))
     ;; ((let ,[format-ident . produces . ident] (fixed-array ,[format-type . produces . type] ,i)
@@ -83,18 +90,18 @@
     ;; ((if ,[format-expr . produces . test] ,conseq)
     ;;  (string-append
     ;;   (indent-before (string-append "if(" test ")\n"))
-    ;;   (indent-more (format-stmt conseq))))
+    ;;   (indent-more (format-stat conseq))))
     ;; ((if ,[format-expr . produces . test] ,conseq ,alt)
     ;;  (string-append
     ;;   (indent-before (string-append "if(" test ")\n"))
-    ;;   (indent-more (format-stmt conseq))
+    ;;   (indent-more (format-stat conseq))
     ;;   "\n"
     ;;   (indent-before "else\n")
-    ;;   (indent-more (format-stmt alt))))
+    ;;   (indent-more (format-stat alt))))
     ;; ((return)
     ;;  (indent-before (string-append "return;")))
-    ;; ((return ,[format-expr . produces . expr])
-    ;;  (indent-before (string-append "return " expr ";")))
+     ((CxxReturnOne _ [format-expr . produces . expr])
+      (indent-before (string-append "return " expr ";")))
     ;; ((print ,[format-expr . produces . expr])
     ;;  (indent-before (string-append "print(" expr ");")))
     ;; ((print ,[format-expr . produces . e] ,[format-expr . produces . op])
@@ -113,7 +120,7 @@
     ;; ((while ,[format-expr . produces . expr] ,stmt)
     ;;  (string-append
     ;;   (indent-before (string-append "while(" expr ")\n"))
-    ;;   (indent-more (format-stmt stmt))))
+    ;;   (indent-more (format-stat stmt))))
     ;; ((for (,[format-ident . produces . i]
     ;;        ,[format-expr . produces . start]
     ;;        ,[format-expr . produces . end])
@@ -122,7 +129,7 @@
     ;;   (indent-before
     ;;    (string-append
     ;;     "for(int " i " = " start "; " i " < " end "; ++" i ")\n"))
-    ;;   (indent-more (format-stmt stmt))))
+    ;;   (indent-more (format-stat stmt))))
     ;; ((for (,[format-ident . produces . i]
     ;;        ,[format-expr . produces . start]
     ;;        ,[format-expr . produces . end]
@@ -132,10 +139,10 @@
     ;;   (indent-before
     ;;    (string-append
     ;;     "for(int " i " = " start "; " i " < " end "; " i "= (" i " + " step "))\n"))
-    ;;   (indent-more (format-stmt stmt))))
+    ;;   (indent-more (format-stat stmt))))
     ;; ((do ,[format-expr . produces . e])
     ;;  (indent-before (string-append e ";")))
-    (else (ew-error 'format-stmt "could not format" else))))
+    (else (ew-error 'format-stat "could not format" else))))
 
 (define (format-expr expr)
   (match expr
@@ -169,16 +176,17 @@
     ;;  (string-append "!(" lhs ")"))
     ;; ((assert ,[format-expr . produces . expr])
     ;;  (string-append "assert(" expr ")"))
-    ;; ((bool ,b) (if (not b) "false" "true"))
-    ;; ((var ,var) (format-ident var))
+    ((Var _ var) var)
     ;; ((char ,c) (format-char-literal c))
-    ;; ((int ,n) (number->string n))
-    ;; ((u64 ,n) (number->string n))
-    ;; ((str ,s) (string-append "\"" (escape-string-literal s) "\""))
-    ;; ((float ,f) (number->string f))
+    ((Literal _ (? number? n))
+     (number->string n))
+    ((Literal _ (? boolean? b))
+     (if (not b) "false" "true"))
+    ((Literal _ (? string? s))
+     (string-append "\"" (escape-string-literal s) "\""))
     ;; ((c-expr ,x) (symbol->string x))
-    ;; ((call ,[format-expr . produces . f] . ,[format-call-args . produces . args])
-    ;;  (string-append f "(" args ")"))
+    ((Apply _ (Var _ f) [format-args . produces . args])
+     (string-append f "(" args ")"))
     (else (ew-error 'format-expr "could not format" else))))
 
 (require (only-in rnrs/base-6 string-for-each))
@@ -210,6 +218,7 @@
 
 (define (format-type t)
   (match t
+    ((TypeName _ (? string? s)) s)
     ;; (u64 "uint64_t")
     ;; ((ptr ,[t])
     ;;  (string-append t " __global *"))
@@ -245,17 +254,17 @@
     ;;     (format-ident x))
     (else (ew-error 'format-type "could not format" else))))
 
-(define (format-args args)
-  (join ", " (map format-arg args)))
+(define (format-params args)
+  (join ", " (map format-param args)))
 
-(define (format-call-args args)
+(define (format-args args)
   (join ", " (map format-expr args)))
 
-(define (format-arg arg)
+(define (format-param arg)
   (match arg
-    ;; ((,[format-ident . produces . x] ,[format-type . produces . t])
-    ;;  (string-append t " " x))
-    (else (ew-error 'format-arg "could not format" else))))
+    ((CxxParam _ [format-type . produces . t] x)
+     (string-append t " " x))
+    (else (ew-error 'format-param "could not format" else))))
 
 (define (format-binop op)
   (case op

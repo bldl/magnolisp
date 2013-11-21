@@ -28,6 +28,9 @@ Note quite sure if we should specify any #:phase for the identifier
 tables, but phase 0 would seem appropriate as all Magnolisp names are
 such.
 
+It is rather important for all Ast derived node types to be
+#:transparent.
+
 |#
 
 (require "ast-util.rkt" "compiler-util.rkt"
@@ -39,11 +42,20 @@ such.
 
 (define-ast-base* Ast)
 
+(define* (annoless typ . arg*)
+  (apply typ #hasheq() arg*))
+
 (define* (Ast-anno-ref ast k #:must (must #t))
   (let* ((annos (Ast-annos ast)))
     (if must
         (hash-ref annos k)
         (hash-ref annos k #f))))
+
+(define* (ast-anno-must ast k)
+  (Ast-anno-ref ast k #:must #t))
+
+(define* (ast-anno-maybe ast k)
+  (Ast-anno-ref ast k #:must #f))
 
 (define* (Ast-anno-set ast k v)
   (define old-annos (Ast-annos ast))
@@ -90,7 +102,7 @@ such.
 ;;; type expressions
 ;;; 
 
-(abstract-struct* Type Ast ())
+(abstract-struct* Type Ast () #:transparent)
 
 (define-ast* AnyT Type () #:singleton (#hasheq()))
 
@@ -126,7 +138,7 @@ such.
 (define-ast* Defun Def ((list-of-term params) (just-term body)))
 
 ;;; 
-;;; others
+;;; other Magnolisp
 ;;; 
 
 ;; 'defs' contains DefVar terms. Said bindings are not visible in
@@ -168,9 +180,6 @@ such.
 ;; Return statement.
 (define-ast* Return Ast ((list-of-term es)))
 
-;; Parenthesized expression.
-(define-ast* Parens Ast ((just-term e)))
-
 #|
 
 (define* (Var-from-stx id-stx)
@@ -180,6 +189,28 @@ such.
   (struct-copy Var ast (name n)))
 
 |#
+
+;;; 
+;;; C++
+;;;
+
+;; kind is either 'user or 'system.
+(define-ast* Include Ast ((no-term kind) (no-term s)))
+
+(define-ast* CxxDefun Def ((no-term modifs) (just-term rtype) (list-of-term params) (list-of-term ss)))
+
+(define-ast* CxxReturnNone Ast ())
+
+(define-ast* CxxReturnOne Ast ((just-term e)))
+
+(define-ast* CxxParam Def ((just-term t)))
+
+;; Parenthesized expression.
+(define-ast* Parens Ast ((just-term e)))
+
+(define-ast* UnaryOp Ast ((no-term op) (just-term e)))
+(define-ast* BinaryOp Ast ((no-term op) (just-term e1) (just-term e2)))
+(define-ast* TrinaryOp Ast ((no-term op) (just-term e1) (just-term e2) (just-term e3)))
 
 ;;; 
 ;;; sexp dumping

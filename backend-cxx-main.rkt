@@ -52,13 +52,31 @@ C++ back end.
 
 (require "backend-cxx-print.rkt")
 
+(define (def-type ast)
+  (annoless TypeName "int"))
+
+(define (id->ew id)
+  (symbol->string (syntax-e id)))
+
 (define (ast->ew ast)
+  ;;(writeln ast)
   (match ast
     ((Defun a id ps b)
      (define export? (hash-ref a 'export #f))
      ;; xxx need EW to support a modifier: "static" for locals, "MGL_API" for exports, and "MGLI_FUNC" for top-level internals (Lua-inspired naming)
      (define modif (if export? "MGL_API" "MGLI_FUNC"))
-     `(func int ,(syntax-e id) ,(map ast->ew ps) ,(ast->ew b)))
+     (CxxDefun a (id->ew id)
+               (list modif) (def-type ast)
+               (map ast->ew ps)
+               (list (annoless CxxReturnOne (ast->ew b)))))
+    ((Param a id)
+     (CxxParam a (def-type ast) (id->ew id)))
+    ((Var a id)
+     (Var a (id->ew id)))
+    ((Apply a (Var va f) es) ;; xxx need to deal with operators and parenthesization
+     (Apply a (Var va (id->ew f)) (map ast->ew es)))
+    ((Literal a d)
+     (Literal a (syntax->datum d)))
     (else
      (unsupported ast))))
 
@@ -94,10 +112,10 @@ C++ back end.
        (define path (path-add-suffix path-stem sfx))
        (define filename (path-basename-as-string path))
        (define basename (path-basename-only-as-string filename))
-       (define incl `(include ,(string-append basename "_config.hpp"))) ;; xxx for now, until we infer required includes
-       (define sexp (cons incl (defs->ew defs))) ;; xxx not this simple, we actually also need type decl and prototype sections also
-       (define msexp (list->mlist/rec sexp))
-       (define s (format-c msexp))
+       (define incl (annoless Include 'user (string-append basename "_config.hpp"))) ;; xxx for now, until we infer required includes
+       (define c-unit (cons incl (defs->ew defs))) ;; xxx not this simple, we actually also need type decl and prototype sections also
+       ;;(for-each writeln c-unit) (exit)
+       (define s (format-c c-unit))
        ;; xxx uncrustify
        (write-generated-output
         path stdout?
