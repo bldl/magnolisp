@@ -11,18 +11,6 @@ C++ back end.
          "util.rkt" "util/case.rkt")
 
 ;;; 
-;;; Scheme compatibility
-;;; 
-
-(require compatibility/mlist)
-
-;; A recursive version of list->mlist.
-(define (list->mlist/rec x)
-  (if (list? x)
-      (apply mlist (map list->mlist/rec x))
-      x))
-
-;;; 
 ;;; reformatting
 ;;; 
 
