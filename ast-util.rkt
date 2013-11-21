@@ -27,8 +27,13 @@ want to define the base node type using the provided macro.
 
 (define (ast-write v out mode)
   (define n (struct-symbol v))
-  (define fvs (cdr (struct->list v)))
-  (write (cons n fvs) out))
+  (define fvs (struct->list v #:on-opaque 'return-false))
+  (unless fvs
+    ;; Important not to 'write' v here, would lead to infinite
+    ;; recursion. For the same reason cannot pass #:on-opaque 'error
+    ;; to struct->list.
+    (error 'ast-write "non-opaque struct ~a" n))
+  (write (cons n (cdr fvs)) out))
 
 (define-syntax-rule* (define-ast-base* n more ...)
   (abstract-struct* n (annos)
