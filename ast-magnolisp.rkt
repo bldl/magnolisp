@@ -45,17 +45,13 @@ It is rather important for all Ast derived node types to be
 (define* (annoless typ . arg*)
   (apply typ #hasheq() arg*))
 
-(define* (Ast-anno-ref ast k #:must (must #t))
-  (let* ((annos (Ast-annos ast)))
-    (if must
-        (hash-ref annos k)
-        (hash-ref annos k #f))))
-
 (define* (ast-anno-must ast k)
-  (Ast-anno-ref ast k #:must #t))
+  (let* ((annos (Ast-annos ast)))
+    (hash-ref annos k)))
 
 (define* (ast-anno-maybe ast k)
-  (Ast-anno-ref ast k #:must #f))
+  (let* ((annos (Ast-annos ast)))
+    (hash-ref annos k #f)))
 
 (define* (Ast-anno-set ast k v)
   (define old-annos (Ast-annos ast))
@@ -65,7 +61,7 @@ It is rather important for all Ast derived node types to be
 (define-with-contract*
   (-> Ast? (or/c syntax? #f))
   (Ast-stx ast)
-  (define stx (Ast-anno-ref ast 'stx #:must #f))
+  (define stx (ast-anno-maybe ast 'stx))
   ;;(when stx (writeln `(origin ,stx ,(syntax-property stx 'origin))))
   stx)
 

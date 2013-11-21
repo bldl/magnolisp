@@ -239,7 +239,7 @@ would have done. Still retains correct scoping and evaluation order.
   (define (redefinition id old-def new-stx)
     (error 'parse-defs-from-module
            "redefinition of ~a: ~a and ~a"
-           id (Ast-anno-ref old-def 'stx) new-stx))
+           id (ast-anno-must old-def 'stx) new-stx))
 
   (define (check-redefinition id new-stx)
     (when-let old-def (get-def-in-mod id)

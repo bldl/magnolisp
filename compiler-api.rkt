@@ -100,7 +100,7 @@ external dependencies for the program/library, as well as the .cpp and
   
   (for (((id def) (in-dict defs)))
     (assert (Def? def))
-    (define b (Ast-anno-ref def 'build #:must #f))
+    (define b (ast-anno-maybe def 'build))
     (when b (add! id b)))
   
   lst)
@@ -180,7 +180,7 @@ external dependencies for the program/library, as well as the .cpp and
     (lambda (ast)
       (when (Var? ast)
         (define var-id (Var-id ast))
-        (define def-id (Ast-anno-ref ast 'def-id #:must #f))
+        (define def-id (ast-anno-maybe ast 'def-id))
         (writeln (list ast (identifier-binding var-id) def-id)))))
    def)) 
 
@@ -191,7 +191,7 @@ external dependencies for the program/library, as well as the .cpp and
   ((topdown-visit
     (lambda (ast)
       (when (Var? ast)
-        (define def-id (Ast-anno-ref ast 'def-id #:must #f))
+        (define def-id (ast-anno-maybe ast 'def-id))
         (when def-id
           (dict-set! defs def-id #t)))))
    def)
@@ -232,7 +232,7 @@ external dependencies for the program/library, as well as the .cpp and
   
   (define (rw-def def)
     (define (get-mod)
-      (define r-mp (Ast-anno-ref def 'r-mp))
+      (define r-mp (ast-anno-must def 'r-mp))
       (values r-mp (hash-ref mods r-mp)))
 
     (define (get-mod-for-id stx)
@@ -294,7 +294,7 @@ external dependencies for the program/library, as well as the .cpp and
       ;;(writeln (list 'resolved-var ast 'reference id 'binding b 'module (syntax-source-module id) 'bound-to def-id))
       (when def-id
         (set! ast (Ast-anno-set ast 'def-id def-id))
-        ;;(writeln `(def-id ,(Ast-anno-ref ast 'def-id)))
+        ;;(writeln `(def-id ,(ast-anno-must ast 'def-id)))
         )
       ast)
   
@@ -338,7 +338,7 @@ external dependencies for the program/library, as well as the .cpp and
   (dict-for-each
    defs
    (lambda (id def)
-     (when (Ast-anno-ref def 'top #:must #f)
+     (when (ast-anno-maybe def 'top)
        (set! sym-def (hash-set sym-def (syntax-e id) def)))))
   sym-def)
 
