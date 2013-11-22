@@ -3,7 +3,7 @@
 #|
 
 This is a basic Stratego-inspired term rewriting library for
-Racket.
+Racket. http://strategoxt.org/
 
 Everything here apart from failure values and 'one', 'some', and 'all'
 strategies are generic, and some of those are also implemented in
@@ -30,7 +30,12 @@ for bottom-up traversals.) We can simply instead choose the subtrees
 we do want to visit, for now, by using lower-level operations.
 Breaking is easy for visits (but not for rewrites), as one can just
 record an escape continuation for the visit. If required, it can be
-recorded in a dynamically scoped global variable.
+recorded in a dynamically scoped variable.
+
+Mutable, closed over variables may be used to hold dynamic rules in
+the sense of Stratego. Something like the dynamic rule scope construct
+in turn can be achieved through the use of parameters. See Bravenboer
+et al: Program Transformation with Scoped Dynamic Rewrite Rules (2005).
 
 |#
 
@@ -202,3 +207,16 @@ recorded in a dynamically scoped global variable.
 (define* innermost
   (rec again s
        (bottomup (try (seq s again)))))
+
+;;; 
+;;; Dynamic rule scope.
+;;; 
+
+;; x ... must be defined as parameters, so that they are visible to
+;; all the relevant strategies. This combinator restores x ... to
+;; their previous values after the strategy s has been executed.
+(define-syntax-rule*
+  (scoped ((x v) ...) s)
+  (lambda (ast)
+    (parameterize ((x v) ...)
+      (s ast))))
