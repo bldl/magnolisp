@@ -45,6 +45,9 @@ It is rather important for all Ast derived node types to be
 (define* (annoless typ . arg*)
   (apply typ #hasheq() arg*))
 
+(define* (syntaxed stx typ . arg*)
+  (apply typ (hasheq 'stx stx) arg*))
+
 (define* (ast-anno-must ast k)
   (let* ((annos (Ast-annos ast)))
     (hash-ref annos k)))
