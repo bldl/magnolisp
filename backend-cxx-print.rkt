@@ -35,6 +35,16 @@
   (let ((decl* (map format-decl decl*)))
     (string-append (join "\n\n" decl*) "\n")))
 
+(define (format-defun name modifs type args [stmt* null])
+  (string-append (space-join (append modifs (list type)))
+                 " " (symbol->string name) "(" args ")"
+                 (if (null? stmt*)
+                     ";\n"
+                     (string-append
+                      " {\n"
+                      (join "\n" (indent-more (map format-stat stmt*)))
+                      "\n}\n"))))
+
 (define (format-decl decl)
   (match decl
     ((struct* Include ([kind kind] [s header]))
@@ -43,24 +53,16 @@
            (values "\"" "\"")
            (values "<" ">")))
      (string-append "#include " lq header rq "\n\n"))
-    ;; ((global ,type ,name ,args ...)
-    ;;  (string-append
-    ;;   (format-type type) " " (format-ident name)
-    ;;   (if (null? args)
-    ;;       ""
-    ;;       (string-append "(" (format-params args) ")"))
-    ;;   ";"))
+    ((TlVerbatim _ s)
+     (string-append s "\n"))
     ((CxxDefun _ name modifs
                [format-type . produces . type]
                [format-params . produces . args] stmt*)
-     (string-append (space-join (append modifs (list type)))
-                    " " (symbol->string name) "(" args ")"
-                    (if (null? stmt*)
-                        ";\n"
-                        (string-append
-                         " {\n"
-                         (join "\n" (indent-more (map format-stat stmt*)))
-                         "\n}\n"))))
+     (format-defun name modifs type args stmt*))
+    ((Proto _ name modifs
+            [format-type . produces . type]
+            [format-params . produces . args])
+     (format-defun name modifs type args))
     ;; ((extern ,[format-type . produces . type] ,[format-ident . produces . name]
     ;;          (,[format-type . produces . args] ...))
     ;;  (string-append type " " name "(" (join ", " args) ");\n"))

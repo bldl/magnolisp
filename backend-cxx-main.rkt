@@ -145,37 +145,72 @@ C++ back end.
 (define (def-type ast)
   (annoless TypeName "int"))
 
-(define (id->ew id)
-  id)
+;; One of:
+;; 'public-prototypes
+;; 'private-types
+;; 'private-prototypes
+;; 'private-implementations
+(define cxx-kind (make-parameter #f))
+
+(define (cxx->partition ast)
+  ;;(writeln ast)
+  (match ast
+    ((CxxDefun a id m t ps bs)
+     ;; xxx 'foreign functions are always just dropped (no proto either)
+     (define export? (hash-ref a 'export #f))
+     (define proto? (memq (cxx-kind) '(public-prototypes private-prototypes)))
+     ;; "static" for locals, "MGL_API_" for exports, "MGL_" for
+     ;; non-exports, "FUNC" for function definitions, and "PROTO" for
+     ;; function prototypes (Lua-inspired naming).
+     (define modif
+       (string-append
+        (if export? "MGL_API_" "MGL_")
+        (if proto? "PROTO" "FUNC")))
+     (set! m (cons modif m))
+     (cond
+      ((eq? (cxx-kind) 'private-implementations)
+       (CxxDefun a id m t ps bs))
+      ((and proto?
+            (or (and export? (eq? (cxx-kind) 'public-prototypes))
+                (and (not export?) (eq? (cxx-kind) 'private-prototypes))))
+       (Proto a id m t ps))
+      (else #f)))
+    (else
+     (unsupported ast))))
+
+(define (defs->partition kind def-lst)
+  (filter
+   values
+   (parameterize ((cxx-kind kind))
+     (map cxx->partition def-lst))))
 
 (define (ast->cxx ast)
   ;;(writeln ast)
   (match ast
     ((Defun a id ps b)
      (define export? (hash-ref a 'export #f))
-     ;; xxx need EW to support a modifier: "static" for locals, "MGL_API" for exports, and "MGLI_FUNC" for top-level internals (Lua-inspired naming)
-     (define modif (if export? "MGL_API" "MGLI_FUNC"))
-     (CxxDefun a (id->ew id)
-               (list modif) (def-type ast)
+     (CxxDefun a id null (def-type ast)
                (map ast->cxx ps)
                (list (annoless CxxReturnOne (ast->cxx b)))))
     ((Param a id)
-     (CxxParam a (def-type ast) (id->ew id)))
+     (CxxParam a (def-type ast) id))
     ((Var a id)
-     (Var a (id->ew id)))
-    ((Apply a (Var va f) es) ;; xxx need to deal with operators and parenthesization
-     (Apply a (Var va (id->ew f)) (map ast->cxx es)))
+     ast)
+    ((Apply a f es) ;; xxx need to deal with operators and parenthesization
+     (Apply a f (map ast->cxx es)))
     ((Literal a d)
      (Literal a (syntax->datum d)))
     (else
      (unsupported ast))))
 
-(define (defs->cxx defs)
-  (map
-   ast->cxx
-   (filter
-    (negate Param?)
-    (dict-values defs))))
+(define (defs->cxx def-lst)
+  (filter
+   values
+   (map
+    ast->cxx
+    (filter
+     (negate Param?)
+     def-lst))))
 
 ;;; 
 ;;; driver routines
@@ -202,10 +237,14 @@ C++ back end.
        (define path (path-add-suffix path-stem sfx))
        (define filename (path-basename-as-string path))
        (define basename (path-basename-only-as-string filename))
-       (define incl (annoless Include 'user (string-append basename "_config.hpp"))) ;; xxx for now, until we infer required includes
-       (define c-unit (cons incl (defs->cxx defs))) ;; xxx not this simple, we actually also need type decl and prototype sections also
+       (define hh-incl (annoless Include 'user (path-basename-as-string (path-add-suffix path-stem (get-suffix 'hh)))))
+       (define config-incl (annoless Include 'user (string-append basename "_config.hpp"))) ;; xxx for now, until we infer required includes
+       (define def-lst (cxx-rename (defs->cxx (dict-values defs))))
+       (define c-unit
+         (append (list hh-incl config-incl)
+                 (defs->partition 'private-prototypes def-lst)
+                 (defs->partition 'private-implementations def-lst)))
        ;;(for-each writeln c-unit) (exit)
-       (set! c-unit (cxx-rename c-unit))
        (define s (format-c c-unit))
        ;; xxx uncrustify
        (write-generated-output

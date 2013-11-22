@@ -198,6 +198,10 @@ It is rather important for all Ast derived node types to be
 
 (define-ast* CxxDefun Def ((no-term modifs) (just-term rtype) (list-of-term params) (list-of-term ss)))
 
+;; A C++ function prototype declaration. No body, and some modifiers
+;; may have to be different to the function definition.
+(define-ast* Proto Def ((no-term modifs) (just-term rtype) (list-of-term params)))
+
 (define-ast* CxxReturnNone Ast ())
 
 (define-ast* CxxReturnOne Ast ((just-term e)))
@@ -210,6 +214,9 @@ It is rather important for all Ast derived node types to be
 (define-ast* UnaryOp Ast ((no-term op) (just-term e)))
 (define-ast* BinaryOp Ast ((no-term op) (just-term e1) (just-term e2)))
 (define-ast* TrinaryOp Ast ((no-term op) (just-term e1) (just-term e2) (just-term e3)))
+
+;; Top-level verbatim string.
+(define-ast* TlVerbatim Ast ((no-term s)))
 
 ;;; 
 ;;; sexp dumping
