@@ -228,6 +228,7 @@ C++ back end.
   (values (second p)))
 
 (define* (generate-cxx-file kinds defs path-stem stdout? banner?)
+  (define def-lst (cxx-rename (defs->cxx (dict-values defs))))
   (set-for-each
    kinds
    (lambda (kind)
@@ -238,10 +239,8 @@ C++ back end.
        (define filename (path-basename-as-string path))
        (define basename (path-basename-only-as-string filename))
        (define hh-incl (annoless Include 'user (path-basename-as-string (path-add-suffix path-stem (get-suffix 'hh)))))
-       (define config-incl (annoless Include 'user (string-append basename "_config.hpp"))) ;; xxx for now, until we infer required includes
-       (define def-lst (cxx-rename (defs->cxx (dict-values defs))))
        (define c-unit
-         (append (list hh-incl config-incl)
+         (append (list hh-incl)
                  (defs->partition 'private-prototypes def-lst)
                  (defs->partition 'private-implementations def-lst)))
        ;;(for-each writeln c-unit) (exit)
@@ -253,7 +252,30 @@ C++ back end.
          (when banner?
            (display-banner "//" filename))
          (display s))))
+      ((eq? kind 'hh)
+       (define sfx (get-suffix kind))
+       (define path (path-add-suffix path-stem sfx))
+       (define filename (path-basename-as-string path))
+       (define basename (path-basename-only-as-string filename))
+       (define config-incl (annoless Include 'user (string-append basename "_config.hpp"))) ;; xxx for now, until we infer required includes
+       (define harness-begin (annoless TlVerbatim (string-append "#ifndef " (path-h-ifdefy filename))))
+       (define harness-end (annoless TlVerbatim "#endif"))
+       (define c-unit
+         (append (list harness-begin config-incl)
+                 (defs->partition 'public-prototypes def-lst)
+                 (list harness-end)))
+       ;;(for-each writeln c-unit) (exit)
+       (define s (format-c c-unit))
+       ;; xxx uncrustify
+       (write-generated-output
+        path stdout?
+        (thunk
+         (when banner?
+           (display-banner "//" filename))
+         (display s))))
       (else
-       ;; xxx 'hh to be supported
-       (unsupported kind)))))
+       (raise-argument-error
+        'generate-cxx-file
+        "set of 'cc or 'hh"
+        kinds)))))
   (void))

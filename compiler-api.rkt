@@ -609,4 +609,4 @@ external dependencies for the program/library, as well as the .cpp and
   (generate-files st (hasheq 'build
                              (seteq 'gnu-make 'qmake 'c 'ruby)
                              'cxx
-                             (seteq 'cc))))
+                             (seteq 'cc 'hh))))
