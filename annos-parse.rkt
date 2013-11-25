@@ -78,11 +78,12 @@ Routines for parsing annotation values into AST nodes.
     (syntax-parse name-stx
       #:context anno-stx
       (name:cxx-id
-       (NameT #'name))))
+       (syntaxed name-stx NameT #'name))))
   
   (syntax-parse anno-stx
-    ((_ (~datum fn) p-type ... r-type)
-     (FunT (map parse-name (syntax->list #'(p-type ...)))
-           (parse-name #'r-type)))
-    (name:id
-     (parse-name anno-stx))))
+    ((_ ((~datum fn) p-type ... r-type))
+     (syntaxed (cdr (syntax-e anno-stx))
+               FunT (map parse-name (syntax->list #'(p-type ...)))
+               (parse-name #'r-type)))
+    ((_ name:id)
+     (parse-name #'name))))

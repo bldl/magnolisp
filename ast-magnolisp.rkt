@@ -129,16 +129,16 @@ It is rather important for all Ast derived node types to be
   #:transparent)
 
 ;; Variable definition.
-(define-ast* DefVar Def ((just-term body)))
+(define-ast* DefVar Def ((just-term t) (just-term body)))
 
 ;; Syntax definition.
 (define-ast* DefStx Def ())
 
 ;; Function parameter declaration.
-(define-ast* Param Def ())
+(define-ast* Param Def ((just-term t)))
 
-;; Function declaration.
-(define-ast* Defun Def ((list-of-term params) (just-term body)))
+;; Function declaration. 't' is the return type, only.
+(define-ast* Defun Def ((just-term t) (list-of-term params) (just-term body)))
 
 ;;; 
 ;;; other Magnolisp
@@ -234,16 +234,16 @@ It is rather important for all Ast derived node types to be
 
 (define* (ast->sexp ast)
   (match ast
-    ((DefVar _ id v)
-     `(var ,(->symbol id) ,(ast->sexp v)))
+    ((DefVar _ id t v)
+     `(var ,(->symbol id) ,(ast->sexp t) ,(ast->sexp v)))
     ((DefStx _ id)
      `(define-syntax ,(->symbol id)))
-    ((Param _ id)
-     (->symbol id))
-    ((Defun a id ps b)
+    ((Param _ id t)
+     `(,(->symbol id) :: ,(ast->sexp t)))
+    ((Defun a id t ps b)
      (define export? (hash-ref a 'export #f))
      (define n (if export? 'function/export 'function))
-     `(,n (,(->symbol id) ,@(map ast->sexp ps))
+     `(,n (,(->symbol id) ,@(map ast->sexp ps) -> ,(ast->sexp t))
           ,(ast->sexp b)))
     ((or (Let a ds bs)
          (Letrec a ds bs))
@@ -266,6 +266,10 @@ It is rather important for all Ast derived node types to be
      (syntax->datum d))
     ((Apply _ f as)
      `(,(ast->sexp f) ,@(map ast->sexp as)))
+    ((NameT _ id)
+     (->symbol id))
+    ((AnyT _)
+     'unresolved)
     (_
      (unsupported ast))))
 

@@ -107,7 +107,7 @@ C++ back end.
        (define-values (r- n-ast)
          (rw-all r (CxxDefun a n-sym m t ps bs)))
        (values r n-ast))
-      ((CxxParam a t id)
+      ((CxxParam a id t)
        (assert (not (dict-has-key? id->sym id)))
        (define orig-sym (syntax-e id))
        (define orig-s (symbol->string orig-sym))
@@ -115,8 +115,8 @@ C++ back end.
          (string->internal-cxx-id orig-s #:default "a"))
        (define-values (n-r n-sym) (next-gensym r (string->symbol cand-s)))
        (set! id->sym (dict-set id->sym id n-sym))
-       (values n-r (CxxParam a t n-sym)))
-      (else
+       (values n-r (CxxParam a n-sym t)))
+      (_
        (rw-all r ast))))
 
   ;; Rewrites subterms of 'ast', updating 'r' in the process.
@@ -133,15 +133,24 @@ C++ back end.
   (define (rw-drop r ast)
     (let-values (((r ast) (rw r ast)))
       ast))
-  
-  (map (fix rw-drop r) ast-lst))
+
+  (define rw-type-refs
+    (topdown
+     (lambda (ast)
+       (match ast
+         ((NameT a id)
+          ;; xxx for now these are taken literally
+          (NameT a (syntax-e id)))
+         (_ ast)))))
+
+  (set! ast-lst (map (fix rw-drop r) ast-lst))
+  (set! ast-lst (map rw-type-refs ast-lst))
+  ;;(writeln ast-lst)
+  ast-lst)
 
 ;;; 
 ;;; C++ translation
 ;;; 
-
-(define (def-type ast)
-  (annoless NameT "int"))
 
 ;; One of:
 ;; 'public-prototypes
@@ -185,13 +194,13 @@ C++ back end.
 (define (ast->cxx ast)
   ;;(writeln ast)
   (match ast
-    ((Defun a id ps b)
+    ((Defun a id t ps b)
      (define export? (hash-ref a 'export #f))
-     (CxxDefun a id null (def-type ast)
+     (CxxDefun a id null t
                (map ast->cxx ps)
                (list (annoless CxxReturnOne (ast->cxx b)))))
-    ((Param a id)
-     (CxxParam a (def-type ast) id))
+    ((Param a id t)
+     (CxxParam a id (annoless RefT (annoless ConstT t))))
     ((Var a id)
      ast)
     ((Apply a f es) ;; xxx need to deal with operators and parenthesization

@@ -39,7 +39,8 @@ would have done. Still retains correct scoping and evaluation order.
 
 |#
 
-(require "ast-magnolisp.rkt"
+(require "annos-parse.rkt"
+         "ast-magnolisp.rkt"
          "compiler-util.rkt"
          (only-in "runtime.rkt" %core)
          (rename-in "strategy.rkt" [id id-rw])
@@ -252,12 +253,22 @@ would have done. Still retains correct scoping and evaluation order.
     (set! ann-h (hash-set* ann-h 'stx stx 'r-mp r-mp 'top global?))
     ;;(writeln `(annos for ,id-stx ,(hash-count ann-h)))
     ann-h)
+
+  (define (lookup-type id-stx)
+    (define (f)
+      (define anno-stx (dict-ref annos id-stx #f))
+      (and anno-stx
+           (let ((type-stx (hash-ref anno-stx 'type #f)))
+             (and type-stx
+                  (parse-type id-stx type-stx)))))
+    (or (f) the-AnyT))
   
   (define (make-DefVar ctx stx id-stx e-stx)
     (check-redefinition id-stx stx)
     (define ast (parse 'expr e-stx))
     (define ann-h (mk-annos ctx stx id-stx))
-    (define def (DefVar ann-h id-stx ast))
+    (define t (lookup-type id-stx))
+    (define def (DefVar ann-h id-stx t ast))
     (set-def-in-mod! id-stx def)
     def)
 
@@ -271,7 +282,7 @@ would have done. Still retains correct scoping and evaluation order.
   (define (make-Param ctx stx id-stx)
     (check-redefinition id-stx stx)
     (define ann-h (mk-annos ctx stx id-stx))
-    (define def (Param ann-h id-stx))
+    (define def (Param ann-h id-stx the-AnyT))
     (set-def-in-mod! id-stx def)
     def)
   

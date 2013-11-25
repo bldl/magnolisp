@@ -59,6 +59,8 @@ external dependencies for the program/library, as well as the .cpp and
      (values id (rw def)))))
 
 (define (de-racketize defs ast)
+  (define default-type (annoless NameT (datum->syntax #f 'int)))
+  
   (define rw
     (topdown
      (lambda (ast)
@@ -69,18 +71,38 @@ external dependencies for the program/library, as well as the .cpp and
           (define def (dict-ref defs id #f))
           ;; Base namespace names may be unresolved.
           (when def
-            (unless (matches? def (DefVar _ _ (? Lambda?)))
+            (unless (matches? def (DefVar _ _ _ (? Lambda?)))
               (raise-language-error/ast
                "application target does not name a function"
                ast e)))
           ast)
 
-         ((DefVar a1 n (Lambda a2 a b))
+         ((DefVar a1 n t (Lambda a2 p b))
           ;; Retain annos from the binding, which has any information
           ;; associated with the binding. It should also have the
           ;; declaration syntax corresponding to the function
           ;; definition.
-          (Defun a1 n a b))
+          (define-values (pt-lst rt)
+            (match t
+              ((AnyT _)
+               (values (map (const default-type) p) default-type))
+              ((FunT _ ps r)
+               (unless (= (length ps) (length p))
+                 (raise-language-error/ast
+                  "arity mismatch between function and its type"
+                  ast t))
+               (values ps r))
+              (_
+               (raise-language-error/ast
+                "expected function type"
+                ast t))))
+          (set! p (map
+                   (lambda (p t)
+                     (match p
+                       ((Param a n _)
+                        (Param a n t))))
+                   p pt-lst))
+          (Defun a1 n rt p b))
          
          (_ ast)))))
   (rw ast))

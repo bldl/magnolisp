@@ -219,15 +219,17 @@
         (mangle-ident (symbol->string ident)))))
 
 (define (format-type t)
+  ;;(writeln t)
   (match t
-    ((NameT _ (? string? s)) s)
+    ((NameT _ (? symbol? s))
+     (symbol->string s))
+    ((ConstT _ t)
+     (string-append (format-type t) " const"))
+    ((RefT _ t)
+     (string-append (format-type t) "&"))
     ;; (u64 "uint64_t")
     ;; ((ptr ,[t])
     ;;  (string-append t " __global *"))
-    ;; ((ref ,[t])
-    ;;  (string-append t " &"))
-    ;; ((const-ptr ,[t])
-    ;;  (string-append t " __global const *"))
     ;; ((fixed-array ,t ,i)
     ;;  (ew-error 'format-type
     ;;         "Directly formatting fixed-size arrays is a bad idea."
@@ -264,9 +266,9 @@
 
 (define (format-param arg)
   (match arg
-    ((CxxParam _ [format-type . produces . t] x)
-     (string-append t " " (symbol->string x)))
-    (else (ew-error 'format-param "could not format" else))))
+    ((CxxParam _ n [format-type . produces . t])
+     (string-append t " " (symbol->string n)))
+    (arg (ew-error 'format-param "could not format" arg))))
 
 (define (format-binop op)
   (case op
