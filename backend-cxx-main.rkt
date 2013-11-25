@@ -44,9 +44,7 @@ C++ back end.
   (define s o-s)
   (set! s (regexp-replace #rx"[!?=]+$" s ""))
   (set! s (string-underscorify s))
-  (when (or (regexp-match? #rx"^[^a-zA-Z_]" s)
-            (regexp-match? #rx"[^a-zA-Z0-9_]" s)
-            (= (string-length s) 0))
+  (unless (string-cxx-id? s)
     (error
      'string->exported-cxx-id
      "illegal name for a C++ export: ~s" o-s))

@@ -103,3 +103,8 @@
          #:continued continued
          #:constructor (lambda (s cs)
                          (exn:fail:language s cs exprs))))
+
+(define* (string-cxx-id? s)
+  (not (or (regexp-match? #rx"^[^a-zA-Z_]" s)
+           (regexp-match? #rx"[^a-zA-Z0-9_]" s)
+           (= (string-length s) 0))))

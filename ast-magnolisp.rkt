@@ -111,6 +111,10 @@ It is rather important for all Ast derived node types to be
 ;; 'ats' are the param types, and 'rt' is the return type
 (define-ast* FunT Type ((list-of-term ats) (just-term rt)))
 
+(define-ast* ConstT Type ((just-term t)))
+
+(define-ast* RefT Type ((just-term t)))
+
 ;;; 
 ;;; definitions
 ;;; 
