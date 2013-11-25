@@ -220,7 +220,7 @@
 
 (define (format-type t)
   (match t
-    ((TypeName _ (? string? s)) s)
+    ((NameT _ (? string? s)) s)
     ;; (u64 "uint64_t")
     ;; ((ptr ,[t])
     ;;  (string-append t " __global *"))

@@ -106,7 +106,7 @@ It is rather important for all Ast derived node types to be
 (define-ast* AnyT Type () #:singleton (#hasheq()))
 
 ;; 'name' is a symbol
-(define-ast* TypeName Type ((no-term name)))
+(define-ast* NameT Type ((no-term name)))
 
 ;; 'ats' are the param types, and 'rt' is the return type
 (define-ast* FunT Type ((list-of-term ats) (just-term rt)))

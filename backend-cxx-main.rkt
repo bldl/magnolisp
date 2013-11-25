@@ -143,7 +143,7 @@ C++ back end.
 ;;; 
 
 (define (def-type ast)
-  (annoless TypeName "int"))
+  (annoless NameT "int"))
 
 ;; One of:
 ;; 'public-prototypes
