@@ -59,3 +59,30 @@ Routines for parsing annotation values into AST nodes.
     (anno->datum h id-stx 'export #f boolean?
                  #:expect "boolean literal"))
   entry-point)
+
+;;; 
+;;; C++ types
+;;; 
+
+(require syntax/parse)
+
+(define-syntax-class cxx-id
+  #:description "C++ identifier"
+  (pattern name:id
+           #:fail-unless (string-cxx-id?
+                          (symbol->string
+                           (syntax-e #'name))) #f))
+
+(define* (parse-type id-stx anno-stx)
+  (define (parse-name name-stx)
+    (syntax-parse name-stx
+      #:context anno-stx
+      (name:cxx-id
+       (NameT #'name))))
+  
+  (syntax-parse anno-stx
+    ((_ (~datum fn) p-type ... r-type)
+     (FunT (map parse-name (syntax->list #'(p-type ...)))
+           (parse-name #'r-type)))
+    (name:id
+     (parse-name anno-stx))))
