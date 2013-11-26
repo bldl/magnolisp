@@ -41,6 +41,13 @@
         ((free-identifier=? k id-stx 0 0) `(free ,(syntax-e k)))
         (else #f)))))))
 
+(define-with-contract*
+  (-> identifier? identifier? boolean?)
+  (def-identifier=? id-1 id-2)
+  (free-identifier=?
+   (or (syntax-property id-1 'def-id) id-1)
+   (or (syntax-property id-2 'def-id) id-2)))
+
 (define* (form-get-name stx)
   (define x (syntax-e stx))
   (cond
