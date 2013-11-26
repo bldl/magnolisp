@@ -93,7 +93,7 @@
        (define s-num (length s-accessors))
        #`(let* ((n #,s-num)
                 (#,v e)
-                (t (type-of #,v))
+                (t (struct-type-of #,v))
                 (ctor (struct-type-make-constructor t))
                 (d-args (struct-flds-all-but n #,v)))
            (apply ctor #,@s-exprs d-args))))))

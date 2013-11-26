@@ -25,7 +25,7 @@ external dependencies for the program/library, as well as the .cpp and
 |#
 
 (require "annos-parse.rkt" "ast-magnolisp.rkt" "compiler-util.rkt"
-         "parse.rkt" "strategy.rkt" "util.rkt"
+         "parse.rkt" "strategy.rkt" "util.rkt" "util/struct.rkt"
          syntax/id-table syntax/moddep)
 
 ;;; 
@@ -197,14 +197,45 @@ external dependencies for the program/library, as well as the .cpp and
        (dict-set! all-defs id def))))
   all-defs)
 
+(define (get-def-id x)
+  (cond
+   ((identifier? x)
+    (syntax-property x 'def-id))
+   ((Def? x)
+    (syntax-property (Def-id x) 'def-id))
+   ((Var? x)
+    (syntax-property (Var-id x) 'def-id))
+   (else
+    (raise-argument-error
+     'get-def-id
+     "(or/c identifier? Def? Var?)"
+     x))))
+
+(define (set-def-id x def-id)
+  (cond
+   ((identifier? x)
+    (syntax-property x 'def-id def-id))
+   ((Def? x)
+    (define id (set-def-id (Def-id x) def-id))
+    (dynamic-struct-copy Def x (id id)))
+   ((Var? x)
+    (define id (set-def-id (Var-id x) def-id))
+    (struct-copy Var x (id id)))
+   (else
+    (raise-argument-error
+     'set-def-id
+     "(or/c identifier? Def? Var?)"
+     0 x def-id))))
+
 (define (def-display-Var-bindings def)
   ((topdown-visit
     (lambda (ast)
       (when (Var? ast)
         (define var-id (Var-id ast))
-        (define def-id (ast-anno-maybe ast 'def-id))
-        (writeln (list ast (identifier-binding var-id) def-id)))))
-   def)) 
+        (define def-id (get-def-id var-id))
+        (assert (or (not def-id) (def-identifier=? var-id def-id)))
+        (writeln (list (syntax-e var-id) ast (identifier-binding var-id) def-id)))))
+   def))
 
 ;; Currently only supports references to variable names, not to type
 ;; names.
@@ -213,7 +244,7 @@ external dependencies for the program/library, as well as the .cpp and
   ((topdown-visit
     (lambda (ast)
       (when (Var? ast)
-        (define def-id (ast-anno-maybe ast 'def-id))
+        (define def-id (get-def-id ast))
         (when def-id
           (dict-set! defs def-id #t)))))
    def)
@@ -249,6 +280,10 @@ external dependencies for the program/library, as well as the .cpp and
     (error 'syntax-source-resolve-module
            "unexpected syntax-source-module ~s for ~s" src stx))))
 
+;; Takes a free-id-table and module information, and returns an
+;; immutable-free-id-table with resolved Vars. I.e., sets 'def-id
+;; information into the Vars. This only affects Vars that resolve to
+;; definitions contained in the specified modules.
 (define (defs-resolve-Vars defs mods)
   ;;(pretty-print mods)
   
@@ -314,11 +349,9 @@ external dependencies for the program/library, as well as the .cpp and
         (error 'defs-resolve-Vars
                "unexpected identifier-binding: ~s" b)))
       ;;(writeln (list 'resolved-var ast 'reference id 'binding b 'module (syntax-source-module id) 'bound-to def-id))
-      (when def-id
-        (set! ast (Ast-anno-set ast 'def-id def-id))
-        ;;(writeln `(def-id ,(ast-anno-must ast 'def-id)))
-        )
-      ast)
+      (if def-id
+        (set-def-id ast def-id)
+        ast))
   
     (define rw
       (topdown
@@ -333,10 +366,9 @@ external dependencies for the program/library, as well as the .cpp and
    (values id (rw-def def))))
 
 ;; Drops all bindings from 'all-defs' that are not reachable via at
-;; least one of the entry points in 'eps'. This relies variable
-;; references (within the codebase) having been resolved. (Type
-;; references are not supported for the moment.) Returns the trimmed
-;; down definitions.
+;; least one of the entry points in 'eps'. This relies on name
+;; references (within the codebase) having been resolved. Returns the
+;; trimmed down definitions as a free-id-table.
 (define (defs-drop-unreachable all-defs eps)
   (define processed-defs (make-free-id-table #:phase 0))
   (let loop ((ids-to-process (dict-keys eps)))
@@ -550,7 +582,7 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-drop-unreachable all-defs eps))
   (set! all-defs (all-defs-de-racketize all-defs))
   
-  ;;(all-defs-display-Var-bindings all-defs)
+  (all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (list 'entry-points (dict-map eps (compose car cons))))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
@@ -627,7 +659,8 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-5-prog.rkt"))
+  (define st (compile-modules "test-6-prog.rkt"))
+  #;
   (generate-files st (hasheq 'build
                              (seteq 'gnu-make 'qmake 'c 'ruby)
                              'cxx
