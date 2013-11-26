@@ -40,8 +40,17 @@ C++ back end.
 ;;; C++ renaming
 ;;; 
 
+(define (translate-id-string s)
+  (when-let r (regexp-match #rx"^(.*)[?]$" s)
+    (set! s (string-append "is_" (second r))))
+  (when-let r (regexp-match #rx"^(.*)[=]$" s)
+    (set! s (string-append (second r) "_equal")))
+  (set! s (regexp-replace* #rx"->" s "_to_"))
+  s)  
+
 (define (string->exported-cxx-id o-s)
   (define s o-s)
+  (set! s (translate-id-string s))
   (set! s (regexp-replace #rx"[!?=]+$" s ""))
   (set! s (string-underscorify s))
   (unless (string-cxx-id? s)
@@ -52,6 +61,7 @@ C++ back end.
 
 (define (string->internal-cxx-id s #:default [default #f])
   (set! s (regexp-replace #rx"^[^a-zA-Z_]+" s ""))
+  (set! s (translate-id-string s))
   (set! s (regexp-replace* #rx"[^a-zA-Z0-9_]+" s ""))
   (if (and default (= (string-length s) 0))
       default s))
