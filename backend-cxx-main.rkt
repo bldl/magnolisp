@@ -258,6 +258,7 @@ C++ back end.
         (thunk
          (when banner?
            (display-banner "//" filename))
+         (display-generated-notice "//")
          (display s))))
       ((eq? kind 'hh)
        (define sfx (get-suffix kind))
@@ -279,6 +280,7 @@ C++ back end.
         (thunk
          (when banner?
            (display-banner "//" filename))
+         (display-generated-notice "//")
          (display s))))
       (else
        (raise-argument-error
