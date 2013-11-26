@@ -65,7 +65,7 @@ C++ back end.
   ;; update functionally.
   (define r #hasheq())
   ;; ID to symbol mappings are stored here. Handled similarly to the
-  ;; 'r' table.
+  ;; 'r' table. Use def-id to look up symbols from this table.
   (define id->sym (make-immutable-free-id-table))
 
   ;; We must collect all top-level IDs (and decide on their C++ name)
@@ -94,13 +94,15 @@ C++ back end.
   (define (rw r ast)
     (match ast
       ((Var a id)
-       ;; The name for any variable reference should also have been
+       ;; The name for any variable reference should already have been
        ;; decided upon. And at this late stage any references to
-       ;; built-in names should have been replaced as well.
-       (define sym (dict-ref id->sym id #f))
-       (unless sym
-         (error 'cxx-rename "unbound variable ~a (~s)"
+       ;; built-in names should have been translated as well.
+       (define def-id (get-def-id id))
+       (unless def-id
+         (error 'cxx-rename "unbound variable ~a: ~s"
                 (syntax-e id) id))
+       (define sym (dict-ref id->sym def-id #f))
+       (assert sym)
        (values r (Var a sym)))
       ((CxxDefun a id m t ps bs)
        (define n-sym (dict-ref id->sym id))

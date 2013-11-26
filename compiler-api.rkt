@@ -552,7 +552,7 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-drop-unreachable all-defs eps))
   (set! all-defs (all-defs-de-racketize all-defs))
   
-  (all-defs-display-Var-bindings all-defs)
+  ;;(all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (list 'entry-points (dict-map eps (compose car cons))))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
@@ -629,8 +629,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-6-prog.rkt"))
-  #;
+  (define st (compile-modules "test-5-prog.rkt"))
   (generate-files st (hasheq 'build
                              (seteq 'gnu-make 'qmake 'c 'ruby)
                              'cxx
