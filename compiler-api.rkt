@@ -197,36 +197,6 @@ external dependencies for the program/library, as well as the .cpp and
        (dict-set! all-defs id def))))
   all-defs)
 
-(define (get-def-id x)
-  (cond
-   ((identifier? x)
-    (syntax-property x 'def-id))
-   ((Def? x)
-    (syntax-property (Def-id x) 'def-id))
-   ((Var? x)
-    (syntax-property (Var-id x) 'def-id))
-   (else
-    (raise-argument-error
-     'get-def-id
-     "(or/c identifier? Def? Var?)"
-     x))))
-
-(define (set-def-id x def-id)
-  (cond
-   ((identifier? x)
-    (syntax-property x 'def-id def-id))
-   ((Def? x)
-    (define id (set-def-id (Def-id x) def-id))
-    (dynamic-struct-copy Def x (id id)))
-   ((Var? x)
-    (define id (set-def-id (Var-id x) def-id))
-    (struct-copy Var x (id id)))
-   (else
-    (raise-argument-error
-     'set-def-id
-     "(or/c identifier? Def? Var?)"
-     0 x def-id))))
-
 (define (def-display-Var-bindings def)
   ((topdown-visit
     (lambda (ast)
