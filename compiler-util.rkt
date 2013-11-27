@@ -41,6 +41,20 @@
         ((free-identifier=? k id-stx 0 0) `(free ,(syntax-e k)))
         (else #f)))))))
 
+(define* (global-id? id)
+  (and (identifier? id)
+       (not (eq? (identifier-binding id 0) 'lexical))))
+
+;; First argument should be a known global identifier to compare
+;; against. Matching is done at phase level 0.
+(define-with-contract*
+  (-> identifier? any/c boolean?)
+  (matches-global-id? g-id x)
+  (and (global-id? x)
+       (global-id? g-id)
+       (or (free-identifier=? g-id x 0 0)
+           (eq? (syntax-e g-id) (syntax-e x)))))
+
 (define-with-contract*
   (-> identifier? identifier? boolean?)
   (def-identifier=? id-1 id-2)

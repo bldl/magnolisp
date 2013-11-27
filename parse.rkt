@@ -205,6 +205,15 @@ would have done. Still retains correct scoping and evaluation order.
     (parse-raw-require-spec stx))
   raw-mp-h)
 
+(define (core-id? x)
+  (matches-global-id? #'%core x))
+
+(define-syntax-class core-id
+  (pattern x #:when (core-id? #'x)))
+
+(define (quote? x)
+  (matches-global-id? #'quote x))
+
 (define-with-contract*
   (-> syntax? immutable-id-table? resolve-module-path-result?
       (values immutable-id-table? id-table? (listof syntax?)))
@@ -256,9 +265,9 @@ would have done. Still retains correct scoping and evaluation order.
 
   (define (lookup-type id-stx)
     (define (f)
-      (define anno-stx (dict-ref annos id-stx #f))
-      (and anno-stx
-           (let ((type-stx (hash-ref anno-stx 'type #f)))
+      (define anno-h (dict-ref annos id-stx #f))
+      (and anno-h
+           (let ((type-stx (hash-ref anno-h 'type #f)))
              (and type-stx
                   (parse-type id-stx type-stx)))))
     (or (f) the-AnyT))
@@ -279,6 +288,21 @@ would have done. Still retains correct scoping and evaluation order.
     (set-def-in-mod! id-stx def)
     def)
 
+  (define (make-ForeignTypeDecl ctx stx id-stx)
+    (check-redefinition id-stx stx)
+    (define id-annos (dict-ref annos id-stx #f))
+    (define foreign-stx (and id-annos (hash-ref id-annos 'foreign #f)))
+    (unless foreign-stx
+      (raise-language-error
+       #f
+       "missing 'foreign' C++ type annotation"
+       stx))
+    (define cxx-t (parse-cxx-type id-stx foreign-stx))
+    (define ann-h (mk-annos ctx stx id-stx))
+    (define def (ForeignTypeDecl ann-h id-stx cxx-t))
+    (set-def-in-mod! id-stx def)
+    def)
+  
   (define (make-Param ctx stx id-stx)
     (check-redefinition id-stx stx)
     (define ann-h (mk-annos ctx stx id-stx))
@@ -301,6 +325,18 @@ would have done. Still retains correct scoping and evaluation order.
     (define e-stx-lst (syntax->list exprs-stx))
     (define e-ast-lst (map (fix parse ctx) e-stx-lst))
     (ctor stx b-ast-lst e-ast-lst))
+
+  (define (parse-define-value ctx stx id-stx e-stx)
+    ;;(writeln (list e-stx (syntax->datum e-stx)))
+    ;;(writeln (identifier-binding #'%core 0))
+    (kernel-syntax-case e-stx #f
+      ((#%plain-app c (q k))
+       (and (core-id? #'c)
+            (quote? #'q)
+            (eq? 'foreign-type (syntax-e #'k)))
+       (make-ForeignTypeDecl ctx stx id-stx))
+      (_
+       (make-DefVar ctx stx id-stx e-stx))))
   
   ;; 'ctx' is a symbolic name of the context that the 'stx' being
   ;; parsed is in. Inserts bindings into 'defs-in-mod' as a side effect.
@@ -351,7 +387,7 @@ would have done. Still retains correct scoping and evaluation order.
       ((define-values (id) e)
        (begin
          (assert (identifier? #'id))
-         (make-DefVar ctx stx #'id #'e)))
+         (parse-define-value ctx stx #'id #'e)))
 
       ;; We only support splitting of module top-level define-values,
       ;; for now. We do not support any top-level computation, so we

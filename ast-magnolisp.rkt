@@ -111,8 +111,10 @@ It is rather important for all Ast derived node types to be
 ;; 'ats' are the param types, and 'rt' is the return type
 (define-ast* FunT Type ((list-of-term ats) (just-term rt)))
 
+;; C++ only
 (define-ast* ConstT Type ((just-term t)))
 
+;; C++ only
 (define-ast* RefT Type ((just-term t)))
 
 ;;; 
@@ -139,6 +141,12 @@ It is rather important for all Ast derived node types to be
 
 ;; Function declaration. 't' is the return type, only.
 (define-ast* Defun Def ((just-term t) (list-of-term params) (just-term body)))
+
+;; 't' is a Magnolisp type expression.
+(define-ast* TypeAlias Def ((just-term t)))
+
+;; 'cxx-t' is a C++ type expression.
+(define-ast* ForeignTypeDecl Def ((just-term cxx-t)))
 
 ;;; 
 ;;; other Magnolisp

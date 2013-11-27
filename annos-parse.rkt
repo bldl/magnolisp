@@ -7,6 +7,7 @@ Routines for parsing annotation values into AST nodes.
 |#
 
 (require "ast-magnolisp.rkt" "compiler-util.rkt" "util.rkt")
+(require syntax/parse)
 
 ;;; 
 ;;; utilities
@@ -64,8 +65,6 @@ Routines for parsing annotation values into AST nodes.
 ;;; C++ types
 ;;; 
 
-(require syntax/parse)
-
 (define-syntax-class cxx-id
   #:description "C++ identifier"
   (pattern name:id
@@ -73,11 +72,21 @@ Routines for parsing annotation values into AST nodes.
                           (symbol->string
                            (syntax-e #'name))) #f))
 
+;; xxx for now we only support C++ type names - to support a range of type specifiers, such as pointer types
+(define* (parse-cxx-type id-stx anno-stx)
+  (syntax-parse anno-stx
+    ((_ name:cxx-id)
+     (syntaxed #'name NameT #'name))))
+
+;;; 
+;;; Magnolisp types
+;;; 
+
 (define* (parse-type id-stx anno-stx)
   (define (parse-name name-stx)
     (syntax-parse name-stx
       #:context anno-stx
-      (name:cxx-id
+      (name:id
        (syntaxed name-stx NameT #'name))))
   
   (syntax-parse anno-stx

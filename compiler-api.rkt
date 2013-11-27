@@ -520,6 +520,7 @@ external dependencies for the program/library, as well as the .cpp and
           ;;(pretty-print (syntax->datum pt))
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
+          ;;(pretty-print (dict->list defs)) (exit)
           (set! mod
                 (struct-copy Mod mod
                              (defs defs) (provs provs) (reqs reqs)))
@@ -629,7 +630,8 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-5-prog.rkt"))
+  (define st (compile-modules "test-2-prog.rkt"))
+  #;
   (generate-files st (hasheq 'build
                              (seteq 'gnu-make 'qmake 'c 'ruby)
                              'cxx

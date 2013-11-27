@@ -82,7 +82,19 @@ this code is not in Magnolisp, only for Magnolisp.
   (function-impl (f p ...) (a ...) b ...)
   (begin
     (define (f p ...) b ...)
-    (anno! f a ...)
-    ))
+    (anno! f a ...)))
 
 (define-annos-wrapper* function)
+
+(define-syntax typedef-impl
+  (syntax-rules ()
+    ((_ t (a ...))
+     (begin
+       (define t (%core 'foreign-type))
+       (anno! t a ...)))
+    ((_ t (a ...) v)
+     (begin
+       (define t (%core 'type-alias v))
+       (anno! t a ...)))))
+
+(define-annos-wrapper* typedef)
