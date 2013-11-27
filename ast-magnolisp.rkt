@@ -105,11 +105,15 @@ It is rather important for all Ast derived node types to be
 
 (define-ast* AnyT Type () #:singleton (#hasheq()))
 
-;; 'name' is a symbol
-(define-ast* NameT Type ((no-term name)))
+;; 'id' is an ID
+(define-ast* NameT Type ((no-term id)))
 
 ;; 'ats' are the param types, and 'rt' is the return type
 (define-ast* FunT Type ((list-of-term ats) (just-term rt)))
+
+;; C++ only;
+;; 'id' is an ID
+(define-ast* CxxNameT Type ((no-term id)))
 
 ;; C++ only
 (define-ast* ConstT Type ((just-term t)))
@@ -241,13 +245,15 @@ It is rather important for all Ast derived node types to be
    ((identifier? x)
     (syntax-property x 'def-id))
    ((Def? x)
-    (syntax-property (Def-id x) 'def-id))
+    (get-def-id (Def-id x)))
    ((Var? x)
-    (syntax-property (Var-id x) 'def-id))
+    (get-def-id (Var-id x)))
+   ((NameT? x)
+    (get-def-id (NameT-id x)))
    (else
     (raise-argument-error
      'get-def-id
-     "(or/c identifier? Def? Var?)"
+     "(or/c identifier? Def? Var? NameT?)"
      x))))
 
 (define-with-contract*
@@ -262,11 +268,29 @@ It is rather important for all Ast derived node types to be
    ((Var? x)
     (define id (set-def-id (Var-id x) def-id))
     (struct-copy Var x (id id)))
+   ((NameT? x)
+    (define id (set-def-id (NameT-id x) def-id))
+    (struct-copy NameT x (id id)))
    (else
     (raise-argument-error
      'set-def-id
-     "(or/c identifier? Def? Var?)"
+     "(or/c identifier? Def? Var? NameT?)"
      0 x def-id))))
+
+;;; 
+;;; names
+;;; 
+
+(define* (name-ref? ast)
+  (or (Var? ast) (NameT? ast)))
+
+(define-with-contract*
+  (-> Ast? identifier?)
+  (name-ref-id ast)
+  (cond
+   ((Var? ast) (Var-id ast))
+   ((NameT? ast) (NameT-id ast))
+   (else (unsupported ast))))
 
 ;;; 
 ;;; sexp dumping
@@ -314,10 +338,15 @@ It is rather important for all Ast derived node types to be
      `(,(ast->sexp f) ,@(map ast->sexp as)))
     ((NameT _ id)
      (->symbol id))
+    ((CxxNameT _ id)
+     `(C++ ,(->symbol id)))
     ((AnyT _)
      'unresolved)
+    ((ForeignTypeDecl _ id cxx-t)
+     `(typedef ,(->symbol id) ,(ast->sexp cxx-t)))
     (_
-     (unsupported ast))))
+     (raise-argument-error
+      'ast->sexp "supported Ast?" ast))))
 
 (define* (ast-pp ast)
   (pretty-print (ast->sexp ast)))

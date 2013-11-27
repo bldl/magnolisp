@@ -213,7 +213,7 @@ external dependencies for the program/library, as well as the .cpp and
   (define defs (make-free-id-table #:phase 0))
   ((topdown-visit
     (lambda (ast)
-      (when (Var? ast)
+      (when (name-ref? ast)
         (define def-id (get-def-id ast))
         (when def-id
           (dict-set! defs def-id #t)))))
@@ -251,10 +251,11 @@ external dependencies for the program/library, as well as the .cpp and
            "unexpected syntax-source-module ~s for ~s" src stx))))
 
 ;; Takes a free-id-table and module information, and returns an
-;; immutable-free-id-table with resolved Vars. I.e., sets 'def-id
-;; information into the Vars. This only affects Vars that resolve to
-;; definitions contained in the specified modules.
-(define (defs-resolve-Vars defs mods)
+;; immutable-free-id-table with resolve Var and NameT nodes. I.e.,
+;; sets 'def-id information into the nodes. This only affects name
+;; references that resolve to definitions contained in the specified
+;; modules.
+(define (defs-resolve-names defs mods)
   ;;(pretty-print mods)
   
   (define (rw-def def)
@@ -269,8 +270,8 @@ external dependencies for the program/library, as well as the .cpp and
           (values r-mp (hash-ref mods r-mp #f))
           (get-mod)))
 
-    (define (rw-var ast)
-      (define id (Var-id ast))
+    (define (rw-ref ast)
+      (define id (name-ref-id ast))
       ;; If 'lexical, we can look up by ID from containing Mod. If #f,
       ;; we should be able to look up by name from source Mod.
       ;; Otherwise there is a module binding, and we can say look it
@@ -284,19 +285,19 @@ external dependencies for the program/library, as well as the .cpp and
        ((not b)
         (define-values [mp mod] (get-mod-for-id id))
         (unless mod
-          (error 'defs-resolve-Vars
-                 "cannot determine module for unbound variable: ~s" id))
+          (error 'defs-resolve-names
+                 "cannot determine module for unbound reference: ~s" id))
         (define syms (Mod-syms mod))
         (define def (hash-ref syms (syntax-e id) #f))
         (unless def
-          (error 'defs-resolve-Vars
-                 "no definition in ~a for unbound variable: ~s" mp id))
+          (error 'defs-resolve-names
+                 "no definition in ~a for unbound reference: ~s" mp id))
         (set! def-id (Def-id def)))
        ((eq? b 'lexical)
         (define def (dict-ref defs id #f))
         (unless def
-          (error 'defs-resolve-Vars
-                 "undefined lexical variable reference: ~s" id))
+          (error 'defs-resolve-names
+                 "undefined lexical name reference: ~s" id))
         (set! def-id (Def-id def))
         (assert (free-identifier=? id def-id)))
        ((list? b)
@@ -310,13 +311,13 @@ external dependencies for the program/library, as well as the .cpp and
           (define syms (Mod-syms mod))
           (define def (hash-ref syms sym #f))
           (unless def
-            (error 'defs-resolve-Vars
-                   "no definition in ~a for module-level variable ~a: ~s"
+            (error 'defs-resolve-names
+                   "no definition in ~a for module-level name ~a: ~s"
                    r-mp sym id))
           (set! def-id (Def-id def))
           (assert (free-identifier=? id def-id))))
        (else
-        (error 'defs-resolve-Vars
+        (error 'defs-resolve-names
                "unexpected identifier-binding: ~s" b)))
       ;;(writeln (list 'resolved-var ast 'reference id 'binding b 'module (syntax-source-module id) 'bound-to def-id))
       (if def-id
@@ -326,7 +327,9 @@ external dependencies for the program/library, as well as the .cpp and
     (define rw
       (topdown
        (lambda (ast)
-         (if (Var? ast) (rw-var ast) ast))))
+         (if (name-ref? ast)
+             (rw-ref ast)
+             ast))))
 
     (rw def))
   
@@ -549,14 +552,14 @@ external dependencies for the program/library, as well as the .cpp and
   (set! mods (mods-fill-in-syms mods))
 
   (define all-defs (merge-defs mods))
-  (set! all-defs (defs-resolve-Vars all-defs mods))
+  (set! all-defs (defs-resolve-names all-defs mods))
+  (pretty-print (dict-map all-defs (lambda (x y) y)))
   (set! all-defs (defs-drop-unreachable all-defs eps))
   (set! all-defs (all-defs-de-racketize all-defs))
   
   ;;(all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (list 'entry-points (dict-map eps (compose car cons))))
-  ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
   (pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
