@@ -62,7 +62,9 @@
    (or (syntax-property id-1 'def-id) id-1)
    (or (syntax-property id-2 'def-id) id-2)))
 
-(define* (form-get-name stx)
+(define-with-contract*
+  (-> syntax? (or/c symbol? #f))
+  (form-get-name stx)
   (define x (syntax-e stx))
   (cond
    ((symbol? x) x)

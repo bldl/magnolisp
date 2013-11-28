@@ -69,9 +69,30 @@ It is rather important for all Ast derived node types to be
   stx)
 
 (define-with-contract*
-  (-> Ast? (or/c syntax? Ast?))
-  (Ast-displayable ast)
-  (or (Ast-stx ast) ast))
+  (-> (or/c syntax? Ast?) (or/c syntax? Ast?))
+  (ast-displayable ast)
+  (if (syntax? ast)
+      ast
+      (or (Ast-stx ast) ast)))
+
+(define-with-contract*
+  (-> (or/c syntax? Ast?) any/c)
+  (ast-displayable/datum ast)
+  (cond
+   ((syntax? ast) (syntax->datum ast))
+   ((Ast-stx ast) => syntax->datum)
+   (else ast)))
+
+(define-with-contract*
+  (-> (or/c syntax? Ast?) (or/c symbol? #f))
+  (form-get-name/ast x)
+  (cond
+   ((syntax? x)
+    (form-get-name x))
+   (else
+    (define stx (Ast-stx x))
+    (or (and stx (form-get-name stx))
+        (struct-symbol x)))))
 
 (define* not-magnolisp-message
   "incorrect Magnolisp")
@@ -80,21 +101,24 @@ It is rather important for all Ast derived node types to be
   (->* (string?)
        ((or/c Ast? syntax? #f) (or/c Ast? syntax? #f)
         (listof (or/c Ast? syntax?))
+        #:fields (listof list?)
         #:name (or/c symbol? #f))
        any)
   (raise-language-error/ast message
                             [ast #f]
                             [sub-ast #f]
                             [extra-sources null]
+                            #:fields [more-fields null]
                             #:name [fallback-name #f])
-  (define name (or (and (Ast? ast) (struct-symbol ast))
-                   (and (Ast? sub-ast) (struct-symbol sub-ast))
+  (define name (or (and ast (form-get-name/ast ast))
+                   (and sub-ast (form-get-name/ast sub-ast))
                    fallback-name))
-  (define expr (Ast-displayable ast))
-  (define sub-expr (Ast-displayable sub-ast))
-  (define extras (filter values (map Ast-stx extra-sources)))
+  (define expr (and ast (ast-displayable ast)))
+  (define sub-expr (and sub-ast (ast-displayable sub-ast)))
+  (define extras (filter values (map ast-displayable extra-sources)))
   (raise-language-error name message
                         expr sub-expr extras
+                        #:fields more-fields
                         #:continued not-magnolisp-message))
 
 ;;; 
@@ -107,6 +131,10 @@ It is rather important for all Ast derived node types to be
 
 ;; 'id' is an ID
 (define-ast* NameT Type ((no-term id)))
+
+;; these are always computed;
+;; for these, 'id' is also 'def-id'
+(define-ast* DefNameT NameT ())
 
 ;; 'ats' are the param types, and 'rt' is the return type
 (define-ast* FunT Type ((list-of-term ats) (just-term rt)))
@@ -248,6 +276,8 @@ It is rather important for all Ast derived node types to be
     (get-def-id (Def-id x)))
    ((Var? x)
     (get-def-id (Var-id x)))
+   ((DefNameT? x)
+    (NameT-id x))
    ((NameT? x)
     (get-def-id (NameT-id x)))
    (else
@@ -277,6 +307,13 @@ It is rather important for all Ast derived node types to be
      "(or/c identifier? Def? Var? NameT?)"
      0 x def-id))))
 
+(define* (get-def-id-or-fail x)
+  (define def-id (get-def-id x))
+  (unless def-id
+    (raise-language-error/ast
+     "reference to unbound name" x))
+  def-id)
+
 ;;; 
 ;;; names
 ;;; 
@@ -302,6 +339,11 @@ It is rather important for all Ast derived node types to be
    ((identifier? x) (syntax-e x))
    (else (unsupported x))))
 
+(define (?->symbol x)
+  (and x (->symbol x)))
+
+(define* show-bindings? (make-parameter #f))
+
 (define* (ast->sexp ast)
   (match ast
     ((DefVar _ id t v)
@@ -323,7 +365,9 @@ It is rather important for all Ast derived node types to be
     ((Begin _ bs)
      `(begin ,@(map ast->sexp bs)))
     ((Var _ id)
-     (->symbol id))
+     (if (show-bindings?)
+         `(Var ,(->symbol id) ~> ,(?->symbol (get-def-id id)))
+         (->symbol id)))
     ((Lambda _ ps b)
      `(lambda 
           (,@(map ast->sexp ps))
@@ -337,7 +381,9 @@ It is rather important for all Ast derived node types to be
     ((Apply _ f as)
      `(,(ast->sexp f) ,@(map ast->sexp as)))
     ((NameT _ id)
-     (->symbol id))
+     (if (show-bindings?)
+         `(NameT ,(->symbol id) ~> ,(?->symbol (get-def-id id)))
+         (->symbol id)))
     ((CxxNameT _ id)
      `(C++ ,(->symbol id)))
     ((AnyT _)

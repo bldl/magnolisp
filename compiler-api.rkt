@@ -107,8 +107,100 @@ external dependencies for the program/library, as well as the .cpp and
          (_ ast)))))
   (rw ast))
 
-(define (all-defs-de-racketize defs)
+(define (defs-de-racketize defs)
   ((make-for-all-defs (fix de-racketize defs)) defs))
+
+;;; 
+;;; type checking
+;;; 
+
+;; Takes an immutable-free-id-table containing just the program, and
+;; checks its types. Expects a fully typed program. 'defs' itself is
+;; used as the type environment. Returns nothing.
+(define (defs-type-check defs)
+  ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values defs))))
+  
+  (define (lookup x)
+    (assert (Var? x))
+    (define def-id (get-def-id-or-fail x))
+    (define def (dict-ref defs def-id))
+    (match def
+      ((DefVar _ _ t _)
+       t)
+      ((Param _ _ t)
+       t)
+      ((Defun _ _ r-t ps _)
+       (annoless FunT (map Param-t ps) r-t)) ;; xxx may be better for the Defun type to be a 'fn' type so do not need to reconstruct here
+      ((ForeignTypeDecl _ id _)
+       (syntaxed id DefNameT id))
+      ))
+  
+  (define (type=? x y)
+    (cond
+     ((AnyT? x) #t)
+     ((AnyT? y) #t)
+     ((and (NameT? x) (NameT? y))
+      (free-identifier=?
+       (get-def-id-or-fail x)
+       (get-def-id-or-fail y)))
+     ((and (FunT? x) (FunT? y))
+      (define x-rt (FunT-rt x))
+      (define y-rt (FunT-rt y))
+      (define x-ats (FunT-ats x))
+      (define y-ats (FunT-ats y))
+      (and (= (length x-ats) (length y-ats))
+           (type=? x-rt y-rt)
+           (andmap type=? x-ats y-ats)))
+     (else #f)))
+
+  (define (tc ast)
+    ;;(writeln `(tc ,ast))
+    (match ast
+      ((or (? ForeignTypeDecl?) (? Param?))
+       (void))
+      ((Defun _ id r-t ps b)
+       ;; xxx perhaps better to check arity correctness here
+       (define b-t (tc b))
+       (unless (type=? r-t b-t)
+         (raise-language-error/ast
+          "function return type does not match body expression"
+          #:fields (list (list "declared return type"
+                               (ast-displayable/datum r-t))
+                         (list "actual return type"
+                               (ast-displayable/datum b-t)))
+          ast b))
+       (void))
+      ((? Var?)
+       (lookup ast))
+      ((Apply _ f as)
+       (define f-t (lookup f))
+       (unless (FunT? f-t)
+         (raise-language-error/ast
+          "application of a non-function"
+          ast f))
+       (unless (= (length as) (length (FunT-ats f-t)))
+         (raise-language-error/ast
+          "function arity does not match number of arguments"
+          #:fields (list (list "function type" (ast-displayable f-t)))
+          ast))
+       (for ([e as] [p-t (FunT-ats f-t)])
+         (define e-t (tc e))
+         (unless (type=? p-t e-t)
+           (raise-language-error/ast
+            "parameter type does not match that of expression"
+            #:fields (list
+                      (list "parameter type" (ast-displayable p-t))
+                      (list "function type" (ast-displayable f-t)))
+            ast e)))
+       (FunT-rt f-t))
+      ((? Literal?)
+       the-AnyT) ;; for now, at least
+      (else
+       (raise-argument-error
+        'tc "supported Ast?" ast))))
+  
+  (for (((id def) (in-dict defs)))
+    (tc def)))
 
 ;;; 
 ;;; build options
@@ -553,9 +645,10 @@ external dependencies for the program/library, as well as the .cpp and
 
   (define all-defs (merge-defs mods))
   (set! all-defs (defs-resolve-names all-defs mods))
-  (pretty-print (dict-map all-defs (lambda (x y) y)))
+  ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
   (set! all-defs (defs-drop-unreachable all-defs eps))
-  (set! all-defs (all-defs-de-racketize all-defs))
+  (set! all-defs (defs-de-racketize all-defs))
+  (defs-type-check all-defs)
   
   ;;(all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
