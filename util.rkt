@@ -24,6 +24,10 @@
   (and (p x) ...))
 
 (define-syntax-rule*
+  (no-pred-holds p ... x)
+  (not (or (p x) ...)))
+
+(define-syntax-rule*
   (apply-values f-expr gen-expr)
   (call-with-values (thunk gen-expr) f-expr))
 

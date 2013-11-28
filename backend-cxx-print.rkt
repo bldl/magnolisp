@@ -221,7 +221,7 @@
 (define (format-type t)
   ;;(writeln t)
   (match t
-    ((NameT _ (? symbol? s))
+    ((CxxNameT _ (? symbol? s))
      (symbol->string s))
     ((ConstT _ t)
      (string-append (format-type t) " const"))

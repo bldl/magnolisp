@@ -150,9 +150,8 @@ C++ back end.
     (topdown
      (lambda (ast)
        (match ast
-         ((NameT a id)
-          ;; xxx for now these are taken literally
-          (NameT a (syntax-e id)))
+         ((CxxNameT a id)
+          (CxxNameT a (syntax-e id)))
          (_ ast)))))
 
   (set! ast-lst (map (fix rw-drop r) ast-lst))
@@ -203,33 +202,45 @@ C++ back end.
    (parameterize ((cxx-kind kind))
      (map cxx->partition def-lst))))
 
-(define (ast->cxx ast)
-  ;;(writeln ast)
-  (match ast
-    ((Defun a id t ps b)
-     (define export? (hash-ref a 'export #f))
-     (CxxDefun a id null t
-               (map ast->cxx ps)
-               (list (annoless CxxReturnOne (ast->cxx b)))))
-    ((Param a id t)
-     (CxxParam a id (annoless RefT (annoless ConstT t))))
-    ((Var a id)
-     ast)
-    ((Apply a f es) ;; xxx need to deal with operators and parenthesization
-     (Apply a f (map ast->cxx es)))
-    ((Literal a d)
-     (Literal a (syntax->datum d)))
-    (else
-     (unsupported ast))))
-
-(define (defs->cxx def-lst)
+(define (defs->cxx defs-t)
+  (define (ast->cxx ast)
+    ;;(writeln ast)
+    (match ast
+      ((Defun a id t ps b)
+       (define export? (hash-ref a 'export #f))
+       (CxxDefun a id null (ast->cxx t)
+                 (map ast->cxx ps)
+                 (list (annoless CxxReturnOne (ast->cxx b)))))
+      ((Param a id t)
+       (CxxParam a id (annoless RefT (annoless ConstT (ast->cxx t)))))
+      ((Var a id)
+       ast)
+      ((Apply a f es) ;; xxx need to deal with operators and parenthesization
+       (Apply a f (map ast->cxx es)))
+      ((Literal a d)
+       (Literal a (syntax->datum d)))
+      ((NameT _ id)
+       (define def-id (get-def-id id))
+       (unless def-id
+         (raise-language-error/ast
+          "reference to unbound type ID"
+          ast id))
+       (define def (dict-ref defs-t def-id))
+       (match def
+         ((ForeignTypeDecl _ _ cxx-t)
+          cxx-t)))
+      (else
+       (raise-argument-error
+        'ast->cxx "supported Ast?" ast))))
+  
   (filter
    values
    (map
     ast->cxx
     (filter
-     (negate Param?)
-     def-lst))))
+     (lambda (x)
+       (no-pred-holds Param? ForeignTypeDecl? x))
+     (dict-values defs-t)))))
 
 ;;; 
 ;;; driver routines
@@ -247,7 +258,7 @@ C++ back end.
   (values (second p)))
 
 (define* (generate-cxx-file kinds defs path-stem stdout? banner?)
-  (define def-lst (cxx-rename (defs->cxx (dict-values defs))))
+  (define def-lst (cxx-rename (defs->cxx defs)))
   (set-for-each
    kinds
    (lambda (kind)
