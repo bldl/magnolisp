@@ -22,9 +22,6 @@
      (when elemact (elemact elem)))
    lst))
 
-(define* (string-underscorify s)
-  (regexp-replace* #rx"[-]" s "_"))
-
 (define* (display-as-string x)
   (format "~a" x))
 

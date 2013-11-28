@@ -74,6 +74,9 @@
 (define* (path-basename-only-as-string fn)
   (path->string (path-basename-only fn)))
 
+(define* (string-underscorify s)
+  (regexp-replace* #rx"[-]" s "_"))
+
 (define* (symbolic-identifier=? a b)
   (eq? (syntax-e a) (syntax-e b)))
 

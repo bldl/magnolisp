@@ -75,6 +75,15 @@ Routines for parsing annotation values into AST nodes.
 ;; xxx for now we only support C++ type names - to support a range of type specifiers, such as pointer types
 (define* (parse-cxx-type id-stx anno-stx)
   (syntax-parse anno-stx
+    (name:id
+     (define s (symbol->string (syntax-e id-stx)))
+     (define cxx-s (string->maybe-cxx-id s))
+     (unless cxx-s
+       (raise-language-error
+        #f "cannot derive C++ name from Magnolisp name"
+        anno-stx))
+     (syntaxed #'name CxxNameT
+               (datum->syntax #f (string->symbol cxx-s))))
     ((_ name:cxx-id)
      (syntaxed #'name CxxNameT #'name))))
 

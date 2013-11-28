@@ -127,7 +127,40 @@
          #:constructor (lambda (s cs)
                          (exn:fail:language s cs exprs))))
 
+;;; 
+;;; C++ identifiers
+;;; 
+
 (define* (string-cxx-id? s)
   (not (or (regexp-match? #rx"^[^a-zA-Z_]" s)
            (regexp-match? #rx"[^a-zA-Z0-9_]" s)
            (= (string-length s) 0))))
+
+(define (translate-id-string s)
+  (when-let r (regexp-match #rx"^(.*)[?]$" s)
+    (set! s (string-append "is_" (second r))))
+  (when-let r (regexp-match #rx"^(.*)[=]$" s)
+    (set! s (string-append (second r) "_equal")))
+  (set! s (regexp-replace* #rx"->" s "_to_"))
+  s)  
+
+(define* (string->maybe-cxx-id s)
+  (set! s (translate-id-string s))
+  (set! s (regexp-replace #rx"[!?=]+$" s ""))
+  (set! s (string-underscorify s))
+  (and (string-cxx-id? s) s))
+
+(define* (string->exported-cxx-id o-s)
+  (define s (string->maybe-cxx-id o-s))
+  (unless s
+    (error
+     'string->exported-cxx-id
+     "illegal name for a C++ export: ~s" o-s))
+  s)
+
+(define* (string->internal-cxx-id s #:default [default #f])
+  (set! s (regexp-replace #rx"^[^a-zA-Z_]+" s ""))
+  (set! s (translate-id-string s))
+  (set! s (regexp-replace* #rx"[^a-zA-Z0-9_]+" s ""))
+  (if (and default (= (string-length s) 0))
+      default s))
