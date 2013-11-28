@@ -87,7 +87,7 @@ C++ back end.
         (define a (Ast-annos ast))
         (define id (Def-id ast))
         (assert (not (dict-has-key? id->sym id)))
-        (define export? (hash-ref a 'export #f))
+        (define export? (actual-export? a))
         (define orig-sym (syntax-e id))
         (define orig-s (symbol->string orig-sym))
         (define cand-s
@@ -175,7 +175,7 @@ C++ back end.
   (match ast
     ((CxxDefun a id m t ps bs)
      ;; xxx 'foreign functions are always just dropped (no proto either)
-     (define export? (hash-ref a 'export #f))
+     (define export? (actual-export? a))
      (define proto? (memq (cxx-kind) '(public-prototypes private-prototypes)))
      ;; "static" for locals, "MGL_API_" for exports, "MGL_" for
      ;; non-exports, "FUNC" for function definitions, and "PROTO" for
@@ -207,7 +207,6 @@ C++ back end.
     ;;(writeln ast)
     (match ast
       ((Defun a id t ps b)
-       (define export? (hash-ref a 'export #f))
        (CxxDefun a id null (ast->cxx (FunT-rt t))
                  (map ast->cxx ps)
                  (list (annoless CxxReturnOne (ast->cxx b)))))

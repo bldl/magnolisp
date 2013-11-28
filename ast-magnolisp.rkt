@@ -331,6 +331,19 @@ It is rather important for all Ast derived node types to be
    (else (unsupported ast))))
 
 ;;; 
+;;; exports
+;;; 
+
+(define* (actual-export? x)
+  (cond
+   ((hash? x) (hash-ref x 'actual-export #f))
+   ((Def? x) (ast-anno-maybe x 'actual-export))
+   (else
+    (raise-argument-error
+     'actual-export?
+     "(or/c hash? Def?)" x))))
+
+;;; 
 ;;; sexp dumping
 ;;; 
 

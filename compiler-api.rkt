@@ -448,6 +448,13 @@ external dependencies for the program/library, as well as the .cpp and
   ;;(pretty-print `(original-defs ,(dict-count all-defs) ,(dict-keys all-defs) retained-defs ,(dict-count processed-defs) ,(dict-keys processed-defs)))
   processed-defs)
 
+(define (defs-annotate-actual-exports! all-defs eps)
+  (for ([(id dummy) (in-dict eps)])
+    (define def (dict-ref all-defs id))
+    (define n-def (Ast-anno-set def 'actual-export #t))
+    (dict-set! all-defs id n-def))
+  (void))
+
 ;; Returns (and/c hash? hash-eq? immutable?).
 (define (build-sym-def-for-mod mod)
   (define defs (Mod-defs mod))
@@ -645,6 +652,7 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-resolve-names all-defs mods))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
   (set! all-defs (defs-drop-unreachable all-defs eps))
+  (defs-annotate-actual-exports! all-defs eps)
   (set! all-defs (defs-de-racketize all-defs))
   (defs-type-check all-defs)
   
