@@ -367,7 +367,7 @@ It is rather important for all Ast derived node types to be
     ((Param _ id t)
      (->symbol id))
     ((Defun a id t ps b)
-     (define export? (hash-ref a 'export #f))
+     (define export? (actual-export? a))
      `(function (,(->symbol id) ,@(map ast->sexp ps))
         #:annos ((type ,(ast->sexp t))
                  (export ,export?))

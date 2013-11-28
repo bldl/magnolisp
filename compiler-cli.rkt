@@ -54,7 +54,7 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
           (error 'command-line
                  "one of ~a as build include file, got ~s"
                  supported-tools kind))
-        (set! tools (hash-set tools k)))
+        (set! tools (set-add tools k)))
        #:args filename filename))
 
     (unless (null? fn-lst)
