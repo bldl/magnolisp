@@ -208,7 +208,7 @@ C++ back end.
     (match ast
       ((Defun a id t ps b)
        (define export? (hash-ref a 'export #f))
-       (CxxDefun a id null (ast->cxx t)
+       (CxxDefun a id null (ast->cxx (FunT-rt t))
                  (map ast->cxx ps)
                  (list (annoless CxxReturnOne (ast->cxx b)))))
       ((Param a id t)

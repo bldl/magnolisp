@@ -171,7 +171,7 @@ It is rather important for all Ast derived node types to be
 ;; Function parameter declaration.
 (define-ast* Param Def ((just-term t)))
 
-;; Function declaration. 't' is the return type, only.
+;; Function declaration. 't' is the function type.
 (define-ast* Defun Def ((just-term t) (list-of-term params) (just-term body)))
 
 ;; 't' is a Magnolisp type expression.
@@ -240,6 +240,7 @@ It is rather important for all Ast derived node types to be
 ;; kind is either 'user or 'system.
 (define-ast* Include Ast ((no-term kind) (no-term s)))
 
+;; 'rtype' is the return type, only.
 (define-ast* CxxDefun Def ((no-term modifs) (just-term rtype) (list-of-term params) (list-of-term ss)))
 
 ;; A C++ function prototype declaration. No body, and some modifiers
@@ -351,12 +352,13 @@ It is rather important for all Ast derived node types to be
     ((DefStx _ id)
      `(define-syntax ,(->symbol id)))
     ((Param _ id t)
-     `(,(->symbol id) :: ,(ast->sexp t)))
+     (->symbol id))
     ((Defun a id t ps b)
      (define export? (hash-ref a 'export #f))
-     (define n (if export? 'function/export 'function))
-     `(,n (,(->symbol id) ,@(map ast->sexp ps) -> ,(ast->sexp t))
-          ,(ast->sexp b)))
+     `(function (,(->symbol id) ,@(map ast->sexp ps))
+        #:annos ((type ,(ast->sexp t))
+                 (export ,export?))
+        ,(ast->sexp b)))
     ((or (Let a ds bs)
          (Letrec a ds bs))
      (define n (if (Let? ast) 'let 'letrec))
@@ -384,6 +386,8 @@ It is rather important for all Ast derived node types to be
      (if (show-bindings?)
          `(NameT ,(->symbol id) ~> ,(?->symbol (get-def-id id)))
          (->symbol id)))
+    ((FunT _ ats rt)
+     `(fn ,@(map ast->sexp ats) ,(ast->sexp rt)))
     ((CxxNameT _ id)
      `(C++ ,(->symbol id)))
     ((AnyT _)

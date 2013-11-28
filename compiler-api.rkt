@@ -59,8 +59,6 @@ external dependencies for the program/library, as well as the .cpp and
      (values id (rw def)))))
 
 (define (de-racketize defs ast)
-  (define default-type (annoless NameT (datum->syntax #f 'int)))
-  
   (define rw
     (topdown
      (lambda (ast)
@@ -84,8 +82,6 @@ external dependencies for the program/library, as well as the .cpp and
           ;; definition.
           (define-values (pt-lst rt)
             (match t
-              ((AnyT _)
-               (values (map (const default-type) p) default-type))
               ((FunT _ ps r)
                (unless (= (length ps) (length p))
                  (raise-language-error/ast
@@ -102,7 +98,7 @@ external dependencies for the program/library, as well as the .cpp and
                        ((Param a n _)
                         (Param a n t))))
                    p pt-lst))
-          (Defun a1 n rt p b))
+          (Defun a1 n t p b))
          
          (_ ast)))))
   (rw ast))
@@ -129,8 +125,8 @@ external dependencies for the program/library, as well as the .cpp and
        t)
       ((Param _ _ t)
        t)
-      ((Defun _ _ r-t ps _)
-       (annoless FunT (map Param-t ps) r-t)) ;; xxx may be better for the Defun type to be a 'fn' type so do not need to reconstruct here
+      ((Defun _ _ t ps _)
+       t)
       ((ForeignTypeDecl _ id _)
        (syntaxed id DefNameT id))
       ))
@@ -158,8 +154,10 @@ external dependencies for the program/library, as well as the .cpp and
     (match ast
       ((or (? ForeignTypeDecl?) (? Param?))
        (void))
-      ((Defun _ id r-t ps b)
-       ;; xxx perhaps better to check arity correctness here
+      ((Defun _ id t ps b)
+       ;; Type kind and arity correctness wrt parameters was already
+       ;; checked in creating Defun.
+       (define r-t (FunT-rt t))
        (define b-t (tc b))
        (unless (type=? r-t b-t)
          (raise-language-error/ast
