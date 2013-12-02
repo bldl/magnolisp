@@ -98,6 +98,8 @@ external dependencies for the program/library, as well as the .cpp and
                        ((Param a n _)
                         (Param a n t))))
                    p pt-lst))
+          (when (hash-ref a1 'foreign #f)
+            (set! b (annoless NoBody)))
           (Defun a1 n t p b))
          
          (_ ast)))))
@@ -158,7 +160,7 @@ external dependencies for the program/library, as well as the .cpp and
        ;; Type kind and arity correctness wrt parameters was already
        ;; checked in creating Defun.
        (define r-t (FunT-rt t))
-       (define b-t (tc b))
+       (define b-t (if (NoBody? b) r-t (tc b)))
        (unless (type=? r-t b-t)
          (raise-language-error/ast
           "function return type does not match body expression"

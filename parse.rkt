@@ -271,11 +271,21 @@ would have done. Still retains correct scoping and evaluation order.
              (and type-stx
                   (parse-type id-stx type-stx)))))
     (or (f) the-AnyT))
+
+  (define (maybe-parse-foreign-anno id-stx ann-h)
+    (define foreign-stx (hash-ref ann-h 'foreign #f))
+    (when foreign-stx
+      (define foreign-name (parse-cxx-name-anno foreign-stx))
+      (when foreign-name
+        (set! ann-h (hash-set ann-h 'foreign foreign-name))))
+    ann-h)
   
   (define (make-DefVar ctx stx id-stx e-stx)
     (check-redefinition id-stx stx)
     (define ast (parse 'expr e-stx))
     (define ann-h (mk-annos ctx stx id-stx))
+    (set! ann-h (maybe-parse-foreign-anno id-stx ann-h))
+    ;; xxx should parse export anno here, too, so that could check that it is not both export and foreign
     (define t (lookup-type id-stx))
     (define def (DefVar ann-h id-stx t ast))
     (set-def-in-mod! id-stx def)

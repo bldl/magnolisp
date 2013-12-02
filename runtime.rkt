@@ -78,12 +78,15 @@ this code is not in Magnolisp, only for Magnolisp.
        (define id-lst (syntax->list #'(ids ...)))
        #`(begin #,@(map decl-for-id id-lst))))))
 
-(define-syntax-rule
-  (function-impl (f p ...) (a ...) b ...)
-  (begin
-    (define (f p ...) b ...)
-    (anno! f a ...)))
-
+(define-syntax function-impl
+  (syntax-rules ()
+    ((_ (f p ...) (a ...))
+     (function-impl (f p ...) (a ...) (void)))
+    ((_ (f p ...) (a ...) b ...)
+     (begin
+       (define (f p ...) b ...)
+       (anno! f a ...)))))
+    
 (define-annos-wrapper* function)
 
 (define-syntax typedef-impl
@@ -92,7 +95,7 @@ this code is not in Magnolisp, only for Magnolisp.
      (begin
        (define t (%core 'foreign-type))
        (anno! t a ...)))
-    ((_ t (a ...) v)
+    #; ((_ t (a ...) v) ;; xxx to be supported
      (begin
        (define t (%core 'type-alias v))
        (anno! t a ...)))))

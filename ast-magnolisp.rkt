@@ -184,6 +184,9 @@ It is rather important for all Ast derived node types to be
 ;;; other Magnolisp
 ;;; 
 
+;; For functions with no Magnolisp body.
+(define-ast* NoBody Ast ())
+
 ;; 'defs' contains DefVar terms. Said bindings are not visible in
 ;; DefVar bodies.
 (define-ast* Let Ast ((list-of-term defs) (list-of-term body)))
@@ -343,6 +346,31 @@ It is rather important for all Ast derived node types to be
      'get-export-name
      "(or/c hash? Def?)" x))))
 
+(define* (get-export-name-as-symbol x)
+  (define y (get-export-name x))
+  (if (identifier? y)
+      (syntax-e y)
+      y))
+
+;;; 
+;;; externals
+;;; 
+
+(define* (get-foreign-name x)
+  (cond
+   ((hash? x) (hash-ref x 'foreign #f))
+   ((Def? x) (ast-anno-maybe x 'foreign))
+   (else
+    (raise-argument-error
+     'get-foreign-name
+     "(or/c hash? Def?)" x))))
+
+(define* (get-foreign-name-as-symbol x)
+  (define y (get-foreign-name x))
+  (if (identifier? y)
+      (syntax-e y)
+      y))
+
 ;;; 
 ;;; sexp dumping
 ;;; 
@@ -366,13 +394,13 @@ It is rather important for all Ast derived node types to be
      `(define-syntax ,(->symbol id)))
     ((Param _ id t)
      (->symbol id))
+    ((NoBody _)
+     'no-body)
     ((Defun a id t ps b)
-     (define export-name (get-export-name a))
-     (when (identifier? export-name)
-       (set! export-name (syntax-e export-name))) 
      `(function (,(->symbol id) ,@(map ast->sexp ps))
         #:annos ((type ,(ast->sexp t))
-                 (export ,export-name))
+                 (export ,(get-export-name-as-symbol a))
+                 (foreign ,(get-foreign-name-as-symbol a)))
         ,(ast->sexp b)))
     ((or (Let a ds bs)
          (Letrec a ds bs))

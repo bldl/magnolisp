@@ -65,7 +65,7 @@ Routines for parsing annotation values into AST nodes.
                           (symbol->string
                            (syntax-e #'name))) #f))
 
-(define (parse-cxx-name-anno id-stx anno-stx)
+(define* (parse-cxx-name-anno anno-stx)
   (syntax-parse anno-stx
     (_:id
      #t)
@@ -76,7 +76,7 @@ Routines for parsing annotation values into AST nodes.
   (-> identifier? hash? (or/c identifier? boolean?))
   (parse-export id-stx h)
   (define anno-stx (hash-ref h 'export #f))
-  (and anno-stx (parse-cxx-name-anno id-stx anno-stx)))
+  (and anno-stx (parse-cxx-name-anno anno-stx)))
 
 ;;; 
 ;;; C++ types

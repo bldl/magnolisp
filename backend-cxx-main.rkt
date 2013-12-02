@@ -62,13 +62,17 @@ C++ back end.
         (define id (Def-id ast))
         (assert (not (dict-has-key? id->sym id)))
         (define export-name (get-export-name a))
+        (define foreign-name (get-foreign-name a))
         (define orig-sym (syntax-e id))
         (define orig-s (symbol->string orig-sym))
+        (define (use-or-make name)
+          (and name
+               (if (identifier? name)
+                   (symbol->string (syntax-e name))
+                   (string->exported-cxx-id orig-s))))
         (define cand-s
-          (if export-name
-              (if (identifier? export-name)
-                  (symbol->string (syntax-e export-name))
-                  (string->exported-cxx-id orig-s))
+          (or (use-or-make export-name)
+              (use-or-make foreign-name)
               (string->internal-cxx-id orig-s #:default "f")))
         (define n-sym (string->symbol cand-s))
         (set!-values (r n-sym) (next-gensym r n-sym))
@@ -150,7 +154,7 @@ C++ back end.
   ;;(writeln ast)
   (match ast
     ((CxxDefun a id m t ps bs)
-     ;; xxx 'foreign functions are always just dropped (no proto either)
+     (define foreign? (and (get-foreign-name a) #t))
      (define export? (and (get-export-name a) #t))
      (define proto? (memq (cxx-kind) '(public-prototypes private-prototypes)))
      ;; "static" for locals, "MGL_API_" for exports, "MGL_" for
@@ -162,6 +166,7 @@ C++ back end.
         (if proto? "PROTO" "FUNC")))
      (set! m (cons modif m))
      (cond
+      (foreign? #f)
       ((eq? (cxx-kind) 'private-implementations)
        (CxxDefun a id m t ps bs))
       ((and proto?
@@ -183,9 +188,12 @@ C++ back end.
     ;;(writeln ast)
     (match ast
       ((Defun a id t ps b)
+       (define foreign? (and (get-foreign-name a) #t))
        (CxxDefun a id null (ast->cxx (FunT-rt t))
                  (map ast->cxx ps)
-                 (list (annoless CxxReturnOne (ast->cxx b)))))
+                 (if foreign?
+                     null
+                     (list (annoless CxxReturnOne (ast->cxx b))))))
       ((Param a id t)
        (CxxParam a id (annoless RefT (annoless ConstT (ast->cxx t)))))
       ((Var a id)
