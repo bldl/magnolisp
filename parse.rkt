@@ -285,7 +285,6 @@ would have done. Still retains correct scoping and evaluation order.
     (define ast (parse 'expr e-stx))
     (define ann-h (mk-annos ctx stx id-stx))
     (set! ann-h (maybe-parse-foreign-anno id-stx ann-h))
-    ;; xxx should parse export anno here, too, so that could check that it is not both export and foreign
     (define t (lookup-type id-stx))
     (define def (DefVar ann-h id-stx t ast))
     (set-def-in-mod! id-stx def)

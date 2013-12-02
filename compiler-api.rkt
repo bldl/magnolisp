@@ -454,7 +454,12 @@ external dependencies for the program/library, as well as the .cpp and
 ;; id-table.
 (define (defs-annotate-export-names defs-in-mod eps-in-mod)
   (for ([(id v) (in-dict eps-in-mod)])
+    (assert v)
     (define def (dict-ref defs-in-mod id))
+    (when (get-foreign-name def)
+      (raise-language-error/ast
+       "definition marked both as 'export' and 'foreign'"
+       def))
     (define n-def (Ast-anno-set def 'export-name v))
     (set! defs-in-mod
           (dict-set defs-in-mod id n-def)))
