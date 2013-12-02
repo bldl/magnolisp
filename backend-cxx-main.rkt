@@ -50,7 +50,7 @@ C++ back end.
   (define r #hasheq())
   ;; ID to symbol mappings are stored here. Handled similarly to the
   ;; 'r' table. Use def-id to look up symbols from this table.
-  (define id->sym (make-immutable-free-id-table))
+  (define id->sym (make-immutable-free-id-table #:phase 0))
 
   ;; We must collect all top-level IDs (and decide on their C++ name)
   ;; before renaming any locals.
@@ -61,12 +61,14 @@ C++ back end.
         (define a (Ast-annos ast))
         (define id (Def-id ast))
         (assert (not (dict-has-key? id->sym id)))
-        (define export? (actual-export? a))
+        (define export-name (get-export-name a))
         (define orig-sym (syntax-e id))
         (define orig-s (symbol->string orig-sym))
         (define cand-s
-          (if export?
-              (string->exported-cxx-id orig-s)
+          (if export-name
+              (if (identifier? export-name)
+                  (symbol->string (syntax-e export-name))
+                  (string->exported-cxx-id orig-s))
               (string->internal-cxx-id orig-s #:default "f")))
         (define n-sym (string->symbol cand-s))
         (set!-values (r n-sym) (next-gensym r n-sym))
@@ -149,7 +151,7 @@ C++ back end.
   (match ast
     ((CxxDefun a id m t ps bs)
      ;; xxx 'foreign functions are always just dropped (no proto either)
-     (define export? (actual-export? a))
+     (define export? (and (get-export-name a) #t))
      (define proto? (memq (cxx-kind) '(public-prototypes private-prototypes)))
      ;; "static" for locals, "MGL_API_" for exports, "MGL_" for
      ;; non-exports, "FUNC" for function definitions, and "PROTO" for

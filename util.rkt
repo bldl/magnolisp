@@ -101,11 +101,14 @@
     (set! h (hash-set h (car p) (cdr p))))
   h)
 
+(define* (dict-empty? d)
+  (= (dict-count d) 0))
+
 (require (for-syntax syntax/for-body))
 
 ;; Different syntax from 'for' in that 'empty-expr' is an extra
-;; expression for constructing an empty dictionary. This is required a
-;; dictionary is an abstract concept.
+;; expression for constructing an empty dictionary. This is required
+;; as a dictionary is an abstract concept.
 (define-syntax* (for/dict stx)
   (syntax-case stx ()
     ((_ empty-expr (clause ...) . body)

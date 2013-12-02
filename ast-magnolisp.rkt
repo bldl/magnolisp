@@ -334,13 +334,13 @@ It is rather important for all Ast derived node types to be
 ;;; exports
 ;;; 
 
-(define* (actual-export? x)
+(define* (get-export-name x)
   (cond
-   ((hash? x) (hash-ref x 'actual-export #f))
-   ((Def? x) (ast-anno-maybe x 'actual-export))
+   ((hash? x) (hash-ref x 'export-name #f))
+   ((Def? x) (ast-anno-maybe x 'export-name))
    (else
     (raise-argument-error
-     'actual-export?
+     'get-export-name
      "(or/c hash? Def?)" x))))
 
 ;;; 
@@ -367,10 +367,12 @@ It is rather important for all Ast derived node types to be
     ((Param _ id t)
      (->symbol id))
     ((Defun a id t ps b)
-     (define export? (actual-export? a))
+     (define export-name (get-export-name a))
+     (when (identifier? export-name)
+       (set! export-name (syntax-e export-name))) 
      `(function (,(->symbol id) ,@(map ast->sexp ps))
         #:annos ((type ,(ast->sexp t))
-                 (export ,export?))
+                 (export ,export-name))
         ,(ast->sexp b)))
     ((or (Let a ds bs)
          (Letrec a ds bs))

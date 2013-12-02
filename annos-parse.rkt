@@ -13,17 +13,20 @@ Routines for parsing annotation values into AST nodes.
 ;;; utilities
 ;;; 
 
-(define (anno->datum h id-stx anno-name default-v pred?
+;; 'h' is a hash of annotations.
+(define (anno->datum h id-stx anno-name
+                     default/no-anno default/no-value
+                     pred?
                      #:expect [expect-s #f])
   (define anno-stx (hash-ref h anno-name #f))
   (if (not anno-stx)
-      default-v
+      default/no-anno
       (syntax-case anno-stx ()
         (n
          (identifier? #'n)
          (begin
            (assert (eq? anno-name (syntax-e #'n)))
-           #t))
+           default/no-value))
         ((_ v-pat)
          (begin
            (define v-stx #'v-pat)
@@ -55,16 +58,6 @@ Routines for parsing annotation values into AST nodes.
 ;;; entry point flag
 ;;; 
 
-(define* (parse-entry-point id-stx h)
-  (define entry-point
-    (anno->datum h id-stx 'export #f boolean?
-                 #:expect "boolean literal"))
-  entry-point)
-
-;;; 
-;;; C++ types
-;;; 
-
 (define-syntax-class cxx-id
   #:description "C++ identifier"
   (pattern name:id
@@ -72,17 +65,38 @@ Routines for parsing annotation values into AST nodes.
                           (symbol->string
                            (syntax-e #'name))) #f))
 
-;; xxx for now we only support C++ type names - to support a range of type specifiers, such as pointer types
+(define (parse-cxx-name-anno id-stx anno-stx)
+  (syntax-parse anno-stx
+    (_:id
+     #t)
+    ((_ name:cxx-id)
+     #'name)))
+
+(define-with-contract*
+  (-> identifier? hash? (or/c identifier? boolean?))
+  (parse-export id-stx h)
+  (define anno-stx (hash-ref h 'export #f))
+  (and anno-stx (parse-cxx-name-anno id-stx anno-stx)))
+
+;;; 
+;;; C++ types
+;;; 
+
+(define (cxx-name-from-magnolisp-name-or-fail id-stx anno-stx)
+  (define s (symbol->string (syntax-e id-stx)))
+  (define cxx-s (string->maybe-cxx-id s))
+  (unless cxx-s
+    (raise-language-error
+     #f "cannot derive C++ name from Magnolisp name"
+     anno-stx))
+  cxx-s)
+
+;; xxx for now we only support C++ type names - to support a range of type specifiers, such as pointer types - although can already specify almost anything, even |char const *|
 (define* (parse-cxx-type id-stx anno-stx)
   (syntax-parse anno-stx
-    (name:id
-     (define s (symbol->string (syntax-e id-stx)))
-     (define cxx-s (string->maybe-cxx-id s))
-     (unless cxx-s
-       (raise-language-error
-        #f "cannot derive C++ name from Magnolisp name"
-        anno-stx))
-     (syntaxed #'name CxxNameT
+    (_:id
+     (define cxx-s (cxx-name-from-magnolisp-name-or-fail id-stx anno-stx))
+     (syntaxed anno-stx CxxNameT
                (datum->syntax #f (string->symbol cxx-s))))
     ((_ name:id)
      (syntaxed #'name CxxNameT #'name))))

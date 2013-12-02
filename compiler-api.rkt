@@ -256,15 +256,15 @@ external dependencies for the program/library, as well as the .cpp and
     (set! annos (make-immutable-free-id-table #:phase 0)))
   (Mod pt annos #f #f #f #f))
 
-(define (list-entry-points annos)
-  (define lst null)
+(define (collect-entry-points annos)
+  (define eps (make-free-id-table #:phase 0))
   (dict-for-each
    annos
    (lambda (id h)
-     (define ep (parse-entry-point id h))
+     (define ep (parse-export id h))
      (when ep
-       (set! lst (cons id lst)))))
-  lst)
+       (dict-set! eps id ep))))
+  eps)
 
 (define (id-table-add-lst! t lst)
   (for ((id lst))
@@ -448,12 +448,15 @@ external dependencies for the program/library, as well as the .cpp and
   ;;(pretty-print `(original-defs ,(dict-count all-defs) ,(dict-keys all-defs) retained-defs ,(dict-count processed-defs) ,(dict-keys processed-defs)))
   processed-defs)
 
-(define (defs-annotate-actual-exports! all-defs eps)
-  (for ([(id dummy) (in-dict eps)])
-    (define def (dict-ref all-defs id))
-    (define n-def (Ast-anno-set def 'actual-export #t))
-    (dict-set! all-defs id n-def))
-  (void))
+;; defs-in-mod is an immutable id-table, whereas eps-in-mod is an
+;; id-table.
+(define (defs-annotate-export-names defs-in-mod eps-in-mod)
+  (for ([(id v) (in-dict eps-in-mod)])
+    (define def (dict-ref defs-in-mod id))
+    (define n-def (Ast-anno-set def 'export-name v))
+    (set! defs-in-mod
+          (dict-set defs-in-mod id n-def)))
+  defs-in-mod)
 
 ;; Returns (and/c hash? hash-eq? immutable?).
 (define (build-sym-def-for-mod mod)
@@ -593,7 +596,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;; specified modules, and all dependencies thereof.
 (define* (compile-modules . ep-mp-lst)
   (define mods (make-hash)) ;; r-mp -> Mod
-  (define eps (make-free-id-table #:phase 0))
+  (define eps-in-prog (make-free-id-table #:phase 0))
   (define dep-q null) ;; deps queued for loading
 
   (define (load mp ep?)
@@ -608,18 +611,20 @@ external dependencies for the program/library, as well as the .cpp and
 
         ;; For entry point modules, use annotations to build a set of
         ;; entry points. Add these to program entry points.
-        (define eps-lst null)
+        (define eps-in-mod #f)
         (when ep?
-          (set! eps-lst (list-entry-points annos))
-          (id-table-add-lst! eps eps-lst))
+          (set! eps-in-mod (collect-entry-points annos))
+          (id-table-add-lst! eps-in-prog (dict-keys eps-in-mod)))
 
         ;; If a module has entry points, or if it is a dependency,
         ;; then collect further information from it.
-        (when (or (not ep?) (and ep? (not (null? eps-lst))))
+        (when (or (not ep?) (and eps-in-mod (not (dict-empty? eps-in-mod))))
           (define pt (Mod-pt mod)) ;; parse tree
           ;;(pretty-print (syntax->datum pt))
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
+          (when eps-in-mod
+            (set! defs (defs-annotate-export-names defs eps-in-mod)))
           ;;(pretty-print (dict->list defs)) (exit)
           (set! mod
                 (struct-copy Mod mod
@@ -651,18 +656,17 @@ external dependencies for the program/library, as well as the .cpp and
   (define all-defs (merge-defs mods))
   (set! all-defs (defs-resolve-names all-defs mods))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
-  (set! all-defs (defs-drop-unreachable all-defs eps))
-  (defs-annotate-actual-exports! all-defs eps)
+  (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
   (set! all-defs (defs-de-racketize all-defs))
   (defs-type-check all-defs)
   
   ;;(all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
-  ;;(pretty-print (list 'entry-points (dict-map eps (compose car cons))))
+  ;;(pretty-print (list 'entry-points (dict-map eps-in-prog (compose car cons))))
   (pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
-  (St mods all-defs eps))
+  (St mods all-defs eps-in-prog))
 
 ;; Compiles the modules defined in the specified files. Returns a
 ;; compilation state with a full IR for the entire program. The
