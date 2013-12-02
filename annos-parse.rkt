@@ -84,7 +84,7 @@ Routines for parsing annotation values into AST nodes.
         anno-stx))
      (syntaxed #'name CxxNameT
                (datum->syntax #f (string->symbol cxx-s))))
-    ((_ name:cxx-id)
+    ((_ name:id)
      (syntaxed #'name CxxNameT #'name))))
 
 ;;; 
