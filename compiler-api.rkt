@@ -262,8 +262,7 @@ external dependencies for the program/library, as well as the .cpp and
            (andmap type=? x-ats y-ats)))
      (else #f)))
 
-  (define (tc ast)
-    ;;(writeln `(tc ,ast))
+  (define (tc-def ast)
     (match ast
       ((or (? ForeignTypeDecl?) (? Param?))
        (void))
@@ -271,7 +270,7 @@ external dependencies for the program/library, as well as the .cpp and
        ;; Type kind and arity correctness wrt parameters was already
        ;; checked in creating Defun.
        (define r-t (FunT-rt t))
-       (define b-t (if (NoBody? b) r-t (tc b)))
+       (define b-t (if (NoBody? b) r-t (tc-expr b)))
        (unless (type=? r-t b-t)
          (raise-language-error/ast
           "function return type does not match body expression"
@@ -281,6 +280,18 @@ external dependencies for the program/library, as well as the .cpp and
                                (ast-displayable/datum b-t)))
           ast b))
        (void))
+      (else
+       (raise-argument-error
+        'tc-def "supported Ast?" ast))))
+
+  (define (tc-stat ast)
+    (match ast
+      (else
+       (raise-argument-error
+        'tc-stat "supported Ast?" ast))))
+      
+  (define (tc-expr ast)
+    (match ast
       ((? Var?)
        (lookup ast))
       ((Apply _ f as)
@@ -295,7 +306,7 @@ external dependencies for the program/library, as well as the .cpp and
           #:fields (list (list "function type" (ast-displayable f-t)))
           ast))
        (for ([e as] [p-t (FunT-ats f-t)])
-         (define e-t (tc e))
+         (define e-t (tc-expr e))
          (unless (type=? p-t e-t)
            (raise-language-error/ast
             "parameter type does not match that of expression"
@@ -308,10 +319,10 @@ external dependencies for the program/library, as well as the .cpp and
        the-AnyT) ;; for now, at least
       (else
        (raise-argument-error
-        'tc "supported Ast?" ast))))
+        'tc-expr "supported Ast?" ast))))
   
   (for (((id def) (in-dict defs)))
-    (tc def)))
+    (tc-def def)))
 
 ;;; 
 ;;; build options
