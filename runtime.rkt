@@ -83,9 +83,9 @@ this code is not in Magnolisp, only for Magnolisp.
   (syntax-rules ()
     ((_ (f p ...) (a ...))
      (function-impl (f p ...) (a ...) (void)))
-    ((_ (f p ...) (a ...) b ...)
+    ((_ (f p ...) (a ...) b)
      (begin
-       (define (f p ...) b ...)
+       (define (f p ...) b)
        (anno! f a ...)))))
     
 (define-annos-wrapper* function)

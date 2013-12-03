@@ -109,6 +109,72 @@ external dependencies for the program/library, as well as the .cpp and
   ((make-for-all-defs (fix de-racketize defs)) defs))
 
 ;;; 
+;;; simplification
+;;; 
+
+(define (compose1-> . fs)
+  (apply compose1 (reverse fs)))
+
+(define-syntax-rule
+  (match-or v clause ...)
+  (match v clause ... (_ v)))
+
+(define ast-empty-Let->BlockStat
+  (topdown
+   (lambda (ast)
+     (match ast
+       ((Let a (list) ss)
+        (BlockStat a ss))
+       (_ ast)))))
+
+(define ast-nested-BlockStat->BlockStat
+  (topdown
+   (lambda (ast)
+     (match-or ast
+       ((BlockStat a ss)
+        (if (not (ormap BlockStat? (BlockStat-ss ast)))
+            ast
+            (BlockStat a (apply append (for/list ((s ss))
+                                         (if (BlockStat? s)
+                                             (BlockStat-ss s)
+                                             (list s)))))))))))
+
+(define-syntax-rule
+  (topdown-match-or #:ast ast clause ...)
+  (topdown
+   (lambda (ast)
+     (match-or ast
+       clause ...))))
+
+(define ast-rm-Pass
+  (topdown-match-or
+   #:ast ast
+   ((and (BlockStat a ss)
+         (? (lambda (ast) (ormap Pass? (BlockStat-ss ast)))))
+    (BlockStat a (apply append (for/list ((s ss))
+                                 (if (Pass? s)
+                                     null
+                                     (list s))))))
+   ((and (BlockExpr a ss)
+         (? (lambda (ast) (ormap Pass? (BlockExpr-ss ast)))))
+    (BlockExpr a (apply append (for/list ((s ss))
+                                 (if (Pass? s)
+                                     null
+                                     (list s))))))
+   ((and (Let a bs ss)
+         (? (lambda (ast) (ormap Pass? (Let-ss ast)))))
+    (Let a bs (apply append (for/list ((s ss))
+                              (if (Pass? s)
+                                  null
+                                  (list s))))))))
+
+(define ast-simplify
+  (compose1->
+   ast-empty-Let->BlockStat
+   ast-rm-Pass
+   ast-nested-BlockStat->BlockStat))
+
+;;; 
 ;;; type checking
 ;;; 
 
@@ -668,6 +734,8 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-resolve-names all-defs mods))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
+  (set! all-defs ((make-for-all-defs ast-simplify) all-defs))
+  (pretty-print (dict-values all-defs)) (exit)
   (set! all-defs (defs-de-racketize all-defs))
   (defs-type-check all-defs)
   
