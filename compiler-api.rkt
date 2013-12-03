@@ -184,6 +184,36 @@ external dependencies for the program/library, as well as the .cpp and
    ast-rm-Pass
    ast-nested-BlockStat->BlockStat))
 
+(define defs-simplify
+  (make-for-all-defs ast-simplify))
+
+;;; 
+;;; local escapes
+;;; 
+
+(define (ast-LetLocalEc->BlockExpr ast)
+  (define enclosing-id #f)
+  
+  (define rw
+    (topdown-match-or
+     #:ast ast
+     ((LetLocalEc a k ss)
+      (set! enclosing-id k)
+      (BlockExpr a ss))
+     ((AppLocalEc a k e)
+      (unless enclosing-id
+        (raise-language-error/ast
+         "local escape without enclosing context"
+         ast))
+      (unless (free-identifier=? enclosing-id k)
+        (raise-language-error/ast
+         "local escape beyond its context"
+         ast k
+         #:fields (list (list "context" enclosing-id))))
+      (Return a e))))
+
+  (rw ast))
+
 ;;; 
 ;;; type checking
 ;;; 
@@ -744,8 +774,9 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-resolve-names all-defs mods))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
-  (set! all-defs ((make-for-all-defs ast-simplify) all-defs))
-  (pretty-print (dict-values all-defs)) (exit)
+  (set! all-defs ((make-for-all-defs ast-LetLocalEc->BlockExpr) all-defs))
+  (set! all-defs (defs-simplify all-defs))
+  ;;(pretty-print (dict-values all-defs)) (exit)
   (set! all-defs (defs-de-racketize all-defs))
   (defs-type-check all-defs)
   
