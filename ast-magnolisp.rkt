@@ -187,16 +187,13 @@ It is rather important for all Ast derived node types to be
 ;; For functions with no Magnolisp body.
 (define-ast* NoBody Ast ())
 
-;; 'defs' contains DefVar terms. Said bindings are not visible in
-;; DefVar bodies.
-(define-ast* Let Ast ((list-of-term defs) (list-of-term body)))
+;; 'defs' contains DefVar terms. 'let-kind annotation has either
+;; 'let-values or 'letrec-values; we mostly do not care, since Racket
+;; has done name resolution.
+(define-ast* Let Ast ((list-of-term defs) (list-of-term ss)))
 
-;; 'defs' contains DefVar terms. Said bindings are visible in DefVar
-;; bodies.
-(define-ast* Letrec Ast ((list-of-term defs) (list-of-term body)))
-
-;; Sequence of expressions (as in Racket).
-(define-ast* Begin Ast ((list-of-term body)))
+;; Sequence of statements.
+(define-ast* BlockStat Ast ((list-of-term ss)))
 
 ;; Variable reference.
 (define-ast* Var Ast ((no-term id)))
@@ -220,21 +217,24 @@ It is rather important for all Ast derived node types to be
 ;; Procedure call.
 (define-ast* Call Ast ((just-term f) (list-of-term args)))
 
+;; Transient. Corresponds to a let/ec that only escapes to a local,
+;; immediately surrounding call/cc continuation. 'k' is a label (an
+;; ID) naming the continuation.
+(define-ast* LetLocalEc Ast ((no-term k) (list-of-term ss)))
+
+;; Escapes to the named LetLocalEc continuation 'k' (an ID) with the
+;; value given by expression 'e'.
+(define-ast* ApplyLocalEc Ast ((no-term k) (just-term e)))
+
 ;; Nil statement.
 (define-ast* Pass Ast ())
 
-;; Return statement.
-(define-ast* Return Ast ((list-of-term es)))
+;; Block expression. Contains statements.
+(define-ast* BlockExpr Ast ((list-of-term ss)))
 
-#|
-
-(define* (Var-from-stx id-stx)
-  (new-Var id-stx (syntax-e id-stx)))
-
-(define* (Var-rename ast n)
-  (struct-copy Var ast (name n)))
-
-|#
+;; Return statement. For now we only support single value returns. The
+;; semantics are to escape from a surrounding BlockExpr.
+(define-ast* Return Ast ((just-term e)))
 
 ;;; 
 ;;; C++
@@ -402,13 +402,12 @@ It is rather important for all Ast derived node types to be
                  (export ,(get-export-name-as-symbol a))
                  (foreign ,(get-foreign-name-as-symbol a)))
         ,(ast->sexp b)))
-    ((or (Let a ds bs)
-         (Letrec a ds bs))
-     (define n (if (Let? ast) 'let 'letrec))
+    ((Let a ds bs)
+     (define n (hash-ref a 'let-kind 'let))
      `(,n (,@(map ast->sexp ds))
           ,@(map ast->sexp bs)))
-    ((Begin _ bs)
-     `(begin ,@(map ast->sexp bs)))
+    ((BlockStat _ bs)
+     `(block-stat ,@(map ast->sexp bs)))
     ((Var _ id)
      (if (show-bindings?)
          `(Var ,(->symbol id) ~> ,(?->symbol (get-def-id id)))

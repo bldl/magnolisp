@@ -25,9 +25,6 @@ screwy when used in compilation mode.
 (require "modbeg.rkt")
 (provide (rename-out (module-begin #%module-begin)))
 
-(require "block-expr.rkt")
-(provide (rename-out [block-expr do]) return)
-
 (require (for-syntax racket/base))
 (provide (for-syntax (all-from-out racket/base)))
 

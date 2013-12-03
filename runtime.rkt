@@ -26,6 +26,7 @@ this code is not in Magnolisp, only for Magnolisp.
 
 (require
  "annos-util.rkt" "annos-store.rkt" "util.rkt"
+ racket/stxparam
  (for-syntax "util.rkt" racket/syntax)) 
 
 ;; Yes we are providing this. If the programmer wants to hack our core
@@ -101,3 +102,17 @@ this code is not in Magnolisp, only for Magnolisp.
        (anno! t a ...)))))
 
 (define-annos-wrapper* typedef)
+
+(define-syntax* (let/local-ec stx)
+  (syntax-case stx ()
+    ((_ . rest)
+     (syntax-property
+      (syntax/loc stx (let/ec . rest))
+      'local-ec #t))))
+
+(define-syntax* (apply/local-ec stx)
+  (syntax-case stx ()
+    ((_ k e)
+     (syntax-property
+      (syntax/loc stx (k e))
+      'local-ec #t))))

@@ -94,7 +94,7 @@ would have done. Still retains correct scoping and evaluation order.
 (define (resolve-provides prov-lst)
   (define provide-tbl
     (for/fold
-        ([h (make-immutable-free-id-table)])
+        ([h (make-immutable-free-id-table #:phase 0)])
         ([p (in-list prov-lst)])
       (syntax-parse p
         [in-out:id
@@ -214,9 +214,10 @@ would have done. Still retains correct scoping and evaluation order.
 (define (quote? x)
   (matches-global-id? #'quote x))
 
+;; Returns defs, provides, and requires in module.
 (define-with-contract*
   (-> syntax? immutable-id-table? resolve-module-path-result?
-      (values immutable-id-table? id-table? (listof syntax?)))
+      (values immutable-id-table? immutable-id-table? (listof syntax?)))
   (parse-defs-from-module modbeg-stx annos r-mp)
 
   (define defs-in-mod (make-immutable-free-id-table #:phase 0))
@@ -319,8 +320,7 @@ would have done. Still retains correct scoping and evaluation order.
     (set-def-in-mod! id-stx def)
     def)
   
-  (define (make-Let ctx stx
-                    ctor binds-stx exprs-stx)
+  (define (make-Let ctx stx kind binds-stx exprs-stx)
     (define i-e-lst (syntax->list binds-stx))
     (define b-ast-lst (map
                        (lambda (i-e)
@@ -332,8 +332,8 @@ would have done. Still retains correct scoping and evaluation order.
                            (_ (unsupported i-e))))
                        i-e-lst))
     (define e-stx-lst (syntax->list exprs-stx))
-    (define e-ast-lst (map (fix parse ctx) e-stx-lst))
-    (ctor stx b-ast-lst e-ast-lst))
+    (define e-ast-lst (map (fix parse 'stat) e-stx-lst))
+    (Let (hasheq 'stx stx 'let-kind kind) b-ast-lst e-ast-lst))
 
   (define (parse-define-value ctx stx id-stx e-stx)
     ;;(writeln (list e-stx (syntax->datum e-stx)))
@@ -371,8 +371,10 @@ would have done. Still retains correct scoping and evaluation order.
        (void))
 
       ((begin . bs)
-       (new-Begin stx (map (fix parse ctx)
-                           (syntax->list #'bs))))
+       (eq? ctx 'stat)
+       (syntaxed BlockStat stx
+                 (map (fix parse ctx)
+                      (syntax->list #'bs))))
       
       ((begin-for-syntax . _)
        (eq? ctx 'module-level)
@@ -448,16 +450,6 @@ would have done. Still retains correct scoping and evaluation order.
        (eq? ctx 'module-level)
        (require! (syntax->list #'specs)))
 
-      ;; %core language
-      
-      ;; ((k-app rt.%core (quote n))
-      ;;  (eq? 'pass (syntax-e #'n))
-      ;;  (new-Pass stx))
-
-      ;; ((k-app rt.%core (quote n) id-stx)
-      ;;  (eq? 'call (syntax-e #'n))
-      ;;  (new-Call stx (Var-from-stx #'id-stx)))
-
       ;; expr non-terminal
 
       ((#%plain-lambda formals . exprs)
@@ -486,6 +478,32 @@ would have done. Still retains correct scoping and evaluation order.
                      (parse ctx #'c)
                      (parse ctx #'t)
                      (parse ctx #'e))))
+
+      ((#%plain-app f e ...)
+       (and (eq? ctx 'stat)
+            (identifier? #'f)
+            (or (free-identifier=? #'f #'void)
+                (free-identifier=? #'f #'values)))
+       (syntaxed stx Pass))
+
+      ((#%plain-app kall
+        (#%plain-lambda (k) b ...))
+       (and (eq? ctx 'expr)
+            (syntax-property stx 'local-ec)
+            (identifier? #'kall)
+            (free-identifier=? #'kall #'call/ec))
+       (syntaxed stx
+        LetLocalEc #'k
+        (map
+         (fix parse 'stat)
+         (syntax->list #'(b ...)))))
+      
+      ((#%plain-app k e)
+       (and (eq? ctx 'stat)
+            (syntax-property stx 'local-ec)
+            (identifier? #'k))
+       (syntaxed stx
+        ApplyLocalEc #'k (parse 'expr #'e)))
       
       ((#%plain-app p-expr . a-expr)
        (when (eq? ctx 'expr)
@@ -500,15 +518,15 @@ would have done. Still retains correct scoping and evaluation order.
            (fix parse ctx)
            (syntax->list #'a-expr)))))
 
-      ((let-values binds . exprs)
-       (when (eq? ctx 'expr)
+      ((let-kw binds . exprs)
+       (and (identifier? #'let-kw)
+            (or (free-identifier=? #'let-kw #'let-values)
+                (free-identifier=? #'let-kw #'letrec-values)))
+       (unless (eq? ctx 'module-level)
+         (when (eq? ctx 'expr)
+           (raise-syntax-error #f "let form in expr context" stx))
          (make-Let ctx stx
-                   new-Let #'binds #'exprs)))
-      
-      ((letrec-values binds . exprs)
-       (when (eq? ctx 'expr)
-         (make-Let ctx stx
-                   new-Letrec #'binds #'exprs)))
+                   (syntax-e #'let-kw) #'binds #'exprs)))
 
       ((set! id expr)
        (identifier? #'id)
@@ -559,16 +577,13 @@ would have done. Still retains correct scoping and evaluation order.
       
       ;; The letrec-syntaxes+values ID we get here is either top-level
       ;; or unbound, according to identifier-binding.
-      ((lsv _ v-binds body ...)
-       (and (identifier? #'lsv)
-            (module-or-top-identifier=? #'lsv #'letrec-syntaxes+values))
-       (when (eq? ctx 'expr)
-         (parse ctx
-                ;; letrec-values might not be the kernel one, but we
-                ;; risk it here.
-                (syntax-track-origin
-                 (syntax/loc stx (letrec-values v-binds body ...))
-                 stx #'lsv))))
+      ((let-kw _ v-binds body ...)
+       (and (identifier? #'let-kw)
+            (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
+       (parse ctx
+              (syntax-track-origin
+               (syntax/loc stx (letrec-values v-binds body ...))
+               stx #'let-kw)))
 
       ;; unrecognized language
       
