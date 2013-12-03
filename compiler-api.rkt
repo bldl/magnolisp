@@ -262,7 +262,7 @@ external dependencies for the program/library, as well as the .cpp and
            (andmap type=? x-ats y-ats)))
      (else #f)))
 
-  (define (tc-def ast)
+  (define (tc-def ast) ;; Ast? -> void?
     (match ast
       ((or (? ForeignTypeDecl?) (? Param?))
        (void))
@@ -284,14 +284,44 @@ external dependencies for the program/library, as well as the .cpp and
        (raise-argument-error
         'tc-def "supported Ast?" ast))))
 
-  (define (tc-stat ast)
+  ;; Initialized to #f for each BlockExpr scope.
+  (define return-type (make-parameter #f))
+  
+  (define (tc-stat ast) ;; Ast? -> void?
     (match ast
+      ((Return _ e)
+       (define t (tc-expr e))
+       (define expect-t (return-type))
+       (when (and expect-t (not (type=? expect-t t)))
+         (raise-language-error/ast
+          "conflicting return type in block"
+          ast e
+          #:fields (list (list "previously"
+                               (ast-displayable/datum expect-t)))))
+       (return-type t)
+       (void))
+      ((Pass _)
+       (void))
+      ((BlockStat _ ss)
+       (for-each tc-stat ss))
+      ((Let _ bs ss)
+       (for-each tc-def bs)
+       (for-each tc-stat ss))
       (else
        (raise-argument-error
         'tc-stat "supported Ast?" ast))))
       
-  (define (tc-expr ast)
+  (define (tc-expr ast) ;; Ast? -> Type?
     (match ast
+      ((BlockExpr _ ss)
+       (parameterize ((return-type #f))
+         (for-each tc-stat ss)
+         (define r-t (return-type))
+         (unless r-t
+           (raise-language-error/ast
+            "block expression without return"
+            ast))
+         r-t))
       ((? Var?)
        (lookup ast))
       ((Apply _ f as)
