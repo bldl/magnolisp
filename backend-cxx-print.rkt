@@ -100,10 +100,10 @@
     ;;   "\n"
     ;;   (indent-before "else\n")
     ;;   (indent-more (format-stat alt))))
-    ;; ((return)
-    ;;  (indent-before (string-append "return;")))
-     ((CxxReturnOne _ [format-expr . produces . expr])
-      (indent-before (string-append "return " expr ";")))
+    ((Return _ [format-expr . produces . expr]) ;; xxx temporary
+     (indent-before (string-append "BLOCK_ESCAPE " expr ";")))
+    ((CxxReturnOne _ [format-expr . produces . expr])
+     (indent-before (string-append "return " expr ";")))
     ;; ((print ,[format-expr . produces . expr])
     ;;  (indent-before (string-append "print(" expr ");")))
     ;; ((print ,[format-expr . produces . e] ,[format-expr . produces . op])
@@ -148,6 +148,11 @@
 
 (define (format-expr expr)
   (match expr
+    ((BlockExpr _ ss) ;; xxx temporary
+     (string-append
+      "BLOCK { "
+      (apply string-append (map format-stat ss))
+      " }"))
     ;; ((empty-struct) "{0}")
     ;; ((field ,[obj] ,x)
     ;;  (string-append obj "." (format-ident x)))
@@ -176,8 +181,6 @@
     ;;  (string-append "(" lhs ") " (format-relop op) " (" rhs ")"))
     ;; ((not ,[format-expr . produces . lhs])
     ;;  (string-append "!(" lhs ")"))
-    ;; ((assert ,[format-expr . produces . expr])
-    ;;  (string-append "assert(" expr ")"))
     ((Var _ var) (symbol->string var))
     ;; ((char ,c) (format-char-literal c))
     ((Literal _ (? number? n))

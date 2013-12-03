@@ -196,10 +196,14 @@ C++ back end.
                      (list (annoless CxxReturnOne (ast->cxx b))))))
       ((Param a id t)
        (CxxParam a id (annoless RefT (annoless ConstT (ast->cxx t)))))
-      ((Var a id)
+      ((? Var?)
        ast)
       ((Apply a f es) ;; xxx need to deal with operators and parenthesization
        (Apply a f (map ast->cxx es)))
+      ((Return a e) ;; xxx proper translation to be done
+       (Return a (ast->cxx e)))
+      ((BlockExpr a ss) ;; xxx proper translation to be done
+       (BlockExpr a (map ast->cxx ss)))
       ((Literal a d)
        (Literal a (syntax->datum d)))
       ((NameT _ id)
