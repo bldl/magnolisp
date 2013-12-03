@@ -224,7 +224,7 @@ It is rather important for all Ast derived node types to be
 
 ;; Escapes to the named LetLocalEc continuation 'k' (an ID) with the
 ;; value given by expression 'e'.
-(define-ast* ApplyLocalEc Ast ((no-term k) (just-term e)))
+(define-ast* AppLocalEc Ast ((no-term k) (just-term e)))
 
 ;; Nil statement.
 (define-ast* Pass Ast ())

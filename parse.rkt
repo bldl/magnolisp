@@ -503,7 +503,7 @@ would have done. Still retains correct scoping and evaluation order.
             (syntax-property stx 'local-ec)
             (identifier? #'k))
        (syntaxed stx
-        ApplyLocalEc #'k (parse 'expr #'e)))
+        AppLocalEc #'k (parse 'expr #'e)))
       
       ((#%plain-app p-expr . a-expr)
        (when (eq? ctx 'expr)

@@ -119,26 +119,6 @@ external dependencies for the program/library, as well as the .cpp and
   (match-or v clause ...)
   (match v clause ... (_ v)))
 
-(define ast-empty-Let->BlockStat
-  (topdown
-   (lambda (ast)
-     (match ast
-       ((Let a (list) ss)
-        (BlockStat a ss))
-       (_ ast)))))
-
-(define ast-nested-BlockStat->BlockStat
-  (topdown
-   (lambda (ast)
-     (match-or ast
-       ((BlockStat a ss)
-        (if (not (ormap BlockStat? ss))
-            ast
-            (BlockStat a (apply append (for/list ((s ss))
-                                         (if (BlockStat? s)
-                                             (BlockStat-ss s)
-                                             (list s)))))))))))
-
 (define-syntax-rule
   (topdown-match-or #:ast ast clause ...)
   (topdown
@@ -162,6 +142,31 @@ external dependencies for the program/library, as well as the .cpp and
     ((Let a bs ss)
      (Let a bs n-ss))))
 
+(define ast-empty-Let->BlockStat
+  (topdown
+   (lambda (ast)
+     (match ast
+       ((Let a (list) ss)
+        (BlockStat a ss))
+       (_ ast)))))
+
+(define ast-nested-BlockStat->BlockStat
+  (topdown
+   (repeat
+    (lambda (ast)
+      (define ss (ast-get-ss ast))
+      (cond
+       ((and ss (ormap BlockStat? ss))
+        (define n-ss
+          (apply append (for/list ((s ss))
+                          (if (BlockStat? s)
+                              (BlockStat-ss s)
+                              (list s)))))
+        (ast-set-ss ast n-ss))
+       (else
+        ;; Signifies failed strategy.
+        #f))))))
+       
 (define (list-rm-Pass ss)
   (apply append (for/list ((s ss))
                   (if (Pass? s)
