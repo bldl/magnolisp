@@ -132,7 +132,7 @@ external dependencies for the program/library, as well as the .cpp and
    (lambda (ast)
      (match-or ast
        ((BlockStat a ss)
-        (if (not (ormap BlockStat? (BlockStat-ss ast)))
+        (if (not (ormap BlockStat? ss))
             ast
             (BlockStat a (apply append (for/list ((s ss))
                                          (if (BlockStat? s)
@@ -146,27 +146,37 @@ external dependencies for the program/library, as well as the .cpp and
      (match-or ast
        clause ...))))
 
+(define (ast-get-ss ast)
+  (match ast
+    ((BlockStat _ ss) ss)
+    ((BlockExpr _ ss) ss)
+    ((Let _ _ ss) ss)
+    (_ #f)))
+
+(define (ast-set-ss ast n-ss)
+  (match ast
+    ((BlockExpr a ss)
+     (BlockExpr a n-ss))
+    ((BlockStat a ss)
+     (BlockStat a n-ss))
+    ((Let a bs ss)
+     (Let a bs n-ss))))
+
+(define (list-rm-Pass ss)
+  (apply append (for/list ((s ss))
+                  (if (Pass? s)
+                      null
+                      (list s)))))
+
 (define ast-rm-Pass
-  (topdown-match-or
-   #:ast ast
-   ((and (BlockStat a ss)
-         (? (lambda (ast) (ormap Pass? (BlockStat-ss ast)))))
-    (BlockStat a (apply append (for/list ((s ss))
-                                 (if (Pass? s)
-                                     null
-                                     (list s))))))
-   ((and (BlockExpr a ss)
-         (? (lambda (ast) (ormap Pass? (BlockExpr-ss ast)))))
-    (BlockExpr a (apply append (for/list ((s ss))
-                                 (if (Pass? s)
-                                     null
-                                     (list s))))))
-   ((and (Let a bs ss)
-         (? (lambda (ast) (ormap Pass? (Let-ss ast)))))
-    (Let a bs (apply append (for/list ((s ss))
-                              (if (Pass? s)
-                                  null
-                                  (list s))))))))
+  (topdown
+   (lambda (ast)
+     (define ss (ast-get-ss ast))
+     (cond
+      ((and ss (ormap Pass? ss))
+       (ast-set-ss ast (list-rm-Pass ss)))
+      (else
+       ast)))))
 
 (define ast-simplify
   (compose1->
