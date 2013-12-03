@@ -183,11 +183,47 @@ external dependencies for the program/library, as well as the .cpp and
       (else
        ast)))))
 
+(define (take-until/inclusive p? lst)
+  (define n-lst null)
+  (let loop ((lst lst))
+    (cond
+     ((null? lst)
+      (void))
+     (else
+      (define e (car lst))
+      (set! n-lst (cons e n-lst))
+      (cond
+       ((p? e) (void))
+       (else (loop (cdr lst)))))))
+  (reverse n-lst))
+
+(define ast-rm-dead-code
+  (topdown
+   (lambda (ast)
+     (define ss (ast-get-ss ast))
+     (cond
+      ((and ss (ormap Return? ss))
+       (define n-ss (take-until/inclusive Return? ss))
+       (ast-set-ss ast n-ss))
+      (else
+       ast)))))
+
+(define ast-simplify-BlockExpr
+  (topdown
+   (repeat
+    (lambda (ast)
+      (match ast
+        ((BlockExpr _ (list (Return a e)))
+         e)
+        (_ #f))))))
+
 (define ast-simplify
   (compose1->
    ast-empty-Let->BlockStat
    ast-rm-Pass
-   ast-nested-BlockStat->BlockStat))
+   ast-nested-BlockStat->BlockStat
+   ast-rm-dead-code
+   ast-simplify-BlockExpr))
 
 (define defs-simplify
   (make-for-all-defs ast-simplify))
