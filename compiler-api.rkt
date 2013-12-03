@@ -226,10 +226,11 @@ external dependencies for the program/library, as well as the .cpp and
 ;; [pt syntax?] is the parse tree, as loaded from the submodule.
 ;; [annos id-table?] are the annotations, as loaded from the
 ;; submodule. A non-Magnolisp module simply gets null values for the
-;; above. [defs id-table?] contains Def objects for parsed modules.
-;; [provs id-table?] maps each internally bound ID to a list of
-;; exported IDs. [reqs (listof syntax?)] is a list of #%require specs.
-;; [syms (hash/c symbol? Def?)] maps top-level names to definitions.
+;; above, since it contains no Magnolisp syntax. [defs id-table?]
+;; contains Def objects for parsed modules. [provs id-table?] maps
+;; each internally bound ID to a list of exported IDs. [reqs (listof
+;; syntax?)] is a list of #%require specs. [syms (hash/c symbol?
+;; Def?)] maps top-level names to definitions.
 (struct Mod (pt annos defs provs reqs syms) #:transparent)
 
 ;;; 
@@ -254,9 +255,12 @@ external dependencies for the program/library, as well as the .cpp and
     (if annos
         (dynamic-require `(submod ,mp magnolisp-info) 'm-ast)
         #'(#%module-begin)))
-  (unless annos
-    (set! annos (make-immutable-free-id-table #:phase 0)))
-  (Mod pt annos #f #f #f #f))
+  (Mod pt
+       (or annos (make-immutable-free-id-table #:phase 0))
+       (make-immutable-free-id-table #:phase 0)
+       (make-immutable-free-id-table #:phase 0)
+       null
+       #hasheq()))
 
 (define (collect-entry-points annos)
   (define eps (make-free-id-table #:phase 0))
@@ -743,7 +747,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-2-prog.rkt"))
+  (define st (compile-modules "test-a-prog.rkt"))
   (generate-files st (hasheq 'build
                              (seteq 'gnu-make 'qmake 'c 'ruby)
                              'cxx
