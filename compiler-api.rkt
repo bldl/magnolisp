@@ -233,25 +233,27 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (define (ast-LetLocalEc->BlockExpr ast)
-  (define enclosing-id #f)
+  (define enclosing-id (make-parameter #f))
   
-  (define rw
-    (topdown-match-or
-     #:ast ast
+  (define (rw ast)
+    (match ast
      ((LetLocalEc a k ss)
-      (set! enclosing-id k)
-      (BlockExpr a ss))
+      (parameterize ((enclosing-id k))
+        (BlockExpr a (map rw ss))))
      ((AppLocalEc a k e)
-      (unless enclosing-id
+      (define e-id (enclosing-id))
+      (unless e-id
         (raise-language-error/ast
          "local escape without enclosing context"
          ast))
-      (unless (free-identifier=? enclosing-id k)
+      (unless (free-identifier=? e-id k)
         (raise-language-error/ast
          "local escape beyond its context"
          ast k
-         #:fields (list (list "context" enclosing-id))))
-      (Return a e))))
+         #:fields (list (list "context" e-id))))
+      (Return a (rw e)))
+     (else
+      (subterm-all rw ast))))
 
   (rw ast))
 
@@ -865,9 +867,10 @@ external dependencies for the program/library, as well as the .cpp and
   ;;(all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (list 'entry-points (dict-map eps-in-prog (compose car cons))))
-  (pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
+  ;;(pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
+  
   (St mods all-defs eps-in-prog))
 
 ;; Compiles the modules defined in the specified files. Returns a
