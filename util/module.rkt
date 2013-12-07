@@ -1,6 +1,6 @@
 #lang racket/base
 
-(require racket/contract (for-syntax racket/base))
+(require racket/contract racket/stxparam (for-syntax racket/base))
 
 (provide define* define-for-syntax* define-syntax*)
 
@@ -51,6 +51,12 @@
      (begin
        (define-syntax-rule (name rest ...) body)
        (provide name)))))
+
+(define-syntax-rule*
+  (define-syntax-parameter* id e)
+  (begin
+    (define-syntax-parameter id e)
+    (provide id)))
 
 (define-syntax-rule*
   (define-values* (n ...) vals)
