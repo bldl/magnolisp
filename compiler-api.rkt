@@ -80,24 +80,6 @@ external dependencies for the program/library, as well as the .cpp and
           ;; associated with the binding. It should also have the
           ;; declaration syntax corresponding to the function
           ;; definition.
-          (define-values (pt-lst rt)
-            (match t
-              ((FunT _ ps r)
-               (unless (= (length ps) (length p))
-                 (raise-language-error/ast
-                  "arity mismatch between function and its type"
-                  ast t))
-               (values ps r))
-              (_
-               (raise-language-error/ast
-                "expected function type"
-                ast t))))
-          (set! p (map
-                   (lambda (p t)
-                     (match p
-                       ((Param a n _)
-                        (Param a n t))))
-                   p pt-lst))
           (when (hash-ref a1 'foreign #f)
             (set! b (annoless NoBody)))
           (Defun a1 n t p b))
@@ -256,141 +238,6 @@ external dependencies for the program/library, as well as the .cpp and
       (subterm-all rw ast))))
 
   (rw ast))
-
-;;; 
-;;; type checking
-;;; 
-
-;; Takes an immutable-free-id-table containing just the program, and
-;; checks its types. Expects a fully typed program. 'defs' itself is
-;; used as the type environment. Returns nothing.
-(define (defs-type-check defs)
-  ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values defs))))
-  
-  (define (lookup x)
-    (assert (Var? x))
-    (define def-id (get-def-id-or-fail x))
-    (define def (dict-ref defs def-id))
-    (match def
-      ((DefVar _ _ t _)
-       t)
-      ((Param _ _ t)
-       t)
-      ((Defun _ _ t ps _)
-       t)
-      ((ForeignTypeDecl _ id _)
-       (syntaxed id DefNameT id))
-      ))
-  
-  (define (type=? x y)
-    (cond
-     ((AnyT? x) #t)
-     ((AnyT? y) #t)
-     ((and (NameT? x) (NameT? y))
-      (free-identifier=?
-       (get-def-id-or-fail x)
-       (get-def-id-or-fail y)))
-     ((and (FunT? x) (FunT? y))
-      (define x-rt (FunT-rt x))
-      (define y-rt (FunT-rt y))
-      (define x-ats (FunT-ats x))
-      (define y-ats (FunT-ats y))
-      (and (= (length x-ats) (length y-ats))
-           (type=? x-rt y-rt)
-           (andmap type=? x-ats y-ats)))
-     (else #f)))
-
-  (define (tc-def ast) ;; Ast? -> void?
-    (match ast
-      ((or (? ForeignTypeDecl?) (? Param?))
-       (void))
-      ((Defun _ id t ps b)
-       ;; Type kind and arity correctness wrt parameters was already
-       ;; checked in creating Defun.
-       (define r-t (FunT-rt t))
-       (define b-t (if (NoBody? b) r-t (tc-expr b)))
-       (unless (type=? r-t b-t)
-         (raise-language-error/ast
-          "function return type does not match body expression"
-          #:fields (list (list "declared return type"
-                               (ast-displayable/datum r-t))
-                         (list "actual return type"
-                               (ast-displayable/datum b-t)))
-          ast b))
-       (void))
-      (else
-       (raise-argument-error
-        'tc-def "supported Ast?" ast))))
-
-  ;; Initialized to #f for each BlockExpr scope.
-  (define return-type (make-parameter #f))
-  
-  (define (tc-stat ast) ;; Ast? -> void?
-    (match ast
-      ((Return _ e)
-       (define t (tc-expr e))
-       (define expect-t (return-type))
-       (when (and expect-t (not (type=? expect-t t)))
-         (raise-language-error/ast
-          "conflicting return type in block"
-          ast e
-          #:fields (list (list "previously"
-                               (ast-displayable/datum expect-t)))))
-       (return-type t)
-       (void))
-      ((Pass _)
-       (void))
-      ((BlockStat _ ss)
-       (for-each tc-stat ss))
-      ((Let _ bs ss)
-       (for-each tc-def bs)
-       (for-each tc-stat ss))
-      (else
-       (raise-argument-error
-        'tc-stat "supported Ast?" ast))))
-      
-  (define (tc-expr ast) ;; Ast? -> Type?
-    (match ast
-      ((BlockExpr _ ss)
-       (parameterize ((return-type #f))
-         (for-each tc-stat ss)
-         (define r-t (return-type))
-         (unless r-t
-           (raise-language-error/ast
-            "block expression without return"
-            ast))
-         r-t))
-      ((? Var?)
-       (lookup ast))
-      ((Apply _ f as)
-       (define f-t (lookup f))
-       (unless (FunT? f-t)
-         (raise-language-error/ast
-          "application of a non-function"
-          ast f))
-       (unless (= (length as) (length (FunT-ats f-t)))
-         (raise-language-error/ast
-          "function arity does not match number of arguments"
-          #:fields (list (list "function type" (ast-displayable f-t)))
-          ast))
-       (for ([e as] [p-t (FunT-ats f-t)])
-         (define e-t (tc-expr e))
-         (unless (type=? p-t e-t)
-           (raise-language-error/ast
-            "parameter type does not match that of expression"
-            #:fields (list
-                      (list "parameter type" (ast-displayable p-t))
-                      (list "function type" (ast-displayable f-t)))
-            ast e)))
-       (FunT-rt f-t))
-      ((? Literal?)
-       the-AnyT) ;; for now, at least
-      (else
-       (raise-argument-error
-        'tc-expr "supported Ast?" ast))))
-  
-  (for (((id def) (in-dict defs)))
-    (tc-def def)))
 
 ;;; 
 ;;; build options
@@ -793,6 +640,8 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; compilation
 ;;;
 
+(require "type-infer.rkt")
+
 ;; Compiles a program consisting of all the entry points in the
 ;; specified modules, and all dependencies thereof.
 (define* (compile-modules . ep-mp-lst)
@@ -860,16 +709,16 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
   (set! all-defs ((make-for-all-defs ast-LetLocalEc->BlockExpr) all-defs))
   (set! all-defs (defs-simplify all-defs))
-  ;;(pretty-print (dict-values all-defs)) (exit)
   (set! all-defs (defs-de-racketize all-defs))
-  (defs-type-check all-defs)
+  (set! all-defs (defs-type-infer all-defs))
+  ;;(pretty-print (dict-values all-defs)) (exit)
   
   ;;(all-defs-display-Var-bindings all-defs)
   ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (list 'entry-points (dict-map eps-in-prog (compose car cons))))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
-  ;;(pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
+  (pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
   
   (St mods all-defs eps-in-prog))
 
@@ -941,6 +790,6 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-b-prog.rkt"))
+  (define st (compile-modules "test-i-prog.rkt"))
   (generate-files st (hasheq ;;'build (seteq 'gnu-make 'qmake 'c 'ruby)
                              'cxx (seteq 'cc 'hh))))

@@ -157,14 +157,14 @@ want to define the base node type using the provided macro.
                #'name
                (syntax->list #'((t field) ...))))
           #:transparent)))
-    ((_ name parent ((t field) ...))
+    ((_ name parent ((t field) ...) modif ...)
      #`(begin
          (concrete-struct* name parent (field ...)
            #:methods gen:strategic
            (#,@(make-strategic
                 #'name
                 (syntax->list #'((t field) ...))))
-           #:transparent)
+           #:transparent modif ...)
          (define* #,(format-id stx "new-~a" (syntax-e #'name))
            (lambda (stx . args)
              (apply name (hasheq 'stx stx) args)))))

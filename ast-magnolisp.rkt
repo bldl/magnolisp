@@ -129,6 +129,10 @@ It is rather important for all Ast derived node types to be
 
 (define-ast* AnyT Type () #:singleton (#hasheq()))
 
+(define-ast* VarT Type ((no-term sym)))
+
+(define-ast* BoxT Type ((just-term t)) #:mutable)
+
 ;; 'id' is an ID
 (define-ast* NameT Type ((no-term id)))
 
