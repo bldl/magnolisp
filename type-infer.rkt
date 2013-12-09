@@ -14,6 +14,26 @@
    Var?
    ast))
 
+;; In IR we do not allow global DefVars.
+(define (ast-local-def? ast)
+  (any-pred-holds
+   Param? DefVar?
+   ast))
+
+(define (defs-update-defs-table defs)
+  (define f
+    (topdown-visit
+     (lambda (ast)
+       (when (ast-local-def? ast)
+         (define id (Def-id ast))
+         (set! defs (dict-set defs id ast))))))
+  
+  (for (((id def) (in-dict defs)))
+    (unless (ast-local-def? def)
+      (f def)))
+
+  defs)
+
 (define (def-get-type def)
   (match def
     ((DefVar _ _ t _)
@@ -64,6 +84,9 @@
       (def-set-type ast t)
       (expr-set-type ast t)))
 
+;; We add boxed types everywhere, so that actual inference no longer
+;; needs to rewrite the AST. It is sufficient to do imperative update
+;; of the boxes.
 (define ast-add-VarT
   (topdown
    (lambda (ast)
@@ -80,7 +103,7 @@
           (raise-language-error/ast
            "illegal type for a variable"
            ast t))))
-       ((Param a id t) ;;; xxx Param can also appear as a definition in its own right, not just under Defun - we may need to lookup a Param Var, so we need it in table - but the Param in AST should probably also get the same type info
+       ((Param a id t)
         (match t
           ((? NameT?) ast)
           ((BoxT _ (VarT _ _)) ast)
@@ -327,9 +350,14 @@
          (make-immutable-free-id-table #:phase 0)
          (((id def) (in-dict defs)))
          (let ()
-           (define n-def (ast-add-VarT def))
+           (define n-def
+             (if (ast-local-def? def)
+                 def
+                 (ast-add-VarT def)))
            (values id n-def))))
 
+  (set! defs (defs-update-defs-table defs))
+  
   (for (((id def) (in-dict defs)))
     (ti-def def))
 
