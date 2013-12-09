@@ -57,6 +57,16 @@
     ((? ForeignTypeDecl?)
      def)))
 
+(define (box-t t)
+  (if (BoxT? t)
+      t
+      (annoless BoxT t)))
+
+(define (unbox-t t)
+  (if (BoxT? t)
+      (BoxT-t t)
+      t))
+
 (define (fresh-type)
   (annoless BoxT (annoless VarT (gensym "t"))))
   
@@ -68,6 +78,9 @@
 
 (define (expr-set-type ast t)
   (Ast-anno-set ast 'type t))
+
+(define (expr-set-type-as-boxed ast t)
+  (expr-set-type ast (box-t t)))
 
 (define (expr-set-boxed-type! ast t)
   (define b (expr-get-type ast))
@@ -84,65 +97,74 @@
       (def-set-type ast t)
       (expr-set-type ast t)))
 
+(define (ast-expr-add-VarT defs-t def)
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         ((? Var?)
+          (define t (lookup-type-from-defs defs-t ast))
+          (expr-set-type-as-boxed ast t))
+         ((? ast-expr?)
+          (expr-set-type ast (fresh-type)))
+         (_ ast)))))
+  
+  (rw def))
+
+(define (def-add-VarT ast)
+  (match ast
+    ((Defun a id t ps b)
+     (define n-t t)
+     (cond
+      ((AnyT? t)
+       (set! n-t
+             (annoless FunT
+                       (map (lambda (x) (fresh-type)) ps)
+                       (fresh-type))))
+      ((FunT? t)
+       (unless (= (length ps) (length (FunT-ats t)))
+         (raise-language-error/ast
+          "arity mismatch between function and its type"
+          ast t)))
+      (else
+       (raise-language-error/ast
+        "illegal type for a function"
+        ast t)))
+     (define n-ps
+       (map
+        (lambda (p t)
+          (match p
+            ((Param a n o-t)
+             (assert (AnyT? o-t))
+             (Param a n t))))
+        ps (FunT-ats n-t)))
+     (Defun a id n-t n-ps b))
+    (_ ast)))
+
 ;; We add boxed types everywhere, so that actual inference no longer
 ;; needs to rewrite the AST. It is sufficient to do imperative update
 ;; of the boxes.
-(define ast-add-VarT
-  (topdown
-   (lambda (ast)
-     (match ast
-       ((? ast-expr?)
-        (expr-set-type ast (fresh-type)))
-       ((DefVar a id t v)
-        (cond
-         ((AnyT? t)
-          (DefVar a id (fresh-type) v))
-         ((NameT? t)
-          ast)
-         (else
-          (raise-language-error/ast
-           "illegal type for a variable"
-           ast t))))
-       ((Param a id t)
-        (match t
-          ((? NameT?) ast)
-          ((BoxT _ (VarT _ _)) ast)
-          (else
-           (raise-language-error/ast
-            "illegal type for a parameter"
-            ast t))))
-       ((Defun a id t ps b)
-        (define n-t t)
-        (cond
-         ((AnyT? t)
-          (set! n-t
-            (annoless FunT
-                      (map (lambda (x) (fresh-type)) ps)
-                      (fresh-type))))
-         ((FunT? t)
-          (unless (= (length ps) (length (FunT-ats t)))
-            (raise-language-error/ast
-             "arity mismatch between function and its type"
-             ast t)))
-         (else
-           (raise-language-error/ast
-            "illegal type for a function"
-            ast t)))
-        (define n-ps
-          (map
-           (lambda (p t)
-             (match p
-               ((Param a n o-t)
-                (assert (AnyT? o-t))
-                (Param a n t))))
-           ps (FunT-ats n-t)))
-        (Defun a id n-t n-ps b))
-       (_ ast)))))
+(define (defs-add-VarT defs)
+  ;; First add types to top-level definitions. This includes any local
+  ;; definitions within them.
+  (set! defs
+        (for/dict
+         (make-immutable-free-id-table #:phase 0)
+         (((id def) (in-dict defs)))
+         (values id (def-add-VarT def))))
 
-(define (unbox-t t)
-  (if (BoxT? t)
-      (BoxT-t t)
-      t))
+  ;; Sync local definitions info into 'defs' table.
+  (set! defs (defs-update-defs-table defs))
+
+  ;; Now add types to expression. For variable definitions, use the
+  ;; types given to the definitions.
+  (set! defs
+        (for/dict
+         (make-immutable-free-id-table #:phase 0)
+         (((id def) (in-dict defs)))
+         (values id (ast-expr-add-VarT defs def))))
+
+  defs)
 
 (define (type=? x y)
   (set! x (unbox-t x))
@@ -189,6 +211,12 @@
          (ast-set-type ast (type-rm-BoxT ast t))
          ast))))
 
+(define (lookup-type-from-defs defs x)
+  (assert (Var? x))
+  (define def-id (get-def-id-or-fail x))
+  (define def (dict-ref defs def-id))
+  (def-get-type def))
+
 ;; Takes an immutable-free-id-table containing just the program, and
 ;; checks/infers its types. 'defs' itself is used as the type
 ;; environment. The input may contain AnyT values, long as their
@@ -197,11 +225,7 @@
 (define* (defs-type-infer defs)
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values defs))))
   
-  (define (lookup x)
-    (assert (Var? x))
-    (define def-id (get-def-id-or-fail x))
-    (define def (dict-ref defs def-id))
-    (def-get-type def))
+  (define lookup (fix lookup-type-from-defs defs))
 
   (define (unify! x y) ;; Type? Type? -> (or/c Type? #f)
     (cond
@@ -308,6 +332,7 @@
          r-t))
       ((? Var?)
        (define t (lookup ast))
+       ;;(writeln `(var has type ,(expr-get-type ast) setting to ,t))
        (expr-set-boxed-type! ast t)
        t)
       ((Apply _ f as)
@@ -345,19 +370,8 @@
        (raise-argument-error
         'ti-expr "supported Ast?" ast))))
 
-  (set! defs
-        (for/dict
-         (make-immutable-free-id-table #:phase 0)
-         (((id def) (in-dict defs)))
-         (let ()
-           (define n-def
-             (if (ast-local-def? def)
-                 def
-                 (ast-add-VarT def)))
-           (values id n-def))))
+  (set! defs (defs-add-VarT defs))
 
-  (set! defs (defs-update-defs-table defs))
-  
   (for (((id def) (in-dict defs)))
     (ti-def def))
 
