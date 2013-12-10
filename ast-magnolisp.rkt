@@ -129,9 +129,8 @@ It is rather important for all Ast derived node types to be
 
 (define-ast* AnyT Type () #:singleton (#hasheq()))
 
-(define-ast* VarT Type ((no-term sym)))
-
-(define-ast* BoxT Type ((just-term t)) #:mutable)
+;; 'lvar' is a logic-var?
+(define-ast* VarT Type ((no-term lvar)))
 
 ;; 'id' is an ID
 (define-ast* NameT Type ((no-term id)))
@@ -336,6 +335,18 @@ It is rather important for all Ast derived node types to be
    ((Var? ast) (Var-id ast))
    ((NameT? ast) (NameT-id ast))
    (else (unsupported ast))))
+
+;;; 
+;;; expressions
+;;; 
+
+(define* (ast-expr? ast)
+  (any-pred-holds
+   Apply?
+   BlockExpr?
+   Literal?
+   Var?
+   ast))
 
 ;;; 
 ;;; exports

@@ -4,22 +4,16 @@
 |#
 
 (require "ast-magnolisp.rkt" "strategy.rkt" "util.rkt"
+         (rename-in racklog [_ make-logic-var])
          syntax/id-table)
 
-(define (ast-expr? ast)
-  (any-pred-holds
-   Apply?
-   BlockExpr?
-   Literal?
-   Var?
-   ast))
+;;; 
+;;; generic passes
+;;;
 
-;; In IR we do not allow global DefVars.
-(define (ast-local-def? ast)
-  (any-pred-holds
-   Param? DefVar?
-   ast))
-
+;; This pass may be used to synchronize the definitions table with
+;; updated local definitions (such as Param) after changes have been
+;; made within the global definitions.
 (define (defs-update-defs-table defs)
   (define f
     (topdown-visit
@@ -33,6 +27,22 @@
       (f def)))
 
   defs)
+
+;;; 
+;;; utilities
+;;; 
+
+;; In IR we do not allow global DefVars.
+(define (ast-local-def? ast)
+  (any-pred-holds
+   Param? DefVar?
+   ast))
+
+(define (expr-get-type ast)
+  (ast-anno-maybe ast 'type))
+
+(define (expr-set-type ast t)
+  (Ast-anno-set ast 'type t))
 
 (define (def-get-type def)
   (match def
@@ -57,34 +67,11 @@
     ((? ForeignTypeDecl?)
      def)))
 
-(define (box-t t)
-  (if (BoxT? t)
-      t
-      (annoless BoxT t)))
-
-(define (unbox-t t)
-  (if (BoxT? t)
-      (BoxT-t t)
-      t))
-
-(define (fresh-type)
-  (annoless BoxT (annoless VarT (gensym "t"))))
-  
-(define (expr-get-type ast)
-  (ast-anno-maybe ast 'type))
-
-(define (expr-get-type-or-make ast)
-  (or (expr-get-type ast) (fresh-type)))
-
-(define (expr-set-type ast t)
-  (Ast-anno-set ast 'type t))
-
-(define (expr-set-type-as-boxed ast t)
-  (expr-set-type ast (box-t t)))
-
-(define (expr-set-boxed-type! ast t)
-  (define b (expr-get-type ast))
-  (set-BoxT-t! b t))
+(define (lookup-type-from-defs defs x)
+  (assert (Var? x))
+  (define def-id (get-def-id-or-fail x))
+  (define def (dict-ref defs def-id))
+  (def-get-type def))
 
 ;; Returns #f for nodes that have no type.
 (define (ast-get-type ast)
@@ -97,16 +84,52 @@
       (def-set-type ast t)
       (expr-set-type ast t)))
 
+(define (type=? x y)
+  (cond
+   ((VarT? x) #t)
+   ((VarT? y) #t)
+   ((and (NameT? x) (NameT? y))
+    (free-identifier=?
+     (get-def-id-or-fail x)
+     (get-def-id-or-fail y)))
+   ((and (FunT? x) (FunT? y))
+    (define x-rt (FunT-rt x))
+    (define y-rt (FunT-rt y))
+    (define x-ats (FunT-ats x))
+    (define y-ats (FunT-ats y))
+    (and (= (length x-ats) (length y-ats))
+         (type=? x-rt y-rt)
+         (andmap type=? x-ats y-ats)))
+   (else #f)))
+
+;;; 
+;;; init with fresh type variables
+;;; 
+
+(define (fresh-type)
+  (annoless VarT (make-logic-var)))
+  
+(define type-AnyT->VarT
+  (topdown
+   (lambda (t)
+     (cond
+      ((AnyT? t) (fresh-type))
+      (else t)))))
+
+(define (type-add-VarT t)
+  (cond
+   ((not t) (fresh-type))
+   ((AnyT? t) (fresh-type))
+   (else (type-AnyT->VarT t))))
+
 (define (ast-expr-add-VarT defs-t def)
   (define rw
     (topdown
      (lambda (ast)
        (match ast
-         ((? Var?)
-          (define t (lookup-type-from-defs defs-t ast))
-          (expr-set-type-as-boxed ast t))
          ((? ast-expr?)
-          (expr-set-type ast (fresh-type)))
+          (define t (type-add-VarT (expr-get-type ast)))
+          (expr-set-type ast t))
          (_ ast)))))
   
   (rw def))
@@ -114,22 +137,22 @@
 (define (def-add-VarT ast)
   (match ast
     ((Defun a id t ps b)
-     (define n-t t)
-     (cond
-      ((AnyT? t)
-       (set! n-t
-             (annoless FunT
-                       (map (lambda (x) (fresh-type)) ps)
-                       (fresh-type))))
-      ((FunT? t)
-       (unless (= (length ps) (length (FunT-ats t)))
+     (define n-t
+       (cond
+        ((AnyT? t)
+         (annoless FunT
+                   (map (lambda (x) (fresh-type)) ps)
+                   (fresh-type)))
+        ((FunT? t)
+         (unless (= (length ps) (length (FunT-ats t)))
+           (raise-language-error/ast
+            "arity mismatch between function and its type"
+            ast t))
+         (type-add-VarT t))
+        (else
          (raise-language-error/ast
-          "arity mismatch between function and its type"
-          ast t)))
-      (else
-       (raise-language-error/ast
-        "illegal type for a function"
-        ast t)))
+          "illegal type for a function"
+          ast t))))
      (define n-ps
        (map
         (lambda (p t)
@@ -141,9 +164,6 @@
      (Defun a id n-t n-ps b))
     (_ ast)))
 
-;; We add boxed types everywhere, so that actual inference no longer
-;; needs to rewrite the AST. It is sufficient to do imperative update
-;; of the boxes.
 (define (defs-add-VarT defs)
   ;; First add types to top-level definitions. This includes any local
   ;; definitions within them.
@@ -166,25 +186,9 @@
 
   defs)
 
-(define (type=? x y)
-  (set! x (unbox-t x))
-  (set! y (unbox-t y))
-  (cond
-   ((VarT? x) #t)
-   ((VarT? y) #t)
-   ((and (NameT? x) (NameT? y))
-    (free-identifier=?
-     (get-def-id-or-fail x)
-     (get-def-id-or-fail y)))
-   ((and (FunT? x) (FunT? y))
-    (define x-rt (FunT-rt x))
-    (define y-rt (FunT-rt y))
-    (define x-ats (FunT-ats x))
-    (define y-ats (FunT-ats y))
-    (and (= (length x-ats) (length y-ats))
-         (type=? x-rt y-rt)
-         (andmap type=? x-ats y-ats)))
-   (else #f)))
+;;; 
+;;; other
+;;; 
 
 ;; Removes any BoxT wrappers. Ensures that no VarT type expressions
 ;; remain. 'err-ast' is used for error reporting, only.
@@ -211,55 +215,65 @@
          (ast-set-type ast (type-rm-BoxT ast t))
          ast))))
 
-(define (lookup-type-from-defs defs x)
-  (assert (Var? x))
-  (define def-id (get-def-id-or-fail x))
-  (define def (dict-ref defs def-id))
-  (def-get-type def))
+;; Racklog does not seem to provide any lower-level access routine to
+;; the value of a logic variable, but we can do this. Returns #f if
+;; 'lvar' is not bound.
+(define (logic-var-val lvar)
+  (define r (%which (x) (%= x lvar)))
+  (and r (cdr (assq 'x r))))
+
+(define (logic->type type-sym->name a-t)
+  (define (f t)
+    (match t
+      ((? logic-var? t)
+       (define v (logic-var-val t))
+       (assert v)
+       (f v))
+      ((list 'fn ats ... rt)
+       (annoless FunT (map f ats) (f rt)))
+      ((? symbol? t)
+       (type-sym->name t))))
+
+  (f a-t))
+
+(define (type->logic type-name->sym a-t)
+  (define (f t)
+    (match t
+      ((VarT _ lvar) lvar)
+      ((NameT _ id) (type-name->sym id))
+      ((FunT _ ats rt) `(fn ,@(map f ats) ,(f rt)))))
+  
+  (f a-t))
 
 ;; Takes an immutable-free-id-table containing just the program, and
 ;; checks/infers its types. 'defs' itself is used as the type
 ;; environment. The input may contain AnyT values, long as their
 ;; meaning can be inferred. Returns a fully typed program, with
-;; expressions having 'type' annotations.
+;; definitions having resolved type fields (where appropriate), and
+;; expressions having resolved 'type' annotations.
 (define* (defs-type-infer defs)
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values defs))))
+
+  (define type-names (make-free-id-table #:phase 0))
+  (define type-syms (make-hasheq))
+  (define (type-name->sym id)
+    (define sym (dict-ref type-names id #f))
+    (cond
+     ((sym sym))
+     (else
+      (define b (symbol->string (syntax-e id)))
+      (define sym (gensym b))
+      (dict-set! type-names id sym)
+      (hash-set! type-syms sym id)
+      sym)))
+  (define (type-sym->name sym)
+    (hash-ref type-syms sym))
   
   (define lookup (fix lookup-type-from-defs defs))
 
-  (define (unify! x y) ;; Type? Type? -> (or/c Type? #f)
-    (cond
-     ((VarT? (unbox-t x))
-      (set-BoxT-t! x (unbox-t y))
-      y)
-     ((VarT? (unbox-t y))
-      (set-BoxT-t! y (unbox-t x))
-      x)
-     ((and (NameT? (unbox-t x)) (NameT? (unbox-t y)))
-      (and (free-identifier=?
-            (get-def-id-or-fail (unbox-t x))
-            (get-def-id-or-fail (unbox-t y)))
-           (unbox-t x)))
-     ((and (FunT? (unbox-t x)) (FunT? (unbox-t y)))
-      (define x-rt (FunT-rt (unbox-t x)))
-      (define y-rt (FunT-rt (unbox-t y)))
-      (define x-ats (FunT-ats (unbox-t x)))
-      (define y-ats (FunT-ats (unbox-t y)))
-      (define f-t
-        (and
-         (= (length x-ats) (length y-ats))
-         (let ((rt (unify! x-rt y-rt)))
-           (and rt
-                (let ((ats (map unify! x-ats y-ats)))
-                  (and (andmap values ats)
-                       (annoless FunT ats rt)))))))
-      (and f-t
-           (begin (assert (type=? f-t x))
-                  (assert (type=? f-t y))
-                  (if (ast-anno-maybe (unbox-t x) 'stx)
-                      x y))))
-     (else #f)))
-
+  (define (unify! x y) ;; Type? Type? -> void?
+    xxx)
+    
   (define (ti-def ast) ;; Def? -> void?
     (match ast
       ((? ForeignTypeDecl?)
