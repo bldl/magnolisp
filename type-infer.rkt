@@ -243,7 +243,7 @@
 ;; substitutions [h mutable (hash/c symbol? Type?)]. As a side effect,
 ;; may modify 'h' to add new substitutions. Returns #t if 'x' and 'y'
 ;; are unifiable, and #f otherwise.
-(define (unify x y h)
+(define (unify h x y)
   ;; 'x' and 'y' must have any substitutions applied.
   (define (f x y)
     (cond
@@ -265,6 +265,15 @@
       (free-identifier=?
        (get-def-id-or-fail x)
        (get-def-id-or-fail y)))
+     ((and (FunT? x) (FunT? y))
+      (define x-rt (FunT-rt x))
+      (define y-rt (FunT-rt y))
+      (define x-ats (FunT-ats x))
+      (define y-ats (FunT-ats y))
+      (and
+       (= (length x-ats) (length y-ats))
+       (unify h x-rt y-rt)
+       (andmap (fix unify h) x-ats y-ats)))
      (else
       #f)))
   
@@ -331,7 +340,7 @@
   ;; Possibly adds a constraint between types 'x' and 'y'. Returns #t
   ;; if they are unifiable or possibly solvable, and #f otherwise.
   (define (unify! x y) ;; Type? Type? -> boolean?
-    (unify x y var-h))
+    (unify var-h x y))
 
   (define (expr-unify! e t)
     (define e-t (expr-get-type e))
@@ -423,13 +432,20 @@
        (expr-unify! f f-t)
 
        ;; We have done prior work to ensure that a function
-       ;; declaration always has FunT type. Now we can unify against
-       ;; the argument expressions' types.
+       ;; declaration always has FunT type. This check should not
+       ;; fail.
        (unless (FunT? f-t)
          (raise-language-error/ast
           "application of a non-function"
           #:fields (list (list "type" (ast-displayable f-t)))
           ast f))
+
+       ;; Now we can unify against the argument expressions' types,
+       ;; and also the type of this expression. We could construct a
+       ;; FunT instance from said information and leave the checking
+       ;; to 'unify', but we get better error messages by doing some
+       ;; extra work here. We make sure to add the same constraints
+       ;; separately here.
        (unless (= (length as) (length (FunT-ats f-t)))
          (raise-language-error/ast
           "function arity does not match number of arguments"
