@@ -203,7 +203,7 @@
 ;; (applied recursively). As a side effect, may update 'h' for
 ;; purposes for memoization. Returns the simplified type. Note that
 ;; eq? may be used to determine if any simplification took place.
-(define (subst t h) ;; (-> Type? hash? Type?)
+(define (subst h t) ;; (-> Type? hash? Type?)
   ;; 'ix' of last successful lookup.
   (define last-ix 0)
   
@@ -214,29 +214,30 @@
            (set! last-ix ix)
            ast)))
 
-  (define (memoize sym ast ix)
+  (define (memoize ix sym ast)
     (when (< ix last-ix)
-      (writeln `(memoize ,sym = ,ast))
+      ;;(writeln `(memoize ,sym = ,ast))
       (hash-set! h sym ast))
     ast)
   
-  (define (f ast ix)
-    (cond
-     ((VarT? ast)
-      (define sym (VarT-sym ast))
+  (define (f ix ast)
+    (match ast
+     ((VarT _ sym)
       (define n-ast (lookup sym ix))
       (cond
        ((not n-ast) ast)
        (else
-        (memoize sym (f n-ast (+ ix 1)) ix))))
-     ((NameT? ast)
+        (memoize ix sym (f (+ ix 1) n-ast)))))
+     ((? NameT?)
       ast)
+     ((FunT a ats rt)
+      (FunT a (map (fix subst h) ats) (subst h rt)))
      (else
       (raise-argument-error
-       'f "(or/c VarT? NameT?)"
-       0 ast ix))))
+       'f "(or/c FunT? NameT? VarT?)"
+       1 ix ast))))
 
-  (f t 0))
+  (f 0 t))
 
 ;; Unifies types 'x' and 'y', in the context of the given
 ;; substitutions [h mutable (hash/c symbol? Type?)]. As a side effect,
@@ -265,14 +266,10 @@
        (get-def-id-or-fail x)
        (get-def-id-or-fail y)))
      (else
-      (raise-arguments-error
-       'unify
-       "expected only (or/c VarT? NameT?) types"
-       "x" x
-       "y" y))))
+      #f)))
   
-  (define s-x (subst x h))
-  (define s-y (subst y h))
+  (define s-x (subst h x))
+  (define s-y (subst h y))
   (f s-x s-y))
 
 ;;; 
@@ -291,7 +288,7 @@
      (lambda (ast)
        (cond
         ((VarT? ast)
-         (define n-ast (subst ast var-h))
+         (define n-ast (subst var-h ast))
          (when (VarT? n-ast)
            (raise-language-error/ast
             "cannot resolve concrete type"
@@ -418,14 +415,16 @@
           ast))
        (expr-unify! ast t))
       ((Apply _ f as)
-       ;; We have done prior work to ensure that a function
-       ;; declaration always has FunT type. That said, here we
-       ;; explicitly unify all the components of 'f' with expressions,
-       ;; and it would be redundant to unify the 'f' expression with
-       ;; the declaration of 'f'. Hence we do not invoke (ti-expr f)
-       ;; here. This also helps keep the unification routine simpler,
-       ;; as we never unify FunT types.
+       ;; We bypass invoking (ti-expr f) here, as we only want to
+       ;; allow FunT typed expressions in this context. We must still
+       ;; be sure to set up a constraint for the expression 'f', lest
+       ;; its type be left unresolved.
        (define f-t (lookup f))
+       (expr-unify! f f-t)
+
+       ;; We have done prior work to ensure that a function
+       ;; declaration always has FunT type. Now we can unify against
+       ;; the argument expressions' types.
        (unless (FunT? f-t)
          (raise-language-error/ast
           "application of a non-function"
@@ -446,6 +445,9 @@
                       (list "parameter type"
                             (ast-displayable p-t)))
             ast e)))
+
+       ;; The type of the Apply expression must unify with the return
+       ;; type of the function.
        (define t (FunT-rt f-t))
        (expr-unify! ast t))
       ((? Literal?)
