@@ -102,6 +102,7 @@ It is rather important for all Ast derived node types to be
        ((or/c Ast? syntax? #f) (or/c Ast? syntax? #f)
         (listof (or/c Ast? syntax?))
         #:fields (listof list?)
+        #:continued (or/c string? (listof string?))
         #:name (or/c symbol? #f))
        any)
   (raise-language-error/ast message
@@ -109,6 +110,7 @@ It is rather important for all Ast derived node types to be
                             [sub-ast #f]
                             [extra-sources null]
                             #:fields [more-fields null]
+                            #:continued [continued not-magnolisp-message]
                             #:name [fallback-name #f])
   (define name (or (and ast (form-get-name/ast ast))
                    (and sub-ast (form-get-name/ast sub-ast))
@@ -119,7 +121,7 @@ It is rather important for all Ast derived node types to be
   (raise-language-error name message
                         expr sub-expr extras
                         #:fields more-fields
-                        #:continued not-magnolisp-message))
+                        #:continued continued))
 
 ;;; 
 ;;; type expressions
@@ -129,8 +131,7 @@ It is rather important for all Ast derived node types to be
 
 (define-ast* AnyT Type () #:singleton (#hasheq()))
 
-;; 'lvar' is a logic-var?
-(define-ast* VarT Type ((no-term lvar)))
+(define-ast* VarT Type ((no-term sym)))
 
 ;; 'id' is an ID
 (define-ast* NameT Type ((no-term id)))

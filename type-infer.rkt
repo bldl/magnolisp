@@ -3,8 +3,8 @@
 #|
 |#
 
-(require "ast-magnolisp.rkt" "strategy.rkt" "util.rkt"
-         (rename-in racklog [_ make-logic-var])
+(require "ast-magnolisp.rkt" "compiler-util.rkt"
+         "strategy.rkt" "util.rkt"
          syntax/id-table)
 
 ;;; 
@@ -102,12 +102,21 @@
          (andmap type=? x-ats y-ats)))
    (else #f)))
 
+(define (variable-type? t)
+  (let/ec k
+    ((topdown-visit
+      (lambda (ast)
+        (when (VarT? ast)
+          (k #t))))
+     t)
+    #f))
+
 ;;; 
 ;;; init with fresh type variables
 ;;; 
 
 (define (fresh-type)
-  (annoless VarT (make-logic-var)))
+  (annoless VarT (gensym "t")))
   
 (define type-AnyT->VarT
   (topdown
@@ -187,63 +196,127 @@
   defs)
 
 ;;; 
-;;; other
+;;; constraint solver
 ;;; 
 
-;; Removes any BoxT wrappers. Ensures that no VarT type expressions
-;; remain. 'err-ast' is used for error reporting, only.
-(define (type-rm-BoxT err-ast t)
+;; Simplifies type 't' using any applicable substitions in 'h'
+;; (applied recursively). As a side effect, may update 'h' for
+;; purposes for memoization. Returns the simplified type. Note that
+;; eq? may be used to determine if any simplification took place.
+(define (subst t h) ;; (-> Type? hash? Type?)
+  ;; 'ix' of last successful lookup.
+  (define last-ix 0)
+  
+  (define (lookup sym ix)
+    (define ast (hash-ref h sym #f))
+    (and ast
+         (begin
+           (set! last-ix ix)
+           ast)))
+
+  (define (memoize sym ast ix)
+    (when (< ix last-ix)
+      (writeln `(memoize ,sym = ,ast))
+      (hash-set! h sym ast))
+    ast)
+  
+  (define (f ast ix)
+    (cond
+     ((VarT? ast)
+      (define sym (VarT-sym ast))
+      (define n-ast (lookup sym ix))
+      (cond
+       ((not n-ast) ast)
+       (else
+        (memoize sym (f n-ast (+ ix 1)) ix))))
+     ((NameT? ast)
+      ast)
+     (else
+      (raise-argument-error
+       'f "(or/c VarT? NameT?)"
+       0 ast ix))))
+
+  (f t 0))
+
+;; Unifies types 'x' and 'y', in the context of the given
+;; substitutions [h mutable (hash/c symbol? Type?)]. As a side effect,
+;; may modify 'h' to add new substitutions. Returns #t if 'x' and 'y'
+;; are unifiable, and #f otherwise.
+(define (unify x y h)
+  ;; 'x' and 'y' must have any substitutions applied.
+  (define (f x y)
+    (cond
+     ((and (VarT? x) (VarT? y))
+      (define x-sym (VarT-sym x))
+      (define y-sym (VarT-sym y))
+      (unless (eq? x-sym y-sym)
+        (hash-set! h x-sym y))
+      #t)
+     ((VarT? x)
+      (define x-sym (VarT-sym x))
+      (hash-set! h x-sym y)
+      #t)
+     ((VarT? y)
+      (define y-sym (VarT-sym y))
+      (hash-set! h y-sym x)
+      #t)
+     ((and (NameT? x) (NameT? y))
+      (free-identifier=?
+       (get-def-id-or-fail x)
+       (get-def-id-or-fail y)))
+     (else
+      (raise-arguments-error
+       'unify
+       "expected only (or/c VarT? NameT?) types"
+       "x" x
+       "y" y))))
+  
+  (define s-x (subst x h))
+  (define s-y (subst y h))
+  (f s-x s-y))
+
+;;; 
+;;; VarT removal
+;;; 
+
+;; Ensures that no VarT type expressions remain in type expression
+;; 't'. It is an error for any appearing VarT to not have an entry in
+;; 'var-h', as that means that the program's (concrete) types cannot
+;; be fully determined. 'ctx-ast' is the expression or definition
+;; whose type is being simplified; it is only used for error
+;; reporting.
+(define (type-rm-VarT var-h t ctx-ast)
   (define f
     (topdown
-     (repeat
-      (lambda (ast)
-        (cond
-         ((BoxT? ast)
-          (unbox-t ast))
-         ((VarT? ast)
-          (raise-language-error/ast
-           "cannot infer type"
-           err-ast t))
-         (else #f))))))
+     (lambda (ast)
+       (cond
+        ((VarT? ast)
+         (define n-ast (subst ast var-h))
+         (when (VarT? n-ast)
+           (raise-language-error/ast
+            "cannot resolve concrete type"
+            #:continued "program is not fully typed"
+            ctx-ast t))
+         n-ast)
+        (else ast)))))
   (f t))
 
-(define ast-rm-BoxT
-  (topdown
-   (lambda (ast)
-     (define t (ast-get-type ast))
-     (if t
-         (ast-set-type ast (type-rm-BoxT ast t))
-         ast))))
+;; Uses the 'var-h' table to substitute any VarT nodes in the type
+;; fields and annotations of the program tree 'ast' with concrete type
+;; expressions.
+(define (ast-rm-VarT var-h ast)
+  (define f
+    (topdown
+     (lambda (ast)
+       (define t (ast-get-type ast))
+       (if t
+           (ast-set-type ast (type-rm-VarT var-h t ast))
+           ast))))
+  (f ast))
 
-;; Racklog does not seem to provide any lower-level access routine to
-;; the value of a logic variable, but we can do this. Returns #f if
-;; 'lvar' is not bound.
-(define (logic-var-val lvar)
-  (define r (%which (x) (%= x lvar)))
-  (and r (cdr (assq 'x r))))
-
-(define (logic->type type-sym->name a-t)
-  (define (f t)
-    (match t
-      ((? logic-var? t)
-       (define v (logic-var-val t))
-       (assert v)
-       (f v))
-      ((list 'fn ats ... rt)
-       (annoless FunT (map f ats) (f rt)))
-      ((? symbol? t)
-       (type-sym->name t))))
-
-  (f a-t))
-
-(define (type->logic type-name->sym a-t)
-  (define (f t)
-    (match t
-      ((VarT _ lvar) lvar)
-      ((NameT _ id) (type-name->sym id))
-      ((FunT _ ats rt) `(fn ,@(map f ats) ,(f rt)))))
-  
-  (f a-t))
+;;; 
+;;; API
+;;; 
 
 ;; Takes an immutable-free-id-table containing just the program, and
 ;; checks/infers its types. 'defs' itself is used as the type
@@ -254,25 +327,20 @@
 (define* (defs-type-infer defs)
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values defs))))
 
-  (define type-names (make-free-id-table #:phase 0))
-  (define type-syms (make-hasheq))
-  (define (type-name->sym id)
-    (define sym (dict-ref type-names id #f))
-    (cond
-     ((sym sym))
-     (else
-      (define b (symbol->string (syntax-e id)))
-      (define sym (gensym b))
-      (dict-set! type-names id sym)
-      (hash-set! type-syms sym id)
-      sym)))
-  (define (type-sym->name sym)
-    (hash-ref type-syms sym))
-  
   (define lookup (fix lookup-type-from-defs defs))
 
-  (define (unify! x y) ;; Type? Type? -> void?
-    xxx)
+  (define var-h (make-hasheq))
+
+  ;; Possibly adds a constraint between types 'x' and 'y'. Returns #t
+  ;; if they are unifiable or possibly solvable, and #f otherwise.
+  (define (unify! x y) ;; Type? Type? -> boolean?
+    (unify x y var-h))
+
+  (define (expr-unify! e t)
+    (define e-t (expr-get-type e))
+    (assert e-t)
+    (unify! e-t t)
+    t)
     
   (define (ti-def ast) ;; Def? -> void?
     (match ast
@@ -284,21 +352,19 @@
        (void))
       ((Defun a id t ps b)
        ;; Type kind and arity correctness wrt parameters has already
-       ;; been checked earlier.
-       (define r-t (FunT-rt t))
-       (define b-t r-t)
+       ;; been checked earlier. There is only any checking to do now
+       ;; if there is a body.
        (unless (NoBody? b)
-         (set! b-t (ti-expr b)))
-       (define u-t (unify! r-t b-t))
-       (unless u-t
-         (raise-language-error/ast
-          "function return type does not match body expression"
-          #:fields (list (list "declared return type"
-                               (ast-displayable/datum (unbox-t r-t)))
-                         (list "actual return type"
-                               (ast-displayable/datum (unbox-t b-t))))
-          ast b))
-       (assert (type=? r-t u-t))
+         (define r-t (FunT-rt t))
+         (define b-t (ti-expr b))
+         (unless (unify! r-t b-t)
+           (raise-language-error/ast
+            "function return type does not match body expression"
+            #:fields (list (list "declared return type"
+                                 (ast-displayable/datum r-t))
+                           (list "actual return type"
+                                 (ast-displayable/datum b-t)))
+            ast b)))
        (void))
       (else
        (raise-argument-error
@@ -318,7 +384,7 @@
           ast e
           #:fields (list (list "previously"
                                (ast-displayable/datum
-                                (unbox-t expect-t))))))
+                                expect-t)))))
        (return-type t)
        (void))
       ((Pass _)
@@ -337,45 +403,51 @@
       ((BlockExpr _ ss)
        (parameterize ((return-type #f))
          (for-each ti-stat ss)
-         (define r-t (return-type))
-         (unless r-t
+         (define t (return-type))
+         (unless t
            (raise-language-error/ast
             "block expression without return"
             ast))
-         (expr-set-boxed-type! ast r-t)
-         r-t))
+         (expr-unify! ast t)))
       ((? Var?)
        (define t (lookup ast))
-       ;;(writeln `(var has type ,(expr-get-type ast) setting to ,t))
-       (expr-set-boxed-type! ast t)
-       t)
+       (when (FunT? t)
+         (raise-language-error/ast
+          "reference to a function as a value"
+          #:fields (list (list "type" (ast-displayable t)))
+          ast))
+       (expr-unify! ast t))
       ((Apply _ f as)
-       (define f-t (ti-expr f))
-       (unless (FunT? (unbox-t f-t))
+       ;; We have done prior work to ensure that a function
+       ;; declaration always has FunT type. That said, here we
+       ;; explicitly unify all the components of 'f' with expressions,
+       ;; and it would be redundant to unify the 'f' expression with
+       ;; the declaration of 'f'. Hence we do not invoke (ti-expr f)
+       ;; here. This also helps keep the unification routine simpler,
+       ;; as we never unify FunT types.
+       (define f-t (lookup f))
+       (unless (FunT? f-t)
          (raise-language-error/ast
           "application of a non-function"
-          #:fields (list (list "type" (ast-displayable (unbox-t f-t))))
+          #:fields (list (list "type" (ast-displayable f-t)))
           ast f))
-       (unless (= (length as) (length (FunT-ats (unbox-t f-t))))
+       (unless (= (length as) (length (FunT-ats f-t)))
          (raise-language-error/ast
           "function arity does not match number of arguments"
           #:fields (list (list "function type"
-                               (ast-displayable (unbox-t f-t))))
+                               (ast-displayable f-t)))
           ast))
-       (for ([e as] [p-t (FunT-ats (unbox-t f-t))])
+       (for ([e as] [p-t (FunT-ats f-t)])
          (define e-t (ti-expr e))
          (unless (unify! p-t e-t)
            (raise-language-error/ast
-            "parameter type does not match that of expression"
+            "parameter type does not match that of argument"
             #:fields (list
                       (list "parameter type"
-                            (ast-displayable (unbox-t p-t)))
-                      (list "function type"
-                            (ast-displayable (unbox-t f-t))))
+                            (ast-displayable p-t)))
             ast e)))
-       (define t (FunT-rt (unbox-t f-t)))
-       (expr-set-boxed-type! ast t)
-       t)
+       (define t (FunT-rt f-t))
+       (expr-unify! ast t))
       ((? Literal?)
        ;; Cannot learn anything from this. Might in some cases want an
        ;; annotation for an expression, but such are to be supported.
@@ -393,6 +465,6 @@
         (for/dict
          (make-immutable-free-id-table #:phase 0)
          (((id def) (in-dict defs)))
-         (values id (ast-rm-BoxT def))))
+         (values id (ast-rm-VarT var-h def))))
   
   defs)
