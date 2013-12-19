@@ -84,6 +84,9 @@
   (unless e
     (error 'assert "assertion ~s failed" (quote e))))
 
+(define* (hash-empty? h)
+  (= (hash-count h) 0))
+
 (define* (hash-merge! h . others)
   (for ((other others))
     (for (([k v] other))
@@ -95,6 +98,12 @@
     (for (([k v] other))
       (set! h (hash-set h k v))))
   h)
+
+(define* (hash-merge-2 h-1 h-2)
+  (cond
+   ((hash-empty? h-1) h-2)
+   ((hash-empty? h-2) h-1)
+   (else (hash-merge h-1 h-2))))
 
 (define* (hash-set/assocs h assocs)
   (for ((p assocs))

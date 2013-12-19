@@ -7,8 +7,7 @@ information is only accessed at macro expansion time.
 
 |#
 
-(require "annos-util.rkt" "util.rkt"
-         (for-syntax "compiler-util.rkt" "util.rkt"
+(require (for-syntax "annos-util.rkt" "compiler-util.rkt" "util.rkt"
                      racket/contract racket/dict racket/pretty
                      syntax/id-table))
 
@@ -25,7 +24,7 @@ information is only accessed at macro expansion time.
  ;; from the identifier itself.
  (define* (set-definfo-from-stx! id-stx [def-stx id-stx])
    ;; hasheq(name-symbol -> value-syntax)
-   (define info (get-annos def-stx))
+   (define info (syntax-get-annos def-stx))
    (dict-update! definfo-table id-stx
                  (lambda (h)
                    (if h (hash-merge h info) info)) #f))

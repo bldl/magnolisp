@@ -25,9 +25,9 @@ this code is not in Magnolisp, only for Magnolisp.
 |#
 
 (require
- "annos-util.rkt" "annos-store.rkt" "util.rkt"
+ "annos-store.rkt" "util.rkt"
  racket/stxparam
- (for-syntax "util.rkt" racket/syntax)) 
+ (for-syntax "annos-util.rkt" "util.rkt" racket/syntax)) 
 
 ;; Yes we are providing this. If the programmer wants to hack our core
 ;; language, they may. The idea is to express core language as (%core
@@ -40,12 +40,21 @@ this code is not in Magnolisp, only for Magnolisp.
 ;; #<undefined>
 (define undefined (make-undefined))
 
-;; A form that cooperates with the reader extension.
+;; A form that annotates not an identifier, but any datum. The
+;; annotations are stored as a list of syntax in a syntax property of
+;; the datum.
 (define-syntax* (anno stx)
   (syntax-case stx ()
-    ((_ n v e)
-     (identifier? #'n)
-     (add-anno #'e (syntax-e #'n) #'v #:from stx))))
+    ((_ a ... e)
+     (let ()
+       (define as (syntax->list #'(a ...)))
+       (unless as
+         (raise-syntax-error
+          #f "expected a list of annotations"
+          stx #'(a ...)))
+       (if (null? as)
+           #'e
+           (syntax-add-annos/stx-list #'e as #:from stx))))))
 
 ;; This is to support annotation metaprogramming. You might want to
 ;; define macros that emit (anno! ...) forms for explicitly recording
@@ -56,6 +65,10 @@ this code is not in Magnolisp, only for Magnolisp.
      (identifier? #'id)
      (let ()
        (define as (syntax->list #'(a ...)))
+       (unless as
+         (raise-syntax-error
+          #f "expected a list of annotations"
+          stx #'(a ...)))
        (unless (null? as) (set-definfo! #'id as))
        (syntax/loc stx (begin))))))
 
