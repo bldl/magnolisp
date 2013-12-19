@@ -2,14 +2,19 @@
 
 #|
 
-A reader extension to support generic annotations preceding arbitrary
-forms. We currently use the crazy syntax #an (generic) or #at (type),
-but these are not currently used, anyway. We follow the Scheme
-tradition by turning these into forms, namely 'anno' forms, and
-libraries can then decide on the semantics of each kind of annotation.
+A reader extension to implement annotation shorthand, for both
+in-declaration use, and to precede any form.
 
-The reader extension also implements a shorthand for (type T), namely
-^T.
+#an(x ...) is short for (#:annos x ...), which are expected to appear
+within declarations.
+
+#ap(x ...) f is short for (anno x ... f), where 'f' is any arbitrary
+annotated form. We follow the Scheme tradition by turning these into
+forms, namely 'anno' forms, and libraries can then decide on the
+semantics of each kind of annotation.
+
+Orthogonally to the above, we also support ^T as shorthand for (type
+T), where 'T' can be any type expression.
 
 |#
 
@@ -27,6 +32,7 @@ The reader extension also implements a shorthand for (type T), namely
 ;;; type annotations
 ;;; 
 
+;; ^T -> (type T)
 (define read-type-anno
   (case-lambda
     ((ch in)
@@ -45,82 +51,66 @@ The reader extension also implements a shorthand for (type T), namely
            (type (unsyntax t)))))))
 
 ;;; 
-;;; form-preceding annotations
+;;; #a annotations
 ;;; 
 
-(define read-preceding-type
+;; (x ...) -> (#:annos x ...)
+(define read-annos-declaration
   (lambda (ch in src line col pos)
     (let ((t (read-syntax src in)))
       (when (eof-object? t)
         (raise-read-eof-error
-         "expected type expression to follow #at"
+         "expected datum to follow #an"
          src line col pos #f))
-      (unless (or (identifier? t) (stx-pair? t))
+      (unless (stx-list? t)
         (raise-read-error
-         (format "expected type expression to follow #at (got: ~s)" t)
+         (format "expected list to follow #an (got: ~s)" t)
          src line col pos #f))
-      (let ((d (read-syntax src in)))
-        (when (eof-object? d)
-          (raise-read-eof-error
-           (format "expected datum to follow type ~s" t)
-           src line col pos #f))
-        (quasisyntax/loc (make-loc-stx src line col pos)
-          ((unsyntax anno-id-stx) type (unsyntax t) (unsyntax d)))))))
+      (quasisyntax/loc t (#:annos (unsyntax-splicing t))))))
 
-(define read-preceding-generic
+;; (x ...) f -> (anno x ... f)
+(define read-anno-form
   (lambda (ch in src line col pos)
     (let ((s (read-syntax src in)))
       (when (eof-object? s)
         (raise-read-eof-error
-         "expected annotation to follow #an"
+         "expected annotation to follow #ap"
          src line col pos #f))
-      (let ((k-v
-             (or (and (identifier? s)
-                      (let ((s-dat (syntax-e s)))
-                        (list s-dat (datum->syntax #f #t s))))
-                 (lets then-if-let s-lst (syntax->list s)
-                       then-let s-len (length s-lst)
-                       then-if (or (= s-len 1) (= s-len 2))
-                       then-let n-stx (first s-lst)
-                       then-if (identifier? n-stx)
-                       then-let v-stx (if (= s-len 1)
-                                          (datum->syntax #f #t s)
-                                          (second s-lst))
-                       (list n-stx v-stx))
-                 (raise-read-error
-                  (format "expected annotation to follow #an, got ~s" s)
-                  src line col pos #f))))
-        (let ((d (read-syntax src in)))
-          (when (eof-object? d)
-            (raise-read-eof-error
-             (format "expected datum to follow annotation ~s" s)
-             src line col pos #f))
-          (quasisyntax/loc (make-loc-stx src line col pos)
-            ((unsyntax anno-id-stx) (unsyntax-splicing k-v)
-             (unsyntax d))))))))
+      (unless (stx-list? s)
+        (raise-read-error
+         (format "expected list to follow #ap (got: ~s)" s)
+         src line col pos #f))
+      (let ((d (read-syntax src in)))
+        (when (eof-object? d)
+          (raise-read-eof-error
+           (format "expected datum to follow #ap annotation ~s" s)
+           src line col pos #f))
+        (quasisyntax/loc (make-loc-stx src line col pos)
+          ((unsyntax anno-id-stx) (unsyntax-splicing s)
+           (unsyntax d)))))))
 
-(define read-form-with-anno
+(define read-hash-a-form
   (case-lambda
     ((ch in)
-     (syntax->datum (read-form-with-anno ch in (object-name in) #f #f #f)))
+     (syntax->datum (read-hash-a-form ch in (object-name in) #f #f #f)))
     ((ch in src line col pos)
      (let ((kind-ch (read-char in)))
        (when (eof-object? kind-ch)
          (raise-read-eof-error
-          "expected 't' or 'n' to follow #a"
+          "expected 'n' or 'p' to follow #a"
           src line col pos #f))
-       (define read-preceding
+       (define read-hash-a-content
          (cond
-          ((eqv? kind-ch #\t) read-preceding-type)
-          ((eqv? kind-ch #\n) read-preceding-generic)
+          ((eqv? kind-ch #\n) read-annos-declaration)
+          ((eqv? kind-ch #\p) read-anno-form)
           (else
            (raise-read-error
-            (format "expected 't' or 'n' to follow #a, got ~s" kind-ch)
+            (format "expected 'n' or 'p' to follow #a, got ~s" kind-ch)
             src line col pos #f))))
        ;; See also 'port-next-location'.
        (when col (set! col (+ col 1)))
        (when pos (set! pos (+ pos 1)))
-       (read-preceding kind-ch in src line col pos)))))
+       (read-hash-a-content kind-ch in src line col pos)))))
 
 ;;; 
 ;;; reader extension
@@ -130,7 +120,7 @@ The reader extension also implements a shorthand for (type T), namely
   (make-readtable
    (current-readtable)
    #\^ 'non-terminating-macro read-type-anno
-   #\a 'dispatch-macro read-form-with-anno
+   #\a 'dispatch-macro read-hash-a-form
    ))
 
 ;;; 
@@ -148,9 +138,13 @@ The reader extension also implements a shorthand for (type T), namely
 (module* main #f
   (with-magnolisp-readtable
    (for ((s (list
-             "#anexternal #at(fn Int Int) (function (f x))"
-             "#anfoo #anbar #anbaz 5"
-             "(quote ^T)"
+             "^T"
+             "#ap(foo bar baz) 5"
+             "#ap(^T export (perms X Y)) 7"
+             "#an(^T)"
+             "(function (f) #an(^T export (import #f)) 5)"
+             ;;"#anexternal #at(fn Int Int) (function (f x))"
+             ;;"#anfoo #anbar #anbaz 5"
              )))
        (define in (open-input-string s))
      (for/list ((obj (in-port read in)))
