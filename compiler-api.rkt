@@ -790,6 +790,6 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-i-prog.rkt"))
+  (define st (compile-modules "test-j-prog.rkt"))
   (generate-files st (hasheq ;;'build (seteq 'gnu-make 'qmake 'c 'ruby)
                              'cxx (seteq 'cc 'hh))))

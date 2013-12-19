@@ -203,7 +203,7 @@
 ;; (applied recursively). As a side effect, may update 'h' for
 ;; purposes for memoization. Returns the simplified type. Note that
 ;; eq? may be used to determine if any simplification took place.
-(define (subst h t) ;; (-> Type? hash? Type?)
+(define (subst h t) ;; (-> hash? Type? Type?)
   ;; 'ix' of last successful lookup.
   (define last-ix 0)
   

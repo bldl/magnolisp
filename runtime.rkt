@@ -64,8 +64,8 @@ this code is not in Magnolisp, only for Magnolisp.
                 (id id))
     #'(define-syntax* id
         (syntax-rules ()
-          ((_ n #:annos a b (... ...))
-           (impl-id n a b (... ...)))
+          ((_ n (#:annos a (... ...)) b (... ...))
+           (impl-id n (a (... ...)) b (... ...)))
           ((_ n b (... ...))
            (impl-id n () b (... ...)))))))
 
