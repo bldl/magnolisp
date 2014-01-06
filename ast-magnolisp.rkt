@@ -196,6 +196,9 @@ It is rather important for all Ast derived node types to be
 ;; has done name resolution.
 (define-ast* Let Ast ((list-of-term defs) (list-of-term ss)))
 
+;; We only allow a limited form of 'let' expressions.
+(define-ast* LetExpr Ast ((just-term def) (just-term e)))
+
 ;; Sequence of statements.
 (define-ast* BlockStat Ast ((list-of-term ss)))
 
@@ -213,10 +216,6 @@ It is rather important for all Ast derived node types to be
 
 ;; A literal datum.
 (define-ast* Literal Ast ((no-term datum)))
-
-;; A typed literal datum. Only used early on during compilation,
-;; afterwards switching to Literal with a 'type annotation.
-(define-ast* TypedLiteral Ast ((just-term t) (no-term datum)))
 
 ;; Function (or predicate) application, with function expression, and
 ;; argument expressions.

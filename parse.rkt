@@ -299,7 +299,7 @@ would have done. Still retains correct scoping and evaluation order.
     (check-redefinition id-stx stx)
     (define ast (parse 'expr e-stx))
     (define ann-h (mk-annos ctx stx id-stx))
-    (set! ann-h (maybe-parse-foreign-anno id-stx ann-h))
+    (set! ann-h (maybe-parse-foreign-anno id-stx ann-h)) ;; xxx may not make sense for foreign variables
     (define t (lookup-type id-stx))
     (define def (DefVar ann-h id-stx t ast))
     (set-def-in-mod! id-stx def)
@@ -536,13 +536,21 @@ would have done. Still retains correct scoping and evaluation order.
            (fix parse ctx)
            (syntax->list #'a-expr)))))
 
+      ((let-values (((n) v)) e)
+       (and (eq? ctx 'expr)
+            (identifier? #'n))
+       (let ()
+         (define d-ast (make-DefVar ctx stx #'n #'v))
+         (define e-ast (parse 'expr #'e))
+         (syntaxed stx LetExpr d-ast e-ast)))
+       
       ((let-kw binds . exprs)
        (and (identifier? #'let-kw)
             (or (free-identifier=? #'let-kw #'let-values)
                 (free-identifier=? #'let-kw #'letrec-values)))
        (unless (eq? ctx 'module-level)
          (when (eq? ctx 'expr)
-           (raise-syntax-error #f "let form in expr context" stx))
+           (raise-syntax-error #f "unallowed let form in expr context" stx))
          (make-Let ctx stx
                    (syntax-e #'let-kw) #'binds #'exprs)))
 

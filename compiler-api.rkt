@@ -214,14 +214,32 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; literals
 ;;; 
 
-(define ast-TypedLiteral->Literal
-  (topdown
-   (lambda (ast)
-     (match ast
-       ((TypedLiteral a t d)
-        (writeln ast)
-        (Literal (hash-set a 'type t) d))
-       (_ ast)))))
+(define (defs-typed-literal->Literal defs)
+  (define del-lst '())
+
+  (define ast-TypedLiteral->Literal
+    (topdown
+     (repeat
+      (lambda (ast)
+        (match ast
+          ((LetExpr a1 (DefVar _ bn t (Literal a2 d)) (Var _ rn))
+           (and
+            (free-identifier=? bn rn)
+            (let ()
+              (set! del-lst (cons bn del-lst))
+              (define a a2)
+              (define a1-stx (hash-ref a1 'stx #f))
+              (when a1-stx
+                (set! a (hash-set a 'stx a1-stx)))
+              (Literal (hash-set a 'type t) d))))
+          (_ #f))))))
+  
+  (define rw (make-for-all-defs ast-TypedLiteral->Literal))
+
+  (define n-defs (rw defs))
+  (for ((id del-lst))
+    (set! n-defs (dict-remove n-defs id)))
+  n-defs)
 
 ;;; 
 ;;; local escapes
@@ -359,7 +377,7 @@ external dependencies for the program/library, as well as the .cpp and
     (lambda (ast)
       (when (name-ref? ast)
         (define def-id (get-def-id ast))
-        (writeln `(name-ref ,ast ,def-id))
+        ;;(writeln `(name-ref ,ast ,def-id))
         (when def-id
           (dict-set! defs def-id #t)))))
    def)
@@ -468,7 +486,7 @@ external dependencies for the program/library, as well as the .cpp and
        (else
         (error 'defs-resolve-names
                "unexpected identifier-binding: ~s" b)))
-      (writeln (list 'resolved-var ast 'reference id 'binding b 'module (syntax-source-module id) 'bound-to def-id))
+      ;;(writeln (list 'resolved-var ast 'reference id 'binding b 'module (syntax-source-module id) 'bound-to def-id))
       (if def-id
         (set-def-id ast def-id)
         ast))
@@ -504,7 +522,7 @@ external dependencies for the program/library, as well as the .cpp and
         (set! ids-to-process
               (append ids-to-process refs-in-def)))
       (loop ids-to-process)))
-  (pretty-print `(original-defs ,(dict-count all-defs) ,(dict-keys all-defs) retained-defs ,(dict-count processed-defs) ,(dict-keys processed-defs)))
+  ;;(pretty-print `(original-defs ,(dict-count all-defs) ,(dict-keys all-defs) retained-defs ,(dict-count processed-defs) ,(dict-keys processed-defs)))
   processed-defs)
 
 ;; defs-in-mod is an immutable id-table, whereas eps-in-mod is an
@@ -721,9 +739,9 @@ external dependencies for the program/library, as well as the .cpp and
 
   (define all-defs (merge-defs mods))
   (set! all-defs (defs-resolve-names all-defs mods))
-  ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
-  (set! all-defs ((make-for-all-defs ast-TypedLiteral->Literal) all-defs))
+  (set! all-defs (defs-typed-literal->Literal all-defs))
+  ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
   (set! all-defs ((make-for-all-defs ast-LetLocalEc->BlockExpr) all-defs))
   (set! all-defs (defs-simplify all-defs))
   (set! all-defs (defs-de-racketize all-defs))
