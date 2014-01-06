@@ -359,10 +359,14 @@ would have done. Still retains correct scoping and evaluation order.
       (set! p-as (hash-set p-as 'type t-ast)))
     p-as)
   
+  (define (parse-expr-type stx)
+    (define as (syntax-get-annos stx))
+    (define t (hash-ref as 'type #f))
+    (and t (parse-type t)))
+  
   (define (make-Literal stx datum-stx)
-    (define ann-h (parse-expr-annos datum-stx))
-    (set! ann-h (hash-set ann-h 'stx stx))
-    (Literal ann-h datum-stx))
+    (define t (or (parse-expr-type stx) the-AnyT))
+    (syntaxed stx TypedLiteral t datum-stx))
   
   (define (parse-define-value ctx stx id-stx e-stx)
     ;;(writeln (list e-stx (syntax->datum e-stx)))
@@ -402,7 +406,7 @@ would have done. Still retains correct scoping and evaluation order.
 
       ((begin . bs)
        (eq? ctx 'stat)
-       (syntaxed BlockStat stx
+       (syntaxed stx BlockStat
                  (map (fix parse ctx)
                       (syntax->list #'bs))))
       

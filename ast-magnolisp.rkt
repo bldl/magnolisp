@@ -214,6 +214,10 @@ It is rather important for all Ast derived node types to be
 ;; A literal datum.
 (define-ast* Literal Ast ((no-term datum)))
 
+;; A typed literal datum. Only used early on during compilation,
+;; afterwards switching to Literal with a 'type annotation.
+(define-ast* TypedLiteral Ast ((just-term t) (no-term datum)))
+
 ;; Function (or predicate) application, with function expression, and
 ;; argument expressions.
 (define-ast* Apply Ast ((just-term f) (list-of-term args)))

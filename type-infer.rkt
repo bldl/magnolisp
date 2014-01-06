@@ -467,9 +467,12 @@
        (define t (FunT-rt f-t))
        (expr-unify! ast t))
       ((? Literal?)
-       ;; Cannot learn anything from this. Might in some cases want an
-       ;; annotation for an expression, but such are to be supported.
-       (expr-get-type ast))
+       ;; May have an explicit type annotation, instead of an
+       ;; auto-assigned type variable. In any case, we cannot learn
+       ;; anything new here.
+       (define l-t (expr-get-type ast))
+       (assert l-t)
+       l-t)
       (else
        (raise-argument-error
         'ti-expr "supported Ast?" ast))))

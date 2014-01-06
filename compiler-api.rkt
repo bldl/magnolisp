@@ -211,6 +211,19 @@ external dependencies for the program/library, as well as the .cpp and
   (make-for-all-defs ast-simplify))
 
 ;;; 
+;;; literals
+;;; 
+
+(define ast-TypedLiteral->Literal
+  (topdown
+   (lambda (ast)
+     (match ast
+       ((TypedLiteral a t d)
+        (writeln ast)
+        (Literal (hash-set a 'type t) d))
+       (_ ast)))))
+
+;;; 
 ;;; local escapes
 ;;; 
 
@@ -340,14 +353,13 @@ external dependencies for the program/library, as well as the .cpp and
         (writeln (list (syntax-e var-id) ast (identifier-binding var-id) def-id)))))
    def))
 
-;; Currently only supports references to variable names, not to type
-;; names.
 (define (Def-all-referred-def-ids def)
   (define defs (make-free-id-table #:phase 0))
   ((topdown-visit
     (lambda (ast)
       (when (name-ref? ast)
         (define def-id (get-def-id ast))
+        (writeln `(name-ref ,ast ,def-id))
         (when def-id
           (dict-set! defs def-id #t)))))
    def)
@@ -384,7 +396,7 @@ external dependencies for the program/library, as well as the .cpp and
            "unexpected syntax-source-module ~s for ~s" src stx))))
 
 ;; Takes a free-id-table and module information, and returns an
-;; immutable-free-id-table with resolve Var and NameT nodes. I.e.,
+;; immutable-free-id-table with resolved Var and NameT nodes. I.e.,
 ;; sets 'def-id information into the nodes. This only affects name
 ;; references that resolve to definitions contained in the specified
 ;; modules.
@@ -435,10 +447,14 @@ external dependencies for the program/library, as well as the .cpp and
         (assert (free-identifier=? id def-id)))
        ((list? b)
         (define mpi (first b))
+        (writeln (module-path-index-resolve mpi))
         (define r-mp 
           (resolved-module-path-name
            (module-path-index-resolve mpi)))
+        (writeln `(r-mp ,r-mp))
+        (writeln `(mods keys ,(hash-keys mods)))
         (define mod (hash-ref mods r-mp #f))
+        ;;(writeln `(mod ,mod))
         (when mod
           (define sym (second b))
           (define syms (Mod-syms mod))
@@ -452,7 +468,7 @@ external dependencies for the program/library, as well as the .cpp and
        (else
         (error 'defs-resolve-names
                "unexpected identifier-binding: ~s" b)))
-      ;;(writeln (list 'resolved-var ast 'reference id 'binding b 'module (syntax-source-module id) 'bound-to def-id))
+      (writeln (list 'resolved-var ast 'reference id 'binding b 'module (syntax-source-module id) 'bound-to def-id))
       (if def-id
         (set-def-id ast def-id)
         ast))
@@ -488,7 +504,7 @@ external dependencies for the program/library, as well as the .cpp and
         (set! ids-to-process
               (append ids-to-process refs-in-def)))
       (loop ids-to-process)))
-  ;;(pretty-print `(original-defs ,(dict-count all-defs) ,(dict-keys all-defs) retained-defs ,(dict-count processed-defs) ,(dict-keys processed-defs)))
+  (pretty-print `(original-defs ,(dict-count all-defs) ,(dict-keys all-defs) retained-defs ,(dict-count processed-defs) ,(dict-keys processed-defs)))
   processed-defs)
 
 ;; defs-in-mod is an immutable id-table, whereas eps-in-mod is an
@@ -707,6 +723,7 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-resolve-names all-defs mods))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y)))
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
+  (set! all-defs ((make-for-all-defs ast-TypedLiteral->Literal) all-defs))
   (set! all-defs ((make-for-all-defs ast-LetLocalEc->BlockExpr) all-defs))
   (set! all-defs (defs-simplify all-defs))
   (set! all-defs (defs-de-racketize all-defs))
@@ -790,6 +807,6 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-j-prog.rkt"))
+  (define st (compile-modules "test-l-prog.rkt"))
   (generate-files st (hasheq ;;'build (seteq 'gnu-make 'qmake 'c 'ruby)
                              'cxx (seteq 'cc 'hh))))
