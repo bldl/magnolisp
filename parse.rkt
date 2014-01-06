@@ -40,6 +40,7 @@ would have done. Still retains correct scoping and evaluation order.
 |#
 
 (require "annos-parse.rkt"
+         "annos-util.rkt"
          "ast-magnolisp.rkt"
          "compiler-util.rkt"
          (only-in "runtime.rkt" %core)
@@ -66,6 +67,19 @@ would have done. Still retains correct scoping and evaluation order.
    (lst (for-each print-stx-with-bindings lst))
    ((identifier? stx) (writeln (list stx (identifier-binding stx))))
    (else (writeln stx))))
+
+(define (stx-print-if-type-annoed stx)
+  (define annos (syntax-get-annos stx))
+  (when annos
+    (define type (hash-ref annos 'type #f))
+    (when type
+      (writeln (list 'TYPED stx type)))))
+
+(define (stx-print-all-type-annoed stx)
+  (stx-print-if-type-annoed stx)
+  (define lst (syntax->list stx))
+  (when lst
+   (for-each stx-print-all-type-annoed lst)))
 
 (define (find-id-stx find-stx stx (msg #f))
   (define (f stx)
@@ -270,7 +284,7 @@ would have done. Still retains correct scoping and evaluation order.
       (and anno-h
            (let ((type-stx (hash-ref anno-h 'type #f)))
              (and type-stx
-                  (parse-type id-stx type-stx)))))
+                  (parse-type type-stx)))))
     (or (f) the-AnyT))
 
   (define (maybe-parse-foreign-anno id-stx ann-h)
@@ -335,6 +349,21 @@ would have done. Still retains correct scoping and evaluation order.
     (define e-ast-lst (map (fix parse 'stat) e-stx-lst))
     (Let (hasheq 'stx stx 'let-kind kind) b-ast-lst e-ast-lst))
 
+  (define (parse-expr-annos stx)
+    (define as (syntax-get-annos stx))
+    (define t (hash-ref as 'type #f))
+    (define p-as #hasheq())
+    (when t
+      (define t-ast (parse-type t))
+      (writeln `(parsed type ,t-ast))
+      (set! p-as (hash-set p-as 'type t-ast)))
+    p-as)
+  
+  (define (make-Literal stx datum-stx)
+    (define ann-h (parse-expr-annos datum-stx))
+    (set! ann-h (hash-set ann-h 'stx stx))
+    (Literal ann-h datum-stx))
+  
   (define (parse-define-value ctx stx id-stx e-stx)
     ;;(writeln (list e-stx (syntax->datum e-stx)))
     ;;(writeln (identifier-binding #'%core 0))
@@ -351,6 +380,7 @@ would have done. Still retains correct scoping and evaluation order.
   ;; parsed is in. Inserts bindings into 'defs-in-mod' as a side effect.
   ;; Returns an Ast object for non top-level things.
   (define (parse ctx stx)
+    ;;(stx-print-if-type-annoed stx)
     ;;(writeln (list ctx stx))
     
     (kernel-syntax-case* stx #f (%core)
@@ -537,7 +567,7 @@ would have done. Still retains correct scoping and evaluation order.
       ((q lit)
        (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote))
        (when (eq? ctx 'expr)
-         (new-Literal stx #'lit)))
+         (make-Literal stx #'lit)))
       
       ((#%top . id) ;; module-level variable
        (identifier? #'id)

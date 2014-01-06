@@ -105,7 +105,7 @@ Routines for parsing annotation values into AST nodes.
 ;;; Magnolisp types
 ;;; 
 
-(define* (parse-type id-stx anno-stx)
+(define* (parse-type anno-stx)
   (define (parse-name name-stx)
     (syntax-parse name-stx
       #:context anno-stx
