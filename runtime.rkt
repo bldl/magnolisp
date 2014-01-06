@@ -103,15 +103,20 @@ this code is not in Magnolisp, only for Magnolisp.
     
 (define-annos-wrapper* function)
 
+(define-syntax var-impl
+  (syntax-rules ()
+    ((_ n (a ...) v)
+     (begin
+       (define n v)
+       (anno! n a ...)))))
+
+(define-annos-wrapper* var)
+
 (define-syntax typedef-impl
   (syntax-rules ()
     ((_ t (a ...))
      (begin
        (define t (%core 'foreign-type))
-       (anno! t a ...)))
-    #; ((_ t (a ...) v) ;; xxx to be supported
-     (begin
-       (define t (%core 'type-alias v))
        (anno! t a ...)))))
 
 (define-annos-wrapper* typedef)
