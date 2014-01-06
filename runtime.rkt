@@ -112,6 +112,21 @@ this code is not in Magnolisp, only for Magnolisp.
 
 (define-annos-wrapper* var)
 
+(define-syntax-rule
+  (let-var-impl n (a ...) v b ...)
+  (let ((n v))
+    (anno! n a ...)
+    b ...))
+
+(define-annos-wrapper* let-var)
+
+(define-syntax* (lit-of stx)
+  (syntax-case stx ()
+    ((_ t d)
+     (with-syntax ((n (generate-temporary 'lit)))
+       (syntax/loc stx
+         (let-var-impl n ((type t)) d n))))))
+
 (define-syntax typedef-impl
   (syntax-rules ()
     ((_ t (a ...))

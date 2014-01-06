@@ -349,24 +349,8 @@ would have done. Still retains correct scoping and evaluation order.
     (define e-ast-lst (map (fix parse 'stat) e-stx-lst))
     (Let (hasheq 'stx stx 'let-kind kind) b-ast-lst e-ast-lst))
 
-  (define (parse-expr-annos stx)
-    (define as (syntax-get-annos stx))
-    (define t (hash-ref as 'type #f))
-    (define p-as #hasheq())
-    (when t
-      (define t-ast (parse-type t))
-      (writeln `(parsed type ,t-ast))
-      (set! p-as (hash-set p-as 'type t-ast)))
-    p-as)
-  
-  (define (parse-expr-type stx)
-    (define as (syntax-get-annos stx))
-    (define t (hash-ref as 'type #f))
-    (and t (parse-type t)))
-  
   (define (make-Literal stx datum-stx)
-    (define t (or (parse-expr-type stx) the-AnyT))
-    (syntaxed stx TypedLiteral t datum-stx))
+    (syntaxed stx Literal datum-stx))
   
   (define (parse-define-value ctx stx id-stx e-stx)
     ;;(writeln (list e-stx (syntax->datum e-stx)))
