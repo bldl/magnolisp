@@ -231,7 +231,7 @@ external dependencies for the program/library, as well as the .cpp and
               (define a2 (Ast-annos v))
               (define a (hash-merge a1 a2))
               (when (Literal? v)
-                (set! a (hash-set a 'type t)))
+                (set! a (hash-set a 'type-ast t)))
               (define n-ast (ast-set-annos v a))
               ;;(writeln (list n-ast (Ast-annos n-ast)))
               n-ast)))
