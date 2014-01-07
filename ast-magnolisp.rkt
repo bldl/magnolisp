@@ -63,7 +63,7 @@ It is rather important for all Ast derived node types to be
 
 (define-with-contract*
   (-> Ast? (or/c syntax? #f))
-  (Ast-stx ast)
+  (ast-stx ast)
   (define stx (ast-anno-maybe ast 'stx))
   ;;(when stx (writeln `(origin ,stx ,(syntax-property stx 'origin))))
   stx)
@@ -73,14 +73,14 @@ It is rather important for all Ast derived node types to be
   (ast-displayable ast)
   (if (syntax? ast)
       ast
-      (or (Ast-stx ast) ast)))
+      (or (ast-stx ast) ast)))
 
 (define-with-contract*
   (-> (or/c syntax? Ast?) any/c)
   (ast-displayable/datum ast)
   (cond
    ((syntax? ast) (syntax->datum ast))
-   ((Ast-stx ast) => syntax->datum)
+   ((ast-stx ast) => syntax->datum)
    (else ast)))
 
 (define-with-contract*
@@ -90,7 +90,7 @@ It is rather important for all Ast derived node types to be
    ((syntax? x)
     (form-get-name x))
    (else
-    (define stx (Ast-stx x))
+    (define stx (ast-stx x))
     (or (and stx (form-get-name stx))
         (struct-symbol x)))))
 
