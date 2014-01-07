@@ -24,7 +24,8 @@ external dependencies for the program/library, as well as the .cpp and
 
 |#
 
-(require "annos-parse.rkt" "ast-magnolisp.rkt" "compiler-util.rkt"
+(require "annos-parse.rkt" "ast-magnolisp.rkt" "ast-util.rkt"
+         "compiler-util.rkt"
          "parse.rkt" "strategy.rkt" "util.rkt" "util/struct.rkt"
          syntax/id-table syntax/moddep)
 
@@ -211,30 +212,32 @@ external dependencies for the program/library, as well as the .cpp and
   (make-for-all-defs ast-simplify))
 
 ;;; 
-;;; literals
+;;; simple LetExpr
 ;;; 
 
-(define (defs-typed-literal->Literal defs)
+(define (defs-rm-simple-LetExpr defs)
   (define del-lst '())
 
-  (define ast-TypedLiteral->Literal
+  (define ast-rm-simple-LetExpr
     (topdown
      (repeat
       (lambda (ast)
         (match ast
-          ((LetExpr a1 (DefVar _ bn t (Literal a2 d)) (Var _ rn))
+          ((LetExpr _ (DefVar a1 bn t v) (Var _ rn))
            (and
             (free-identifier=? bn rn)
             (let ()
               (set! del-lst (cons bn del-lst))
-              (define a a2)
-              (define a1-stx (hash-ref a1 'stx #f))
-              (when a1-stx
-                (set! a (hash-set a 'stx a1-stx)))
-              (Literal (hash-set a 'type t) d))))
+              (define a2 (Ast-annos v))
+              (define a (hash-merge a1 a2))
+              (when (Literal? v)
+                (set! a (hash-set a 'type t)))
+              (define n-ast (ast-set-annos v a))
+              ;;(writeln (list n-ast (Ast-annos n-ast)))
+              n-ast)))
           (_ #f))))))
   
-  (define rw (make-for-all-defs ast-TypedLiteral->Literal))
+  (define rw (make-for-all-defs ast-rm-simple-LetExpr))
 
   (define n-defs (rw defs))
   (for ((id del-lst))
@@ -740,7 +743,7 @@ external dependencies for the program/library, as well as the .cpp and
   (define all-defs (merge-defs mods))
   (set! all-defs (defs-resolve-names all-defs mods))
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
-  (set! all-defs (defs-typed-literal->Literal all-defs))
+  (set! all-defs (defs-rm-simple-LetExpr all-defs))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
   (set! all-defs ((make-for-all-defs ast-LetLocalEc->BlockExpr) all-defs))
   (set! all-defs (defs-simplify all-defs))
