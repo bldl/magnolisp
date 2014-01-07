@@ -1,14 +1,12 @@
-This is a work-in-progress implementation of /Magnolisp/, an experimental variant of the likewise experimental programming language [[http://magnolia-lang.org/][Magnolia]]. This strives to be a practical (non-academic) implementation of a Magnolia-like language, with practical in this case meaning lightweight and easy to integrate with tools that people actually use.
+This is a work-in-progress implementation of /Magnolisp/, a small, experimental language and implementation. It is experimental in its implementation technique, which is to replace the phase level 0 (runtime) language of [[http://racket-lang.org/][Racket]] with something non-Racket (here: Magnolisp), and translate it into another language (here: C++) for execution.
 
-Magnolisp's component-level language shall come from Magnolia, whereas algorithmic language can include anything "C++ symbiotic" (i.e., anything naturally and efficiently mappable to C++). Racket provides the module and macro systems.
+Magnolisp is an amalgamation of Racket and the likewise experimental programming language [[http://magnolia-lang.org/][Magnolia]]. Its algebraic language is inspired by Magnolia (or a subset thereof), but adapted for a more natural fit with Racket. Racket provides the module and macro systems. Magnolia is a good fit for C++ translation as it is designed for natural and efficient mapping to most mainstream languages.
 
-The implementation has both an evaluator (implemented in the usual way as a [[http://racket-lang.org/][Racket]] =#lang=) and a source-to-source compiler targeting C++. The motivation for an evaluator is to act as a fast testing facility, a simulator of sorts, whereas for real-world deployment onto interesting platforms C++ source code is required.
-
-The core language for the evaluator is Racket, naturally, but the core language for targeting C++ can be different; we express C++ specific language as either annotations or calls to a supposed =%core= Racket function, which is not actually invoked.
+The implementation has both an evaluator (implemented in the usual way as a Racket =#lang=) and a source-to-source compiler targeting C++. The motivation for an evaluator is to act as a fast testing facility, a simulator of sorts, whereas for real-world deployment onto interesting platforms C++ source code is required.
 
 * Running
 
-  Programs written in =#lang magnolisp= can be evaluated in the usual Racket way. The compiler API is provided by the =compiler-api.rkt= module, and can also be invoked via the =mglcc= command-line tool, specifying the program to compile. The C++ backend depends on =uncrustify= as an external tool, and the tool requires a configuration file; one is installable using the provided =Makefile=.
+  Programs written in =#lang magnolisp= can be evaluated in the usual Racket way. The compiler API is provided by the =compiler-api.rkt= module, and can also be invoked via the =mglc= command-line tool, specifying the program to compile. The C++ backend depends on =uncrustify= as an external tool, and the tool requires a configuration file; one is installable using the provided =Makefile=.
 
 * License
 
