@@ -351,6 +351,8 @@ external dependencies for the program/library, as well as the .cpp and
 ;; objects. [eps id-table?] has entry points as keys, and #t values.
 (struct St (mods defs eps) #:transparent)
 
+(define* compilation-state? St?)
+
 (define (merge-defs mods)
   (define all-defs (make-free-id-table #:phase 0))
   (for (([r-mp mod] mods))

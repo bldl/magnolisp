@@ -1,4 +1,4 @@
-default : install
+default : setup
 
 -include local.mk
 
