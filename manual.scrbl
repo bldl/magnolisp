@@ -1,5 +1,5 @@
 #lang scribble/doc
-@(require scribble/manual
+@(require scribble/eval scribble/manual
 	  (for-label magnolisp/runtime
                      (except-in racket/base do #%module-begin)
                      syntax/modresolve))
@@ -14,6 +14,10 @@
 
 @(define (warning . str)
    (list "(" (italic "Warning: ") str ")"))
+
+@(define the-eval (make-base-eval))
+@(the-eval '(require magnolisp/reader-ext magnolisp/runtime))
+@;(the-eval '(current-readtable magnolisp-readtable))
 
 @title{Magnolisp}
 
@@ -51,6 +55,8 @@ For defining macros and doing transformation time computation, the relevant Rack
 
 In Magnolisp, it is possible to declare @racket[function]s, types (with @racket[typedef]), and @racket[var]iables; of these, variable definitions are not allowed at the top level. The Magnolisp binding forms are in the @racketmodname[magnolisp/runtime] library. The @racketmodname[magnolisp] language provides @racketmodname[magnolisp/runtime] at phase level 0.
 
+As Magnolisp has no standard library, it is ultimately necessary to define primitive types and functions (flagged as @racketid[foreign]) in order to be able to compile programs that do anything interesting.
+
 @defform/subs[(function (id arg ...) maybe-annos maybe-body)
               ([maybe-body code:blank expr])]{
 Declares a function. The (optional) body of a function is a single expression, which must produce a single value. @warning{Local functions are not supported by the C++ back end yet.}
@@ -59,16 +65,45 @@ Providing a body is optional in the case where the function is declared as @rack
 
 A function with the @racket[export] flag in its annotations indicates that the function is part of the public API of a program that includes the containing module. When a function is used merely as a dependency, any @racket[export] flag is ignored.
 
-When a function includes a @racket[type] annotation, the type expression must be of the form @racket[_fn-type-expr].}
+When a function includes a @racketid[type] annotation, the type expression must be of the form @racket[_fn-type-expr].
+
+For example:
+@(racketblock+eval #:eval the-eval
+  (function (f x) 
+    x)
+  (function (five) (#:annos export (type (fn int)))
+    5)
+  (function (inc x) (#:annos foreign (type (fn int int)))
+    (+ x 1)))
+}
 
 @defform[(typedef id maybe-annos)]{
-Declares a type. Presently only foreign types may be declared, and @racket[id] gives the corresponding Magnolisp name. The @racketid[foreign] annotation should always be provided.}
+Declares a type. Presently only foreign types may be declared, and @racket[id] gives the corresponding Magnolisp name. The @racketid[foreign] annotation should always be provided.
+
+For example:
+@(racketblock+eval #:eval the-eval
+  (typedef int (#:annos foreign))
+  (typedef long (#:annos (foreign cxx_long))))
+}
 
 @defform[(var id maybe-annos expr)]{
-Declares a local variable with the name @racket[id], and the (initial) value given by @racket[expr]. A @racketid[type] annotation may be included to specify the Magnolisp type of the variable.}
+Declares a local variable with the name @racket[id], and the (initial) value given by @racket[expr]. A @racketid[type] annotation may be included to specify the Magnolisp type of the variable.
+
+For example:
+@(interaction #:eval the-eval
+  (let ()
+    (var x (#:annos (type int)) 5)
+    (add1 x)))
+}
 
 @defform[(let-var id maybe-annos v-expr body)]{
-A shorthand for declaring a single, annotated, locally scoped variable. The variable @racket[id] with the initial value given by @racket[v-expr] is only in the scope of the @racket[body] expression. Where no annotations are given, this form is equivalent to @racket[(let ((id v-expr)) body)]. With or without annotations, this form is semantically equivalent to the expression @racket[(do (var id maybe-annos v-expr) (return body))], provided that @racket[id] does not appear in @racket[v-expr].}
+A shorthand for declaring a single, annotated, locally scoped variable. The variable @racket[id] with the initial value given by @racket[v-expr] is only in the scope of the @racket[body] expression. Where no annotations are given, this form is equivalent to @racket[(let ((id v-expr)) body)]. With or without annotations, this form is semantically equivalent to the expression @racket[(do (var id maybe-annos v-expr) (return body))], provided that @racket[id] does not appear in @racket[v-expr].
+
+For example:
+@(interaction #:eval the-eval
+  (let-var x (#:annos (type int)) 5
+    (add1 x)))
+}
 
 @subsection{Annotations}
 
@@ -97,11 +132,18 @@ For convenience, the @racketmodname[magnolisp] language installs a reader extens
 Annotates a literal, which by themselves are untyped in Magnolisp. While the literal @racket["foo"] is treated as a @racket[string?] value by Racket, the Magnolisp compiler will expect to determine the literal expression's Magnolisp type based on annotations. The @racket[lit-of] form allows one to ``cast'' a literal to a specific type for the compiler.
 
 For example:
-@(racketblock (lit-of int 5))
+@(interaction #:eval the-eval (lit-of int 5))
 }
 
 @defform[(anno! id anno-expr ...)]{
-Explicitly annotates the identifier @racket[id] with the specified annotations. May be used to specify annotations for an identifier that is bound separately, probably by one of the Racket binding forms such as @racket[define], @racket[let], @etc}
+Explicitly annotates the identifier @racket[id] with the specified annotations. May be used to specify annotations for an identifier that is bound separately, probably by one of the Racket binding forms such as @racket[define], @racket[let], @etc
+
+For example:
+@(interaction #:eval the-eval
+  (begin
+    (define x 5)
+    (anno! x (type int))))
+}
 
 While generally only declarations require annotations, @racket[lit-of] demonstrates a specific case where it is useful to associate annotations with expressions. Simple ``data'' can be stored in syntax properties, but that approach may not be suitable for identifiers that must respect lexical scope (as appearing in type expressions). The @racket[lit-of] form deals with this by binding the literal to a fresh identifier, and annotating it with a @racketid[type] using @racket[anno!].
 
@@ -131,7 +173,14 @@ The @racket[(let ([id val-expr] ...) body ...+)], @racket[(let* ([id val-expr] .
 @racket[var], @racket[function], and @racket[typedef] declarations may appear in a statement position. The same is true of @racket[define] forms that conform to the restricted syntax supported by the Magnolisp compiler.
 
 @defform[(do stat ...)]{
-An @deftech{expression block} containing a sequence of statements. As the term implies, and expression block is an expression, despite containing statements. The block must produce a single value by @racket[return]ing it. Control must not reach the end of a block expression---the @racket[return] statement must be invoked somewhere before control ``falls out'' of the block. The returned value becomes the value of the containing @racket[do] expression.}
+An @deftech{expression block} containing a sequence of statements. As the term implies, and expression block is an expression, despite containing statements. The block must produce a single value by @racket[return]ing it. Control must not reach the end of a block expression---the @racket[return] statement must be invoked somewhere before control ``falls out'' of the block. The returned value becomes the value of the containing @racket[do] expression.
+
+For example:
+@(interaction #:eval the-eval
+  (do (void)
+      (return 1)
+      (return 2)))
+}
 
 @defform[(return expr)]{
 A statement that causes any enclosing @racket[do] block (which must exist) to yield the value of the expression @racket[expr].}
@@ -189,3 +238,5 @@ which instructs the compiler to print out C++ code into standard output, with ba
 @section{License}
 
 Except where otherwise noted, all code is authored by Tero Hasu, copyright Tero Hasu and University of Bergen, and not licensed for distribution at this time.
+
+@(close-eval the-eval)
