@@ -20,6 +20,7 @@ screwy when used in compilation mode.
 
 |#
 
+;;(provide (except-out (all-from-out racket/base) #%module-begin do))
 (provide (except-out (all-from-out racket/base) #%module-begin))
 
 (require "modbeg.rkt")
@@ -29,4 +30,7 @@ screwy when used in compilation mode.
 (provide (for-syntax (all-from-out racket/base)))
 
 (require "runtime.rkt")
+;;(provide (except-out (all-from-out "runtime.rkt") mgl-do))
+;;(provide (rename-out [mgl-do do]))
 (provide (all-from-out "runtime.rkt"))
+
