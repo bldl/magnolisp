@@ -9,6 +9,15 @@ install :
 sys-install :
 	sudo aptitude install uncrustify
 
-setup :
+clean :
+	raco setup --clean magnolisp
+
+doc :
 	raco setup --no-zo --no-launcher --no-install --no-post-install --verbose magnolisp
 
+pdf :
+	-mkdir pdfs
+	raco setup --no-zo --no-launcher --no-install --no-post-install --verbose --doc-pdf pdfs magnolisp
+
+setup :
+	raco setup magnolisp
