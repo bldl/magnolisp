@@ -15,49 +15,6 @@
                      package-exported-identifiers
                      package-original-identifiers))
 
-(define-for-syntax (do-define-* stx define-values-id)
-  (syntax-case stx ()
-    [(_ (id ...) rhs)
-     (let ([ids (syntax->list #'(id ...))])
-       (for-each (lambda (id)
-                   (unless (identifier? id)
-                     (raise-syntax-error
-                      #f
-                      "expected an identifier for definition"
-                      stx
-                      id)))
-                 ids)
-       (with-syntax ([define-values define-values-id])
-         (syntax/loc stx
-           (define-values (id ...) rhs))))]))
-(define-syntax (-define*-values stx)
-  (do-define-* stx #'define-values))
-(define-syntax (-define*-syntaxes stx)
-  (do-define-* stx #'define-syntaxes))
-(define-syntax (define*-values stx)
-  (syntax-case stx ()
-    [(_ (id ...) rhs)
-     (syntax-property
-      (syntax/loc stx (-define*-values (id ...) rhs))
-      'certify-mode
-      'transparent-binding)]))
-(define-syntax (define*-syntaxes stx)
-  (syntax-case stx ()
-    [(_ (id ...) rhs)
-     (syntax-property
-      (syntax/loc stx (-define*-syntaxes (id ...) rhs))
-      'certify-mode
-      'transparent-binding)]))
-
-(define-syntax (define* stx)
-  (let-values ([(id rhs) (normalize-definition stx #'lambda)])
-    (quasisyntax/loc stx
-      (define*-values (#,id) #,rhs))))
-(define-syntax (define*-syntax stx)
-  (let-values ([(id rhs) (normalize-definition stx #'lambda)])
-    (quasisyntax/loc stx
-      (define*-syntaxes (#,id) #,rhs))))
-
 (begin-for-syntax
  (define-struct package (exports hidden)
    #:omit-define-syntaxes
@@ -112,12 +69,11 @@
      (let ([id #'pack-id]
            [exports #'exports]
            [mode (syntax-e #'mode)])
-       (unless (eq? mode '#:begin)
-         (unless (identifier? id)
-           (raise-syntax-error #f
-                               "expected an identifier"
-                               stx
-                               id)))
+       (unless (identifier? id)
+         (raise-syntax-error #f
+                             "expected an identifier"
+                             stx
+                             id))
        (let ([exports
               (cond
                [(syntax->list exports)
@@ -252,7 +208,7 @@
                              exports
                              exports-renamed)
                    (let-values ([(exports exports-renamed)
-                                 (if (memq mode '(#:only #:begin))
+                                 (if (eq? mode '#:only)
                                      (values exports exports-renamed)
                                      (let ([all-exports-renamed (complement new-bindings exports-renamed)])
                                        ;; In case of define*, get only the last definition:
@@ -276,25 +232,21 @@
                                    [(hidden ...) (map prune (complement new-bindings exports-renamed))])
                        (let ([body (map (fixup-sub-package exports-renamed defined-renamed def-ctxes) 
                                         (reverse rev-forms))])
-                         (if (eq? mode '#:begin)
-                             (if (eq? 'expression (syntax-local-context))
-                                 (quasisyntax/loc stx (let () #,@body))
-                                 (quasisyntax/loc stx (begin #,@body)))
-                             (quasisyntax/loc stx
-                               (begin
-                                 #,@(if (eq? 'top-level (syntax-local-context))
-                                        ;; delcare all bindings before they are used:
-                                        #`((define-syntaxes #,defined-renamed (values)))
-                                        null)
-                                 #,@body
-                                 (define-syntax pack-id
-                                   (make-package
-                                    (lambda ()
-                                      (list (cons (quote-syntax export)
-                                                  (quote-syntax renamed))
-                                            ...))
-                                    (lambda ()
-                                      (list (quote-syntax hidden) ...)))))))))))]
+                         (quasisyntax/loc stx
+                           (begin
+                             #,@(if (eq? 'top-level (syntax-local-context))
+                                    ;; delcare all bindings before they are used:
+                                    #`((define-syntaxes #,defined-renamed (values)))
+                                    null)
+                             #,@body
+                             (define-syntax pack-id
+                               (make-package
+                                (lambda ()
+                                  (list (cons (quote-syntax export)
+                                              (quote-syntax renamed))
+                                        ...))
+                                (lambda ()
+                                  (list (quote-syntax hidden) ...))))))))))]
                 [else
                  (let ([expr (local-expand (car exprs)
                                            ctx
@@ -350,10 +302,7 @@
                                 (if star? (cons def-ctx def-ctxes) def-ctxes))))]
                      [else
                       (loop (cdr exprs) 
-                            (cons (if (and (eq? mode '#:begin)
-                                           (null? (cdr exprs)))
-                                      expr
-                                      #`(define-values () (begin #,expr (values))))
+                            (cons #`(define-values () (begin #,expr (values)))
                                   rev-forms)
                             def-ctxes)]))]))))))]))
 
