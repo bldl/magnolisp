@@ -37,8 +37,6 @@ The @racketmodname[racket/base] definitions (with the exception of the @racket-d
 
 When a @racketmodname[magnolisp] module is evaluated as Racket, any module top-level runtime expressions will also get evaluated; this feature is intended to facilitate testing during development. The Magnolisp compiler, on the other hand, discards top-level expressions, and also any top-level definitions that are not actually part of the program being compiled. One motivation for making most of the @racketmodname[racket/base] bindings available for runtime code is their potential usefulness in code invoked by top-level expressions.
 
-The Magnolisp-specific phase level 0 @racketmodname[magnolisp] language comes from the library @racketmodname[magnolisp/runtime].
-
 @subsection{Modules and Macros}
 
 The Racket @racket[provide] and @racket[require] forms may be used as normal, also at phase level 0. However, as far as C++ compilation is concerned, these are only used to connect together Magnolisp definitions internally to the compiled program/library. C++ imports and exports are specified separately using the @racketid[foreign] and @racketid[export] annotations.
@@ -69,13 +67,14 @@ When a function includes a @racketid[type] annotation, the type expression must 
 
 For example:
 @(racketblock+eval #:eval the-eval
-  (function (f x) 
+  (function (identity x) 
     x)
   (function (five) (#:annos export (type (fn int)))
     5)
   (function (inc x) (#:annos foreign (type (fn int int)))
-    (+ x 1)))
-}
+    (add1 x)))
+
+Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in different type contexts.}
 
 @defform[(typedef id maybe-annos)]{
 Declares a type. Presently only foreign types may be declared, and @racket[id] gives the corresponding Magnolisp name. The @racketid[foreign] annotation should always be provided.
@@ -96,8 +95,8 @@ For example:
     (add1 x)))
 }
 
-@defform[(let-var id maybe-annos v-expr body)]{
-A shorthand for declaring a single, annotated, locally scoped variable. The variable @racket[id] with the initial value given by @racket[v-expr] is only in the scope of the @racket[body] expression. Where no annotations are given, this form is equivalent to @racket[(let ((id v-expr)) body)]. With or without annotations, this form is semantically equivalent to the expression @racket[(do (var id maybe-annos v-expr) (return body))], provided that @racket[id] does not appear in @racket[v-expr].
+@defform[(let-var id maybe-annos val-expr body)]{
+A shorthand for declaring a single, annotated, locally scoped variable. The variable @racket[id] with the initial value given by @racket[val-expr] is only in the scope of the @racket[body] expression. Where no annotations are given, this form is equivalent to @racket[(let ((id val-expr)) body)]. With or without annotations, this form is semantically equivalent to the expression @racket[(do (var id maybe-annos val-expr) (return body))], provided that @racket[id] does not appear in @racket[val-expr].
 
 For example:
 @(interaction #:eval the-eval
@@ -126,7 +125,7 @@ The set of annotations that may be used in Magnolisp is open ended, to allow for
 
 It is not always necessary to explicitly specify a @racket[type] for a typed Magnolisp definition, as the Magnolisp compiler does whole-program type inference (in Hindley-Milner style). When evaluating as Racket, @racket[type] annotations are not used at all.
 
-For convenience, the @racketmodname[magnolisp] language installs a reader extension that supports annotation related shorthands: @litchar{#an}@racket[(_anno-expr ...)] is short for @racket[(#:annos _anno-expr ...)]; and @litchar{^}@racket[_type-expr] is short for @racket[(type _type-expr)]. For example, @litchar{#an}(@litchar{^}@racketidfont{int}) reads as @racket[(#:annos ((type int)))].
+For convenience, the @racketmodname[magnolisp] language installs a reader extension that supports annotation related shorthands: @litchar{#an}@racket[(_anno-expr ...)] is short for @racket[(#:annos _anno-expr ...)]; and @litchar{^}@racket[_type-expr] is short for @racket[(type _type-expr)]. For example, @litchar{#an}(@litchar{^}@racketidfont{int}) reads as @racket[(#:annos (type int))].
 
 @defform[(lit-of type-expr literal-expr)]{
 Annotates a literal, which by themselves are untyped in Magnolisp. While the literal @racket["foo"] is treated as a @racket[string?] value by Racket, the Magnolisp compiler will expect to determine the literal expression's Magnolisp type based on annotations. The @racket[lit-of] form allows one to ``cast'' a literal to a specific type for the compiler.
@@ -162,7 +161,7 @@ Type expressions are parsed according to the above grammar, where @racket[_type-
 
 Unlike Racket, the Magnolisp language makes a distinction between statements and expressions. Although Magnolisp supports @emph{some} of the Racket language, a given Racket construct must typically appear only in a specific context (either statement or expression context).
 
-In Magnolisp, an @racket[if] form is either a statement or expression, depending on context. That is, depending on context the form is either @racket[(if _test-expr _then-expr _else-expr)] or @racket[(if _test-expr _then-stat _else-stat)]. The @racket[when] and @racket[unless] forms are always statements, and contain statements in their body.
+In Magnolisp, an @racket[if] form is either a statement or expression, depending on context. That is, depending on context the form is either @racket[(if _test-expr _then-expr _else-expr)] or @racket[(if _test-expr _then-stat _else-stat)]. The @racket[when] and @racket[unless] forms are always statements, and contain statements in their body. The truthiness of an expression depends on a type-specific C++ predicate, assumed to be named @racketvarfont{C++-id}@racketidfont{_is_true}.
 
 A @racket[(begin _stat ...)] form, in Magnolisp, signifies a sequence of statements, itself constituting a statement.
 
@@ -206,7 +205,7 @@ Any @racket[path-s] is mapped to a @racket[`(file ,path-s)] module path, coercin
 }
 
 @defparam[mp-root-path rel-to-path-v any/c]{
-A parameter that determines the path for resolving relative module paths during compilation. Its value must be passable to @racket[resolve-module-path] as the second argument. @warning{Resolving relative module paths in file hierarchies mostly untested, and this API is subject to change.}}
+A parameter that determines the path for resolving relative module paths during compilation. Its value must be passable to @racket[resolve-module-path] as the second argument. @warning{Resolving relative module paths in file hierarchies is mostly untested, and this API is subject to change.}}
 
 @defproc[(compilation-state? [v any/c]) boolean?]{
 Returns @racket[#t] if @racket[v] is a compilation state object (as returned by @racket[compile-modules] or @racket[compile-files]), @racket[#f] otherwise.
