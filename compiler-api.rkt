@@ -212,6 +212,18 @@ external dependencies for the program/library, as well as the .cpp and
   (make-for-all-defs ast-simplify))
 
 ;;; 
+;;; DefStx
+;;; 
+
+(define (defs-rm-DefStx defs)
+  ;; xxx May have to rewrite 'def' to remove local ones, too.
+  ;;(writeln (dict->list defs))
+  (for/dict
+   (make-immutable-free-id-table #:phase 0)
+   ([(id def) (in-dict defs)] #:unless (DefStx? def))
+   (values id def)))
+
+;;; 
 ;;; simple LetExpr
 ;;; 
 
@@ -709,7 +721,7 @@ external dependencies for the program/library, as well as the .cpp and
         ;; then collect further information from it.
         (when (or (not ep?) (and eps-in-mod (not (dict-empty? eps-in-mod))))
           (define pt (Mod-pt mod)) ;; parse tree
-          (pretty-print (syntax->datum pt))
+          ;;(pretty-print (syntax->datum pt))
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
           (when eps-in-mod
@@ -743,10 +755,12 @@ external dependencies for the program/library, as well as the .cpp and
   (set! mods (mods-fill-in-syms mods))
 
   (define all-defs (merge-defs mods))
+  ;;(pretty-print (dict->list all-defs))
   (set! all-defs (defs-resolve-names all-defs mods))
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
-  (set! all-defs (defs-rm-simple-LetExpr all-defs))
+  (set! all-defs (defs-rm-DefStx all-defs))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
+  (set! all-defs (defs-rm-simple-LetExpr all-defs))
   (set! all-defs ((make-for-all-defs ast-LetLocalEc->BlockExpr) all-defs))
   (set! all-defs (defs-simplify all-defs))
   (set! all-defs (defs-de-racketize all-defs))
