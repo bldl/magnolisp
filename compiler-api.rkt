@@ -709,7 +709,7 @@ external dependencies for the program/library, as well as the .cpp and
         ;; then collect further information from it.
         (when (or (not ep?) (and eps-in-mod (not (dict-empty? eps-in-mod))))
           (define pt (Mod-pt mod)) ;; parse tree
-          ;;(pretty-print (syntax->datum pt))
+          (pretty-print (syntax->datum pt))
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
           (when eps-in-mod
@@ -830,6 +830,6 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-k-prog.rkt"))
+  (define st (compile-modules "test-packages-1.rkt"))
   (generate-files st (hasheq ;;'build (seteq 'gnu-make 'qmake 'c 'ruby)
                              'cxx (seteq 'cc 'hh))))

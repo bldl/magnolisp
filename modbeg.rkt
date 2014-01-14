@@ -55,17 +55,22 @@ same variables at the same phase level).
       (list #,@(hash-map
                 h
                 (lambda (n-sym val-stx)
-                  #`(cons '#,n-sym #'#,val-stx))))))
+                  #`(cons '#,n-sym (quote-syntax #,val-stx)))))))
  
- ;; Given an id-table [t dict?], returns syntax for an expression that
- ;; produces something for which the dict? predicate returns true. The
- ;; table values are assumed to be syntax objects, and they are
- ;; preserved as such.
- (define (syntax-for-id-table-dict t)
-   #`(list #,@(dict-map
-               t
-               (lambda (id-stx h)
-                 #`(cons #'#,id-stx #,(syntax-for-hasheq h))))))
+ ;; Given id-tables [ts (listof dict?)], returns syntax for an
+ ;; expression that produces something for which the dict? predicate
+ ;; returns true. The table values are assumed to be syntax objects,
+ ;; and they are preserved as such.
+ (define (syntax-for-id-table-dict . ts)
+   #`(list #,@(apply
+               append
+               (map
+                (lambda (t)
+                  (dict-map
+                   t
+                   (lambda (id-stx h)
+                     #`(cons #'#,id-stx #,(syntax-for-hasheq h)))))
+                ts))))
 
  (define (make-definfo-submodule ast)
    (set! ast (disarm* ast))
@@ -75,10 +80,11 @@ same variables at the same phase level).
    ;;(pretty-print (syntax->datum ast))
    #`(begin-for-syntax
       (module* magnolisp-info #f
-        (define m-id-count #,(dict-count definfo-table))
+        (define m-id-count #,(+ (dict-count definfo-table-b)
+                                (dict-count definfo-table-f)))
         (define m-annos
           (make-immutable-free-id-table
-           #,(syntax-for-id-table-dict definfo-table)
+           #,(syntax-for-id-table-dict definfo-table-b definfo-table-f)
            #:phase 0))
         (define m-ast (quote-syntax #,ast))
         (provide m-id-count m-annos m-ast))))

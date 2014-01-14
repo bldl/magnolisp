@@ -17,17 +17,8 @@ information is only accessed at macro expansion time.
 
 (begin-for-syntax
 
- (define* definfo-table (make-bound-id-table #:phase 0))
-
- ;; Copies definition annotations from the syntax properties of the
- ;; given syntax object. If not provided, the annotations are taken
- ;; from the identifier itself.
- (define* (set-definfo-from-stx! id-stx [def-stx id-stx])
-   ;; hasheq(name-symbol -> value-syntax)
-   (define info (syntax-get-annos def-stx))
-   (dict-update! definfo-table id-stx
-                 (lambda (h)
-                   (if h (hash-merge h info) info)) #f))
+ (define* definfo-table-f (make-free-id-table #:phase 0))
+ (define* definfo-table-b (make-bound-id-table #:phase 0))
 
  ;; Adds the specified annotations for the specified binding. Full
  ;; annotation forms must be given. The name of each annotation must
@@ -35,8 +26,8 @@ information is only accessed at macro expansion time.
  ;;
  ;; E.g., (set-definfo! #'x (list #'(a 1) #'(b 2 3)))
  (define-with-contract*
-   (-> identifier? (listof syntax?) void?)
-   (set-definfo! id-stx stx-lst)
+   (->* (identifier? (listof syntax?)) (#:bound? boolean?) void?)
+   (set-definfo! id-stx stx-lst #:bound? [bound? #f])
    (define assocs (map
                    (lambda (stx)
                      (define n (form-get-name stx))
@@ -47,7 +38,8 @@ information is only accessed at macro expansion time.
                         stx))
                      (cons n stx))
                    stx-lst))
-   (dict-update! definfo-table id-stx
+   (dict-update! (if bound? definfo-table-b definfo-table-f)
+                 id-stx
                  (lambda (h)
                    (if h
                        (hash-set/assocs h assocs)
