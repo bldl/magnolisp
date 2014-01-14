@@ -722,6 +722,7 @@ external dependencies for the program/library, as well as the .cpp and
         (when (or (not ep?) (and eps-in-mod (not (dict-empty? eps-in-mod))))
           (define pt (Mod-pt mod)) ;; parse tree
           ;;(pretty-print (syntax->datum pt))
+          (pretty-print (syntax->datum/free-id pt))
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
           (when eps-in-mod

@@ -62,6 +62,40 @@
    (or (syntax-property id-1 'def-id) id-1)
    (or (syntax-property id-2 'def-id) id-2)))
 
+;; E.g.
+;; (let* ((x 1)
+;;        (x-id #'x))
+;;   (let ((x 1))
+;;     (syntax->datum/free-id #`(x x #,x-id y))))
+(define* (syntax->datum/free-id stx)
+  (define h (make-free-id-table #:phase 0))
+  (define (f x)
+    (cond
+     ((null? x)
+      null)
+     ((pair? x)
+      (cons (f (car x)) (f (cdr x))))
+     ((syntax? x)
+      (define uw (syntax-e x))
+      (cond
+       ((pair? uw)
+        (f uw))
+       ((symbol? uw)
+        (define sym (dict-ref h x #f))
+        (cond
+         (sym sym)
+         (else
+          (define n-sym (gensym (format "~a." (syntax-e x))))
+          (dict-set! h x n-sym)
+          n-sym)))
+       (else
+        ;; Composite types other than pairs (vectors, boxes, etc.) not
+        ;; supported at this time.
+        (syntax->datum x))))
+     (else
+      (error 'syntax->datum/free-id "unsupported: ~s" x))))
+  (f stx))
+
 (define-with-contract*
   (-> syntax? (or/c symbol? #f))
   (form-get-name stx)
