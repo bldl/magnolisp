@@ -68,6 +68,7 @@
 ;;   (let ((x 1))
 ;;     (syntax->datum/free-id #`(x x #,x-id y))))
 (define* (syntax->datum/free-id stx)
+  (define n 0)
   (define h (make-free-id-table #:phase 0))
   (define (f x)
     (cond
@@ -81,13 +82,11 @@
        ((pair? uw)
         (f uw))
        ((symbol? uw)
-        (define sym (dict-ref h x #f))
-        (cond
-         (sym sym)
-         (else
-          (define n-sym (gensym (format "~a." (syntax-e x))))
-          (dict-set! h x n-sym)
-          n-sym)))
+        (define cur-n (dict-ref h x #f))
+        (unless cur-n
+          (set!-values (n cur-n) (values (+ n 1) n))
+          (dict-set! h x cur-n))
+        (string->symbol (format "~a.~a" (syntax-e x) cur-n)))
        (else
         ;; Composite types other than pairs (vectors, boxes, etc.) not
         ;; supported at this time.
