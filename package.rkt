@@ -1,4 +1,11 @@
 #lang racket/base
+
+#|
+
+A simplified version of compatibility/package.
+
+|#
+
 (require (for-syntax racket/base
                      racket/list
                      syntax/kerncase

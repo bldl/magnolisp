@@ -497,12 +497,19 @@ would have done. Still retains correct scoping and evaluation order.
                      (parse ctx #'t)
                      (parse ctx #'e))))
 
-      ((#%plain-app f e ...)
+      ((#%plain-app f . e)
        (and (eq? ctx 'stat)
             (identifier? #'f)
             (or (free-identifier=? #'f #'void)
                 (free-identifier=? #'f #'values)))
-       (syntaxed stx Pass))
+       (begin
+         (unless (null? (syntax-e #'e))
+           (raise-syntax-error
+            #f
+            (format "arguments not allowed for ~a in a statement position"
+                    (syntax-e #'f))
+            stx #'e))
+         (syntaxed stx Pass)))
 
       ((#%plain-app kall
         (#%plain-lambda (k) b ...))
