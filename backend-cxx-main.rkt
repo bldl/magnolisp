@@ -216,8 +216,8 @@ C++ back end.
        (CxxParam a id (annoless RefT (annoless ConstT (ast->cxx t)))))
       ((DefVar a id t v)
        (DefVar a id (ast->cxx t) (ast->cxx v)))
-      ((Let a (list dv) ss) ;; xxx only one DefVar for now - might run into trouble with letrec otherwise
-       (BlockStat a (map ast->cxx (cons dv ss))))
+      ((Let a dvs ss)
+       (BlockStat a (map ast->cxx (append dvs ss))))
       ((? Var?)
        ast)
       ((Apply a f es) ;; xxx need to deal with operators and parenthesization
