@@ -10,7 +10,7 @@ C++ back end.
          "backend-util.rkt"
          "compiler-util.rkt" "strategy.rkt"
          "util.rkt" "util/case.rkt"
-         syntax/id-table)
+         racket/syntax syntax/id-table)
 
 ;;; 
 ;;; reformatting
@@ -39,6 +39,15 @@ C++ back end.
 ;;; 
 ;;; C++ renaming
 ;;; 
+
+;; Trickery to generate fresh, unique IDs for the purposes of the
+;; backend. Should only be used in contexts where def-id is used for
+;; comparison. The 'stem' argument must be a symbol.
+(define (fresh-id stem)
+  (syntax-property
+   (datum->syntax #f stem)
+   'def-id
+   (generate-temporary)))
 
 ;; Renames Racket IDs to legal C++ symbols. Tracks renamings using a
 ;; map. Does fairly "stable" renaming by limiting the context of
@@ -83,36 +92,41 @@ C++ back end.
    ast-lst)
 
   ;; Returns (values r sym).
-  (define (do-var-def r id t stem)
-    (when (dict-has-key? id->sym id)
+  (define (decide-name-for-id r id stem)
+    (define def-id (or (get-def-id id) id))
+    (when (dict-has-key? id->sym def-id)
       (raise-assertion-error
-       'do-var-def
+       'decide-name-for-id
        "dictionary already has key ~s: ~s"
-       id (dict->list id->sym)))
+       def-id (dict->list id->sym)))
     (define orig-sym (syntax-e id))
     (define orig-s (symbol->string orig-sym))
     (define cand-s
       (string->internal-cxx-id orig-s #:default stem))
     (define-values (n-r n-sym) (next-gensym r (string->symbol cand-s)))
-    (set! id->sym (dict-set id->sym id n-sym))
+    (set! id->sym (dict-set id->sym def-id n-sym))
     (values n-r n-sym))
+
+  (define (get-decision-for id [def-id (get-def-id id)])
+    (define sym (dict-ref id->sym def-id #f))
+    (unless sym
+      (raise-assertion-error
+       'cxx-rename
+       "expected C++ name to have been decided for ~a" (syntax-e id)))
+    sym)
   
   ;; Returns (values r ast).
   (define (rw r ast)
     (match ast
       ((Var a id)
-       ;; The name for any variable reference should already have been
-       ;; decided upon. And at this late stage any references to
-       ;; built-in names should have been translated as well.
+       ;; The name for any binding should already have been decided
+       ;; upon. And at this late stage any references to built-in
+       ;; names should have been translated as well.
        (define def-id (get-def-id id))
        (unless def-id
          (error 'cxx-rename "unbound variable ~a: ~s"
                 (syntax-e id) id))
-       (define sym (dict-ref id->sym def-id #f))
-       (unless sym
-         (raise-assertion-error
-          'cxx-rename
-          "expected C++ name to have been decided for ~a" (syntax-e id)))
+       (define sym (get-decision-for id def-id))
        (values r (Var a sym)))
       ((CxxDefun a id m t ps bs)
        (define n-sym (dict-ref id->sym id))
@@ -120,12 +134,24 @@ C++ back end.
          (rw-all r (CxxDefun a n-sym m t ps bs)))
        (values r n-ast))
       ((CxxParam a id t)
-       (define-values (n-r n-sym) (do-var-def r id t "a"))
+       (define-values (n-r n-sym) (decide-name-for-id r id "a"))
        (values n-r (CxxParam a n-sym t)))
       ((DefVar a id t v)
        (define-values (r-1 n-v) (rw r v))
-       (define-values (r-2 n-sym) (do-var-def r-1 id t "v"))
+       (define-values (r-2 n-sym) (decide-name-for-id r-1 id "v"))
        (values r-2 (DefVar a n-sym t n-v)))
+      ((CxxDeclVar a id t)
+       (define-values (r-2 n-sym) (decide-name-for-id r id "v"))
+       (values r-2 (CxxDeclVar a n-sym t)))
+      ((GccLabelDecl a id)
+       (define-values (n-r n-sym) (decide-name-for-id r id "l"))
+       (values n-r (GccLabelDecl a n-sym)))
+      ((CxxLabel a id)
+       (define sym (get-decision-for id))
+       (values r (CxxLabel a sym)))
+      ((Goto a id)
+       (define sym (get-decision-for id))
+       (values r (Goto a sym)))
       (_
        (rw-all r ast))))
 
@@ -202,6 +228,9 @@ C++ back end.
      (map cxx->partition def-lst))))
 
 (define (defs->cxx defs-t)
+  ;; When within a BlockExpr, this is (cons/c label-id var-id).
+  (define b-tgt (make-parameter #f))
+  
   (define (ast->cxx ast)
     ;;(writeln ast)
     (match ast
@@ -222,10 +251,32 @@ C++ back end.
        ast)
       ((Apply a f es) ;; xxx need to deal with operators and parenthesization
        (Apply a f (map ast->cxx es)))
-      ((Return a e) ;; xxx proper translation to be done
-       (Return a (ast->cxx e)))
-      ((BlockExpr a ss) ;; xxx proper translation to be done
-       (BlockExpr a (map ast->cxx ss)))
+      ((Return a e)
+       (define tgt (b-tgt))
+       (unless tgt
+         (raise-language-error/ast
+          "return without surrounding block expression"
+          ast))
+       (BlockStat a (list (annoless Assign
+                                    (annoless Var (cdr tgt))
+                                    (ast->cxx e))
+                          (annoless Goto (car tgt)))))
+      ((BlockExpr a ss)
+       (define t (expr-get-type ast))
+       (define cxx-t (ast->cxx t))
+       (define lbl (fresh-id 'b))
+       (define rval (fresh-id 'r))
+       (define n-ss
+         (parameterize ((b-tgt (cons lbl rval)))
+           (map ast->cxx ss)))
+       (GccStatExpr
+        a
+        (append (list
+                 (annoless GccLabelDecl lbl)
+                 (annoless CxxDeclVar rval cxx-t))
+                n-ss
+                (list (annoless CxxLabel lbl)))
+        (annoless Var rval)))
       ((Literal a d)
        (Literal a (syntax->datum d)))
       ((NameT _ id)

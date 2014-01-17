@@ -83,6 +83,10 @@
        [format-expr . produces . expr])
      (indent-before
       (string-append type " " ident " = " expr ";")))
+    ((CxxDeclVar _ [format-ident . produces . ident]
+       [format-type . produces . type])
+     (indent-before
+      (string-append type " " ident ";")))
     ;; ((let ,[format-ident . produces . ident] (fixed-array ,[format-type . produces . type] ,i)
     ;;       ,[format-expr . produces . expr])
     ;;  (indent-before
@@ -109,21 +113,19 @@
      (indent-before (string-append "BLOCK_ESCAPE " expr ";")))
     ((CxxReturnOne _ [format-expr . produces . expr])
      (indent-before (string-append "return " expr ";")))
-    ;; ((print ,[format-expr . produces . expr])
-    ;;  (indent-before (string-append "print(" expr ");")))
-    ;; ((print ,[format-expr . produces . e] ,[format-expr . produces . op])
-    ;;  (indent-before (string-append "print(" e ", " op ");")))
-    ;; ((set! ,[format-expr . produces . x] ,[format-expr . produces . v])
-    ;;  (indent-before
-    ;;   (string-append x " = " v ";")))
+    ((Assign _ [format-expr . produces . x] [format-expr . produces . v])
+     (indent-before
+      (string-append x " = " v ";")))
     ;; ((vector-set! ,[format-expr . produces . vec-expr]
     ;;               ,[format-expr . produces . i-expr] ,[format-expr . produces . val-expr])
     ;;  (indent-before
     ;;   (string-append vec-expr "[" i-expr "] = " val-expr ";")))
-    ;; ((goto ,name)
-    ;;  (indent-before (string-append "goto " (format-ident name) ";")))
-    ;; ((label ,name)
-    ;;  (indent-before (string-append (format-ident name) ":")))
+    ((Goto _ name)
+     (indent-before (string-append "goto " (format-ident name) ";")))
+    ((GccLabelDecl _ name)
+     (string-append "__label__ " (format-ident name) ";"))
+    ((CxxLabel _ name)
+     (string-append (format-ident name) ":"))
     ;; ((while ,[format-expr . produces . expr] ,stmt)
     ;;  (string-append
     ;;   (indent-before (string-append "while(" expr ")\n"))
@@ -153,11 +155,12 @@
 
 (define (format-expr expr)
   (match expr
-    ((BlockExpr _ ss) ;; xxx temporary
+    ((GccStatExpr _ ss e)
      (string-append
-      "BLOCK { "
-      (apply string-append (map format-stat ss))
-      " }"))
+      "({ "
+      (join "\n" (append (map format-stat ss)
+                         (list (string-append (format-expr e) ";"))))
+      " })"))
     ;; ((empty-struct) "{0}")
     ;; ((field ,[obj] ,x)
     ;;  (string-append obj "." (format-ident x)))

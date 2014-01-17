@@ -38,12 +38,6 @@
    Param? DefVar?
    ast))
 
-(define (expr-get-type ast)
-  (ast-anno-maybe ast 'type-ast))
-
-(define (expr-set-type ast t)
-  (Ast-anno-set ast 'type-ast t))
-
 (define (def-get-type def)
   (match def
     ((DefVar _ _ t _)

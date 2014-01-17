@@ -263,8 +263,10 @@ It is rather important for all Ast derived node types to be
 
 (define-ast* CxxParam Def ((just-term t)))
 
+(define-ast* CxxDeclVar Def ((just-term t)))
+
 ;; Statement expression (GCC extension).
-(define-ast* GccStatExpr Ast ((just-term t) (list-of-term ss)))
+(define-ast* GccStatExpr Ast ((list-of-term ss) (just-term e)))
 
 ;; Local label declaration (GCC extension). A statement.
 (define-ast* GccLabelDecl Ast ((no-term n)))
@@ -363,6 +365,16 @@ It is rather important for all Ast derived node types to be
    Literal?
    Var?
    ast))
+
+;;; 
+;;; types
+;;; 
+
+(define* (expr-get-type ast)
+  (ast-anno-maybe ast 'type-ast))
+
+(define* (expr-set-type ast t)
+  (Ast-anno-set ast 'type-ast t))
 
 ;;; 
 ;;; exports
