@@ -80,9 +80,12 @@
 (define* (symbolic-identifier=? a b)
   (eq? (syntax-e a) (syntax-e b)))
 
+(define* (raise-assertion-error src fmt . v)
+  (apply error src (string-append "assertion failed: " fmt) v))
+
 (define-syntax-rule* (assert e)
   (unless e
-    (error 'assert "assertion ~s failed" (quote e))))
+    (raise-assertion-error 'assert "~s" (quote e))))
 
 (define* (hash-empty? h)
   (= (hash-count h) 0))

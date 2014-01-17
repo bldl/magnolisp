@@ -72,12 +72,17 @@
 
 (define (format-stat stmt)
   (match stmt
-    ;; ((begin ,stmt* ...)
-    ;;  (string-append
-    ;;   (indent-before "{\n")
-    ;;   (join "\n" (indent-more (map format-stat stmt*)))
-    ;;   "\n"
-    ;;   (indent-before "}")))
+    ((BlockStat _ stmt*)
+     (string-append
+      (indent-before "{\n")
+      (join "\n" (indent-more (map format-stat stmt*)))
+      "\n"
+      (indent-before "}")))
+    ((DefVar _ [format-ident . produces . ident]
+       [format-type . produces . type]
+       [format-expr . produces . expr])
+     (indent-before
+      (string-append type " " ident " = " expr ";")))
     ;; ((let ,[format-ident . produces . ident] (fixed-array ,[format-type . produces . type] ,i)
     ;;       ,[format-expr . produces . expr])
     ;;  (indent-before

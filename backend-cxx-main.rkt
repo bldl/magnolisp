@@ -44,6 +44,8 @@ C++ back end.
 ;; map. Does fairly "stable" renaming by limiting the context of
 ;; locals to the function body.
 (define (cxx-rename ast-lst)
+  ;;(pretty-print ast-lst)
+  
   ;; We use (next-gensym r sym) with this to do numbering. All the
   ;; global names are in this table. When visiting function bodies we
   ;; update functionally.
@@ -80,6 +82,21 @@ C++ back end.
        (_ (void))))
    ast-lst)
 
+  ;; Returns (values r sym).
+  (define (do-var-def r id t stem)
+    (when (dict-has-key? id->sym id)
+      (raise-assertion-error
+       'do-var-def
+       "dictionary already has key ~s: ~s"
+       id (dict->list id->sym)))
+    (define orig-sym (syntax-e id))
+    (define orig-s (symbol->string orig-sym))
+    (define cand-s
+      (string->internal-cxx-id orig-s #:default stem))
+    (define-values (n-r n-sym) (next-gensym r (string->symbol cand-s)))
+    (set! id->sym (dict-set id->sym id n-sym))
+    (values n-r n-sym))
+  
   ;; Returns (values r ast).
   (define (rw r ast)
     (match ast
@@ -92,22 +109,23 @@ C++ back end.
          (error 'cxx-rename "unbound variable ~a: ~s"
                 (syntax-e id) id))
        (define sym (dict-ref id->sym def-id #f))
-       (assert sym)
+       (unless sym
+         (raise-assertion-error
+          'cxx-rename
+          "expected C++ name to have been decided for ~a" (syntax-e id)))
        (values r (Var a sym)))
       ((CxxDefun a id m t ps bs)
        (define n-sym (dict-ref id->sym id))
-       (define-values (r- n-ast)
+       (define-values (r-dummy n-ast)
          (rw-all r (CxxDefun a n-sym m t ps bs)))
        (values r n-ast))
       ((CxxParam a id t)
-       (assert (not (dict-has-key? id->sym id)))
-       (define orig-sym (syntax-e id))
-       (define orig-s (symbol->string orig-sym))
-       (define cand-s
-         (string->internal-cxx-id orig-s #:default "a"))
-       (define-values (n-r n-sym) (next-gensym r (string->symbol cand-s)))
-       (set! id->sym (dict-set id->sym id n-sym))
+       (define-values (n-r n-sym) (do-var-def r id t "a"))
        (values n-r (CxxParam a n-sym t)))
+      ((DefVar a id t v)
+       (define-values (r-1 n-v) (rw r v))
+       (define-values (r-2 n-sym) (do-var-def r-1 id t "v"))
+       (values r-2 (DefVar a n-sym t n-v)))
       (_
        (rw-all r ast))))
 
@@ -196,6 +214,10 @@ C++ back end.
                      (list (annoless CxxReturnOne (ast->cxx b))))))
       ((Param a id t)
        (CxxParam a id (annoless RefT (annoless ConstT (ast->cxx t)))))
+      ((DefVar a id t v)
+       (DefVar a id (ast->cxx t) (ast->cxx v)))
+      ((Let a (list dv) ss) ;; xxx only one DefVar for now - might run into trouble with letrec otherwise
+       (BlockStat a (map ast->cxx (cons dv ss))))
       ((? Var?)
        ast)
       ((Apply a f es) ;; xxx need to deal with operators and parenthesization
@@ -226,7 +248,7 @@ C++ back end.
     ast->cxx
     (filter
      (lambda (x)
-       (no-pred-holds Param? ForeignTypeDecl? x))
+       (no-pred-holds Param? DefVar? ForeignTypeDecl? x))
      (dict-values defs-t)))))
 
 ;;; 

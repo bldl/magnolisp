@@ -263,6 +263,12 @@ It is rather important for all Ast derived node types to be
 
 (define-ast* CxxParam Def ((just-term t)))
 
+;; Statement expression (GCC extension).
+(define-ast* GccStatExpr Ast ((just-term t) (list-of-term ss)))
+
+;; Local label declaration (GCC extension).
+(define-ast* GccLabelDecl Ast ((no-term n)))
+
 ;; Parenthesized expression.
 (define-ast* Parens Ast ((just-term e)))
 
