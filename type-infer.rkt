@@ -372,6 +372,17 @@
                                  (ast-displayable/datum b-t)))
             ast b)))
        (void))
+      ((DefVar _ id t v)
+       (define v-t (ti-expr v))
+       (unless (unify! t v-t)
+         (raise-language-error/ast
+          "declared variable type does not match value expression"
+          #:fields (list (list "declared type"
+                               (ast-displayable/datum t))
+                         (list "actual type of value"
+                               (ast-displayable/datum v-t)))
+            ast v))
+       (void))
       (else
        (raise-argument-error
         'ti-def "supported Ast?" ast))))
