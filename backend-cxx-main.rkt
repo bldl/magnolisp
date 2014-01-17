@@ -247,9 +247,11 @@ C++ back end.
    (map
     ast->cxx
     (filter
-     (lambda (x)
-       (no-pred-holds Param? DefVar? ForeignTypeDecl? x))
+     Defun?
      (dict-values defs-t)))))
+
+(define (cxx-decl-sort lst)
+  (sort lst symbol<? #:key Def-id))
 
 ;;; 
 ;;; driver routines
@@ -267,7 +269,7 @@ C++ back end.
   (values (second p)))
 
 (define* (generate-cxx-file kinds defs path-stem stdout? banner?)
-  (define def-lst (cxx-rename (defs->cxx defs)))
+  (define def-lst (cxx-decl-sort (cxx-rename (defs->cxx defs))))
   (set-for-each
    kinds
    (lambda (kind)

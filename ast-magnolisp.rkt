@@ -266,8 +266,14 @@ It is rather important for all Ast derived node types to be
 ;; Statement expression (GCC extension).
 (define-ast* GccStatExpr Ast ((just-term t) (list-of-term ss)))
 
-;; Local label declaration (GCC extension).
+;; Local label declaration (GCC extension). A statement.
 (define-ast* GccLabelDecl Ast ((no-term n)))
+
+;; Label for the following statements. Itself a statement.
+(define-ast* CxxLabel Ast ((no-term n)))
+
+;; Where 'n' is a label. A statement.
+(define-ast* Goto Ast ((no-term n)))
 
 ;; Parenthesized expression.
 (define-ast* Parens Ast ((just-term e)))

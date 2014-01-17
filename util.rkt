@@ -80,6 +80,9 @@
 (define* (symbolic-identifier=? a b)
   (eq? (syntax-e a) (syntax-e b)))
 
+(define* (symbol<? x y)
+  (string<? (symbol->string x) (symbol->string y)))
+
 (define* (raise-assertion-error src fmt . v)
   (apply error src (string-append "assertion failed: " fmt) v))
 
