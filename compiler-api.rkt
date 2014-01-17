@@ -224,32 +224,46 @@ external dependencies for the program/library, as well as the .cpp and
    (values id def)))
 
 ;;; 
-;;; simple LetExpr
+;;; LetExpr
 ;;; 
 
-(define (defs-rm-simple-LetExpr defs)
+(define (defs-rm-LetExpr defs)
   (define del-lst '())
 
-  (define ast-rm-simple-LetExpr
+  ;; Complex case. Turn LetExpr into a BlockExpr + Let.
+  (define (rw-complex ast)
+    (match-define (LetExpr a dv e) ast)
+    (define n-ast
+      (BlockExpr a (list
+                    (Let #hasheq((let-kind . let))
+                         (list dv)
+                         (list (annoless Return e))))))
+    (pretty-print n-ast)
+    n-ast)
+  
+  (define ast-rm-LetExpr
     (topdown
      (repeat
       (lambda (ast)
         (match ast
           ((LetExpr _ (DefVar a1 bn t v) (Var _ rn))
-           (and
-            (free-identifier=? bn rn)
-            (let ()
-              (set! del-lst (cons bn del-lst))
-              (define a2 (Ast-annos v))
-              (define a (hash-merge a1 a2))
-              (when (Literal? v)
-                (set! a (hash-set a 'type-ast t)))
-              (define n-ast (ast-set-annos v a))
-              ;;(writeln (list n-ast (Ast-annos n-ast)))
-              n-ast)))
+           (if (free-identifier=? bn rn)
+               ;; Simple case. Just retain expression 'v'.
+               (let ()
+                 (set! del-lst (cons bn del-lst))
+                 (define a2 (Ast-annos v))
+                 (define a (hash-merge a1 a2))
+                 (when (Literal? v)
+                   (set! a (hash-set a 'type-ast t)))
+                 (define n-ast (ast-set-annos v a))
+                 ;;(writeln (list n-ast (Ast-annos n-ast)))
+                 n-ast)
+               (rw-complex ast)))
+          ((? LetExpr?)
+           (rw-complex ast))
           (_ #f))))))
   
-  (define rw (make-for-all-defs ast-rm-simple-LetExpr))
+  (define rw (make-for-all-defs ast-rm-LetExpr))
 
   (define n-defs (rw defs))
   (for ((id del-lst))
@@ -482,12 +496,12 @@ external dependencies for the program/library, as well as the .cpp and
         (assert (free-identifier=? id def-id)))
        ((list? b)
         (define mpi (first b))
-        (writeln (module-path-index-resolve mpi))
+        ;;(writeln (module-path-index-resolve mpi))
         (define r-mp 
           (resolved-module-path-name
            (module-path-index-resolve mpi)))
-        (writeln `(r-mp ,r-mp))
-        (writeln `(mods keys ,(hash-keys mods)))
+        ;;(writeln `(r-mp ,r-mp))
+        ;;(writeln `(mods keys ,(hash-keys mods)))
         (define mod (hash-ref mods r-mp #f))
         ;;(writeln `(mod ,mod))
         (when mod
@@ -722,7 +736,7 @@ external dependencies for the program/library, as well as the .cpp and
         (when (or (not ep?) (and eps-in-mod (not (dict-empty? eps-in-mod))))
           (define pt (Mod-pt mod)) ;; parse tree
           ;;(pretty-print (syntax->datum pt))
-          (pretty-print (syntax->datum/free-id pt))
+          ;;(pretty-print (syntax->datum/free-id pt))
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
           (when eps-in-mod
@@ -761,7 +775,8 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
   (set! all-defs (defs-rm-DefStx all-defs))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
-  (set! all-defs (defs-rm-simple-LetExpr all-defs))
+  (set! all-defs (defs-rm-LetExpr all-defs))
+  ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (set! all-defs ((make-for-all-defs ast-LetLocalEc->BlockExpr) all-defs))
   (set! all-defs (defs-simplify all-defs))
   (set! all-defs (defs-de-racketize all-defs))
@@ -845,6 +860,6 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-packages-1.rkt"))
+  (define st (compile-modules "test-let-expr-1.rkt"))
   (generate-files st (hasheq ;;'build (seteq 'gnu-make 'qmake 'c 'ruby)
                              'cxx (seteq 'cc 'hh))))
