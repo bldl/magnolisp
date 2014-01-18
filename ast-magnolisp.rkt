@@ -10,7 +10,7 @@ It is rather important for all Ast derived node types to be
 |#
 
 (require "ast-util.rkt" "compiler-util.rkt"
-         "util.rkt" "util/struct.rkt")
+         "util.rkt" "util/struct.rkt" syntax/id-table)
 
 ;;; 
 ;;; abstract node
@@ -98,6 +98,84 @@ It is rather important for all Ast derived node types to be
                         expr sub-expr extras
                         #:fields more-fields
                         #:continued continued))
+
+;;; 
+;;; identifiers
+;;; 
+
+;; [name symbol?] is the name of the identifier. [bind symbol?] is
+;; used for comparison with other identifiers, and solely determines
+;; if two identifiers access the same binding.
+(define-ast* Id Ast ((no-term name) (no-term bind)))
+
+(define-with-contract*
+  (-> Id? Id? boolean?)
+  (ast-identifier=? x y)
+  (eq? (Id-bind x) (Id-bind y)))
+
+(define-with-contract*
+  (-> Id? string?)
+  (ast-identifier->string x)
+  (symbol->string (Id-name x)))
+
+(define* (ast-identifier<? x y)
+  (string<? (ast-identifier->string x)
+            (ast-identifier->string y)))
+
+(define-with-contract*
+  (->* () ((or/c symbol? string?)) Id?)
+  (fresh-ast-identifier [base 'g])
+  (annoless Id (gensym base) (gensym 'b)))
+
+(define-with-contract*
+  (->* (identifier?) (#:bind (or/c symbol? Id?)) Id?)
+  (identifier->ast id #:bind [other #f])
+  (define name (syntax-e id))
+  (define bind (cond
+                ((symbol? other) other)
+                ((Id? other) (Id-bind other))
+                (else (gensym name))))
+  (Id (hasheq 'stx id) name bind))
+
+;; Use (make-immutable-free-id-table #:phase 0) to create initial
+;; state.
+(define-with-contract*
+  (-> immutable-free-id-table? identifier? 
+      (values immutable-free-id-table? Id?))
+  (identifier->ast/stateful id->bind id)
+  (define name (syntax-e id))
+  (define def-id (or (syntax-property id 'def-id) id))
+  (define bind (dict-ref id->bind def-id #f))
+  (unless bind
+    (set! bind (gensym name))
+    (set! id->bind (dict-set id->bind def-id bind)))
+  (values id->bind
+          (Id (hasheq 'stx id) name bind)))
+
+;; Returns #f instead of Id in the bind? = #t if already bound, or in
+;; the bind? = #f case if unbound. Otherwise returns a functionally
+;; modified Id, in addition to the updated state.
+(define-with-contract*
+  (-> hash? hash? boolean? Id?
+      (values hash? hash? (or/c Id? #f)))
+  (ast-identifier-assign-name name->num bind->name bind? id)
+  (match-define (Id a n b) id)
+  (cond
+   (bind?
+    (cond
+     ((hash-has-key? bind->name b)
+      (values name->num bind->name #f))
+     (else
+      (define-values (name->num+ name)
+        (next-gensym name->num (string->symbol n)))
+      (values name->num+
+              (hash-set bind->name b name)
+              (Id a name b)))))
+   (else
+    (define name (hash-ref bind->name b #f))
+    (values name->num bind->name
+            (and name
+                 (Id a name b))))))
 
 ;;; 
 ;;; type expressions
