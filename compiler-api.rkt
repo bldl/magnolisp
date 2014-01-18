@@ -566,7 +566,7 @@ external dependencies for the program/library, as well as the .cpp and
       (raise-language-error/ast
        "definition marked both as 'export' and 'foreign'"
        def))
-    (define n-def (Ast-anno-set def 'export-name v))
+    (define n-def (ast-anno-set def 'export-name v))
     (set! defs-in-mod
           (dict-set defs-in-mod id n-def)))
   defs-in-mod)

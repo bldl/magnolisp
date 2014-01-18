@@ -2,34 +2,10 @@
 
 #|
 
-Data types used for internal representation of abstract syntax. The
-frontend creates (syntax for) such values in phase 1, whereas the
-backend uses the values in phase 0.
-
-We use a bound-id-table for recording information about identifiers
-during macro expansion. The key being the ID, and the value being a
-hasheq, keyed by the following:
-
-  - 'type :: a Type for each declared typed construct
-
-  - 'entry-point :: a #t value for each library entry point
-
-The 'verbatim and 'external property:
-
-  - 'external means an externally defined function (in C++)
-
-  - 'verbatim means that body is foreign language (C++)
-
-The reason we are using a bound id-table is that whenever we are
-adding a metadata record it is for a freshly bound definition - we
-never add a new metadata record for the same identifier.
-
-Note quite sure if we should specify any #:phase for the identifier
-tables, but phase 0 would seem appropriate as all Magnolisp names are
-such.
+Data types used for internal representation of abstract syntax.
 
 It is rather important for all Ast derived node types to be
-#:transparent.
+#:transparent, as such is assumed by some of the compiler machinery.
 
 |#
 
@@ -56,7 +32,7 @@ It is rather important for all Ast derived node types to be
   (let* ((annos (Ast-annos ast)))
     (hash-ref annos k #f)))
 
-(define* (Ast-anno-set ast k v)
+(define* (ast-anno-set ast k v)
   (define old-annos (Ast-annos ast))
   (define new-annos (hash-set old-annos k v))
   (ast-set-annos ast new-annos))
@@ -374,7 +350,7 @@ It is rather important for all Ast derived node types to be
   (ast-anno-maybe ast 'type-ast))
 
 (define* (expr-set-type ast t)
-  (Ast-anno-set ast 'type-ast t))
+  (ast-anno-set ast 'type-ast t))
 
 ;;; 
 ;;; exports
