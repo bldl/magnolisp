@@ -5,12 +5,16 @@
 This is a basic Stratego-inspired term rewriting library for
 Racket. http://strategoxt.org/
 
+The primitive traversal operators (one, some, all) and strategy
+combinators (e.g., topdown, bottomup) together implement the notion of
+generic traversal strategies.
+
 Everything here apart from failure values and 'one', 'some', and 'all'
-strategies are generic, and some of those are also implemented in
-terms of interfaces. Unfortunately such interfaces cannot be defined
-for existing datatypes. Perhaps we should define this module as a
-'unit' or somesuch parameterizable construct to allow these operations
-to be freely specified.
+operators are generic, and some of those are also implemented in terms
+of interfaces. Unfortunately such interfaces cannot be defined for
+existing datatypes. Perhaps we should define this module as a 'unit'
+or somesuch parameterizable construct to allow these operations to be
+freely specified.
 
 We have some additions here, such as 'must' to function as a sort of
 an assertion. If a 'must' succeed strategy fails it is an error, and
@@ -36,6 +40,10 @@ Mutable, closed over variables may be used to hold dynamic rules in
 the sense of Stratego. Something like the dynamic rule scope construct
 in turn can be achieved through the use of parameters. See Bravenboer
 et al: Program Transformation with Scoped Dynamic Rewrite Rules (2005).
+
+For related discussion on Scheme-based implementation of generic
+traversal strategies, see Chapter 5 of Pankaj Surana's dissertation
+Meta-Compilation of Language Abstractions (2006).
 
 |#
 

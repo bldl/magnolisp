@@ -37,6 +37,61 @@ C++ back end.
   (exe-filter s '("/usr/bin/uncrustify" "-l" "cpp" "-q")))
 
 ;;; 
+;;; identifier -> Id conversion
+;;;
+
+(require "ast-util.rkt" "util/struct.rkt")
+
+(define (defs-id->ast defs)
+  (define id->bind
+    (for/dict
+     (make-immutable-free-id-table #:phase 0)
+     ([(id def) (in-dict defs)])
+     (let* ((name (syntax-e id))
+            (bind (gensym name)))
+       (values id bind))))
+
+  (define (mk-id id)
+    (define def-id (or (syntax-property id 'def-id) id))
+    (define bind (dict-ref id->bind def-id #f))
+    (unless bind
+      (error 'defs-id->ast
+             "unbound identifier ~a: ~s"
+             (syntax-e id) id))
+    (identifier->ast id #:bind bind))
+
+  (define (rw-annos annos)
+    (define type-ast (hash-ref annos 'type-ast #f))
+    (and type-ast
+         (hash-set annos 'type-ast (rw type-ast))))
+
+  (define (ast-rw-annos ast)
+    (define annos (rw-annos (Ast-annos ast)))
+    (if annos (ast-set-annos ast annos) ast))
+  
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         ((? Def?)
+          (define id (Def-id ast))
+          (define id-ast (mk-id id))
+          (dynamic-struct-copy Def ast (id id-ast)))
+         ((Var a id)
+          (define id-ast (mk-id id))
+          (Var (or (rw-annos a) a) id-ast))
+         ((NameT a id)
+          (define id-ast (mk-id id))
+          (NameT a id-ast))
+         (else
+          (ast-rw-annos ast))))))
+  
+  (for/hasheq ([(id def) (in-dict defs)])
+    (let ((bind (dict-ref id->bind id #f)))
+      (assert bind)
+      (values bind (rw def)))))
+
+;;; 
 ;;; C++ renaming
 ;;; 
 
@@ -320,6 +375,7 @@ C++ back end.
   (values (second p)))
 
 (define* (generate-cxx-file kinds defs path-stem stdout? banner?)
+  ;;(pretty-print (defs-id->ast defs)) (exit)
   (define def-lst (cxx-decl-sort (cxx-rename (defs->cxx defs))))
   (set-for-each
    kinds

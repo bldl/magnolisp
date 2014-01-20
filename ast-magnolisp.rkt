@@ -103,10 +103,14 @@ It is rather important for all Ast derived node types to be
 ;;; identifiers
 ;;; 
 
+(define (id-write v out mode)
+  (fprintf out "~a.~a" (Id-name v) (Id-bind v)))
+
 ;; [name symbol?] is the name of the identifier. [bind symbol?] is
 ;; used for comparison with other identifiers, and solely determines
 ;; if two identifiers access the same binding.
-(define-ast* Id Ast ((no-term name) (no-term bind)))
+(define-ast* Id Ast ((no-term name) (no-term bind))
+  #:property prop:custom-write id-write)
 
 (define-with-contract*
   (-> Id? Id? boolean?)
@@ -125,7 +129,8 @@ It is rather important for all Ast derived node types to be
 (define-with-contract*
   (->* () ((or/c symbol? string?)) Id?)
   (fresh-ast-identifier [base 'g])
-  (annoless Id (gensym base) (gensym 'b)))
+  (define sym (gensym base))
+  (annoless Id sym sym))
 
 (define-with-contract*
   (->* (identifier?) (#:bind (or/c symbol? Id?)) Id?)
@@ -152,9 +157,9 @@ It is rather important for all Ast derived node types to be
   (values id->bind
           (Id (hasheq 'stx id) name bind)))
 
-;; Returns #f instead of Id in the bind? = #t if already bound, or in
-;; the bind? = #f case if unbound. Otherwise returns a functionally
-;; modified Id, in addition to the updated state.
+;; Returns #f instead of Id in the bind? = #t case if already bound,
+;; or in the bind? = #f case if unbound. Otherwise returns a
+;; functionally modified Id, in addition to the updated state.
 (define-with-contract*
   (-> hash? hash? boolean? Id?
       (values hash? hash? (or/c Id? #f)))
