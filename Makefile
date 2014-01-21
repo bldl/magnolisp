@@ -25,3 +25,6 @@ pdf :
 
 setup :
 	raco setup magnolisp
+
+test :
+	raco test tests/run-*.rkt

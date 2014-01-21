@@ -236,6 +236,10 @@ An example invocation would be:
 
 which instructs the compiler to print out C++ code into standard output, with banners, for the program @filepath{my-program.rkt}.
 
+@section{Example Code}
+
+For sample Magnolisp programs, see the @filepath{test-*.rkt} files in the @filepath{tests} directory of the Magnolisp implementation codebase.
+
 @section{License}
 
 Except where otherwise noted, all code is authored by Tero Hasu, copyright Tero Hasu and University of Bergen, and not licensed for distribution at this time.
