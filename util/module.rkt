@@ -83,6 +83,20 @@
     (define the-nm (ctor e ...))
     (provide (except-out (struct-out nm) ctor) the-nm)))
 
+(define-syntax* define-with-contract
+  (syntax-rules ()
+    ((_ contract (name . rest) body ...)
+     (define (name . rest) body ...))
+    ((_ contract name value)
+     (define name value))))
+
+(define-syntax* define*-with-contract
+  (syntax-rules ()
+    ((_ contract (name . rest) body ...)
+     (define* (name . rest) body ...))
+    ((_ contract name value)
+     (define* name value))))
+
 (define-syntax* define-with-contract*
   (syntax-rules ()
     ((_ contract (name . rest) body ...)
