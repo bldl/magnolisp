@@ -128,9 +128,8 @@ It is rather important for all Ast derived node types to be
 
 (define-with-contract*
   (->* () ((or/c symbol? string?)) Id?)
-  (fresh-ast-identifier [base 'g])
-  (define sym (gensym base))
-  (annoless Id sym sym))
+  (fresh-ast-identifier [sym 'g])
+  (annoless Id sym (gensym sym)))
 
 (define-with-contract*
   (->* (identifier?) (#:bind (or/c symbol? Id?)) Id?)
@@ -156,6 +155,12 @@ It is rather important for all Ast derived node types to be
     (set! id->bind (dict-set id->bind def-id bind)))
   (values id->bind
           (Id (hasheq 'stx id) name bind)))
+
+(define-with-contract*
+  (-> hash? Id? any/c)
+  (ast-identifier-lookup bind->def id)
+  (define def (hash-ref bind->def (Id-bind id) #f))
+  def)
 
 ;; Returns #f instead of Id in the bind? = #t case if already bound,
 ;; or in the bind? = #f case if unbound. Otherwise returns a

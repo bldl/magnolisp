@@ -860,6 +860,6 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-modules "test-let-expr-1.rkt"))
+  (define st (compile-files "tests/test-let-expr-1.rkt"))
   (generate-files st (hasheq ;;'build (seteq 'gnu-make 'qmake 'c 'ruby)
                              'cxx (seteq 'cc 'hh))))

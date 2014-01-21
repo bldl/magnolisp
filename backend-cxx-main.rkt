@@ -95,29 +95,34 @@ C++ back end.
 ;;; C++ renaming
 ;;; 
 
-;; Trickery to generate fresh, unique IDs for the purposes of the
-;; backend. Should only be used in contexts where def-id is used for
-;; comparison. The 'stem' argument must be a symbol.
-(define (fresh-id stem)
-  (syntax-property
-   (datum->syntax #f stem)
-   'def-id
-   (generate-temporary)))
-
 ;; Renames Racket IDs to legal C++ symbols. Tracks renamings using a
 ;; map. Does fairly "stable" renaming by limiting the context of
 ;; locals to the function body.
 (define (cxx-rename ast-lst)
-  ;;(pretty-print ast-lst)
+  ;;(pretty-print ast-lst) (exit)
   
   ;; We use (next-gensym r sym) with this to do numbering. All the
-  ;; global names are in this table. When visiting function bodies we
-  ;; update functionally.
+  ;; global names are in this table by Id-name. When visiting function
+  ;; bodies we update functionally.
   (define r #hasheq())
-  ;; ID to symbol mappings are stored here. Handled similarly to the
-  ;; 'r' table. Use def-id to look up symbols from this table.
-  (define id->sym (make-immutable-free-id-table #:phase 0))
+  
+  ;; Id-bind to renamed symbol mappings are stored here.
+  (define id->sym (make-hasheq))
 
+  ;; More than one binding may get the same name, but each binding is
+  ;; unique.
+  (define (record-cxx-name! id n-sym)
+    (define bind (Id-bind id))
+    (when (hash-has-key? id->sym bind)
+      (raise-assertion-error
+       'record-cxx-name!
+       "C++ name already recorded for ~s: ~s"
+       id (hash->list id->sym)))
+    (hash-set! id->sym bind n-sym))
+
+  (define (lookup-cxx-name id)
+    (hash-ref id->sym (Id-bind id) #f))
+  
   ;; We must collect all top-level IDs (and decide on their C++ name)
   ;; before renaming any locals.
   (for-each
@@ -126,11 +131,9 @@ C++ back end.
        ((? CxxDefun?)
         (define a (Ast-annos ast))
         (define id (Def-id ast))
-        (assert (not (dict-has-key? id->sym id)))
         (define export-name (get-export-name a))
         (define foreign-name (get-foreign-name a))
-        (define orig-sym (syntax-e id))
-        (define orig-s (symbol->string orig-sym))
+        (define orig-s (ast-identifier->string id))
         (define (use-or-make name)
           (and name
                (if (identifier? name)
@@ -142,49 +145,36 @@ C++ back end.
               (string->internal-cxx-id orig-s #:default "f")))
         (define n-sym (string->symbol cand-s))
         (set!-values (r n-sym) (next-gensym r n-sym))
-        (set! id->sym (dict-set id->sym id n-sym)))
+        (record-cxx-name! id n-sym))
        (_ (void))))
    ast-lst)
 
-  ;; Returns (values r sym).
+  ;; Decides name for an ID binding. Returns (values r sym).
   (define (decide-name-for-id r id stem)
-    (define def-id (or (get-def-id id) id))
-    (when (dict-has-key? id->sym def-id)
-      (raise-assertion-error
-       'decide-name-for-id
-       "dictionary already has key ~s: ~s"
-       def-id (dict->list id->sym)))
-    (define orig-sym (syntax-e id))
-    (define orig-s (symbol->string orig-sym))
+    (define orig-s (ast-identifier->string id))
     (define cand-s
       (string->internal-cxx-id orig-s #:default stem))
     (define-values (n-r n-sym) (next-gensym r (string->symbol cand-s)))
-    (set! id->sym (dict-set id->sym def-id n-sym))
+    (record-cxx-name! id n-sym)
     (values n-r n-sym))
 
-  (define (get-decision-for id [def-id (get-def-id id)])
-    (define sym (dict-ref id->sym def-id #f))
+  ;; Gets decided name for an ID reference.
+  (define (get-decision-for id)
+    (define sym (lookup-cxx-name id))
     (unless sym
       (raise-assertion-error
        'cxx-rename
-       "expected C++ name to have been decided for ~a" (syntax-e id)))
+       "expected C++ name to have been decided for ~s" id))
     sym)
   
   ;; Returns (values r ast).
   (define (rw r ast)
     (match ast
       ((Var a id)
-       ;; The name for any binding should already have been decided
-       ;; upon. And at this late stage any references to built-in
-       ;; names should have been translated as well.
-       (define def-id (get-def-id id))
-       (unless def-id
-         (error 'cxx-rename "unbound variable ~a: ~s"
-                (syntax-e id) id))
-       (define sym (get-decision-for id def-id))
+       (define sym (get-decision-for id))
        (values r (Var a sym)))
       ((CxxDefun a id m t ps bs)
-       (define n-sym (dict-ref id->sym id))
+       (define n-sym (get-decision-for id))
        (define-values (r-dummy n-ast)
          (rw-all r (CxxDefun a n-sym m t ps bs)))
        (values r n-ast))
@@ -229,7 +219,7 @@ C++ back end.
     (topdown
      (lambda (ast)
        (match ast
-         ((CxxNameT a id)
+         ((CxxNameT a id) ;; xxx exceptionally, C++ type names are still Racket identifiers here
           (CxxNameT a (syntax-e id)))
          (_ ast)))))
 
@@ -319,8 +309,8 @@ C++ back end.
       ((BlockExpr a ss)
        (define t (expr-get-type ast))
        (define cxx-t (ast->cxx t))
-       (define lbl (fresh-id 'b))
-       (define rval (fresh-id 'r))
+       (define lbl (fresh-ast-identifier 'b))
+       (define rval (fresh-ast-identifier 'r))
        (define n-ss
          (parameterize ((b-tgt (cons lbl rval)))
            (map ast->cxx ss)))
@@ -335,12 +325,11 @@ C++ back end.
       ((Literal a d)
        (Literal a (syntax->datum d)))
       ((NameT _ id)
-       (define def-id (get-def-id id))
-       (unless def-id
+       (define def (ast-identifier-lookup defs-t id))
+       (unless def
          (raise-language-error/ast
           "reference to unbound type ID"
           ast id))
-       (define def (dict-ref defs-t def-id))
        (match def
          ((ForeignTypeDecl _ _ cxx-t)
           cxx-t)))
@@ -354,7 +343,7 @@ C++ back end.
     ast->cxx
     (filter
      Defun?
-     (dict-values defs-t)))))
+     (hash-values defs-t)))))
 
 (define (cxx-decl-sort lst)
   (sort lst symbol<? #:key Def-id))
@@ -376,7 +365,11 @@ C++ back end.
 
 (define* (generate-cxx-file kinds defs path-stem out banner?)
   ;;(pretty-print (defs-id->ast defs)) (exit)
-  (define def-lst (cxx-decl-sort (cxx-rename (defs->cxx defs))))
+  (define def-lst
+    (cxx-decl-sort
+     (cxx-rename
+      (defs->cxx
+        (defs-id->ast defs)))))
   (set-for-each
    kinds
    (lambda (kind)
