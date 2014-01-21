@@ -68,7 +68,7 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
                               'build tools)
                       #:outdir (or out-dir (current-directory))
                       #:basename out-basename
-                      #:stdout stdout?
+                      #:out (and stdout? (current-output-port))
                       #:banner banner?))
     
     (void))

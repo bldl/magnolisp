@@ -73,9 +73,10 @@
     ((_ body ...)
      (capture-output (lambda () body ...)))))
 
-(define* (write-generated-output path stdout? writer)
-  (if stdout?
-      (writer)
+(define* (write-generated-output path out writer)
+  (if out
+      (parameterize ((current-output-port out))
+        (writer))
       (write-changed-file
        path
        (capture-output writer))))

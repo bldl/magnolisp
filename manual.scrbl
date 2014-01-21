@@ -216,10 +216,10 @@ Returns @racket[#t] if @racket[v] is a compilation state object (as returned by 
           [backends (hash/c symbol? (set/c symbol? #:cmp 'eq))]
           [#:outdir outdir path-string? (current-directory)]
           [#:basename basename string? "output"]
-          [#:stdout stdout? boolean? #t]
+          [#:out out output-port? (current-output-port)]
           [#:banner banner? boolean? #t])
          void?]{
-Performs code generation for the program whose intermediate representation (IR) is stored in the compilation state @racket[st]. Code generation is only performed with the specified compiler back ends, and for the specified back end specific file types. For instance, to generate both a C++ header and implementation, you may pass @racket[backends] as @racket[(hasheq 'cxx (seteq 'cc 'hh))]. Passing @racket[stdout?] as @racket[#t] causes code generation to standard output. When @racket[stdout?] is @racket[#t], the @racket[banner?] argument indicates whether banners (with filenames) should be printed to precede individual output files. When @racket[stdout?] is @racket[#f], the @racket[outdir] argument specifies the output directory for generated files. The @racket[basename] string is used as the ``stem'' for output file names.
+Performs code generation for the program whose intermediate representation (IR) is stored in the compilation state @racket[st]. Code generation is only performed with the specified compiler back ends, and for the specified back end specific file types. For instance, to generate both a C++ header and implementation, you may pass @racket[backends] as @racket[(hasheq 'cxx (seteq 'cc 'hh))]. Passing @racket[out] as @racket[#f] causes code generation into (separate) files; otherwise the specified output port is used. When @racket[out] is a true value, the @racket[banner?] argument indicates whether banners (with filenames) should be printed to precede individual output files. When @racket[out] is @racket[#f], the @racket[outdir] argument specifies the output directory for generated files. The @racket[basename] string is used as the ``stem'' for output file names.
 }
 
 @; The C++ backend depends on @exec{uncrustify} as an external tool, and the tool requires a configuration file; one is installable using the provided @filepath{Makefile}.

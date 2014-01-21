@@ -21,7 +21,8 @@
       (generate-files
        st
        (hasheq 'build (seteq 'gnu-make 'qmake 'c 'ruby)
-               'cxx (seteq 'cc 'hh)))))
+               'cxx (seteq 'cc 'hh))
+       #:out (open-output-nowhere))))
    (format "failed to compile program ~a" fn)))
     
 (define (compile-mgl-files)

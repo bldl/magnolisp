@@ -231,15 +231,15 @@
   (values (second p) (third p) (fourth p)))
 
 (define-with-contract*
-  (-> symbol? list? path-string? boolean? boolean? void?)
-  (generate-build-file kind attrs path-stem stdout? banner?)
+  (-> symbol? list? path-string? output-port? boolean? void?)
+  (generate-build-file kind attrs path-stem out banner?)
 
   (define-values (writer sfx pfx) (get-writer-etc kind))
   (define path (path-add-suffix path-stem sfx))
   (define filename (path-basename-as-string path))
   
   (write-generated-output
-   path stdout?
+   path out
    (thunk
     (when banner?
       (display-banner pfx filename))

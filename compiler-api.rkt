@@ -820,13 +820,13 @@ external dependencies for the program/library, as well as the .cpp and
   (->* (St? (hash/c symbol? (set/c symbol? #:cmp 'eq)))
        (#:outdir path-string?
         #:basename string?
-        #:stdout boolean?
+        #:out output-port?
         #:banner boolean?)
        void?)
   (generate-files st backends
                   #:outdir [outdir (current-directory)]
                   #:basename [basename "output"]
-                  #:stdout [stdout? #t]
+                  #:out [out (current-output-port)]
                   #:banner [banner? #t])
 
   (unless (string-file-id? basename)
@@ -839,7 +839,7 @@ external dependencies for the program/library, as well as the .cpp and
     (when (and kinds (not (set-empty? kinds)))
       (define defs (St-defs st))
       (define path-stem (build-path outdir basename))
-      (generate-cxx-file kinds defs path-stem stdout? banner?)))
+      (generate-cxx-file kinds defs path-stem out banner?)))
 
   (let ((kinds (hash-ref backends 'build #f)))
     (when (and kinds (not (set-empty? kinds)))
@@ -851,7 +851,7 @@ external dependencies for the program/library, as well as the .cpp and
       (set-for-each
        kinds
        (lambda (kind)
-         (generate-build-file kind opts-lst path-stem stdout? banner?)))))
+         (generate-build-file kind opts-lst path-stem out banner?)))))
   
   (void))
 

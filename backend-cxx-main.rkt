@@ -374,7 +374,7 @@ C++ back end.
                           "either 'cc or 'hh" kind))
   (values (second p)))
 
-(define* (generate-cxx-file kinds defs path-stem stdout? banner?)
+(define* (generate-cxx-file kinds defs path-stem out banner?)
   ;;(pretty-print (defs-id->ast defs)) (exit)
   (define def-lst (cxx-decl-sort (cxx-rename (defs->cxx defs))))
   (set-for-each
@@ -395,7 +395,7 @@ C++ back end.
        (define s (format-c c-unit))
        ;; xxx uncrustify
        (write-generated-output
-        path stdout?
+        path out
         (thunk
          (when banner?
            (display-banner "//" filename))
@@ -417,7 +417,7 @@ C++ back end.
        (define s (format-c c-unit))
        ;; xxx uncrustify
        (write-generated-output
-        path stdout?
+        path out
         (thunk
          (when banner?
            (display-banner "//" filename))
