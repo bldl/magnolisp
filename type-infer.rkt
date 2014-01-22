@@ -125,6 +125,10 @@
    ((AnyT? t) (fresh-type))
    (else (type-AnyT->VarT t))))
 
+;; For each expression in 'def', if it has no type expression, add one
+;; referring to a fresh type variable. For any existing type
+;; expressions in 'def', replace AnyT type expressions with fresh
+;; type variables.
 (define (ast-expr-add-VarT defs-t def)
   (define rw
     (topdown
@@ -137,39 +141,44 @@
   
   (rw def))
 
-(define (def-add-VarT ast)
-  (match ast
-    ((Defun a id t ps b)
-     (define n-t
-       (cond
-        ((AnyT? t)
-         (annoless FunT
-                   (map (lambda (x) (fresh-type)) ps)
-                   (fresh-type)))
-        ((FunT? t)
-         (unless (= (length ps) (length (FunT-ats t)))
-           (raise-language-error/ast
-            "arity mismatch between function and its type"
-            ast t))
-         (type-add-VarT t))
-        (else
-         (raise-language-error/ast
-          "illegal type for a function"
-          ast t))))
-     (define n-ps
-       (map
-        (lambda (p t)
-          (match p
-            ((Param a n o-t)
-             (assert (AnyT? o-t))
-             (Param a n t))))
-        ps (FunT-ats n-t)))
-     (Defun a id n-t n-ps b))
-    (_ ast)))
+(define (def-add-VarT def)
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         ((Defun a id t ps b) ;; handles associated Param nodes also
+          (define n-t
+            (cond
+             ((AnyT? t)
+              (annoless FunT
+                        (map (lambda (x) (fresh-type)) ps)
+                        (fresh-type)))
+             ((FunT? t)
+              (unless (= (length ps) (length (FunT-ats t)))
+                (raise-language-error/ast
+                 "arity mismatch between function and its type"
+                 ast t))
+              (type-add-VarT t))
+             (else
+              (raise-language-error/ast
+               "illegal type for a function"
+               ast t))))
+          (define n-ps
+            (map
+             (lambda (p t)
+               (match p
+                 ((Param a n o-t)
+                  (assert (AnyT? o-t))
+                  (Param a n t))))
+             ps (FunT-ats n-t)))
+          (Defun a id n-t n-ps b))
+         ((DefVar a id t v)
+          (DefVar a id (type-add-VarT t) v))
+         (_ ast)))))
+  (rw def))
 
 (define (defs-add-VarT defs)
-  ;; First add types to top-level definitions. This includes any local
-  ;; definitions within them.
+  ;; First add types for bindings.
   (set! defs
         (for/dict
          (make-immutable-free-id-table #:phase 0)
@@ -179,8 +188,7 @@
   ;; Sync local definitions info into 'defs' table.
   (set! defs (defs-update-defs-table defs))
 
-  ;; Now add types to expression. For variable definitions, use the
-  ;; types given to the definitions.
+  ;; Now add types to expressions.
   (set! defs
         (for/dict
          (make-immutable-free-id-table #:phase 0)
@@ -483,6 +491,7 @@
         'ti-expr "supported Ast?" ast))))
 
   (set! defs (defs-add-VarT defs))
+  ;;(defs-dump defs '(type-ast))
 
   (for (((id def) (in-dict defs)))
     (ti-def def))
