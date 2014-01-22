@@ -9,7 +9,7 @@ It is rather important for all Ast derived node types to be
 
 |#
 
-(require "ast-util.rkt" "compiler-util.rkt"
+(require "ast-util.rkt" "compiler-util.rkt" "strategy.rkt"
          "util.rkt" "util/struct.rkt" syntax/id-table)
 
 ;;; 
@@ -477,6 +477,29 @@ It is rather important for all Ast derived node types to be
   (if (identifier? y)
       (syntax-e y)
       y))
+
+;;; 
+;;; AST dumping
+;;;
+
+(define* (ast->list ast (annos null))
+  (define lst null)
+  ((topdown-visit
+    (lambda (ast)
+      (define h (Ast-annos ast))
+      (set! lst
+            (cons
+             `(,ast ANNOS ,@(for/list ((k annos)
+                                       #:when (hash-has-key? h k))
+                              `(,k ,(hash-ref h k))))
+             lst))))
+   ast)
+  (reverse lst))
+
+(define* (defs-dump defs (annos null))
+  (pretty-print
+   (for/list (((id def) (in-dict defs)))
+     `(DEF ,(syntax-e id) IS ,@(ast->list def annos)))))
 
 ;;; 
 ;;; sexp dumping
