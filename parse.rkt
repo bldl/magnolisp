@@ -287,7 +287,11 @@ would have done. Still retains correct scoping and evaluation order.
                   (parse-type type-stx)))))
     (or (f) the-AnyT))
 
-  (define (maybe-parse-foreign-anno id-stx ann-h)
+  ;; Parses annotations specific to variable declarations. Also for
+  ;; function declarations, in practice. Presently only 'foreign'
+  ;; declarations (which make no sense for variables, and will be
+  ;; ignored).
+  (define (parse-add-DefVar-annos id-stx ann-h)
     (define foreign-stx (hash-ref ann-h 'foreign #f))
     (when foreign-stx
       (define foreign-name (parse-cxx-name-anno foreign-stx))
@@ -299,7 +303,7 @@ would have done. Still retains correct scoping and evaluation order.
     (check-redefinition id-stx stx)
     (define ast (parse 'expr e-stx))
     (define ann-h (mk-annos ctx stx id-stx))
-    (set! ann-h (maybe-parse-foreign-anno id-stx ann-h)) ;; xxx may not make sense for foreign variables
+    (set! ann-h (parse-add-DefVar-annos id-stx ann-h))
     (define t (lookup-type id-stx))
     (define def (DefVar ann-h id-stx t ast))
     (set-def-in-mod! id-stx def)
@@ -555,16 +559,16 @@ would have done. Still retains correct scoping and evaluation order.
        (and (identifier? #'let-kw)
             (or (free-identifier=? #'let-kw #'let-values)
                 (free-identifier=? #'let-kw #'letrec-values)))
-       (unless (eq? ctx 'module-level)
-         (when (eq? ctx 'expr)
-           (raise-syntax-error #f "unallowed let form in expr context" stx))
+       (cond
+        ((eq? ctx 'module-level)
+         (void))
+        ((eq? ctx 'stat)
          (make-Let ctx stx
-                   (syntax-e #'let-kw) #'binds #'exprs)))
-
-      ((set! id expr)
-       (identifier? #'id)
-       (when (eq? ctx 'expr)
-         (new-Assign #'id (parse ctx #'expr))))
+                   (syntax-e #'let-kw) #'binds #'exprs))
+        (else
+         (raise-syntax-error
+          #f
+          (format "unallowed let form in ~a context" ctx) stx))))
 
       ;; 'quote', as it comes in, appears to be unbound for us.
       ((q lit)
@@ -579,6 +583,19 @@ would have done. Still retains correct scoping and evaluation order.
       (id
        (identifier? #'id)
        (new-Var stx #'id))
+
+      ((set! id expr)
+       (identifier? #'id)
+       (cond
+        ((eq? ctx 'module-level)
+         (void))
+        ((eq? ctx 'stat)
+         ;;(new-Assign #'id (parse ctx #'expr))
+         (not-magnolisp stx))
+        (else
+         (raise-syntax-error
+          #f
+          (format "unallowed set! form in ~a context" ctx) stx))))
 
       ((quote-syntax datum)
        (not-magnolisp stx))
