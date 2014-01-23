@@ -259,7 +259,10 @@ would have done. Still retains correct scoping and evaluation order.
                   (filter for-runtime-require? stx-lst))))
   
   (define (not-magnolisp stx)
-    (error 'parse-defs-from-module "not Magnolisp: ~a" stx))
+    (raise-language-error
+     #f "syntax not supported in Magnolisp" stx
+     #:fields `(("binding"
+                 ,(or (stx-binding-info stx) 'unbound)))))
 
   (define (redefinition id old-def new-stx)
     (error 'parse-defs-from-module
@@ -369,7 +372,8 @@ would have done. Still retains correct scoping and evaluation order.
        (make-DefVar ctx stx id-stx e-stx))))
   
   ;; 'ctx' is a symbolic name of the context that the 'stx' being
-  ;; parsed is in. Inserts bindings into 'defs-in-mod' as a side effect.
+  ;; parsed is in (one of: module-begin, module-level, stat, and
+  ;; expr). Inserts bindings into 'defs-in-mod' as a side effect.
   ;; Returns an Ast object for non top-level things.
   (define (parse ctx stx)
     ;;(stx-print-if-type-annoed stx)
@@ -379,14 +383,17 @@ would have done. Still retains correct scoping and evaluation order.
 
       ((#%module-begin . bs)
        (eq? ctx 'module-begin)
-       (for-each (fix parse 'module-level)
-                 (syntax->list #'bs)))
+       (for-each
+        (fix parse 'module-level)
+        (syntax->list #'bs)))
 
       ;; top-level-form non-terminal
       
-      ((#%expression _)
-       (eq? ctx 'module-level)
-       (void))
+      ((#%expression e)
+       (memq ctx '(module-level expr))
+       ;; These do appear as well.
+       (when (eq? ctx 'expr)
+         (parse ctx #'e)))
 
       ((module . _)
        (eq? ctx 'module-level)
@@ -461,13 +468,14 @@ would have done. Still retains correct scoping and evaluation order.
                #:continued not-magnolisp-message))))))
       
       ((define-syntaxes (id ...) _)
-       (begin
-         (assert (eq? ctx 'module-level))
+       (eq? ctx 'module-level)
+       (let ()
          (define id-lst (syntax->list #'(id ...)))
          (assert (andmap identifier? id-lst))
          (for ((id id-lst))
            (make-DefStx ctx stx id))))
 
+      ;; Local requires are not supported.
       ((#%require . specs)
        (eq? ctx 'module-level)
        (require! (syntax->list #'specs)))
@@ -475,6 +483,7 @@ would have done. Still retains correct scoping and evaluation order.
       ;; expr non-terminal
 
       ((#%plain-lambda formals . exprs)
+       (memq ctx '(module-level expr))
        (when (eq? ctx 'expr)
          (define par-id-lst (syntax->list #'formals))
          (define e-stx-lst (syntax->list #'exprs))
@@ -492,14 +501,21 @@ would have done. Still retains correct scoping and evaluation order.
                 par-id-lst))
          (define e-stx (first e-stx-lst))
          (define e-ast (parse 'expr e-stx))
-         (new-Lambda stx par-ast-lst e-ast)))
+         (syntaxed stx Lambda par-ast-lst e-ast)))
       
       ((if c t e)
-       (when (eq? ctx 'expr)
-         (new-IfExpr stx
-                     (parse ctx #'c)
-                     (parse ctx #'t)
-                     (parse ctx #'e))))
+       (memq ctx '(module-level stat expr))
+       (cond
+        ((eq? ctx 'expr)
+         (syntaxed stx IfExpr
+                   (parse 'expr #'c)
+                   (parse 'expr #'t)
+                   (parse 'expr #'e)))
+        ((eq? ctx 'stat)
+         (syntaxed stx IfStat
+                   (parse 'expr #'c)
+                   (parse 'stat #'t)
+                   (parse 'stat #'e)))))
 
       ((#%plain-app f . e)
        (and (eq? ctx 'stat)
@@ -531,10 +547,10 @@ would have done. Still retains correct scoping and evaluation order.
        (and (eq? ctx 'stat)
             (syntax-property stx 'local-ec)
             (identifier? #'k))
-       (syntaxed stx
-        AppLocalEc #'k (parse 'expr #'e)))
+       (syntaxed stx AppLocalEc #'k (parse 'expr #'e)))
       
       ((#%plain-app p-expr . a-expr)
+       (memq ctx '(module-level expr))
        (when (eq? ctx 'expr)
          (unless (identifier? #'p-expr)
            ;; No first-class functions in Magnolisp.
@@ -558,44 +574,36 @@ would have done. Still retains correct scoping and evaluation order.
       ((let-kw binds . exprs)
        (and (identifier? #'let-kw)
             (or (free-identifier=? #'let-kw #'let-values)
-                (free-identifier=? #'let-kw #'letrec-values)))
-       (cond
-        ((eq? ctx 'module-level)
-         (void))
-        ((eq? ctx 'stat)
+                (free-identifier=? #'let-kw #'letrec-values))
+            (memq ctx '(module-level stat)))
+       (when (eq? ctx 'stat)
          (make-Let ctx stx
-                   (syntax-e #'let-kw) #'binds #'exprs))
-        (else
-         (raise-syntax-error
-          #f
-          (format "unallowed let form in ~a context" ctx) stx))))
+                   (syntax-e #'let-kw) #'binds #'exprs)))
 
       ;; 'quote', as it comes in, appears to be unbound for us.
       ((q lit)
-       (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote))
+       (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote)
+            (memq ctx '(module-level expr)))
        (when (eq? ctx 'expr)
          (make-Literal stx #'lit)))
       
       ((#%top . id) ;; module-level variable
-       (identifier? #'id)
-       (new-Var stx #'id))
+       (and (memq ctx '(module-level expr)) (identifier? #'id))
+       (when (eq? ctx 'expr)
+         (new-Var stx #'id)))
       
       (id
-       (identifier? #'id)
-       (new-Var stx #'id))
+       (and (memq ctx '(module-level expr)) (identifier? #'id))
+       (when (eq? ctx 'expr)
+         (new-Var stx #'id)))
 
       ((set! id expr)
-       (identifier? #'id)
-       (cond
-        ((eq? ctx 'module-level)
-         (void))
-        ((eq? ctx 'stat)
-         ;;(new-Assign #'id (parse ctx #'expr))
-         (not-magnolisp stx))
-        (else
-         (raise-syntax-error
-          #f
-          (format "unallowed set! form in ~a context" ctx) stx))))
+       (and (eq? ctx 'module-level) (identifier? #'id))
+       (void))
+
+      ;; ((set! id expr)
+      ;;  (and (identifier? #'id) (eq? ctx 'stat))
+      ;;  (new-Assign #'id (parse ctx #'expr)))
 
       ((quote-syntax datum)
        (not-magnolisp stx))
@@ -618,11 +626,6 @@ would have done. Still retains correct scoping and evaluation order.
       ((#%variable-reference)
        (not-magnolisp stx))
       
-      ;; These do appear as well.
-      ((#%expression e)
-       (eq? ctx 'expr)
-       (parse ctx #'e))
-
       ;; local-expand result language
       
       ;; The letrec-syntaxes+values ID we get here is either top-level

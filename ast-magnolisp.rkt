@@ -278,6 +278,9 @@ It is rather important for all Ast derived node types to be
 ;; If expression.
 (define-ast* IfExpr Ast ((just-term c) (just-term t) (just-term e)))
 
+;; If statement.
+(define-ast* IfStat Ast ((just-term c) (just-term t) (just-term e)))
+
 ;; A literal datum.
 (define-ast* Literal Ast ((no-term datum)))
 
