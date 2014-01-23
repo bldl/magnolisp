@@ -46,6 +46,59 @@ external dependencies for the program/library, as well as the .cpp and
       ((exn:fail? (lambda (e) #f)))
     b ...))
 
+;;; 
+;;; identifier -> Id conversion
+;;;
+
+(define (defs-id->ast defs)
+  (define id->bind
+    (for/dict
+     (make-immutable-free-id-table #:phase 0)
+     ([(id def) (in-dict defs)])
+     (let* ((name (syntax-e id))
+            (bind (gensym name)))
+       (values id bind))))
+
+  (define (mk-id id)
+    (define def-id (or (syntax-property id 'def-id) id))
+    (define bind (dict-ref id->bind def-id #f))
+    (unless bind
+      (error 'defs-id->ast
+             "unbound identifier ~a: ~s"
+             (syntax-e id) id))
+    (identifier->ast id #:bind bind))
+
+  (define (rw-annos annos)
+    (define type-ast (hash-ref annos 'type-ast #f))
+    (and type-ast
+         (hash-set annos 'type-ast (rw type-ast))))
+
+  (define (ast-rw-annos ast)
+    (define annos (rw-annos (Ast-annos ast)))
+    (if annos (ast-set-annos ast annos) ast))
+  
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         ((? Def?)
+          (define id (Def-id ast))
+          (define id-ast (mk-id id))
+          (dynamic-struct-copy Def ast (id id-ast)))
+         ((Var a id)
+          (define id-ast (mk-id id))
+          (Var (or (rw-annos a) a) id-ast))
+         ((NameT a id)
+          (define id-ast (mk-id id))
+          (NameT a id-ast))
+         (else
+          (ast-rw-annos ast))))))
+  
+  (for/hasheq ([(id def) (in-dict defs)])
+    (let ((bind (dict-ref id->bind id #f)))
+      (assert bind)
+      (values bind (rw def)))))
+
 ;;;
 ;;; de-Racketization
 ;;;
@@ -374,7 +427,8 @@ external dependencies for the program/library, as well as the .cpp and
     (dict-set! t id #t)))
 
 ;; Compilation state. [mods hash?] maps resolved module paths to Mod
-;; objects. [eps id-table?] has entry points as keys, and #t values.
+;; objects. [defs hash?] maps bind symbols to AST nodes. [eps
+;; id-table?] has entry points as keys, and #t values.
 (struct St (mods defs eps) #:transparent)
 
 (define* compilation-state? St?)
@@ -789,7 +843,7 @@ external dependencies for the program/library, as well as the .cpp and
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
   (pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
-  
+
   (St mods all-defs eps-in-prog))
 
 ;; Compiles the modules defined in the specified files. Returns a
@@ -837,7 +891,7 @@ external dependencies for the program/library, as well as the .cpp and
 
   (let ((kinds (hash-ref backends 'cxx #f)))
     (when (and kinds (not (set-empty? kinds)))
-      (define defs (St-defs st))
+      (define defs (defs-id->ast (St-defs st)))
       (define path-stem (build-path outdir basename))
       (generate-cxx-file kinds defs path-stem out banner?)))
 
