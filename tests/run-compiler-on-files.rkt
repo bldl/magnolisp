@@ -19,9 +19,8 @@
    (thunk
     (let ((st (compile-files fn)))
       (generate-files
-       st
-       (hasheq 'build (seteq 'gnu-make 'qmake 'c 'ruby)
-               'cxx (seteq 'cc 'hh))
+       st '((build (gnu-make qmake c ruby))
+            (cxx (cc hh)))
        #:out (open-output-nowhere)
        )))
    (format "failed to compile program ~a" fn)))

@@ -871,7 +871,7 @@ external dependencies for the program/library, as well as the .cpp and
   (regexp-match? #rx"^[a-zA-Z0-9_][a-zA-Z0-9_-]*$" s))
 
 (define-with-contract*
-  (->* (St? (hash/c symbol? (set/c symbol? #:cmp 'eq)))
+  (->* (St? (listof (cons/c symbol? any/c)))
        (#:outdir path-string?
         #:basename string?
         #:out output-port?
@@ -889,23 +889,27 @@ external dependencies for the program/library, as well as the .cpp and
      "file basename of non-zero length, without exotic characters"
      basename))
 
-  (let ((kinds (hash-ref backends 'cxx #f)))
-    (when (and kinds (not (set-empty? kinds)))
-      (define defs (defs-id->ast (St-defs st)))
-      (define path-stem (build-path outdir basename))
-      (generate-cxx-file kinds defs path-stem out banner?)))
+  (when-let entry (assq 'cxx backends)
+    (match entry
+      ((list _ (list (? symbol? kinds) ...))
+       (unless (null? kinds)
+         (set! kinds (remove-duplicates kinds eq?))
+         (define defs (defs-id->ast (St-defs st)))
+         (define path-stem (build-path outdir basename))
+         (generate-cxx-file kinds defs path-stem out banner?)))))
 
-  (let ((kinds (hash-ref backends 'build #f)))
-    (when (and kinds (not (set-empty? kinds)))
-      (define defs (St-defs st))
-      (define opts-stx (defs-collect-build-annos defs))
-      (define opts-lst (parse-analyze-build-annos opts-stx))
-      (define path-stem (build-path outdir (string-append basename "_build")))
-      ;;(pretty-print opts-lst)
-      (set-for-each
-       kinds
-       (lambda (kind)
-         (generate-build-file kind opts-lst path-stem out banner?)))))
+  (when-let entry (assq 'build backends)
+    (match entry
+      ((list _ (list (? symbol? kinds) ...))
+       (unless (null? kinds)
+         (set! kinds (remove-duplicates kinds eq?))
+         (define defs (St-defs st))
+         (define opts-stx (defs-collect-build-annos defs))
+         (define opts-lst (parse-analyze-build-annos opts-stx))
+         (define path-stem (build-path outdir (string-append basename "_build")))
+         ;;(pretty-print opts-lst)
+         (for ((kind kinds))
+           (generate-build-file kind opts-lst path-stem out banner?))))))
   
   (void))
 
@@ -915,5 +919,7 @@ external dependencies for the program/library, as well as the .cpp and
 
 (module* main #f
   (define st (compile-files "tests/test-let-expr-3.rkt"))
-  (generate-files st (hasheq ;;'build (seteq 'gnu-make 'qmake 'c 'ruby)
-                             'cxx (seteq 'cc 'hh))))
+  (generate-files st '(
+                       ;;(build (gnu-make qmake c ruby))
+                       (cxx (cc hh))
+                       )))

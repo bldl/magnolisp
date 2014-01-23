@@ -22,7 +22,7 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
     (define stdout? #f)
     (define banner? #f)
     (define cxx? #f)
-    (define tools (seteq))
+    (define tools null)
     (define supported-tools '(c gnu-make qmake ruby))
 
     (define fn-lst
@@ -54,7 +54,7 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
           (error 'command-line
                  "one of ~a as build include file, got ~s"
                  supported-tools kind))
-        (set! tools (set-add tools k)))
+        (set! tools (cons k tools)))
        #:args filename filename))
 
     (unless (null? fn-lst)
@@ -64,12 +64,12 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
               (path-basename-only-as-string (first fn-lst))))
       (define st (apply compile-files fn-lst))
       (generate-files st
-                      (hasheq 'cxx (seteq 'cc 'hh)
-                              'build tools)
-                      #:outdir (or out-dir (current-directory))
-                      #:basename out-basename
-                      #:out (and stdout? (current-output-port))
-                      #:banner banner?))
+                       (list (and cxx? '(cxx (cc hh)))       
+                             `(build ,tools))
+                       #:outdir (or out-dir (current-directory))
+                       #:basename out-basename
+                       #:out (and stdout? (current-output-port))
+                       #:banner banner?))
     
     (void))
 

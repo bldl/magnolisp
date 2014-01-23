@@ -308,61 +308,61 @@ C++ back end.
                           "either 'cc or 'hh" kind))
   (values (second p)))
 
-(define* (generate-cxx-file kinds defs path-stem out banner?)
+(define-with-contract*
+  (-> (listof symbol?) hash? path-string? output-port? boolean? void?)
+  (generate-cxx-file kinds defs path-stem out banner?)
   ;;(pretty-print (defs-id->ast defs)) (exit)
   (define def-lst
     (cxx-decl-sort
      (cxx-rename
       (defs->cxx defs))))
-  (set-for-each
-   kinds
-   (lambda (kind)
-     (cond
-      ((eq? kind 'cc)
-       (define sfx (get-suffix kind))
-       (define path (path-add-suffix path-stem sfx))
-       (define filename (path-basename-as-string path))
-       (define basename (path-basename-only-as-string filename))
-       (define hh-incl (annoless Include 'user (path-basename-as-string (path-add-suffix path-stem (get-suffix 'hh)))))
-       (define c-unit
-         (append (list hh-incl)
-                 (defs->partition 'private-prototypes def-lst)
-                 (defs->partition 'private-implementations def-lst)))
-       ;;(for-each writeln c-unit) (exit)
-       (define s (format-c c-unit))
-       ;; xxx uncrustify
-       (write-generated-output
-        path out
-        (thunk
-         (when banner?
-           (display-banner "//" filename))
-         (display-generated-notice "//")
-         (display s))))
-      ((eq? kind 'hh)
-       (define sfx (get-suffix kind))
-       (define path (path-add-suffix path-stem sfx))
-       (define filename (path-basename-as-string path))
-       (define basename (path-basename-only-as-string filename))
-       (define config-incl (annoless Include 'user (string-append basename "_config.hpp"))) ;; xxx for now, until we infer required includes
-       (define harness-begin (annoless TlVerbatim (string-append "#ifndef " (path-h-ifdefy filename))))
-       (define harness-end (annoless TlVerbatim "#endif"))
-       (define c-unit
-         (append (list harness-begin config-incl)
-                 (defs->partition 'public-prototypes def-lst)
-                 (list harness-end)))
-       ;;(for-each writeln c-unit) (exit)
-       (define s (format-c c-unit))
-       ;; xxx uncrustify
-       (write-generated-output
-        path out
-        (thunk
-         (when banner?
-           (display-banner "//" filename))
-         (display-generated-notice "//")
-         (display s))))
-      (else
-       (raise-argument-error
-        'generate-cxx-file
-        "set of 'cc or 'hh"
-        kinds)))))
+  (for ((kind kinds))
+    (cond
+     ((eq? kind 'cc)
+      (define sfx (get-suffix kind))
+      (define path (path-add-suffix path-stem sfx))
+      (define filename (path-basename-as-string path))
+      (define basename (path-basename-only-as-string filename))
+      (define hh-incl (annoless Include 'user (path-basename-as-string (path-add-suffix path-stem (get-suffix 'hh)))))
+      (define c-unit
+        (append (list hh-incl)
+                (defs->partition 'private-prototypes def-lst)
+                (defs->partition 'private-implementations def-lst)))
+      ;;(for-each writeln c-unit) (exit)
+      (define s (format-c c-unit))
+      ;; xxx uncrustify
+      (write-generated-output
+       path out
+       (thunk
+        (when banner?
+          (display-banner "//" filename))
+        (display-generated-notice "//")
+        (display s))))
+     ((eq? kind 'hh)
+      (define sfx (get-suffix kind))
+      (define path (path-add-suffix path-stem sfx))
+      (define filename (path-basename-as-string path))
+      (define basename (path-basename-only-as-string filename))
+      (define config-incl (annoless Include 'user (string-append basename "_config.hpp"))) ;; xxx for now, until we infer required includes
+      (define harness-begin (annoless TlVerbatim (string-append "#ifndef " (path-h-ifdefy filename))))
+      (define harness-end (annoless TlVerbatim "#endif"))
+      (define c-unit
+        (append (list harness-begin config-incl)
+                (defs->partition 'public-prototypes def-lst)
+                (list harness-end)))
+      ;;(for-each writeln c-unit) (exit)
+      (define s (format-c c-unit))
+      ;; xxx uncrustify
+      (write-generated-output
+       path out
+       (thunk
+        (when banner?
+          (display-banner "//" filename))
+        (display-generated-notice "//")
+        (display s))))
+     (else
+      (raise-argument-error
+       'generate-cxx-file
+       "set of 'cc or 'hh"
+       kinds))))
   (void))
