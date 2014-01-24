@@ -341,6 +341,9 @@ would have done. Still retains correct scoping and evaluation order.
     (set-def-in-mod! id-stx def)
     def)
   
+  (define (make-Literal stx datum-stx)
+    (syntaxed stx Literal datum-stx))
+  
   (define (make-Let ctx stx kind binds-stx exprs-stx)
     (define i-e-lst (syntax->list binds-stx))
     (define b-ast-lst (map
@@ -356,11 +359,8 @@ would have done. Still retains correct scoping and evaluation order.
     (define e-ast-lst (map (fix parse 'stat) e-stx-lst))
     (Let (hasheq 'stx stx 'let-kind kind) b-ast-lst e-ast-lst))
 
-  (define (make-Literal stx datum-stx)
-    (syntaxed stx Literal datum-stx))
-  
   (define (parse-define-value ctx stx id-stx e-stx)
-    ;;(writeln (list e-stx (syntax->datum e-stx)))
+    ;;(writeln (list 'parse-define-value e-stx (syntax->datum e-stx)))
     ;;(writeln (identifier-binding #'%core 0))
     (kernel-syntax-case e-stx #f
       ((#%plain-app c (q k))
@@ -379,7 +379,7 @@ would have done. Still retains correct scoping and evaluation order.
     ;;(stx-print-if-type-annoed stx)
     ;;(writeln (list ctx stx))
     
-    (kernel-syntax-case* stx #f (%core)
+    (kernel-syntax-case* stx #f (%core values)
 
       ((#%module-begin . bs)
        (eq? ctx 'module-begin)
@@ -400,10 +400,16 @@ would have done. Still retains correct scoping and evaluation order.
        (void))
 
       ((begin . bs)
-       (eq? ctx 'stat)
-       (syntaxed stx BlockStat
-                 (map (fix parse ctx)
-                      (syntax->list #'bs))))
+       (memq ctx '(module-level stat))
+       (cond
+        ((eq? ctx 'module-level)
+         (for-each
+          (fix parse 'module-level)
+          (syntax->list #'bs)))
+        (else
+         (syntaxed stx BlockStat
+                   (map (fix parse 'stat)
+                        (syntax->list #'bs))))))
       
       ((begin-for-syntax . _)
        (eq? ctx 'module-level)
@@ -423,50 +429,39 @@ would have done. Still retains correct scoping and evaluation order.
       
       ;; general-top-level-form non-terminal
 
-      ;; TODO multiple (or zero) binding case (in the general case)
-      ((define-values (id) e)
-       (begin
-         (assert (identifier? #'id))
-         (parse-define-value ctx stx #'id #'e)))
-
-      ;; We only support splitting of module top-level define-values,
-      ;; for now. We do not support any top-level computation, so we
-      ;; expect a direct (values v ...) expression.
-      ((define-values (id ...) e)
+      ;; We support (values v ...) in an expression position only
+      ;; directly in binding form value expressions.
+      ((define-values (id ...) (#%plain-app values v ...))
        (eq? ctx 'module-level)
        (let ()
-         (define ids (syntax->list #'(id ...)))
-         (unless (null? ids) ;; (void) result otherwise
-           (assert (> (length ids) 1))
-           (define e-stx #'e)
-           (kernel-syntax-case e-stx #f
-             ((#%plain-app values v ...)
-              (let ()
-                (define vs (syntax->list #'(v ...)))
-                (unless (= (length vs) (length ids))
-                  (raise-language-error
-                   #f
-                   (format "expected ~a values" (length ids))
-                   stx e-stx
-                   #:continued not-magnolisp-message))
-                (define def-lst
-                  (map
-                   (lambda (id-stx v-stx)
-                     (syntax-track-origin
-                      (quasisyntax/loc stx
-                        (define-values (#,id-stx) #,v-stx))
-                      stx (car (syntax-e stx))))
-                   ids vs))
-                (parse
-                 ctx
-                 (quasisyntax/loc stx
-                   (begin #,@def-lst)))))
-             (_
-              (raise-language-error
-               #f "expected (values v ...) expression"
-               stx e-stx
-               #:continued not-magnolisp-message))))))
+         (define id-lst (syntax->list #'(id ...)))
+         (assert (andmap identifier? id-lst))
+         (define v-lst (syntax->list #'(v ...)))
+         (unless (= (length v-lst) (length id-lst))
+           (raise-language-error
+            #f
+            (format "expected ~a values" (length id-lst))
+            stx))
+         (define def-lst
+           (map
+            (lambda (id-stx v-stx)
+              (syntax-track-origin
+               (quasisyntax/loc stx
+                 (define-values (#,id-stx) #,v-stx))
+               stx (car (syntax-e stx))))
+            id-lst v-lst))
+         (parse
+          ctx
+          (syntax-track-origin
+           (quasisyntax/loc stx (begin #,@def-lst))
+           stx (car (syntax-e stx))))))
       
+      ((define-values (id) e)
+       (and (eq? ctx 'module-level) (identifier? #'id))
+       (let ()
+         ;;(writeln (syntax->datum stx))
+         (parse-define-value ctx stx #'id #'e)))
+
       ((define-syntaxes (id ...) _)
        (eq? ctx 'module-level)
        (let ()
@@ -489,9 +484,7 @@ would have done. Still retains correct scoping and evaluation order.
          (define e-stx-lst (syntax->list #'exprs))
          (when (> (length e-stx-lst) 1)
            (raise-syntax-error
-            #f
-            "function body must be a single expression"
-            stx))
+            #f "function body must be a single expression" stx))
          (define par-ast-lst
            (map (lambda (id)
                   ;; Annotations would probably have to be propagated

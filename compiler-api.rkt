@@ -842,7 +842,7 @@ external dependencies for the program/library, as well as the .cpp and
   ;;(pretty-print (list 'entry-points (dict-map eps-in-prog (compose car cons))))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
-  (pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
+  ;;(pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
 
   (St mods all-defs eps-in-prog))
 
