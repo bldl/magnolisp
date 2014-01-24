@@ -258,9 +258,9 @@ would have done. Still retains correct scoping and evaluation order.
           (append req-lst
                   (filter for-runtime-require? stx-lst))))
   
-  (define (not-magnolisp stx)
+  (define (not-magnolisp stx [sub-stx #f])
     (raise-language-error
-     #f "syntax not supported in Magnolisp" stx
+     #f "syntax not supported in Magnolisp" stx sub-stx
      #:fields `(("binding"
                  ,(or (stx-binding-info stx) 'unbound)))))
 
@@ -346,15 +346,30 @@ would have done. Still retains correct scoping and evaluation order.
   
   (define (make-Let ctx stx kind binds-stx exprs-stx)
     (define i-e-lst (syntax->list binds-stx))
-    (define b-ast-lst (map
-                       (lambda (i-e)
-                         (syntax-case i-e ()
-                           ;; TODO multiple (or zero) binding case
-                           (((id) e)
-                            (identifier? #'id)
-                            (make-DefVar ctx stx #'id #'e))
-                           (_ (unsupported i-e))))
-                       i-e-lst))
+    (define b-ast-lst
+      (apply append
+             (for/list ((i-e i-e-lst))
+               ;;(pretty-print `(parsing ,(syntax->datum i-e)))
+               (kernel-syntax-case* i-e #f (values)
+                 [((id ...) (#%plain-app values v ...))
+                  (let ()
+                    (define id-lst (syntax->list #'(id ...)))
+                    (assert (andmap identifier? id-lst))
+                    (define v-lst (syntax->list #'(v ...)))
+                    (unless (= (length v-lst) (length id-lst))
+                      (raise-language-error
+                       #f
+                       (format "expected ~a values" (length id-lst))
+                       stx))
+                    (map
+                     (lambda (id-stx v-stx)
+                       (make-DefVar ctx stx id-stx v-stx))
+                     id-lst v-lst))]
+                 [((id) v)
+                  (identifier? #'id)
+                  (list (make-DefVar ctx stx #'id #'v))]
+                 [_
+                  (not-magnolisp stx i-e)]))))
     (define e-stx-lst (syntax->list exprs-stx))
     (define e-ast-lst (map (fix parse 'stat) e-stx-lst))
     (Let (hasheq 'stx stx 'let-kind kind) b-ast-lst e-ast-lst))
