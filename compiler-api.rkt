@@ -162,14 +162,24 @@ external dependencies for the program/library, as well as the .cpp and
      (match-or ast
        clause ...))))
 
-(define (ast-get-ss ast)
+(define (StatCont? ast)
+  (any-pred-holds BlockExpr? BlockStat? Let? ast))
+
+(define-match-expander StatCont
+  (syntax-rules ()
+    [(_ a ss)
+     (or (BlockStat a ss)
+         (BlockExpr a ss)
+         (Let a _ ss))]))
+
+(define (StatCont-ss ast)
   (match ast
     ((BlockStat _ ss) ss)
     ((BlockExpr _ ss) ss)
     ((Let _ _ ss) ss)
     (_ #f)))
 
-(define (ast-set-ss ast n-ss)
+(define (set-StatCont-ss ast n-ss)
   (match ast
     ((BlockExpr a ss)
      (BlockExpr a n-ss))
@@ -177,6 +187,15 @@ external dependencies for the program/library, as well as the .cpp and
      (BlockStat a n-ss))
     ((Let a bs ss)
      (Let a bs n-ss))))
+
+(define (StatCont-copy ast n-a n-ss)
+  (match ast
+    ((BlockExpr a ss)
+     (BlockExpr n-a n-ss))
+    ((BlockStat a ss)
+     (BlockStat n-a n-ss))
+    ((Let a bs ss)
+     (Let n-a bs n-ss))))
 
 (define ast-empty-Let->BlockStat
   (topdown
@@ -190,7 +209,7 @@ external dependencies for the program/library, as well as the .cpp and
   (topdown
    (repeat
     (lambda (ast)
-      (define ss (ast-get-ss ast))
+      (define ss (StatCont-ss ast))
       (cond
        ((and ss (ormap BlockStat? ss))
         (define n-ss
@@ -198,7 +217,7 @@ external dependencies for the program/library, as well as the .cpp and
                           (if (BlockStat? s)
                               (BlockStat-ss s)
                               (list s)))))
-        (ast-set-ss ast n-ss))
+        (set-StatCont-ss ast n-ss))
        (else
         ;; Signifies failed strategy.
         #f))))))
@@ -212,10 +231,10 @@ external dependencies for the program/library, as well as the .cpp and
 (define ast-rm-Pass
   (topdown
    (lambda (ast)
-     (define ss (ast-get-ss ast))
+     (define ss (StatCont-ss ast))
      (cond
       ((and ss (ormap Pass? ss))
-       (ast-set-ss ast (list-rm-Pass ss)))
+       (set-StatCont-ss ast (list-rm-Pass ss)))
       (else
        ast)))))
 
@@ -236,11 +255,11 @@ external dependencies for the program/library, as well as the .cpp and
 (define ast-rm-dead-code
   (topdown
    (lambda (ast)
-     (define ss (ast-get-ss ast))
+     (define ss (StatCont-ss ast))
      (cond
       ((and ss (ormap Return? ss))
        (define n-ss (take-until/inclusive Return? ss))
-       (ast-set-ss ast n-ss))
+       (set-StatCont-ss ast n-ss))
       (else
        ast)))))
 
