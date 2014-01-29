@@ -223,20 +223,15 @@ external dependencies for the program/library, as well as the .cpp and
         #f))))))
        
 (define (list-rm-Pass ss)
-  (apply append (for/list ((s ss))
-                  (if (Pass? s)
-                      null
-                      (list s)))))
+  (filter (negate Pass?) ss))
 
 (define ast-rm-Pass
   (topdown
    (lambda (ast)
-     (define ss (StatCont-ss ast))
-     (cond
-      ((and ss (ormap Pass? ss))
-       (set-StatCont-ss ast (list-rm-Pass ss)))
-      (else
-       ast)))))
+     (match ast
+       [(StatCont a (? (curry ormap Pass?) ss))
+        (StatCont-copy ast a (filter (negate Pass?) ss))]
+       [_ ast]))))
 
 (define (take-until/inclusive p? lst)
   (define n-lst null)
@@ -937,7 +932,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-files "tests/test-let-expr-3.rkt"))
+  (define st (compile-files "tests/test-pass-1.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))
                        (cxx (cc hh))
