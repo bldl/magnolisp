@@ -13,6 +13,10 @@ custom-install-bin :
 	-ln -s $(PWD)/mglc $(HOME)/bin/
 
 clean :
+	-rm -r `find -name compiled -type d`
+
+# takes a long time
+clean-with-raco :
 	raco setup --clean magnolisp
 
 api-doc :
