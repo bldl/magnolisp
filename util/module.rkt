@@ -1,38 +1,29 @@
 #lang racket/base
 
-(require racket/contract racket/stxparam (for-syntax racket/base))
+(require racket/contract racket/stxparam
+         (for-syntax racket/base syntax/define))
 
 (provide define* define-for-syntax* define-syntax*)
 
-(define-syntax define*
-  (syntax-rules ()
-    ((_ (name arg ... . rest) body ...)
+(define-syntax (define* stx)
+  (syntax-case stx ()
+    [(_ . rest)
      (begin
-       (define (name arg ... . rest) body ...)
-       (provide name)))
-    ((_ (name arg ...) body ...)
-     (begin
-       (define (name arg ...) body ...)
-       (provide name)))
-    ((_ name body ...)
-     (begin
-       (define name body ...)
-       (provide name)))))
+       (define-values (id rhs)
+         (normalize-definition stx #'lambda #t #t))
+       #`(begin
+           (define #,id #,rhs)
+           (provide #,id)))]))
 
-(define-syntax define-for-syntax*
-  (syntax-rules ()
-    ((_ (name arg ... . rest) body ...)
-     (begin-for-syntax
-       (define (name arg ... . rest) body ...)
-       (provide name)))
-    ((_ (name arg ...) body ...)
-     (begin-for-syntax
-       (define (name arg ...) body ...)
-       (provide name)))
-    ((_ name body ...)
-     (begin-for-syntax
-       (define name body ...)
-       (provide name)))))
+(define-syntax (define-for-syntax* stx)
+  (syntax-case stx ()
+    [(_ . rest)
+     (begin
+       (define-values (id rhs)
+         (normalize-definition stx #'lambda #t #t))
+       #`(begin-for-syntax
+           (define #,id #,rhs)
+           (provide #,id)))]))
 
 (define-syntax define-syntax*
   (syntax-rules ()
