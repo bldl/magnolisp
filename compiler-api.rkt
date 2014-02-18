@@ -678,15 +678,15 @@ external dependencies for the program/library, as well as the .cpp and
 
 (define (build-l-to-mp-i-for-mods sym-prov-for-mods mods)
   (define l-to-mp-i-for-mods (make-hash))
-  (for (([r-mp mod] mods))
+  (for (([parent-r-mp mod] mods))
     (define req-lst (Mod-reqs mod))
-    ;;(pretty-print (list 'req-specs r-mp req-lst))
+    ;;(pretty-print (list 'req-specs parent-r-mp req-lst))
     (define reqs-per-mp
       (req-specs->reqs-per-mp req-lst))
-    ;;(pretty-print (list 'reqs-per-mp r-mp reqs-per-mp))
+    ;;(pretty-print (list 'reqs-per-mp parent-r-mp reqs-per-mp))
     (define l-to-mp-i (make-hasheq))
     (for (([mp reqs] reqs-per-mp))
-      (define r-mp (resolve-module-path mp (mp-root-path)))
+      (define r-mp (resolve-module-path mp parent-r-mp))
       (define mp-syms (hash-keys (hash-ref sym-prov-for-mods r-mp)))
       (for ((req reqs))
         (cond
@@ -702,7 +702,7 @@ external dependencies for the program/library, as well as the .cpp and
                      (cons r-mp
                            (syntax-e (cdr req)))))
          (else (assert #f)))))
-    (hash-set! l-to-mp-i-for-mods r-mp l-to-mp-i))
+    (hash-set! l-to-mp-i-for-mods parent-r-mp l-to-mp-i))
   l-to-mp-i-for-mods)
 
 ;; 'mods' is a (hash/c resolve-module-path-result? Mod?) of all the
@@ -723,13 +723,13 @@ external dependencies for the program/library, as well as the .cpp and
   ;; For each module, maps each exported symbol to a locally used
   ;; symbol.
   (define sym-prov-for-mods (build-sym-prov-for-mods mods))
-  ;;(pretty-print (list 'sym-prov-for-mods sym-prov-for-mods))
+  (pretty-print (list 'sym-prov-for-mods sym-prov-for-mods))
 
   ;; For each module, maps each local, imported symbol to a module and
   ;; one of its exported symbols.
   (define l-to-mp-i-for-mods (build-l-to-mp-i-for-mods
                               sym-prov-for-mods mods))
-  ;;(pretty-print (list 'l-to-mp-i-for-mods l-to-mp-i-for-mods))
+  (pretty-print (list 'l-to-mp-i-for-mods l-to-mp-i-for-mods))
 
   ;; For each module, maps each top-level name to its Def, which may
   ;; be in a different module.
@@ -796,7 +796,7 @@ external dependencies for the program/library, as well as the .cpp and
     (define r-mp (resolve-module-path mp rel-to-path-v))
     (define mod (hash-ref mods r-mp #f))
     (unless mod ;; not yet loaded
-      (writeln (list 'loading-submod-of r-mp mp))
+      ;;(writeln (list 'loading-submod-of r-mp mp))
       (set! mod (load-mod-from-submod r-mp mp))
 
       (when (Mod? mod) ;; is a Magnolisp module
@@ -814,7 +814,7 @@ external dependencies for the program/library, as well as the .cpp and
         ;; then collect further information from it.
         (when (or (not ep?) (and eps-in-mod (not (dict-empty? eps-in-mod))))
           (define pt (Mod-pt mod)) ;; parse tree
-          (pretty-print (syntax->datum pt))
+          ;;(pretty-print (syntax->datum pt))
           ;;(pretty-print (syntax->datum/free-id pt))
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
