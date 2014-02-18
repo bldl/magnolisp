@@ -30,14 +30,6 @@ external dependencies for the program/library, as well as the .cpp and
          syntax/id-table syntax/moddep)
 
 ;;; 
-;;; parameters
-;;; 
-
-;; Any module paths are resolved relative to this path. May be #f, in
-;; which case the current directory is used.
-(define* mp-root-path (make-parameter #f))
-
-;;; 
 ;;; utilities
 ;;; 
 
@@ -723,13 +715,13 @@ external dependencies for the program/library, as well as the .cpp and
   ;; For each module, maps each exported symbol to a locally used
   ;; symbol.
   (define sym-prov-for-mods (build-sym-prov-for-mods mods))
-  (pretty-print (list 'sym-prov-for-mods sym-prov-for-mods))
+  ;;(pretty-print (list 'sym-prov-for-mods sym-prov-for-mods))
 
   ;; For each module, maps each local, imported symbol to a module and
   ;; one of its exported symbols.
   (define l-to-mp-i-for-mods (build-l-to-mp-i-for-mods
                               sym-prov-for-mods mods))
-  (pretty-print (list 'l-to-mp-i-for-mods l-to-mp-i-for-mods))
+  ;;(pretty-print (list 'l-to-mp-i-for-mods l-to-mp-i-for-mods))
 
   ;; For each module, maps each top-level name to its Def, which may
   ;; be in a different module.
@@ -792,7 +784,7 @@ external dependencies for the program/library, as well as the .cpp and
     (set! dep-q (append dep-q deps)))
   
   (define (load ep? mp rel-to-path-v)
-    (writeln `(load ,ep? ,mp ,rel-to-path-v))
+    ;;(writeln `(load ,ep? ,mp ,rel-to-path-v))
     (define r-mp (resolve-module-path mp rel-to-path-v))
     (define mod (hash-ref mods r-mp #f))
     (unless mod ;; not yet loaded

@@ -204,9 +204,6 @@ Both functions return an opaque compilation state object, which may be passed to
 Any @racket[path-s] is mapped to a @racket[`(file ,path-s)] module path, coercing @racket[path-s] to a string if necessary.
 }
 
-@defparam[mp-root-path rel-to-path-v any/c]{
-A parameter that determines the path for resolving relative module paths during compilation. Its value must be passable to @racket[resolve-module-path] as the second argument. @warning{Resolving relative module paths in file hierarchies is mostly untested, and this API is subject to change.}}
-
 @defproc[(compilation-state? [v any/c]) boolean?]{
 Returns @racket[#t] if @racket[v] is a compilation state object (as returned by @racket[compile-modules] or @racket[compile-files]), @racket[#f] otherwise.
 }
