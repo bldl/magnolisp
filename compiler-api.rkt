@@ -776,14 +776,23 @@ external dependencies for the program/library, as well as the .cpp and
 (require "type-infer.rkt")
 
 ;; Compiles a program consisting of all the entry points in the
-;; specified modules, and all dependencies thereof.
+;; specified modules, and all dependencies thereof. All of the
+;; 'ep-mp-lst' module paths should be either absolute ones, or '(file
+;; ...)' paths relative to the working directory (no module relative
+;; paths as entry points).
 (define* (compile-modules . ep-mp-lst)
+  ;;(writeln ep-mp-lst)
+  
   (define mods (make-hash)) ;; r-mp -> Mod
   (define eps-in-prog (make-free-id-table #:phase 0))
   (define dep-q null) ;; deps queued for loading
 
-  (define (load mp ep?)
-    (define r-mp (resolve-module-path mp (mp-root-path)))
+  (define (add-deps! deps)
+    (set! dep-q (append dep-q deps)))
+  
+  (define (load ep? mp rel-to-path-v)
+    (writeln `(load ,ep? ,mp ,rel-to-path-v))
+    (define r-mp (resolve-module-path mp rel-to-path-v))
     (define mod (hash-ref mods r-mp #f))
     (unless mod ;; not yet loaded
       (set! mod (load-mod-from-submod mp))
@@ -818,21 +827,24 @@ external dependencies for the program/library, as well as the .cpp and
           ;;(pretty-print (dict-map defs cons))
           ;;(pretty-print (list 'provided-ids (dict-map provs list)))
           ;;(pretty-print (list 'raw-module-paths raw-mp-lst))
-          (set! dep-q (append dep-q (map syntax->datum raw-mp-lst)))))
+          (add-deps! (map
+                      (lambda (raw-mp)
+                        (list (syntax->datum raw-mp) r-mp))
+                      raw-mp-lst))))
 
       (hash-set! mods r-mp mod)))
 
   ;; Load all the "entry" modules.
   (for ((mp ep-mp-lst))
-    (load mp #t))
+    (load #t mp #f))
 
   ;; Keep loading dependencies until all loaded.
   (let loop ()
     (unless (null? dep-q)
       (define mp-lst dep-q)
       (set! dep-q null)
-      (for ((mp mp-lst))
-        (load mp #f))
+      (for ((mp-and-rel mp-lst))
+        (apply load #f mp-and-rel))
       (loop)))
 
   (set! mods (mods-fill-in-syms mods))
@@ -932,7 +944,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-files "tests/test-pass-1.rkt"))
+  (define st (compile-files "tests/test-modules-1.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))
                        (cxx (cc hh))
