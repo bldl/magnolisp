@@ -401,23 +401,24 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; import resolution
 ;;; 
 
-;; (-> module-path? (or/c Mod? #t)) Loads the specified module. It is
-;; an error if the module path does not specify an existing module.
-;; Only sets 'pt' and 'annos' fields.
-(define (load-mod-from-submod mp)
+;; (-> module-path? Mod?) Loads the specified module. It is an error
+;; if the module path does not specify an existing module. Only sets
+;; 'pt' and 'annos' fields.
+(define (load-mod-from-submod r-mp mp)
+  (define sub-mp `(submod ,r-mp magnolisp-info))
   (define annos
     (may-fail
-     (dynamic-require `(submod ,mp magnolisp-info) 'm-annos (thunk #f))))
+     (dynamic-require sub-mp 'm-annos (thunk #f))))
   (when annos
     (define original
-      (dynamic-require `(submod ,mp magnolisp-info) 'm-id-count))
+      (dynamic-require sub-mp 'm-id-count))
     (define current (dict-count annos))
     (unless (= original current)
       (error 'load-mod-from-submod
              "count mismatch (~a): ~a != ~a" mp original current)))
   (define pt
     (if annos
-        (dynamic-require `(submod ,mp magnolisp-info) 'm-ast)
+        (dynamic-require sub-mp 'm-ast)
         #'(#%module-begin)))
   (Mod pt
        (or annos (make-immutable-free-id-table #:phase 0))
@@ -713,7 +714,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;; also supports re-exports. We collect this information for all
 ;; top-level Magnolisp bindings that are visible in each module,
 ;; including syntax bindings. We proceed in topological order. Racket
-;; disallows cyclic requires, and we need not worry about them.
+;; disallows cyclic requires, so we need not worry about them.
 (define (mods-fill-in-syms mods)
   ;; For each module, maps each local symbol to a local Def.
   (define sym-def-for-mods (build-sym-def-for-mods mods))
@@ -795,7 +796,8 @@ external dependencies for the program/library, as well as the .cpp and
     (define r-mp (resolve-module-path mp rel-to-path-v))
     (define mod (hash-ref mods r-mp #f))
     (unless mod ;; not yet loaded
-      (set! mod (load-mod-from-submod mp))
+      (writeln (list 'loading-submod-of r-mp mp))
+      (set! mod (load-mod-from-submod r-mp mp))
 
       (when (Mod? mod) ;; is a Magnolisp module
         (define annos (Mod-annos mod))
@@ -812,7 +814,7 @@ external dependencies for the program/library, as well as the .cpp and
         ;; then collect further information from it.
         (when (or (not ep?) (and eps-in-mod (not (dict-empty? eps-in-mod))))
           (define pt (Mod-pt mod)) ;; parse tree
-          ;;(pretty-print (syntax->datum pt))
+          (pretty-print (syntax->datum pt))
           ;;(pretty-print (syntax->datum/free-id pt))
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
