@@ -116,9 +116,6 @@
     (set! h (hash-set h (car p) (cdr p))))
   h)
 
-(define* (dict-empty? d)
-  (= (dict-count d) 0))
-
 (require (for-syntax syntax/for-body))
 
 ;; Different syntax from 'for' in that 'empty-expr' is an extra
