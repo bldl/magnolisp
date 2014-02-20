@@ -2,7 +2,8 @@
 
 #|
 
-A simplified version of compatibility/package.
+A simplified version of compatibility/package. For experiments only.
+Not a dependency for the language implementation.
 
 |#
 

@@ -3,7 +3,8 @@
 #|
 |#
 
-(require "util.rkt" syntax/id-table syntax/stx unstable/error)
+(require "racket-5-compat.rkt" "util.rkt"
+         syntax/id-table syntax/stx)
 
 (define* (next-gensym r sym)
   (define num (hash-ref r sym 0))
