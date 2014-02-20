@@ -1,4 +1,5 @@
 #lang setup/infotab
+(define collection "magnolisp")
 (define name "Magnolisp")
 (define blurb
   '("A Magnolisp language implementation."))

@@ -13,7 +13,7 @@ custom-install-bin :
 	-ln -s $(PWD)/mglc $(HOME)/bin/
 
 clean :
-	-rm -r `find -name compiled -type d`
+	find -name compiled -type d -print0 | xargs -0 --no-run-if-empty rm -r
 
 # takes a long time
 clean-with-raco :
@@ -26,6 +26,7 @@ api-doc :
 	-rm -r doc
 	raco setup --no-zo --no-launcher --no-install --no-post-install magnolisp
 
+# for this rule to produce .pdf, must do setup first, it seems
 pdf :
 	-mkdir pdfs
 	raco setup --no-zo --no-launcher --no-install --no-post-install --verbose --doc-pdf pdfs magnolisp
