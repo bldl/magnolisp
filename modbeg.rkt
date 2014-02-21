@@ -42,7 +42,7 @@ same variables at the same phase level).
 
 (require "annos-store.rkt"
          (for-syntax
-          racket/dict racket/pretty syntax/id-table
+          racket/dict racket/pretty syntax/id-table syntax/quote
           typed-racket/utils/disarm ;; probably considered internal
           "util.rkt"))
 
@@ -55,7 +55,7 @@ same variables at the same phase level).
       (list #,@(hash-map
                 h
                 (lambda (n-sym val-stx)
-                  #`(cons '#,n-sym (quote-syntax #,val-stx)))))))
+                  #`(cons '#,n-sym (quote-syntax/keep-srcloc #,val-stx)))))))
  
  ;; Given id-tables [ts (listof dict?)], returns syntax for an
  ;; expression that produces something for which the dict? predicate
