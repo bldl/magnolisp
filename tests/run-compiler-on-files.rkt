@@ -27,7 +27,7 @@
     
 (define (compile-mgl-files)
   (for ((bn (directory-list mgl-file-dir))
-        #:when (regexp-match? "^test-" bn))
+        #:when (regexp-match? "^test-.*[.]rkt$" bn))
     (define fn (build-path mgl-file-dir bn))
     (compile-mgl-file fn)))
 
