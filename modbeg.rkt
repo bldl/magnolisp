@@ -44,7 +44,7 @@ same variables at the same phase level).
          (for-syntax
           racket/dict racket/pretty syntax/id-table syntax/quote
           typed-racket/utils/disarm ;; probably considered internal
-          "util.rkt"))
+          "syntax-quote.rkt" "util.rkt"))
 
 (begin-for-syntax
  ;; Given [h hash?], returns syntax for an expression that produces an
@@ -55,7 +55,7 @@ same variables at the same phase level).
       (list #,@(hash-map
                 h
                 (lambda (n-sym val-stx)
-                  #`(cons '#,n-sym (quote-syntax/keep-srcloc #,val-stx)))))))
+                  #`(cons '#,n-sym (quote-syntax/keep-properties #,val-stx)))))))
  
  ;; Given id-tables [ts (listof dict?)], returns syntax for an
  ;; expression that produces something for which the dict? predicate
@@ -86,7 +86,7 @@ same variables at the same phase level).
           (make-immutable-free-id-table
            #,(syntax-for-id-table-dict definfo-table-b definfo-table-f)
            #:phase 0))
-        (define m-ast (quote-syntax #,ast))
+        (define m-ast (quote-syntax/keep-properties #,ast (paren-shape origin local-ec)))
         (provide m-id-count m-annos m-ast))))
  ) ;; end begin-for-syntax
 

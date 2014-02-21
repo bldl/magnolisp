@@ -1,31 +1,35 @@
 #lang racket/base
 
 #|
+
+Routines for preserving syntax object location information and
+specified syntax properties. Very similar to quote-syntax/keep-srcloc.
+
 |#
 
 (require (for-syntax racket/base))
 
-(provide quote-syntax/keep-srcloc)
+(provide quote-syntax/keep-properties
+         (for-syntax keep-properties))
 
-(define-syntax (quote-syntax/keep-srcloc stx)
-  (define (wrap i n)
-    (cond
-     [(eq? i n) (let loop ([n n])
-                  (cond
-                   [(syntax? n) #`(quote-syntax #,n)]
-                   [(pair? n) #`(cons #,(loop (car n))
-                                      #,(loop (cdr n)))]
-                   [(box? n) #`(box #,(loop (unbox n)))]
-                   [(vector? n) #`(vector . #,(for/list ([i (in-vector n)])
-                                                (loop i)))]
-                   [(prefab-struct-key n)
-                    #`(make-prefab-struct '#,(prefab-struct-key n)
-                                          . #,(for/list ([i (in-list (cdr (vector->list 
-                                                                           (struct->vector n))))])
-                                                (loop i)))]
-                   [else #`(quote #,n)]))]
-     [else n]))
-  (define (convert e src-stx)
+(begin-for-syntax
+
+  (define (syntax-for v)
+    (let loop ([n v])
+      (cond
+       [(syntax? n) #`(quote-syntax #,n)]
+       [(pair? n) #`(cons #,(loop (car n)) #,(loop (cdr n)))]
+       [(box? n) #`(box #,(loop (unbox n)))]
+       [(vector? n) #`(vector . #,(for/list ([i (in-vector n)])
+                                    (loop i)))]
+       [(prefab-struct-key n)
+        #`(make-prefab-struct '#,(prefab-struct-key n)
+                              . #,(for/list ([i (in-list (cdr (vector->list 
+                                                               (struct->vector n))))])
+                                    (loop i)))]
+       [else #`(quote #,n)])))
+
+  (define (convert e keep? keep)
     (let loop ([e e])
       (cond
        [(pair? e)
@@ -35,7 +39,7 @@
         (define new-b (loop b))
         (if (and (eq? a new-a) (eq? b new-b))
             e
-            #`(cons #,(wrap a new-a) #,(wrap b new-b)))]
+            #`(cons #,new-a #,new-b))]
        [(vector? e)
         (define new-vec (for/list ([i (in-vector e)])
                           (loop i)))
@@ -43,58 +47,72 @@
                       [n (in-list new-vec)])
               (eq? i n))
             e
-            #`(vector . #,(for/list ([i (in-vector e)]
-                                     [n (in-list new-vec)])
-                            (wrap i n))))]
+            #`(vector . #,new-vec))]
        [(prefab-struct-key e)
         (define l (cdr (vector->list (struct->vector e))))
         (define new-l (for/list ([i (in-list l)])
                         (loop i)))
-        (if (equal? l new-l)
+        (if (for/and ([i l]
+                      [n new-l])
+              (eq? i n))
             e
-            #`(make-prefab-struct '#,(prefab-struct-key e)
-                                  . #,(for/list ([i (in-list l)]
-                                                 [n (in-list new-l)])
-                                        (wrap i n))))]
+            #`(make-prefab-struct '#,(prefab-struct-key e) . #,new-l))]
        [(box? e)
         (define a (unbox e))
         (define new-a (loop a))
         (if (eq? a new-a)
             e
-            #`(box #,(wrap a new-a)))]
+            #`(box #,new-a))]
        [(syntax? e)
         (define v (syntax-e e))
         (define new-v (loop v))
-        (if (and (eq? v new-v)
-                 (not (syntax-position e))
-                 (not (syntax-property e 'paren-shape)))
+        (define has-pos? (syntax-position e))
+        (define has-props? (keep? e))
+        (if (and (eq? v new-v) (not has-pos?) (not has-props?))
             e
-            (let ([s #`(datum->syntax (quote-syntax #,(datum->syntax e 'ctx))
-                                      #,(wrap v new-v)
-                                      `#(#,(if src-stx
-                                               #`(unquote #,src-stx)
-                                               (syntax-source e))
-                                         #,(syntax-line e)
-                                         #,(syntax-column e)
-                                         #,(syntax-position e)
-                                         #,(syntax-span e)))])
-              (if (syntax-property e 'paren-shape)
-                  #`(syntax-property #,s 'paren-shape '#,(syntax-property e 'paren-shape))
-                  s)))]
-       [else e])))
+            (let ([s 
+                   (if has-pos?
+                       #`(datum->syntax (quote-syntax #,(datum->syntax e 'ctx))
+                                         #,new-v
+                                         `#(#,(syntax-source e)
+                                            #,(syntax-line e)
+                                            #,(syntax-column e)
+                                            #,(syntax-position e)
+                                            #,(syntax-span e)))
+                       #`(datum->syntax (quote-syntax #,(datum->syntax e 'ctx))
+                                        #,new-v))])
+              (when has-props?
+                (set! s (keep s e)))
+              s))]
+       [else #`(quote #,e)])))
+
+  (define (keep-properties e-stx #:properties [ps '(paren-shape)])
+    (define (keep? stx)
+      (ormap (lambda (n) (syntax-property stx n)) ps))
+    (define (keep e-stx p-stx)
+      (for/fold ([stx e-stx]) ([n ps])
+        (define v (syntax-property p-stx n))
+        (if v
+            #`(syntax-property #,stx '#,n #,(syntax-for v))
+            stx)))
+    (convert e-stx keep? keep))
+
+  ) ;; begin-for-syntax
+
+(define-syntax (quote-syntax/keep-properties stx)
   (syntax-case stx ()
-    [(_ #:source src-expr e)
-     (wrap #'e (convert #'e #'src-expr))]
+    [(_ e (sym ...))
+     (keep-properties #'e #:properties (syntax->datum #'(sym ...)))]
     [(_ e)
-     (wrap #'e (convert #'e #f))]))
+     (keep-properties #'e)]))
 
 #|
 
 This library is derived from the syntax/quote library of Racket
 5.93.
 
-Racket
 Copyright (c) 2010-2013 PLT Design Inc.
+              2014 Tero Hasu and University of Bergen
 
 Racket is distributed under the GNU Lesser General Public License
 (LGPL).  This means that you can link Racket into proprietary
