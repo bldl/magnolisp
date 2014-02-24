@@ -79,6 +79,9 @@ C++ back end.
         (define export-name (get-export-name a))
         (define foreign-name (get-foreign-name a))
         (define orig-s (ast-identifier->string id))
+        (when-let owner-id (hash-ref a 'owner-id #f)
+          (set! orig-s (string-append (ast-identifier->string owner-id)
+                                      "_" orig-s)))
         (define (use-or-make name)
           (and name
                (if (identifier? name)
