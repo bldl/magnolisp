@@ -11,6 +11,18 @@
     ((_ fn arg ...)
      (lambda rest (apply fn arg ... rest)))))
 
+(define* (compose1-> . fs)
+  (apply compose1 (reverse fs)))
+
+(define* (thread1-> v . fs)
+  ((apply compose1-> fs) v))
+
+;; As in Carl Eastlund's Mischief.
+(define-syntax-rule* (values-of e)
+  (call-with-values
+      (lambda () (#%expression e))
+    list))
+
 ;; True iff any of the specified predicates matches the specified
 ;; datum. Implemented using a macro for efficiency.
 (define-syntax-rule*

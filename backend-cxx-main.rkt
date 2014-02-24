@@ -290,6 +290,41 @@ C++ back end.
      Defun?
      (hash-values defs-t)))))
 
+(define (defs-lift-locals defs)
+  (define n-defs (make-hasheq))
+  (define owner-id (make-parameter #f))
+
+  (define rw-body
+    (topdown
+     (lambda (ast)
+       (cond
+        ((and (Let? ast) (ormap Defun? (Let-defs ast)))
+         (match-define (Let a bs ss) ast)
+         (define-values (fun-bs var-bs) (partition Defun? bs))
+         (for-each do-Defun fun-bs)
+         (Let a var-bs ss))
+        (else
+         ast)))))
+  
+  (define (do-Defun ast)
+    (match-define (Defun a id t ps b) ast)
+    (define oid (owner-id))
+    (unless (ast-identifier=? id oid)
+      (set! a (hash-set a 'owner-id oid)))
+    (set! b (ast-simplify (rw-body b)))
+    (hash-set! n-defs (Id-bind id) (Defun a id t ps b)))
+  
+  (for ([(bind def) defs])
+    (cond
+     ((Defun? def)
+      (when (ast-anno-must def 'top)
+        (parameterize ((owner-id (Def-id def)))
+          (do-Defun def))))
+     (else
+      (hash-set! n-defs bind def))))
+  
+  n-defs)
+
 (define (cxx-decl-sort lst)
   (sort lst symbol<? #:key Def-id))
 
@@ -313,9 +348,12 @@ C++ back end.
   (generate-cxx-file kinds defs path-stem out banner?)
   ;;(pretty-print (defs-id->ast defs)) (exit)
   (define def-lst
-    (cxx-decl-sort
-     (cxx-rename
-      (defs->cxx defs))))
+    (thread1->
+     defs
+     defs-lift-locals
+     defs->cxx
+     cxx-rename
+     cxx-decl-sort))
   (for ((kind kinds))
     (cond
      ((eq? kind 'cc)

@@ -128,6 +128,7 @@ external dependencies for the program/library, as well as the .cpp and
           ;; definition.
           (when (hash-ref a1 'foreign #f)
             (set! b (annoless NoBody)))
+          ;;(writeln (list n (hash-ref a1 'top)))
           (Defun a1 n t p b))
          
          (_ ast)))))
@@ -135,140 +136,6 @@ external dependencies for the program/library, as well as the .cpp and
 
 (define (defs-de-racketize defs)
   ((make-for-all-defs (fix de-racketize defs)) defs))
-
-;;; 
-;;; simplification
-;;; 
-
-(define (compose1-> . fs)
-  (apply compose1 (reverse fs)))
-
-(define-syntax-rule
-  (match-or v clause ...)
-  (match v clause ... (_ v)))
-
-(define-syntax-rule
-  (topdown-match-or #:ast ast clause ...)
-  (topdown
-   (lambda (ast)
-     (match-or ast
-       clause ...))))
-
-(define (StatCont? ast)
-  (any-pred-holds BlockExpr? BlockStat? Let? ast))
-
-(define-match-expander StatCont
-  (syntax-rules ()
-    [(_ a ss)
-     (or (BlockStat a ss)
-         (BlockExpr a ss)
-         (Let a _ ss))]))
-
-(define (StatCont-ss ast)
-  (match ast
-    ((BlockStat _ ss) ss)
-    ((BlockExpr _ ss) ss)
-    ((Let _ _ ss) ss)
-    (_ #f)))
-
-(define (set-StatCont-ss ast n-ss)
-  (match ast
-    ((BlockExpr a ss)
-     (BlockExpr a n-ss))
-    ((BlockStat a ss)
-     (BlockStat a n-ss))
-    ((Let a bs ss)
-     (Let a bs n-ss))))
-
-(define (StatCont-copy ast n-a n-ss)
-  (match ast
-    ((BlockExpr a ss)
-     (BlockExpr n-a n-ss))
-    ((BlockStat a ss)
-     (BlockStat n-a n-ss))
-    ((Let a bs ss)
-     (Let n-a bs n-ss))))
-
-(define ast-empty-Let->BlockStat
-  (topdown
-   (lambda (ast)
-     (match ast
-       ((Let a (list) ss)
-        (BlockStat a ss))
-       (_ ast)))))
-
-(define ast-nested-BlockStat->BlockStat
-  (topdown
-   (repeat
-    (lambda (ast)
-      (define ss (StatCont-ss ast))
-      (cond
-       ((and ss (ormap BlockStat? ss))
-        (define n-ss
-          (apply append (for/list ((s ss))
-                          (if (BlockStat? s)
-                              (BlockStat-ss s)
-                              (list s)))))
-        (set-StatCont-ss ast n-ss))
-       (else
-        ;; Signifies failed strategy.
-        #f))))))
-       
-(define (list-rm-Pass ss)
-  (filter (negate Pass?) ss))
-
-(define ast-rm-Pass
-  (topdown
-   (lambda (ast)
-     (match ast
-       [(StatCont a (? (curry ormap Pass?) ss))
-        (StatCont-copy ast a (filter (negate Pass?) ss))]
-       [_ ast]))))
-
-(define (take-until/inclusive p? lst)
-  (define n-lst null)
-  (let loop ((lst lst))
-    (cond
-     ((null? lst)
-      (void))
-     (else
-      (define e (car lst))
-      (set! n-lst (cons e n-lst))
-      (cond
-       ((p? e) (void))
-       (else (loop (cdr lst)))))))
-  (reverse n-lst))
-
-(define ast-rm-dead-code
-  (topdown
-   (lambda (ast)
-     (define ss (StatCont-ss ast))
-     (cond
-      ((and ss (ormap Return? ss))
-       (define n-ss (take-until/inclusive Return? ss))
-       (set-StatCont-ss ast n-ss))
-      (else
-       ast)))))
-
-(define ast-simplify-BlockExpr
-  (topdown
-   (repeat
-    (lambda (ast)
-      (match ast
-        ((BlockExpr _ (list (Return a e)))
-         e)
-        (_ #f))))))
-
-(define ast-simplify
-  (compose1->
-   ast-empty-Let->BlockStat
-   ast-rm-Pass
-   ast-nested-BlockStat->BlockStat
-   ast-rm-dead-code
-   ast-simplify-BlockExpr))
-
-(define defs-simplify
-  (make-for-all-defs ast-simplify))
 
 ;;; 
 ;;; DefStx
@@ -806,7 +673,7 @@ external dependencies for the program/library, as well as the .cpp and
         ;; then collect further information from it.
         (when (or (not ep?) (and eps-in-mod (not (dict-empty? eps-in-mod))))
           (define pt (Mod-pt mod)) ;; parse tree
-          ;;(pretty-print (syntax->datum pt))
+          ;;(pretty-print (syntax->datum pt)) (exit)
           ;;(pretty-print (syntax->datum/free-id pt))
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
@@ -844,7 +711,7 @@ external dependencies for the program/library, as well as the .cpp and
   (set! mods (mods-fill-in-syms mods))
 
   (define all-defs (merge-defs mods))
-  ;;(pretty-print (dict->list all-defs))
+  ;;(pretty-print (dict->list all-defs)) (exit)
   (set! all-defs (defs-resolve-names all-defs mods))
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
   (set! all-defs (defs-rm-DefStx all-defs))
@@ -852,7 +719,7 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-rm-LetExpr all-defs))
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (set! all-defs ((make-for-all-defs ast-LetLocalEc->BlockExpr) all-defs))
-  (set! all-defs (defs-simplify all-defs))
+  (set! all-defs ((make-for-all-defs ast-simplify) all-defs))
   (set! all-defs (defs-de-racketize all-defs))
   (set! all-defs (defs-type-infer all-defs))
   ;;(pretty-print (dict-values all-defs)) (exit)
@@ -938,7 +805,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-files "tests/test-modules-1.rkt"))
+  (define st (compile-files "tests/test-locals-1.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))
                        (cxx (cc hh))
