@@ -57,7 +57,7 @@ As Magnolisp has no standard library, it is ultimately necessary to define primi
 
 @defform/subs[(function (id arg ...) maybe-annos maybe-body)
               ([maybe-body code:blank expr])]{
-Declares a function. The (optional) body of a function is a single expression, which must produce a single value. @warning{Local functions are not supported by the C++ back end yet.}
+Declares a function. The (optional) body of a function is a single expression, which must produce a single value.
 
 Providing a body is optional in the case where the function is declared as @racket[foreign], in which case the compiler will ignore any body @racket[expr]. When a function without a body is invoked as Racket, the result is @|void-const|. When a @racket[foreign] function with a body is invoked as Racket, the body may be implemented in full Racket, typically to ``simulate'' the behavior of the C++ implementation.
 
@@ -153,7 +153,7 @@ While generally only declarations require annotations, @racket[lit-of] demonstra
 [type-expr type-id fn-type-expr]
 [fn-type-expr (fn type-expr ... type-expr)]]
 
-Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier declared with @racket[typedef]. The @racket[(fn _type-expr ... _type-expr)] form contains type expressions for arguments and the return value, in that order. A Magnolisp function always returns a single value.
+Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only built-in type is @racket[predicate], and any others must be declared using @racket[typedef]. The @racket[(fn _type-expr ... _type-expr)] form contains type expressions for arguments and the return value, in that order. A Magnolisp function always returns a single value.
 
 @subsection{Statements and Expressions}
 
@@ -161,7 +161,7 @@ Type expressions are parsed according to the above grammar, where @racket[_type-
 
 Unlike Racket, the Magnolisp language makes a distinction between statements and expressions. Although Magnolisp supports @emph{some} of the Racket language, a given Racket construct must typically appear only in a specific context (either statement or expression context).
 
-In Magnolisp, an @racket[if] form is either a statement or expression, depending on context. That is, depending on context the form is either @racket[(if _test-expr _then-expr _else-expr)] or @racket[(if _test-expr _then-stat _else-stat)]. The @racket[when] and @racket[unless] forms are always statements, and contain statements in their body. The truthiness of an expression depends on a type-specific C++ predicate, assumed to be named @racketvarfont{C++-id}@racketidfont{_is_true}.
+In Magnolisp, an @racket[if] form is either a statement or expression, depending on context. That is, depending on context the form is either @racket[(if _test-expr _then-expr _else-expr)] or @racket[(if _test-expr _then-stat _else-stat)]. The @racket[when] and @racket[unless] forms are always statements, and contain statements in their body. The @racket[_test-expr] conditional expression must always be of type @racket[predicate], and whether it holds depends on the ``truthiness'' of its value, as interpreted in C++ or Racket (as applicable).
 
 A @racket[(begin _stat ...)] form, in Magnolisp, signifies a sequence of statements, itself constituting a statement.
 
@@ -183,6 +183,28 @@ For example:
 
 @defform[(return expr)]{
 A statement that causes any enclosing @racket[do] block (which must exist) to yield the value of the expression @racket[expr].}
+
+@subsection{Predicate Expressions}
+
+@(declare-exporting magnolisp/runtime)
+
+A @deftech{predicate expression} is simply an expression of type @racket[predicate], which is the only built-in type in Magnolisp.
+
+@defthing[#:kind "type" predicate any/c]{
+A built-in type. The ``literals'' of this type are @racket[true] and @racket[false]. All conditional expressions in Magnolisp are of this type.
+}
+
+@deftogether[(
+@defproc[(TRUE) #t]
+@defproc[(FALSE) #f]
+)]{
+The only built-in (primitive) functions in Magnolisp are @racket[TRUE] and @racket[FALSE], which are both of type @racket[(fn predicate)]. While @racket[TRUE] and @racket[FALSE] are built-in, only Racket implementations are provided; suitable implementations must be provided for C++ as necessary, named @racketidfont{mgl_predicate}, @racketidfont{mgl_TRUE}, and @racketidfont{mgl_FALSE}, respectively. The expression @racket[(TRUE)] is expected to always evaluate to a true value, and @racket[(FALSE)] is expected to always evaluate to a false value; in Racket these evaluate to @racket[#t] and @racket[#f], respectively.}
+
+@deftogether[(
+@defidform[true]
+@defidform[false]
+)]{
+There is also shorthand syntax @racket[true] and @racket[false]; said syntaxes expand to @racket[(TRUE)] and  @racket[(FALSE)], respectively.}
 
 @section{Evaluation}
 

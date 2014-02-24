@@ -524,17 +524,6 @@ It is rather important for all Ast derived node types to be
 ;;; simplification
 ;;; 
 
-(define-syntax-rule
-  (match-or v clause ...)
-  (match v clause ... (_ v)))
-
-(define-syntax-rule
-  (topdown-match-or #:ast ast clause ...)
-  (topdown
-   (lambda (ast)
-     (match-or ast
-       clause ...))))
-
 (define ast-empty-Let->BlockStat
   (topdown
    (lambda (ast)

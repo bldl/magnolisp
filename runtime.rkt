@@ -13,7 +13,8 @@ using macros or runtime values. This is not really a problem since
 unique identifiers for functions can be given here, and our syntax can
 be expressed in terms of application of such functions. We use '%core'
 as our special function. We can also record annotations for our
-declared names, into a separate table.
+declared names, into a separate table. We can also use syntax
+properties to signify our own syntax.
 
 We cannot do much quoting to make sure that we retain binding
 information, and to make sure that macros get expanded. Again, no
@@ -162,3 +163,16 @@ this code is not in Magnolisp, only for Magnolisp.
          ((_ v) (apply/local-ec k v)))))
      body ...
      (values))))
+
+(typedef predicate (#:annos (foreign mgl_predicate)))
+(function (TRUE) (#:annos (type (fn predicate)) (foreign mgl_TRUE)) #t)
+(function (FALSE) (#:annos (type (fn predicate)) (foreign mgl_FALSE)) #f)
+(provide predicate TRUE FALSE)
+
+(define-syntax* true
+  (syntax-id-rules ()
+    [_ (TRUE)]))
+
+(define-syntax* false
+  (syntax-id-rules ()
+    [_ (FALSE)]))
