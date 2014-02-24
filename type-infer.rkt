@@ -32,10 +32,14 @@
 ;;; utilities
 ;;; 
 
+(define (local-Defun? ast)
+  (and (Defun? ast)
+       (not (ast-anno-must ast 'top))))
+
 ;; In IR we do not allow global DefVars.
 (define (ast-local-def? ast)
   (any-pred-holds
-   Param? DefVar?
+   Param? DefVar? local-Defun?
    ast))
 
 (define (def-get-type def)
@@ -331,8 +335,9 @@
 ;; environment. The input may contain AnyT values, long as their
 ;; meaning can be inferred. Returns a fully typed program, with
 ;; definitions having resolved type fields (where appropriate), and
-;; expressions having resolved 'type' annotations.
+;; expressions having resolved 'type-ast' annotations.
 (define* (defs-type-infer defs)
+  ;;(pretty-print (dict->list defs))
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values defs))))
 
   (define lookup (fix lookup-type-from-defs defs))
