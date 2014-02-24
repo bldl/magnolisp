@@ -1,6 +1,6 @@
 #lang racket/base
 
-(require racket/contract racket/stxparam
+(require racket/contract racket/match racket/stxparam
          (for-syntax racket/base syntax/define))
 
 (provide define* define-for-syntax* define-syntax*)
@@ -73,6 +73,12 @@
     (struct nm rest ... #:constructor-name ctor)
     (define the-nm (ctor e ...))
     (provide (except-out (struct-out nm) ctor) the-nm)))
+
+(define-syntax-rule*
+  (define-match-expander* id rest ...)
+  (begin
+    (define-match-expander id rest ...)
+    (provide id)))
 
 (define-syntax* define-with-contract
   (syntax-rules ()
