@@ -163,16 +163,3 @@ this code is not in Magnolisp, only for Magnolisp.
          ((_ v) (apply/local-ec k v)))))
      body ...
      (values))))
-
-(typedef predicate (#:annos (foreign mgl_predicate)))
-(function (TRUE) (#:annos (type (fn predicate)) (foreign mgl_TRUE)) #t)
-(function (FALSE) (#:annos (type (fn predicate)) (foreign mgl_FALSE)) #f)
-(provide predicate TRUE FALSE)
-
-(define-syntax* true
-  (syntax-id-rules ()
-    [_ (TRUE)]))
-
-(define-syntax* false
-  (syntax-id-rules ()
-    [_ (FALSE)]))
