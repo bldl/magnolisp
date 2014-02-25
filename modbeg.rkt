@@ -90,20 +90,6 @@ same variables at the same phase level).
         (provide m-id-count m-annos m-ast))))
  ) ;; end begin-for-syntax
 
-(define-syntax (module-begin stx)
-  (syntax-case stx ()
-    ((_ . bodies)
-     (let ((ast (local-expand
-                 (with-syntax ((prelude (datum->syntax stx 'magnolisp/prelude)))
-                   #'(#%module-begin (require prelude) . bodies))
-                 'module-begin null)))
-       (with-syntax (((mb . bodies) ast)
-                     (sm (make-definfo-submodule ast)))
-         (let ((mb-stx
-                #'(mb sm . bodies)))
-           ;;(pretty-print (syntax->datum mb-stx))
-           mb-stx))))))
-
 (define-syntax (base-module-begin stx)
   (syntax-case stx ()
     ((_ . bodies)
@@ -115,3 +101,9 @@ same variables at the same phase level).
                 #'(mb sm . bodies)))
            ;;(pretty-print (syntax->datum mb-stx))
            mb-stx))))))
+
+(define-syntax (module-begin stx)
+  (syntax-case stx ()
+    ((_ . bodies)
+     (with-syntax ((prelude (datum->syntax stx 'magnolisp/prelude)))
+       #'(base-module-begin (require prelude) . bodies)))))
