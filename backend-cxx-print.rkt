@@ -98,10 +98,10 @@
     ;; ((let ,[format-ident . produces . ident] ,[format-type . produces . type])
     ;;  (indent-before
     ;;   (string-append type " " ident ";")))
-    ;; ((if ,[format-expr . produces . test] ,conseq)
-    ;;  (string-append
-    ;;   (indent-before (string-append "if(" test ")\n"))
-    ;;   (indent-more (format-stat conseq))))
+    ((CxxIfSugar _ [format-expr . produces . test] conseq)
+     (string-append
+      (indent-before (string-append "if (" test ")\n"))
+      (indent-more (format-stat conseq))))
     ((IfStat _ [format-expr . produces . test] conseq alt)
      (string-append
       (indent-before (string-append "if (" test ")\n"))
