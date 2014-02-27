@@ -289,6 +289,8 @@ C++ back end.
        (match def
          ((ForeignTypeDecl _ _ cxx-t)
           cxx-t)))
+      ((Pass _)
+       ast)
       (else
        (raise-argument-error
         'ast->cxx "supported Ast?" ast))))

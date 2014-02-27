@@ -124,6 +124,8 @@
      (string-append "__label__ " (format-ident name) ";"))
     ((CxxLabel _ name)
      (string-append (format-ident name) ":"))
+    ((Pass _)
+     "/* nothing */;")
     ;; ((while ,[format-expr . produces . expr] ,stmt)
     ;;  (string-append
     ;;   (indent-before (string-append "while(" expr ")\n"))
