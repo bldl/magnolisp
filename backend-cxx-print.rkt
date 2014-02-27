@@ -102,15 +102,13 @@
     ;;  (string-append
     ;;   (indent-before (string-append "if(" test ")\n"))
     ;;   (indent-more (format-stat conseq))))
-    ;; ((if ,[format-expr . produces . test] ,conseq ,alt)
-    ;;  (string-append
-    ;;   (indent-before (string-append "if(" test ")\n"))
-    ;;   (indent-more (format-stat conseq))
-    ;;   "\n"
-    ;;   (indent-before "else\n")
-    ;;   (indent-more (format-stat alt))))
-    ((Return _ [format-expr . produces . expr]) ;; xxx temporary
-     (indent-before (string-append "BLOCK_ESCAPE " expr ";")))
+    ((IfStat _ [format-expr . produces . test] conseq alt)
+     (string-append
+      (indent-before (string-append "if (" test ")\n"))
+      (indent-more (format-stat conseq))
+      "\n"
+      (indent-before "else\n")
+      (indent-more (format-stat alt))))
     ((CxxReturnOne _ [format-expr . produces . expr])
      (indent-before (string-append "return " expr ";")))
     ((Assign _ [format-expr . produces . x] [format-expr . produces . v])
@@ -166,10 +164,10 @@
     ;;  (string-append obj "." (format-ident x)))
     ;; ((field ,[obj] ,x ,[format-type . produces . t])
     ;;  (string-append obj "." (format-ident x) "<" t ">"))
-    ;; ((if ,[format-expr . produces . test]
-    ;;      ,[format-expr . produces . conseq]
-    ;;      ,[format-expr . produces . alt])
-    ;;  (string-append "(" test ") ? (" conseq ") : (" alt ")"))
+    ((IfExpr _ [format-expr . produces . test]
+             [format-expr . produces . conseq]
+             [format-expr . produces . alt])
+     (string-append "(" test ") ? (" conseq ") : (" alt ")"))
     ;; ((vector-ref ,[format-expr . produces . v]
     ;;              ,[format-expr . produces . i])
     ;;  (string-append v "[" i "]"))

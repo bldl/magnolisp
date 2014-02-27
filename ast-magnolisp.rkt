@@ -331,6 +331,8 @@ It is rather important for all Ast derived node types to be
 
 (define-ast* CxxReturnOne Ast ((just-term e)))
 
+(define-ast* CxxIfSugar Ast ((just-term c) (just-term t)))
+
 (define-ast* CxxParam Def ((just-term t)))
 
 (define-ast* CxxDeclVar Def ((just-term t)))

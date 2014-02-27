@@ -244,6 +244,12 @@ C++ back end.
        ast)
       ((Apply a f es) ;; xxx need to deal with operators and parenthesization
        (Apply a f (map ast->cxx es)))
+      ((IfStat a c t e)
+       (IfStat a (ast->cxx c) (ast->cxx t) (ast->cxx e)))
+      ((IfExpr a c t e)
+       (IfExpr a (ast->cxx c) (ast->cxx t) (ast->cxx e)))
+      ((BlockStat a ss)
+       (BlockStat a (map ast->cxx ss)))
       ((Return a e)
        (define tgt (b-tgt))
        (unless tgt
