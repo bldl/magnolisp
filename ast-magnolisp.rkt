@@ -24,6 +24,9 @@ It is rather important for all Ast derived node types to be
 (define* (syntaxed stx typ . arg*)
   (apply typ (hasheq 'stx stx) arg*))
 
+(define* (self-syntaxed typ stx)
+  (syntaxed stx typ stx))
+
 (define* (ast-anno-must ast k)
   (let* ((annos (Ast-annos ast)))
     (hash-ref annos k)))
@@ -288,7 +291,7 @@ It is rather important for all Ast derived node types to be
 ;; argument expressions.
 (define-ast* Apply Ast ((just-term f) (list-of-term args)))
 
-;; Procedure call.
+;; Procedure call. A statement.
 (define-ast* Call Ast ((just-term f) (list-of-term args)))
 
 ;; Transient. Corresponds to a let/ec that only escapes to a local,
@@ -400,6 +403,7 @@ It is rather important for all Ast derived node types to be
      0 x def-id))))
 
 (define* (get-def-id-or-fail x)
+  ;;(writeln x)
   (define def-id (get-def-id x))
   (unless def-id
     (raise-language-error/ast
@@ -429,6 +433,7 @@ It is rather important for all Ast derived node types to be
   (any-pred-holds
    Apply?
    BlockExpr?
+   IfExpr?
    Literal?
    Var?
    ast))
@@ -677,6 +682,8 @@ It is rather important for all Ast derived node types to be
     ((Assign _ lv rv)
      `(set! ,(ast->sexp lv) ,(ast->sexp rv)))
     ((IfExpr _ c t e)
+     `(if ,(ast->sexp c) ,(ast->sexp t) ,(ast->sexp e)))
+    ((IfStat _ c t e)
      `(if ,(ast->sexp c) ,(ast->sexp t) ,(ast->sexp e)))
     ((Literal _ d)
      (syntax->datum d))

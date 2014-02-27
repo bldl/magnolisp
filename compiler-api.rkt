@@ -142,8 +142,6 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (define (defs-rm-DefStx defs)
-  ;; xxx May have to rewrite 'def' to remove local ones, too.
-  ;;(writeln (dict->list defs))
   (for/dict
    (make-immutable-free-id-table #:phase 0)
    ([(id def) (in-dict defs)] #:unless (DefStx? def))
@@ -642,7 +640,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;; paths as entry points).
 (define* (compile-modules . ep-mp-lst)
   ;;(writeln ep-mp-lst)
-  
+
   (define mods (make-hash)) ;; r-mp -> Mod
   (define eps-in-prog (make-free-id-table #:phase 0))
   (define dep-q null) ;; deps queued for loading
@@ -710,6 +708,21 @@ external dependencies for the program/library, as well as the .cpp and
 
   (set! mods (mods-fill-in-syms mods))
 
+  ;; Make note of interesting prelude definitions (if it is even a
+  ;; dependency).
+  (define predicate-id
+    (let* ((r-mp (resolve-module-path 'magnolisp/prelude #f))
+           (mod (hash-ref mods r-mp #f)))
+      (if (not mod)
+          #'predicate
+          (let ((syms (Mod-syms mod)))
+            (define def (hash-ref syms 'predicate #f))
+            (unless def
+              (error 'compile-modules
+                     "prelude does not define 'predicate': ~s"
+                     r-mp))
+            (Def-id def)))))
+  
   (define all-defs (merge-defs mods))
   ;;(pretty-print (dict->list all-defs)) (exit)
   (set! all-defs (defs-resolve-names all-defs mods))
@@ -721,7 +734,8 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs ((make-for-all-defs ast-LetLocalEc->BlockExpr) all-defs))
   (set! all-defs ((make-for-all-defs ast-simplify) all-defs))
   (set! all-defs (defs-de-racketize all-defs))
-  (set! all-defs (defs-type-infer all-defs))
+  ;;(pretty-print (dict->list all-defs)) (exit)
+  (set! all-defs (defs-type-infer predicate-id all-defs))
   ;;(pretty-print (dict-values all-defs)) (exit)
   
   ;;(all-defs-display-Var-bindings all-defs)
@@ -805,7 +819,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-files "tests/test-type-infer-3.rkt"))
+  (define st (compile-files "tests/test-if-1.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))
                        (cxx (cc hh))

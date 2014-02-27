@@ -51,7 +51,7 @@
     ((Defun _ _ t _ _)
      t)
     ((ForeignTypeDecl _ id _)
-     (syntaxed id DefNameT id))
+     (self-syntaxed DefNameT id))
     ))
 
 (define (def-set-type def t)
@@ -336,10 +336,12 @@
 ;; meaning can be inferred. Returns a fully typed program, with
 ;; definitions having resolved type fields (where appropriate), and
 ;; expressions having resolved 'type-ast' annotations.
-(define* (defs-type-infer defs)
+(define* (defs-type-infer predicate-id defs)
   ;;(pretty-print (dict->list defs))
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values defs))))
 
+  (define predicate-NameT (self-syntaxed DefNameT predicate-id))
+  
   (define lookup (fix lookup-type-from-defs defs))
 
   (define var-h (make-hasheq))
@@ -418,6 +420,16 @@
       ((Let _ bs ss)
        (for-each ti-def bs)
        (for-each ti-stat ss))
+      ((IfStat _ c t e)
+       (define c-t (ti-expr c))
+       (unless (unify! predicate-NameT c-t)
+         (raise-language-error/ast
+          "expected type 'predicate' for conditional"
+          ast c
+          #:fields (list (list "actual type"
+                               (ast-displayable/datum c-t)))))
+       (ti-stat t)
+       (ti-stat e))
       (else
        (raise-argument-error
         'ti-stat "supported Ast?" ast))))
@@ -491,6 +503,26 @@
        (define l-t (expr-get-type ast))
        (assert l-t)
        l-t)
+
+      ((IfExpr _ c t e)
+       (define c-t (ti-expr c))
+       (unless (unify! predicate-NameT c-t)
+         (raise-language-error/ast
+          "expected type 'predicate' for conditional"
+          ast c
+          #:fields (list (list "actual type"
+                               (ast-displayable/datum c-t)))))
+       (define t-t (ti-expr t))
+       (define e-t (ti-expr e))
+       (unless (unify! t-t e-t)
+         (raise-language-error/ast
+          "expected same type for both 'if' branches"
+          ast
+          #:fields (list
+                    (list "THEN branch type" (ast-displayable/datum t-t))
+                    (list "ELSE branch type" (ast-displayable/datum e-t))
+                    )))
+       (expr-unify! ast t-t))
       (else
        (raise-argument-error
         'ti-expr "supported Ast?" ast))))
