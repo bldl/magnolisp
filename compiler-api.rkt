@@ -148,6 +148,40 @@ external dependencies for the program/library, as well as the .cpp and
    (values id def)))
 
 ;;; 
+;;; IfExpr and IfStat
+;;; 
+
+(define (defs-optimize-if TRUE-id FALSE-id defs)
+  (define (make-f-pred id)
+    (lambda (ast)
+      (and (Apply? ast)
+           (let ((f (Apply-f ast)))
+             (and (Var? f)
+                  (free-identifier=? (Var-id f) id))))))
+
+  (define TRUE? (make-f-pred TRUE-id))
+  (define FALSE? (make-f-pred FALSE-id))
+  
+  (define-match-expander SomeIf
+    (syntax-rules ()
+      [(_ a c t e)
+       (or (IfExpr a c t e)
+           (IfStat a c t e))]))
+
+  (define rw
+    (bottomup
+     (lambda (ast)
+       (match ast
+         ((SomeIf _ c t e)
+          (cond
+           ((TRUE? c) t)
+           ((FALSE? c) e)
+           (else ast)))
+         (_ ast)))))
+
+  ((make-for-all-defs rw) defs))
+
+;;; 
 ;;; LetExpr
 ;;; 
 
@@ -710,22 +744,27 @@ external dependencies for the program/library, as well as the .cpp and
 
   ;; Make note of interesting prelude definitions (if it is even a
   ;; dependency).
-  (define predicate-id
+  (define-values (predicate-id TRUE-id FALSE-id)
     (let* ((r-mp (resolve-module-path 'magnolisp/prelude #f))
            (mod (hash-ref mods r-mp #f)))
-      (if (not mod)
-          #'predicate
-          (let ((syms (Mod-syms mod)))
-            (define def (hash-ref syms 'predicate #f))
-            (unless def
-              (error 'compile-modules
-                     "prelude does not define 'predicate': ~s"
-                     r-mp))
-            (Def-id def)))))
+      (define (get-id sym)
+        (if (not mod)
+            (datum->syntax #'here sym)
+            (let ((syms (Mod-syms mod)))
+              (define def (hash-ref syms sym #f))
+              (unless def
+                (error 'compile-modules
+                       "prelude does not define '~a': ~s"
+                       sym r-mp))
+              (Def-id def))))
+      (values (get-id 'predicate)
+              (get-id 'TRUE)
+              (get-id 'FALSE))))
   
   (define all-defs (merge-defs mods))
   ;;(pretty-print (dict->list all-defs)) (exit)
   (set! all-defs (defs-resolve-names all-defs mods))
+  (set! all-defs (defs-optimize-if TRUE-id FALSE-id all-defs))
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
   (set! all-defs (defs-rm-DefStx all-defs))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
