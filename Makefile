@@ -26,10 +26,31 @@ api-doc :
 	-rm -r doc
 	raco setup --no-zo --no-launcher --no-install --no-post-install magnolisp
 
+DIST_HOME := $(PWD)/dist
+
 # for this rule to produce .pdf, must do setup first, it seems
 pdf :
-	-mkdir pdfs
-	raco setup --no-zo --no-launcher --no-install --no-post-install --verbose --doc-pdf pdfs magnolisp
+	-mkdir $(DIST_HOME)
+	raco setup --no-zo --no-launcher --no-install --no-post-install --verbose --doc-pdf $(DIST_HOME) magnolisp
+
+html-doc :
+	-rm -r $(DIST_HOME)/manual
+	mkdir -p $(DIST_HOME)/manual
+	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --html --dest $(DIST_HOME)/manual --dest-name index.html manual.scrbl
+
+MIRROR_DIR := /tmp/raco-tmp/magnolisp
+
+# this indirection ensures that we only get what we would have in a Git repo
+# (using 'git archive' would be more straightforward, but for future proofing)
+pkg :
+	-mkdir $(DIST_HOME)
+	-rm -r $(MIRROR_DIR)
+	mkdir -p $(MIRROR_DIR)
+	cp -ai ./ $(MIRROR_DIR)/
+	( cd $(MIRROR_DIR) && git clean -dxff && rm -rf $(MIRROR_DIR)/.git && raco pkg create --format tgz --dest $(DIST_HOME) --from-dir $(MIRROR_DIR) )
+
+website : html-doc pdf pkg
+	chmod -R a+rX $(DIST_HOME)
 
 setup :
 	raco setup magnolisp
