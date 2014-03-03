@@ -604,7 +604,7 @@ It is rather important for all Ast derived node types to be
 (define* ast-simplify
   (compose1->
    ast-empty-Let->BlockStat
-   ast-rm-Pass
+   ;;ast-rm-Pass
    ast-nested-BlockStat->BlockStat
    ast-rm-dead-code
    ast-simplify-BlockExpr))

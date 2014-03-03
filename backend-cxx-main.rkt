@@ -245,7 +245,7 @@ C++ back end.
       ((Apply a f es) ;; xxx need to deal with operators and parenthesization
        (Apply a f (map ast->cxx es)))
       ((IfStat a c t e)
-       (if (Pass? e)
+       (if (and (BlockStat? e) (null? (BlockStat-ss e)))
            (CxxIfSugar a (ast->cxx c) (ast->cxx t))
            (IfStat a (ast->cxx c) (ast->cxx t) (ast->cxx e))))
       ((IfExpr a c t e)

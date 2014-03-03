@@ -229,6 +229,17 @@ external dependencies for the program/library, as well as the .cpp and
   n-defs)
 
 ;;; 
+;;; Pass -> empty BlockStat
+;;; 
+
+(define ast-Pass->BlockStat
+  (bottomup
+   (lambda (ast)
+     (match ast
+       ((Pass a) (BlockStat a null))
+       (_ ast)))))
+
+;;; 
 ;;; local escapes
 ;;; 
 
@@ -771,6 +782,7 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-rm-LetExpr all-defs))
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (set! all-defs ((make-for-all-defs ast-LetLocalEc->BlockExpr) all-defs))
+  (set! all-defs ((make-for-all-defs ast-Pass->BlockStat) all-defs))
   (set! all-defs ((make-for-all-defs ast-simplify) all-defs))
   (set! all-defs (defs-de-racketize all-defs))
   ;;(pretty-print (dict->list all-defs)) (exit)
