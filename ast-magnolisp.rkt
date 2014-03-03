@@ -556,17 +556,6 @@ It is rather important for all Ast derived node types to be
         ;; Signifies failed strategy.
         #f))))))
        
-(define (list-rm-Pass ss)
-  (filter (negate Pass?) ss))
-
-(define ast-rm-Pass
-  (topdown
-   (lambda (ast)
-     (match ast
-       [(StatCont a (? (curry ormap Pass?) ss))
-        (StatCont-copy ast a (filter (negate Pass?) ss))]
-       [_ ast]))))
-
 (define (take-until/inclusive p? lst)
   (define n-lst null)
   (let loop ((lst lst))
@@ -604,7 +593,6 @@ It is rather important for all Ast derived node types to be
 (define* ast-simplify
   (compose1->
    ast-empty-Let->BlockStat
-   ;;ast-rm-Pass
    ast-nested-BlockStat->BlockStat
    ast-rm-dead-code
    ast-simplify-BlockExpr))
