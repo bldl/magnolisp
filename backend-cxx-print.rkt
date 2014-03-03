@@ -112,8 +112,7 @@
     ((CxxReturnOne _ [format-expr . produces . expr])
      (indent-before (string-append "return " expr ";")))
     ((Assign _ [format-expr . produces . x] [format-expr . produces . v])
-     (indent-before
-      (string-append x " = " v ";")))
+     (indent-before (string-append x " = " v ";")))
     ;; ((vector-set! ,[format-expr . produces . vec-expr]
     ;;               ,[format-expr . produces . i-expr] ,[format-expr . produces . val-expr])
     ;;  (indent-before

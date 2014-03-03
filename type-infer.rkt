@@ -430,6 +430,16 @@
                                (ast-displayable/datum c-t)))))
        (ti-stat t)
        (ti-stat e))
+      ((Assign _ lhs rhs)
+       (define lhs-t (ti-expr lhs))
+       (define rhs-t (ti-expr rhs))
+       (unless (unify! lhs-t rhs-t)
+         (raise-language-error/ast
+          "assignment between different types"
+          ast
+          #:fields (list (list "lvalue type" (ast-displayable/datum lhs-t))
+                         (list "rvalue type" (ast-displayable/datum rhs-t)))))
+       (void))
       (else
        (raise-argument-error
         'ti-stat "supported Ast?" ast))))

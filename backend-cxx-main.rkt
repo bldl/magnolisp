@@ -291,6 +291,8 @@ C++ back end.
           cxx-t)))
       ((Pass _)
        ast)
+      ((Assign a lhs rhs)
+       (Assign a (ast->cxx lhs) (ast->cxx rhs)))
       (else
        (raise-argument-error
         'ast->cxx "supported Ast?" ast))))

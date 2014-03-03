@@ -165,7 +165,11 @@ In Magnolisp, an @racket[if] form is either a statement or expression, depending
 
 A @racket[(begin _stat ...)] form, in Magnolisp, signifies a sequence of statements, itself constituting a statement.
 
-The @racket[(let ([id val-expr] ...) body ...+)], @racket[(let* ([id val-expr] ...) body ...+)], and @racket[(letrec ([id val-expr] ...) body ...+)] forms are statements in Magnolisp, and the @racket[_body]s must likewise be statements. The named variant of @racket[let] is not supported. A limited form of @racketidfont{let} is supported in expression context---see @racket[let-var].
+The @racket[(let ([_id _expr] ...) _body ...+)], @racket[(let* ([_id _expr] ...) _body ...+)], and @racket[(letrec ([_id _expr] ...) _body ...+)] forms are statements in Magnolisp, and the @racket[_body]s must likewise be statements. The named variant of @racket[let] is not supported. A limited form of @racketidfont{let} is supported in expression context---see @racket[let-var].
+
+A @racket[(set! _id _expr)] form is an assignment statement in Magnolisp.
+The left-hand side expression @racket[_id] must be a reference to a bound variable.
+(The @racket[_id] may naturally instead be a transformer binding to an assignment transformer, in which case the form is macro transformed as normal.)
 
 @racket[(void)] is a Magnolisp statement with no effect. Unlike in Racket, arguments are not allowed. @racket[(values)] is also a statement with no effect, when it appears in a statement position. The two differ only when evaluating as Racket, as the former may only appear in a 1-value context, and the latter in a 0-value context.
 
