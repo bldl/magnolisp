@@ -61,7 +61,7 @@ want to define the base node type using the provided macro.
       (ast-set-annos v a))))
 
 ;;; 
-;;; concrete AST node definition
+;;; gen:strategic
 ;;; 
 
 ;; Note that ordering is delicate here. Any identifiers must be
@@ -145,6 +145,10 @@ want to define the base node type using the provided macro.
   (list (make-for-each-subterm nn-stx f-stx-lst)
         (make-subterm-all nn-stx f-stx-lst)))
 
+;;; 
+;;; concrete AST node definition
+;;; 
+
 (define-syntax* (define-ast* stx)
   (syntax-case stx ()
     ((_ name parent ((t field) ...) #:singleton (arg ...))
@@ -164,8 +168,5 @@ want to define the base node type using the provided macro.
            (#,@(make-strategic
                 #'name
                 (syntax->list #'((t field) ...))))
-           #:transparent modif ...)
-         (define* #,(format-id stx "new-~a" (syntax-e #'name))
-           (lambda (stx . args)
-             (apply name (hasheq 'stx stx) args)))))
+           #:transparent modif ...)))
     ))

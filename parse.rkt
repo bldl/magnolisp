@@ -564,8 +564,7 @@ would have done. Still retains correct scoping and evaluation order.
            ;; No first-class functions in Magnolisp.
            (raise-syntax-error #f "expected identifier"
                                stx #'p-expr))
-         (new-Apply
-          stx
+         (syntaxed stx Apply
           (parse ctx #'p-expr)
           (map
            (fix parse ctx)
@@ -598,20 +597,20 @@ would have done. Still retains correct scoping and evaluation order.
       ((#%top . id) ;; module-level variable
        (and (memq ctx '(module-level expr)) (identifier? #'id))
        (when (eq? ctx 'expr)
-         (new-Var stx #'id)))
+         (syntaxed stx Var #'id)))
       
       (id
        (and (memq ctx '(module-level expr)) (identifier? #'id))
        (when (eq? ctx 'expr)
-         (new-Var stx #'id)))
+         (syntaxed stx Var #'id)))
 
       ((set! id expr)
        (and (eq? ctx 'module-level) (identifier? #'id))
        (void))
 
-      ;; ((set! id expr)
-      ;;  (and (identifier? #'id) (eq? ctx 'stat))
-      ;;  (new-Assign #'id (parse ctx #'expr)))
+      ((set! id expr)
+       (and (identifier? #'id) (eq? ctx 'stat))
+       (syntaxed stx Assign (parse 'expr #'id) (parse 'expr #'expr)))
 
       ((quote-syntax datum)
        (not-magnolisp stx))
