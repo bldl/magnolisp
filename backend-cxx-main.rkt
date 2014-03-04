@@ -224,34 +224,31 @@ C++ back end.
   ;; When within a BlockExpr, this is (cons/c label-id var-id).
   (define b-tgt (make-parameter #f))
   
-  (define (ast->cxx ast)
-    ;;(writeln ast)
+  (define (def->cxx ast)
     (match ast
       ((Defun a id t ps b)
        (define foreign? (and (get-foreign-name a) #t))
-       (CxxDefun a id null (ast->cxx (FunT-rt t))
-                 (map ast->cxx ps)
+       (CxxDefun a id null (type->cxx (FunT-rt t))
+                 (map def->cxx ps)
                  (if foreign?
                      null
-                     (list (annoless CxxReturnOne (ast->cxx b))))))
+                     (list (annoless CxxReturnOne (expr->cxx b))))))
       ((Param a id t)
-       (CxxParam a id (annoless RefT (annoless ConstT (ast->cxx t)))))
+       (CxxParam a id (annoless RefT (annoless ConstT (type->cxx t)))))
       ((DefVar a id t v)
-       (DefVar a id (ast->cxx t) (ast->cxx v)))
-      ((Let a dvs ss)
-       (BlockStat a (map ast->cxx (append dvs ss))))
-      ((? Var?)
-       ast)
-      ((Apply a f es) ;; xxx need to deal with operators and parenthesization
-       (Apply a f (map ast->cxx es)))
+       (DefVar a id (type->cxx t) (expr->cxx v)))
+      (_
+       (raise-argument-error
+        'def->cxx "supported definition Ast?" ast))))
+  
+  (define (stat->cxx ast)
+    (match ast
       ((IfStat a c t e)
        (if (and (BlockStat? e) (null? (BlockStat-ss e)))
-           (CxxIfSugar a (ast->cxx c) (ast->cxx t))
-           (IfStat a (ast->cxx c) (ast->cxx t) (ast->cxx e))))
-      ((IfExpr a c t e)
-       (IfExpr a (ast->cxx c) (ast->cxx t) (ast->cxx e)))
+           (CxxIfSugar a (expr->cxx c) (stat->cxx t))
+           (IfStat a (expr->cxx c) (stat->cxx t) (stat->cxx e))))
       ((BlockStat a ss)
-       (BlockStat a (map ast->cxx ss)))
+       (BlockStat a (map stat->cxx ss)))
       ((Return a e)
        (define tgt (b-tgt))
        (unless tgt
@@ -260,16 +257,33 @@ C++ back end.
           ast))
        (BlockStat a (list (annoless Assign
                                     (annoless Var (cdr tgt))
-                                    (ast->cxx e))
+                                    (expr->cxx e))
                           (annoless Goto (car tgt)))))
+      ((Let a dvs ss)
+       (BlockStat a (append (map def->cxx dvs)
+                            (map stat->cxx ss))))
+      ((Assign a lhs rhs)
+       (Assign a (expr->cxx lhs) (expr->cxx rhs)))
+      (_
+       (raise-argument-error
+        'stat->cxx "supported statement Ast?" ast))))
+  
+  (define (expr->cxx ast)
+    (match ast
+      ((? Var?)
+       ast)
+      ((Apply a f es)
+       (Apply a f (map expr->cxx es)))
+      ((IfExpr a c t e)
+       (IfExpr a (expr->cxx c) (expr->cxx t) (expr->cxx e)))
       ((BlockExpr a ss)
        (define t (expr-get-type ast))
-       (define cxx-t (ast->cxx t))
+       (define cxx-t (type->cxx t))
        (define lbl (fresh-ast-identifier 'b))
        (define rval (fresh-ast-identifier 'r))
        (define n-ss
          (parameterize ((b-tgt (cons lbl rval)))
-           (map ast->cxx ss)))
+           (map stat->cxx ss)))
        (GccStatExpr
         a
         (append (list
@@ -280,6 +294,12 @@ C++ back end.
         (annoless Var rval)))
       ((Literal a d)
        (Literal a (syntax->datum d)))
+      (_
+       (raise-argument-error
+        'expr->cxx "supported expression Ast?" ast))))
+  
+  (define (type->cxx ast)
+    (match ast
       ((NameT _ id)
        (define def (ast-identifier-lookup defs-t id))
        (unless def
@@ -289,18 +309,14 @@ C++ back end.
        (match def
          ((ForeignTypeDecl _ _ cxx-t)
           cxx-t)))
-      ((Pass _)
-       ast)
-      ((Assign a lhs rhs)
-       (Assign a (ast->cxx lhs) (ast->cxx rhs)))
-      (else
+      (_
        (raise-argument-error
-        'ast->cxx "supported Ast?" ast))))
+        'type->cxx "supported type expression Ast?" ast))))
   
   (filter
    values
    (map
-    ast->cxx
+    def->cxx
     (filter
      Defun?
      (hash-values defs-t)))))
