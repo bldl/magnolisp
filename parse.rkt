@@ -616,27 +616,6 @@
        (and (identifier? #'id) (eq? ctx 'stat))
        (syntaxed stx Assign (parse 'expr #'id) (parse 'expr #'expr)))
 
-      ((quote-syntax datum)
-       (not-magnolisp stx))
-
-      ((case-lambda (f b ...) ...)
-       (not-magnolisp stx))
-
-      ((begin0 v-e e ...)
-       (not-magnolisp stx))
-      
-      ((with-continuation-mark expr1 expr2 expr3)
-       (not-magnolisp stx))
-      
-      ((#%variable-reference (#%top . id))
-       (not-magnolisp stx))
-      
-      ((#%variable-reference id)
-       (not-magnolisp stx))
-      
-      ((#%variable-reference)
-       (not-magnolisp stx))
-      
       ;; The letrec-syntaxes+values ID we get here is either top-level
       ;; or unbound, according to identifier-binding. This form is
       ;; local-expand result language.
