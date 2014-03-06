@@ -351,73 +351,42 @@
       (_
        (make-DefVar ctx stx id-stx e-stx))))
 
+  (define (parse-at-ctx ctx stx)
+    ((cond
+      ((eq? ctx 'module-level) parse-module-level)
+      ((eq? ctx 'stat) (fix parse 'stat))
+      ((eq? ctx 'expr) (fix parse 'expr))
+      (else (raise-argument-error
+             'parse-at-ctx
+             "(or/c 'module-level 'stat 'expr)"
+             0 ctx stx)))
+     stx))
+  
   (define (parse-module-begin stx)
     (kernel-syntax-case stx #f
       ((#%module-begin . bs)
        (for-each
-        (fix parse 'module-level)
+        parse-module-level
         (syntax->list #'bs)))
+
       (_ (raise-language-error
-          #f "unsupported syntax in 'module-begin context" stx
+          #f "illegal syntax for #%module-begin" stx
           #:fields `(("binding"
                       ,(or (stx-binding-info stx) 'unbound)))))))
-  
-  ;; 'ctx' is a symbolic name of the context that the 'stx' being
-  ;; parsed is in (one of: module-level, stat, and expr). Inserts
-  ;; bindings into 'defs-in-mod' as a side effect. Returns an Ast
-  ;; object for non top-level things.
-  (define (parse ctx stx)
-    ;;(stx-print-if-type-annoed stx)
-    ;;(writeln (list ctx stx))
-    
-    (kernel-syntax-case* stx #f (%core values)
 
-      ;; top-level-form non-terminal
-      
-      ((#%expression e)
-       (memq ctx '(module-level expr))
-       ;; These do appear as well.
-       (when (eq? ctx 'expr)
-         (parse ctx #'e)))
-
-      ((module . _)
-       (eq? ctx 'module-level)
-       (void))
-
+  (define (parse-module-level stx)
+    (kernel-syntax-case* stx #f (values)
       ((begin . bs)
-       (memq ctx '(module-level stat))
-       (cond
-        ((eq? ctx 'module-level)
-         (for-each
-          (fix parse 'module-level)
-          (syntax->list #'bs)))
-        (else
-         (syntaxed stx BlockStat
-                   (map (fix parse 'stat)
-                        (syntax->list #'bs))))))
-      
+       (for-each
+        parse-module-level
+        (syntax->list #'bs)))
+
       ((begin-for-syntax . _)
-       (eq? ctx 'module-level)
        (void))
-
-      ;; module-level-form non-terminal
-
-      ((#%provide . specs)
-       (eq? ctx 'module-level)
-       (provide! (syntax->list #'specs)))
-
-      ;; submodule-form non-terminal
-
-      ((module* . _)
-       (eq? ctx 'module-level)
-       (void))
-      
-      ;; general-top-level-form non-terminal
 
       ;; We support (values v ...) in an expression position only
       ;; directly in binding form value expressions.
       ((define-values (id ...) (#%plain-app values v ...))
-       (eq? ctx 'module-level)
        (let ()
          (define id-lst (syntax->list #'(id ...)))
          (assert (andmap identifier? id-lst))
@@ -435,36 +404,109 @@
                  (define-values (#,id-stx) #,v-stx))
                stx (car (syntax-e stx))))
             id-lst v-lst))
-         (parse
-          ctx
+         (parse-module-level
           (syntax-track-origin
            (quasisyntax/loc stx (begin #,@def-lst))
            stx (car (syntax-e stx))))))
-      
+
+      ;; Must come after the ((define-values (id ...) (#%plain-app
+      ;; values v ...)) pattern.
       ((define-values (id) e)
-       (and (eq? ctx 'module-level) (identifier? #'id))
+       (identifier? #'id)
        (let ()
          ;;(writeln (syntax->datum stx))
-         (parse-define-value ctx stx #'id #'e)))
+         (parse-define-value 'module-level stx #'id #'e)))
 
       ((define-syntaxes (id ...) _)
-       (eq? ctx 'module-level)
        (let ()
          (define id-lst (syntax->list #'(id ...)))
          (assert (andmap identifier? id-lst))
          (for ((id id-lst))
-           (make-DefStx ctx stx id))))
+           (make-DefStx 'module-level stx id))))
 
+      ((#%expression e)
+       (void))
+
+      ((if c t e)
+       (void))
+      
+      ((let-kw binds . exprs)
+       (and (identifier? #'let-kw)
+            (or (free-identifier=? #'let-kw #'let-values)
+                (free-identifier=? #'let-kw #'letrec-values)))
+       (void))
+      
+      ((let-kw _ v-binds body ...)
+       (and (identifier? #'let-kw)
+            (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
+       (void))
+      
+      ((module . _)
+       (void))
+
+      ((module* . _)
+       (void))
+
+      ((#%plain-lambda formals . exprs)
+       (void))
+      
+      ((#%provide . specs)
+       (provide! (syntax->list #'specs)))
+
+      ((q lit)
+       (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote))
+       (void))
+      
       ;; Local requires are not supported.
       ((#%require . specs)
-       (eq? ctx 'module-level)
        (require! (syntax->list #'specs)))
 
+      ((set! id expr)
+       (identifier? #'id)
+       (void))
+
+      ((#%top . id) ;; module-level variable
+       (identifier? #'id)
+       (void))
+      
+      ((#%plain-app . _)
+       (void))
+      
+      (id
+       (identifier? #'id)
+       (void))
+      
+      (_ (raise-language-error
+          #f "illegal syntax at module level" stx
+          #:fields `(("binding"
+                      ,(or (stx-binding-info stx) 'unbound)))))))
+  
+  ;; 'ctx' is a symbolic name of the context that the 'stx' being
+  ;; parsed is in (one of: stat, and expr). Inserts bindings into
+  ;; 'defs-in-mod' as a side effect. Returns an Ast object for non
+  ;; top-level things.
+  (define (parse ctx stx)
+    ;;(stx-print-if-type-annoed stx)
+    ;;(writeln (list ctx stx))
+    
+    (kernel-syntax-case* stx #f (%core values)
+
+      ;; These do appear as well.
+      ((#%expression e)
+       (eq? ctx 'expr)
+       (parse ctx #'e))
+
+      ((begin . bs)
+       (eq? ctx 'stat)
+       (syntaxed stx BlockStat
+                 (map (fix parse 'stat)
+                      (syntax->list #'bs))))
+      
       ;; expr non-terminal
 
       ((#%plain-lambda formals . exprs)
-       (memq ctx '(module-level expr))
-       (when (eq? ctx 'expr)
+       (eq? ctx 'expr)
+       (let ()
          (define par-id-lst (syntax->list #'formals))
          (define e-stx-lst (syntax->list #'exprs))
          (when (> (length e-stx-lst) 1)
@@ -482,7 +524,7 @@
          (syntaxed stx Lambda par-ast-lst e-ast)))
       
       ((if c t e)
-       (memq ctx '(module-level stat expr))
+       (memq ctx '(stat expr))
        (cond
         ((eq? ctx 'expr)
          (syntaxed stx IfExpr
@@ -493,7 +535,8 @@
          (syntaxed stx IfStat
                    (parse 'expr #'c)
                    (parse 'stat #'t)
-                   (parse 'stat #'e)))))
+                   (parse 'stat #'e)))
+        (else (assert #f))))
 
       ((#%plain-app f . e)
        (and (eq? ctx 'stat)
@@ -528,8 +571,8 @@
        (syntaxed stx AppLocalEc #'k (parse 'expr #'e)))
       
       ((#%plain-app p-expr . a-expr)
-       (memq ctx '(module-level expr))
-       (when (eq? ctx 'expr)
+       (eq? ctx 'expr)
+       (let ()
          (unless (identifier? #'p-expr)
            ;; No first-class functions in Magnolisp.
            (raise-syntax-error #f "expected identifier"
@@ -541,8 +584,7 @@
            (syntax->list #'a-expr)))))
 
       ((let-values (((n) v)) e)
-       (and (eq? ctx 'expr)
-            (identifier? #'n))
+       (and (eq? ctx 'expr) (identifier? #'n))
        (let ()
          (define d-ast (make-DefVar ctx stx #'n #'v))
          (define e-ast (parse 'expr #'e))
@@ -552,31 +594,23 @@
        (and (identifier? #'let-kw)
             (or (free-identifier=? #'let-kw #'let-values)
                 (free-identifier=? #'let-kw #'letrec-values))
-            (memq ctx '(module-level stat)))
-       (when (eq? ctx 'stat)
-         (make-Let ctx stx
-                   (syntax-e #'let-kw) #'binds #'exprs)))
+            (eq? ctx 'stat))
+       (make-Let ctx stx
+                 (syntax-e #'let-kw) #'binds #'exprs))
 
       ;; 'quote', as it comes in, appears to be unbound for us.
       ((q lit)
        (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote)
-            (memq ctx '(module-level expr)))
-       (when (eq? ctx 'expr)
-         (make-Literal stx #'lit)))
+            (eq? ctx 'expr))
+       (make-Literal stx #'lit))
       
       ((#%top . id) ;; module-level variable
-       (and (memq ctx '(module-level expr)) (identifier? #'id))
-       (when (eq? ctx 'expr)
-         (syntaxed stx Var #'id)))
+       (and (eq? ctx 'expr) (identifier? #'id))
+       (syntaxed stx Var #'id))
       
       (id
-       (and (memq ctx '(module-level expr)) (identifier? #'id))
-       (when (eq? ctx 'expr)
-         (syntaxed stx Var #'id)))
-
-      ((set! id expr)
-       (and (eq? ctx 'module-level) (identifier? #'id))
-       (void))
+       (and (eq? ctx 'expr) (identifier? #'id))
+       (syntaxed stx Var #'id))
 
       ((set! id expr)
        (and (identifier? #'id) (eq? ctx 'stat))
@@ -603,10 +637,9 @@
       ((#%variable-reference)
        (not-magnolisp stx))
       
-      ;; local-expand result language
-      
       ;; The letrec-syntaxes+values ID we get here is either top-level
-      ;; or unbound, according to identifier-binding.
+      ;; or unbound, according to identifier-binding. This form is
+      ;; local-expand result language.
       ((let-kw _ v-binds body ...)
        (and (identifier? #'let-kw)
             (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
