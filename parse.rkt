@@ -269,7 +269,7 @@
   
   (define (make-DefVar ctx stx id-stx e-stx)
     (check-redefinition id-stx stx)
-    (define ast (parse 'expr e-stx))
+    (define ast (parse-expr e-stx))
     (define ann-h (mk-annos ctx stx id-stx))
     (set! ann-h (parse-add-DefVar-annos id-stx ann-h))
     (define t (lookup-type id-stx))
@@ -336,7 +336,7 @@
                  [_
                   (not-magnolisp stx i-e)]))))
     (define e-stx-lst (syntax->list exprs-stx))
-    (define e-ast-lst (map (fix parse 'stat) e-stx-lst))
+    (define e-ast-lst (map parse-stat e-stx-lst))
     (Let (hasheq 'stx stx 'let-kind kind) b-ast-lst e-ast-lst))
 
   (define (parse-define-value ctx stx id-stx e-stx)
@@ -351,11 +351,13 @@
       (_
        (make-DefVar ctx stx id-stx e-stx))))
 
+  ;; 'ctx' is a symbolic name of the context that the 'stx' being
+  ;; parsed is in.
   (define (parse-at-ctx ctx stx)
     ((cond
       ((eq? ctx 'module-level) parse-module-level)
-      ((eq? ctx 'stat) (fix parse 'stat))
-      ((eq? ctx 'expr) (fix parse 'expr))
+      ((eq? ctx 'stat) parse-stat)
+      ((eq? ctx 'expr) parse-expr)
       (else (raise-argument-error
              'parse-at-ctx
              "(or/c 'module-level 'stat 'expr)"
@@ -481,66 +483,24 @@
           #:fields `(("binding"
                       ,(or (stx-binding-info stx) 'unbound)))))))
   
-  ;; 'ctx' is a symbolic name of the context that the 'stx' being
-  ;; parsed is in (one of: stat, and expr). Inserts bindings into
-  ;; 'defs-in-mod' as a side effect. Returns an Ast object for non
-  ;; top-level things.
-  (define (parse ctx stx)
-    ;;(stx-print-if-type-annoed stx)
-    ;;(writeln (list ctx stx))
-    
-    (kernel-syntax-case* stx #f (%core values)
-
-      ;; These do appear as well.
-      ((#%expression e)
-       (eq? ctx 'expr)
-       (parse ctx #'e))
-
+  (define (parse-stat stx)
+    (kernel-syntax-case* stx #f (values)
       ((begin . bs)
-       (eq? ctx 'stat)
        (syntaxed stx BlockStat
-                 (map (fix parse 'stat)
+                 (map parse-stat
                       (syntax->list #'bs))))
       
-      ;; expr non-terminal
-
-      ((#%plain-lambda formals . exprs)
-       (eq? ctx 'expr)
-       (let ()
-         (define par-id-lst (syntax->list #'formals))
-         (define e-stx-lst (syntax->list #'exprs))
-         (when (> (length e-stx-lst) 1)
-           (raise-syntax-error
-            #f "function body must be a single expression" stx))
-         (define par-ast-lst
-           (map (lambda (id)
-                  ;; Annotations would probably have to be propagated
-                  ;; from any binding whose value this lambda is, but
-                  ;; that must wait until later.
-                  (make-Param ctx stx id))
-                par-id-lst))
-         (define e-stx (first e-stx-lst))
-         (define e-ast (parse 'expr e-stx))
-         (syntaxed stx Lambda par-ast-lst e-ast)))
+      ((#%expression e)
+       (parse-stat #'e))
       
       ((if c t e)
-       (memq ctx '(stat expr))
-       (cond
-        ((eq? ctx 'expr)
-         (syntaxed stx IfExpr
-                   (parse 'expr #'c)
-                   (parse 'expr #'t)
-                   (parse 'expr #'e)))
-        ((eq? ctx 'stat)
-         (syntaxed stx IfStat
-                   (parse 'expr #'c)
-                   (parse 'stat #'t)
-                   (parse 'stat #'e)))
-        (else (assert #f))))
+       (syntaxed stx IfStat
+                 (parse-expr #'c)
+                 (parse-stat #'t)
+                 (parse-stat #'e)))
 
       ((#%plain-app f . e)
-       (and (eq? ctx 'stat)
-            (identifier? #'f)
+       (and (identifier? #'f)
             (or (free-identifier=? #'f #'void)
                 (free-identifier=? #'f #'values)))
        (begin
@@ -552,69 +512,21 @@
             stx #'e))
          (syntaxed stx Pass)))
 
-      ((#%plain-app kall
-        (#%plain-lambda (k) b ...))
-       (and (eq? ctx 'expr)
-            (syntax-property stx 'local-ec)
-            (identifier? #'kall)
-            (free-identifier=? #'kall #'call/ec))
-       (syntaxed stx
-        LetLocalEc #'k
-        (map
-         (fix parse 'stat)
-         (syntax->list #'(b ...)))))
-      
       ((#%plain-app k e)
-       (and (eq? ctx 'stat)
-            (syntax-property stx 'local-ec)
+       (and (syntax-property stx 'local-ec)
             (identifier? #'k))
-       (syntaxed stx AppLocalEc #'k (parse 'expr #'e)))
+       (syntaxed stx AppLocalEc #'k (parse-expr #'e)))
       
-      ((#%plain-app p-expr . a-expr)
-       (eq? ctx 'expr)
-       (let ()
-         (unless (identifier? #'p-expr)
-           ;; No first-class functions in Magnolisp.
-           (raise-syntax-error #f "expected identifier"
-                               stx #'p-expr))
-         (syntaxed stx Apply
-          (parse ctx #'p-expr)
-          (map
-           (fix parse ctx)
-           (syntax->list #'a-expr)))))
-
-      ((let-values (((n) v)) e)
-       (and (eq? ctx 'expr) (identifier? #'n))
-       (let ()
-         (define d-ast (make-DefVar ctx stx #'n #'v))
-         (define e-ast (parse 'expr #'e))
-         (syntaxed stx LetExpr d-ast e-ast)))
-       
       ((let-kw binds . exprs)
        (and (identifier? #'let-kw)
             (or (free-identifier=? #'let-kw #'let-values)
-                (free-identifier=? #'let-kw #'letrec-values))
-            (eq? ctx 'stat))
-       (make-Let ctx stx
+                (free-identifier=? #'let-kw #'letrec-values)))
+       (make-Let 'stat stx
                  (syntax-e #'let-kw) #'binds #'exprs))
 
-      ;; 'quote', as it comes in, appears to be unbound for us.
-      ((q lit)
-       (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote)
-            (eq? ctx 'expr))
-       (make-Literal stx #'lit))
-      
-      ((#%top . id) ;; module-level variable
-       (and (eq? ctx 'expr) (identifier? #'id))
-       (syntaxed stx Var #'id))
-      
-      (id
-       (and (eq? ctx 'expr) (identifier? #'id))
-       (syntaxed stx Var #'id))
-
       ((set! id expr)
-       (and (identifier? #'id) (eq? ctx 'stat))
-       (syntaxed stx Assign (parse 'expr #'id) (parse 'expr #'expr)))
+       (identifier? #'id)
+       (syntaxed stx Assign (parse-expr #'id) (parse-expr #'expr)))
 
       ;; The letrec-syntaxes+values ID we get here is either top-level
       ;; or unbound, according to identifier-binding. This form is
@@ -622,15 +534,108 @@
       ((let-kw _ v-binds body ...)
        (and (identifier? #'let-kw)
             (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
-       (parse ctx
-              (syntax-track-origin
-               (syntax/loc stx (letrec-values v-binds body ...))
-               stx #'let-kw)))
+       (parse-stat
+        (syntax-track-origin
+         (syntax/loc stx (letrec-values v-binds body ...))
+         stx #'let-kw)))
 
-      ;; unrecognized language
+      (_ (raise-language-error
+          #f "illegal syntax in statement context" stx
+          #:fields `(("binding"
+                      ,(or (stx-binding-info stx) 'unbound)))))))
+
+  ;; Inserts bindings into 'defs-in-mod' as a side effect. Returns an
+  ;; Ast object for non top-level things.
+  (define (parse-expr stx)
+    ;;(stx-print-if-type-annoed stx)
+    ;;(writeln (list ctx stx))
+    
+    (kernel-syntax-case* stx #f (values)
+
+      ;; These do appear as well.
+      ((#%expression e)
+       (parse-expr #'e))
+
+      ((#%plain-lambda formals . exprs)
+       (let ()
+         (define par-id-lst (syntax->list #'formals))
+         (define e-stx-lst (syntax->list #'exprs))
+         (when (> (length e-stx-lst) 1)
+           (raise-syntax-error
+            #f "function body must be a single expression" stx))
+         (define par-ast-lst
+           (map (lambda (id)
+                  ;; Annotations would probably have to be propagated
+                  ;; from any binding whose value this lambda is, but
+                  ;; that must wait until later.
+                  (make-Param 'expr stx id))
+                par-id-lst))
+         (define e-stx (first e-stx-lst))
+         (define e-ast (parse-expr e-stx))
+         (syntaxed stx Lambda par-ast-lst e-ast)))
+      
+      ((if c t e)
+       (syntaxed stx IfExpr
+                 (parse-expr #'c)
+                 (parse-expr #'t)
+                 (parse-expr #'e)))
+
+      ((#%plain-app kall
+        (#%plain-lambda (k) b ...))
+       (and (syntax-property stx 'local-ec)
+            (identifier? #'kall)
+            (free-identifier=? #'kall #'call/ec))
+       (syntaxed stx
+        LetLocalEc #'k
+        (map
+         parse-stat
+         (syntax->list #'(b ...)))))
+      
+      ((#%plain-app p-expr . a-expr)
+       (let ()
+         (unless (identifier? #'p-expr)
+           ;; No first-class functions in Magnolisp.
+           (raise-syntax-error #f "expected identifier"
+                               stx #'p-expr))
+         (syntaxed stx Apply
+          (parse-expr #'p-expr)
+          (map
+           parse-expr
+           (syntax->list #'a-expr)))))
+
+      ((let-values (((n) v)) e)
+       (identifier? #'n)
+       (let ()
+         (define d-ast (make-DefVar 'expr stx #'n #'v))
+         (define e-ast (parse-expr #'e))
+         (syntaxed stx LetExpr d-ast e-ast)))
+       
+      ;; 'quote', as it comes in, appears to be unbound for us.
+      ((q lit)
+       (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote))
+       (make-Literal stx #'lit))
+      
+      ((#%top . id) ;; module-level variable
+       (identifier? #'id)
+       (syntaxed stx Var #'id))
+      
+      ;; The letrec-syntaxes+values ID we get here is either top-level
+      ;; or unbound, according to identifier-binding. This form is
+      ;; local-expand result language.
+      ((let-kw _ v-binds body ...)
+       (and (identifier? #'let-kw)
+            (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
+       (parse-expr
+        (syntax-track-origin
+         (syntax/loc stx (letrec-values v-binds body ...))
+         stx #'let-kw)))
+
+      (id
+       (identifier? #'id)
+       (syntaxed stx Var #'id))
       
       (_ (raise-language-error
-          #f (format "unsupported syntax in ~a context" ctx) stx
+          #f "illegal syntax in expression context" stx
           #:fields `(("binding"
                       ,(or (stx-binding-info stx) 'unbound)))))))
 
