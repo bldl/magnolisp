@@ -497,7 +497,7 @@
             (format "arguments not allowed for ~a in a statement position"
                     (syntax-e #'f))
             stx #'e))
-         (syntaxed stx Pass)))
+         (syntaxed stx BlockStat null)))
 
       ((#%plain-app k e)
        (and (syntax-property stx 'local-ec)

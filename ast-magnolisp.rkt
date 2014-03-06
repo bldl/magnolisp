@@ -303,9 +303,6 @@ It is rather important for all Ast derived node types to be
 ;; value given by expression 'e'.
 (define-ast* AppLocalEc Ast ((no-term k) (just-term e)))
 
-;; Nil statement.
-(define-ast* Pass Ast ())
-
 ;; Block expression. Contains statements.
 (define-ast* BlockExpr Ast ((list-of-term ss)))
 

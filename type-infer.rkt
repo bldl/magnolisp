@@ -413,8 +413,6 @@
                                 expect-t)))))
        (return-type t)
        (void))
-      ((Pass _)
-       (void))
       ((BlockStat _ ss)
        (for-each ti-stat ss))
       ((Let _ bs ss)
