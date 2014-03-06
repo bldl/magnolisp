@@ -2,41 +2,6 @@
 
 #|
 
-Note that language not in the runtime library may appear. Such
-language may come from the lexical cope of 'expand' itself, or from
-the lexical scope of a macro expander. But what we are parsing here is
-fully expanded, and it is an error if there are any references to
-functions in the Racket runtime, unless we happen to explicitly
-support such things.
-
-Note that #%app and lambda in 'racket' are macros that expand to
-primitives, probably ones in '#%kernel, and this is something to keep
-in mind when comparing identifiers. The 'syntax/kerncase' module and
-particularly kernel-syntax-case should be of interest here.
-
-We would of course be able to manually import '#%kernel versions of
-constructs, e.g.
-
-  (only-in '#%kernel [#%app k-app] [lambda k-lambda])
-
-We collect some information about all bindings. Really only those ones
-that are top-level might have to be translated into C++. Although some
-locals might have to be lifted to the top-level in C++.
-
-We drop all #%require and #%provide directives, anything within
-begin-for-syntax, any submodules, and also all top-level expressions.
-
-identifier-binding may be useful for getting information about IDs. It
-will tell us if an ID is local, module-level, or something else. For
-module bindings it also tells us the original name, plus the defining
-module.
-
-Note that letrec-syntaxes+values does not appear in fully expanded
-programs, but it can appear in the result of a local-expand, which
-means that it can appear here. We can just translate to a kernel
-letrec-syntaxes, although that may not quite correspond to what Racket
-would have done. Still retains correct scoping and evaluation order.
-
 |#
 
 (require "annos-parse.rkt"
@@ -385,22 +350,27 @@ would have done. Still retains correct scoping and evaluation order.
        (make-ForeignTypeDecl ctx stx id-stx))
       (_
        (make-DefVar ctx stx id-stx e-stx))))
+
+  (define (parse-module-begin stx)
+    (kernel-syntax-case stx #f
+      ((#%module-begin . bs)
+       (for-each
+        (fix parse 'module-level)
+        (syntax->list #'bs)))
+      (_ (raise-language-error
+          #f "unsupported syntax in 'module-begin context" stx
+          #:fields `(("binding"
+                      ,(or (stx-binding-info stx) 'unbound)))))))
   
   ;; 'ctx' is a symbolic name of the context that the 'stx' being
-  ;; parsed is in (one of: module-begin, module-level, stat, and
-  ;; expr). Inserts bindings into 'defs-in-mod' as a side effect.
-  ;; Returns an Ast object for non top-level things.
+  ;; parsed is in (one of: module-level, stat, and expr). Inserts
+  ;; bindings into 'defs-in-mod' as a side effect. Returns an Ast
+  ;; object for non top-level things.
   (define (parse ctx stx)
     ;;(stx-print-if-type-annoed stx)
     ;;(writeln (list ctx stx))
     
     (kernel-syntax-case* stx #f (%core values)
-
-      ((#%module-begin . bs)
-       (eq? ctx 'module-begin)
-       (for-each
-        (fix parse 'module-level)
-        (syntax->list #'bs)))
 
       ;; top-level-form non-terminal
       
@@ -652,7 +622,7 @@ would have done. Still retains correct scoping and evaluation order.
           #:fields `(("binding"
                       ,(or (stx-binding-info stx) 'unbound)))))))
 
-  (parse 'module-begin modbeg-stx)
+  (parse-module-begin modbeg-stx)
   (define prov-h (resolve-provides prov-lst))
   ;;(pretty-print (dict-map prov-h list))
   (values defs-in-mod prov-h req-lst))
