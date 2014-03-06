@@ -27,21 +27,6 @@
   (or (immutable-free-id-table? x)
       (immutable-bound-id-table? x)))
 
-(define* (pretty-print-id-table d)
-  (pretty-print (dict-map d cons)))
-
-(define* (show-matches-in-id-table id-stx d)
-  (writeln
-   (cons
-    `(looking-for ,(syntax-e id-stx))
-    (dict-map
-     d
-     (lambda (k v)
-       (cond
-        ((bound-identifier=? k id-stx 0) `(bound ,(syntax-e k)))
-        ((free-identifier=? k id-stx 0 0) `(free ,(syntax-e k)))
-        (else #f)))))))
-
 (define* (global-id? id)
   (and (identifier? id)
        (not (eq? (identifier-binding id 0) 'lexical))))
@@ -198,3 +183,46 @@
   (set! s (regexp-replace* #rx"[^a-zA-Z0-9_]+" s ""))
   (if (and default (= (string-length s) 0))
       default s))
+
+;;; 
+;;; debugging utilities
+;;; 
+
+(define* (pretty-print-id-table d)
+  (pretty-print (dict-map d cons)))
+
+(define* (show-matches-in-id-table id-stx d)
+  (writeln
+   (cons
+    `(looking-for ,(syntax-e id-stx))
+    (dict-map
+     d
+     (lambda (k v)
+       (cond
+        ((bound-identifier=? k id-stx 0) `(bound ,(syntax-e k)))
+        ((free-identifier=? k id-stx 0 0) `(free ,(syntax-e k)))
+        (else #f)))))))
+
+(define* (print-with-select-syntax-properties props stx)
+  (define (props-for stx)
+    (define lst
+      (for/list ((prop props))
+        (define v (syntax-property stx prop))
+        (and v (cons prop v))))
+    (filter identity lst))
+
+  (define (print-for stx)
+    (define vs (props-for stx))
+    (unless (null? vs)
+      (writeln `(PROPS ,vs ,stx))))
+  
+  (define (f stx)
+    (define lst (syntax->list stx))
+    (cond
+     (lst (print-for stx)
+          (for-each f lst))
+     (else (print-for stx))))
+
+  (pretty-print (syntax->datum stx))
+  (f stx))
+

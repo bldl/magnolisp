@@ -310,6 +310,8 @@ It is rather important for all Ast derived node types to be
 ;; semantics are to escape from a surrounding BlockExpr.
 (define-ast* Return Ast ((just-term e)))
 
+(define-ast* RacketExpr Ast ())
+
 ;;; 
 ;;; C++
 ;;;
@@ -434,6 +436,7 @@ It is rather important for all Ast derived node types to be
    BlockExpr?
    IfExpr?
    Literal?
+   RacketExpr?
    Var?
    ast))
 

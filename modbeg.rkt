@@ -86,7 +86,7 @@ same variables at the same phase level).
           (make-immutable-free-id-table
            #,(syntax-for-id-table-dict definfo-table-b definfo-table-f)
            #:phase 0))
-        (define m-ast (quote-syntax/keep-properties #,ast (paren-shape origin local-ec)))
+        (define m-ast (quote-syntax/keep-properties #,ast (in-racket local-ec origin paren-shape)))
         (provide m-id-count m-annos m-ast))))
  ) ;; end begin-for-syntax
 

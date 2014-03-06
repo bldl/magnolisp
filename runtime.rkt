@@ -163,3 +163,10 @@ this code is not in Magnolisp, only for Magnolisp.
          ((_ v) (apply/local-ec k v)))))
      body ...
      (values))))
+
+(define-syntax* (begin-racket stx)
+  (syntax-case stx ()
+    ((_ e ...)
+     (syntax-property
+      (syntax/loc stx (let () e ...))
+      'in-racket #t))))

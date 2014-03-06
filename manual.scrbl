@@ -59,7 +59,7 @@ As Magnolisp has no standard library, it is ultimately necessary to define primi
               ([maybe-body code:blank expr])]{
 Declares a function. The (optional) body of a function is a single expression, which must produce a single value.
 
-Providing a body is optional in the case where the function is declared as @racket[foreign], in which case the compiler will ignore any body @racket[expr]. When a function without a body is invoked as Racket, the result is @|void-const|. When a @racket[foreign] function with a body is invoked as Racket, the body may be implemented in full Racket, typically to ``simulate'' the behavior of the C++ implementation.
+Providing a body is optional in the case where the function is declared as @racket[foreign], in which case the compiler will ignore any body @racket[expr]. When a function without a body is invoked as Racket, the result is @|void-const|. When a @racket[foreign] function with a body is invoked as Racket, the body may be implemented in full Racket, typically to ``simulate'' the behavior of the C++ implementation. To implement a function body in Racket instead of Magnolisp, enclose the body expression within a @racket[begin-racket] form.
 
 A function with the @racket[export] flag in its annotations indicates that the function is part of the public API of a program that includes the containing module. When a function is used merely as a dependency, any @racket[export] flag is ignored.
 
@@ -72,7 +72,9 @@ For example:
   (function (five) (#:annos export (type (fn int)))
     5)
   (function (inc x) (#:annos foreign (type (fn int int)))
-    (add1 x)))
+    (add1 x))
+  (function (seven) (#:annos foreign (type (fn int)))
+    (begin-racket 1 2 3 4 5 6 7)))
 
 Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in different type contexts.}
 
@@ -167,13 +169,13 @@ A @racket[(begin _stat ...)] form, in Magnolisp, signifies a sequence of stateme
 
 The @racket[(let ([_id _expr] ...) _body ...+)], @racket[(let* ([_id _expr] ...) _body ...+)], and @racket[(letrec ([_id _expr] ...) _body ...+)] forms are statements in Magnolisp, and the @racket[_body]s must likewise be statements. The named variant of @racket[let] is not supported. A limited form of @racketidfont{let} is supported in expression context---see @racket[let-var].
 
-A @racket[(set! _id _expr)] form is an assignment statement in Magnolisp.
+The @racket[(set! _id _expr)] form is an assignment statement in Magnolisp.
 The left-hand side expression @racket[_id] must be a reference to a bound variable.
 (The @racket[_id] may naturally instead be a transformer binding to an assignment transformer, in which case the form is macro transformed as normal.)
 
-@racket[(void)] is a Magnolisp statement with no effect. Unlike in Racket, arguments are not allowed. @racket[(values)] is also a statement with no effect, when it appears in a statement position. The two differ only when evaluating as Racket, as the former may only appear in a 1-value context, and the latter in a 0-value context.
+In Magnolisp, @racket[(void)] signifies a statement with no effect. Unlike in Racket, arguments are not allowed. The @racket[(values)] form likewise signifies a statement with no effect, when it appears in a statement position. The two differ only when evaluating as Racket, as the former may only appear in a 1-value context, and the latter in a 0-value context.
 
-@racket[var], @racket[function], and @racket[typedef] declarations may appear in a statement position. The same is true of @racket[define] forms that conform to the restricted syntax supported by the Magnolisp compiler.
+The @racket[var], @racket[function], and @racket[typedef] declaration forms may appear in a statement position. The same is true of @racket[define] forms that conform to the restricted syntax supported by the Magnolisp compiler.
 
 @defform[(do stat ...)]{
 An @deftech{expression block} containing a sequence of statements. As the term implies, and expression block is an expression, despite containing statements. The block must produce a single value by @racket[return]ing it. Control must not reach the end of a block expression---the @racket[return] statement must be invoked somewhere before control ``falls out'' of the block. The returned value becomes the value of the containing @racket[do] expression.
@@ -209,6 +211,17 @@ The only built-in (primitive) functions in Magnolisp are @racket[TRUE] and @rack
 @defidform[false]
 )]{
 There is also shorthand syntax @racket[true] and @racket[false]; said syntaxes expand to @racket[(TRUE)] and  @racket[(FALSE)], respectively.}
+
+@subsection{Racket Forms}
+
+@(declare-exporting magnolisp/runtime)
+
+To use Racket code in a runtime context, you may wrap the code in a @racket[begin-racket] form. Such wrapping has no effect on the namespace of the enclosed forms, but rather means that they no longer have to be grammatically conformant with Magnolisp.
+
+@defform[(begin-racket Racket-form ...)]{
+A Racket expression that is equivalent to writing @racket[(let () Racket-form ...)]. The Magnolisp semantics is to: ignore such forms when at module top-level; treat such forms as no-ops in statement context; and treat them as uncompilable expressions when appearing in an expression position. Uncompilable expressions are acceptable for as long as they are not part of a compiled program, or can be optimized away.
+}
+
 
 @section{Evaluation}
 

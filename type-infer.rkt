@@ -453,6 +453,7 @@
             "block expression without return"
             ast))
          (expr-unify! ast t)))
+
       ((? Var?)
        (define t (lookup ast))
        (when (FunT? t)
@@ -461,6 +462,7 @@
           #:fields (list (list "type" (ast-displayable t)))
           ast))
        (expr-unify! ast t))
+
       ((Apply _ f as)
        ;; We bypass invoking (ti-expr f) here, as we only want to
        ;; allow FunT typed expressions in this context. We must still
@@ -504,6 +506,7 @@
        ;; type of the function.
        (define t (FunT-rt f-t))
        (expr-unify! ast t))
+
       ((? Literal?)
        ;; May have an explicit type annotation, instead of an
        ;; auto-assigned type variable. In any case, we cannot learn
@@ -531,6 +534,10 @@
                     (list "ELSE branch type" (ast-displayable/datum e-t))
                     )))
        (expr-unify! ast t-t))
+
+      ((? RacketExpr?)
+       (expr-get-type ast))
+
       (else
        (raise-argument-error
         'ti-expr "supported Ast?" ast))))

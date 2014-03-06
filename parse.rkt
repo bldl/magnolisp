@@ -365,6 +365,10 @@
 
   (define (parse-module-level stx)
     (kernel-syntax-case* stx #f (values)
+      (_
+       (syntax-property stx 'in-racket)
+       (void))
+      
       ((begin . bs)
        (for-each
         parse-module-level
@@ -472,6 +476,10 @@
   
   (define (parse-stat stx)
     (kernel-syntax-case* stx #f (values)
+      (_
+       (syntax-property stx 'in-racket)
+       (syntaxed stx BlockStat null))
+      
       ((begin . bs)
        (syntaxed stx BlockStat
                  (map parse-stat
@@ -539,6 +547,10 @@
     
     (kernel-syntax-case* stx #f (values)
 
+      (_
+       (syntax-property stx 'in-racket)
+       (syntaxed stx RacketExpr))
+      
       ;; These do appear as well.
       ((#%expression e)
        (parse-expr #'e))
@@ -626,6 +638,7 @@
           #:fields `(("binding"
                       ,(or (stx-binding-info stx) 'unbound)))))))
 
+  ;;(print-with-select-syntax-properties '(in-racket local-ec) modbeg-stx)
   (parse-module-begin modbeg-stx)
   (define prov-h (resolve-provides prov-lst))
   ;;(pretty-print (dict-map prov-h list))
