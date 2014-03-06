@@ -170,3 +170,14 @@ this code is not in Magnolisp, only for Magnolisp.
      (syntax-property
       (syntax/loc stx (let () e ...))
       'in-racket #t))))
+
+(define-syntax* (begin-for-racket stx)
+  (syntax-case stx ()
+    ((_ e ...)
+     (syntax-property
+      (syntax/loc stx (begin e ...))
+      'in-racket #t))))
+
+(define-syntax-rule*
+  (define-for-racket rest ...)
+  (begin-for-racket (define rest ...)))

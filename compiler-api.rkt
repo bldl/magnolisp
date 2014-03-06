@@ -859,7 +859,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-files "tests/test-foreign-1.rkt"))
+  (define st (compile-files "tests/test-foreign-2.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))
                        (cxx (cc hh))
