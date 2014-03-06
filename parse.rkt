@@ -351,19 +351,6 @@
       (_
        (make-DefVar ctx stx id-stx e-stx))))
 
-  ;; 'ctx' is a symbolic name of the context that the 'stx' being
-  ;; parsed is in.
-  (define (parse-at-ctx ctx stx)
-    ((cond
-      ((eq? ctx 'module-level) parse-module-level)
-      ((eq? ctx 'stat) parse-stat)
-      ((eq? ctx 'expr) parse-expr)
-      (else (raise-argument-error
-             'parse-at-ctx
-             "(or/c 'module-level 'stat 'expr)"
-             0 ctx stx)))
-     stx))
-  
   (define (parse-module-begin stx)
     (kernel-syntax-case stx #f
       ((#%module-begin . bs)
