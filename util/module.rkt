@@ -99,11 +99,11 @@
     ((_ contract (name . rest) body ...)
      (begin
        (define (name . rest) body ...)
-       (provide/contract [name contract])))
+       (provide (contract-out [name contract]))))
     ((_ contract name value)
      (begin
        (define name value)
-       (provide/contract [name contract])))))
+       (provide (contract-out [name contract]))))))
 
 (define-syntax-rule*
   (require* n ...)

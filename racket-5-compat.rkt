@@ -25,13 +25,14 @@ written for Racket 5. Currently only raise-misc-error.
   (recursive-contract
    (or/c '() (cons/c field/c (cons/c any/c details-list/c)))))
 
-(provide/contract
- [raise-misc-error
-  (->* (symbol? string?)
-       (#:continued (or/c string? (listof string))
-        #:constructor (-> string? continuation-mark-set? exn?))
-       #:rest details-list/c
-       any)])
+(provide
+ (contract-out
+  [raise-misc-error
+   (->* (symbol? string?)
+        (#:continued (or/c string? (listof string))
+         #:constructor (-> string? continuation-mark-set? exn?))
+         #:rest details-list/c
+         any)]))
 
 ;; ----
 
