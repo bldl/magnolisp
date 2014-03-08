@@ -417,22 +417,12 @@
          (for ((id id-lst))
            (make-DefStx 'module-level stx id))))
 
-      ((#%expression e)
-       (void))
-
-      ((if c t e)
-       (void))
+      ((#%provide . specs)
+       (provide! (syntax->list #'specs)))
       
-      ((let-kw binds . exprs)
-       (and (identifier? #'let-kw)
-            (or (free-identifier=? #'let-kw #'let-values)
-                (free-identifier=? #'let-kw #'letrec-values)))
-       (void))
-      
-      ((let-kw _ v-binds body ...)
-       (and (identifier? #'let-kw)
-            (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
-       (void))
+      ;; Local requires are not supported.
+      ((#%require . specs)
+       (require! (syntax->list #'specs)))
       
       ((module . _)
        (void))
@@ -440,33 +430,56 @@
       ((module* . _)
        (void))
 
-      ((#%plain-lambda formals . exprs)
+      ((#%expression e)
        (void))
       
-      ((#%provide . specs)
-       (provide! (syntax->list #'specs)))
-
-      ((q lit)
-       (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote))
+      ;; Any other module-level Racket expression is ignored. (These
+      ;; are as for the Racket 'expr' non-terminal, in the same order,
+      ;; too. With the exception of 'begin', which we care about.
+      (id
+       (identifier? #'id)
        (void))
-      
-      ;; Local requires are not supported.
-      ((#%require . specs)
-       (require! (syntax->list #'specs)))
-
+      ((#%plain-lambda . _)
+       (void))
+      ((case-lambda . _)
+       (void))
+      ((if c t e)
+       (void))
+      ((begin0 . _)
+       (void))
+      ((let-kw binds . exprs)
+       (and (identifier? #'let-kw)
+            (or (free-identifier=? #'let-kw #'let-values)
+                (free-identifier=? #'let-kw #'letrec-values)))
+       (void))
       ((set! id expr)
        (identifier? #'id)
        (void))
-
-      ((#%top . id) ;; module-level variable
-       (identifier? #'id)
+      ((q lit)
+       (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote))
        (void))
-      
+      ((quote-syntax _)
+       (void))
+      ((with-continuation-mark expr1 expr2 expr3)
+       (void))
       ((#%plain-app . _)
        (void))
-      
-      (id
+      ((#%top . id) ;; should not appear in a module body
        (identifier? #'id)
+       (void))
+      ((#%variable-reference id)
+       (identifier? #'id)
+       (void))
+      ((#%variable-reference (#%top . id))
+       (identifier? #'id)
+       (void))
+      ((#%variable-reference)
+       (void))
+
+      ;; Not Racket core language, but may appear here.
+      ((let-kw _ v-binds body ...)
+       (and (identifier? #'let-kw)
+            (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
        (void))
       
       (_ (raise-language-error
