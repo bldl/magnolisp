@@ -1,5 +1,5 @@
 #lang scribble/doc
-@(require scribble/eval scribble/manual
+@(require scribble/eval scribble/manual "manual-util.rkt"
 	  (for-label magnolisp/runtime
                      (except-in racket/base do #%module-begin)
                      syntax/modresolve))
@@ -255,6 +255,37 @@ For example:
      (begin-racket (* (begin 1 2) two)))
    (four))
 }
+
+@subsection{Fully Expanded Programs}
+
+@(declare-exporting magnolisp/runtime)
+
+As far as the Magnolisp compiler is concerned, a Magnolisp program is fully expanded if it conforms to the following grammar. Any non-terminal marked with the subscript ``rkt'' is as documented in the ``Fully Expanded Programs'' section of The Racket Reference. Any non-terminal marked with the subscript ``ign'' is for language that is ignored by the Magnolisp compiler, but which may be useful when evaluating as Racket.
+
+@racketgrammar*[
+#:literals (begin begin-for-syntax define-values define-syntaxes values #%plain-app #%provide #%require)
+[module-begin-form (#,racket-module-begin module-level-form ...)]
+[module-level-form (#%provide #,(rkt-nt raw-provide-spec) ...)
+		   (#%require #,(rkt-nt raw-require-spec) ...)
+		   #,(rkt-ign-nt submodule-form)
+                   (begin module-level-form ...)
+		   #,(ign-nt begin-for-syntax-form)
+                   module-level-def
+                   #,(ign-nt define-syntaxes-form)
+                   #,(rkt-ign-nt expr)
+                   #,(ign-nt in-racket-form)
+		   ]
+[begin-for-syntax-form (begin-for-syntax module-level-form ...)]
+[define-syntaxes-form (define-syntaxes (id ...) expr)]
+[module-level-def (define-values (id) def-expr)
+		  (define-values (id ...) 
+                     (#%plain-app values def-expr ...))]
+]
+
+where:
+
+@specsubform[in-racket-form]{
+Any Racket module top-level form that has the syntax property @racket['in-racket] set to a true value. These are ignored by the Magnolisp compiler. The @racket[begin-for-racket] form is implemented through this mechanism.}
 
 @section{Evaluation}
 

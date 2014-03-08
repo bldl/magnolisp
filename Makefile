@@ -49,7 +49,7 @@ pkg :
 	cp -ai ./ $(MIRROR_DIR)/
 	( cd $(MIRROR_DIR) && git clean -dxff && rm -rf $(MIRROR_DIR)/.git && raco pkg create --format tgz --dest $(DIST_HOME) --from-dir $(MIRROR_DIR) )
 
-website : html-doc pdf pkg
+website : pdf pkg
 	chmod -R a+rX $(DIST_HOME)
 
 setup :
