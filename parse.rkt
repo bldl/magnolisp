@@ -368,11 +368,6 @@
       (_
        (syntax-property stx 'in-racket)
        (void))
-      
-      ((begin . bs)
-       (for-each
-        parse-module-level
-        (syntax->list #'bs)))
 
       ((begin-for-syntax . _)
        (void))
@@ -397,10 +392,7 @@
                  (define-values (#,id-stx) #,v-stx))
                stx (car (syntax-e stx))))
             id-lst v-lst))
-         (parse-module-level
-          (syntax-track-origin
-           (quasisyntax/loc stx (begin #,@def-lst))
-           stx (car (syntax-e stx))))))
+         (for-each parse-module-level def-lst)))
 
       ;; Must come after the ((define-values (id ...) (#%plain-app
       ;; values v ...)) pattern.
@@ -435,7 +427,9 @@
       
       ;; Any other module-level Racket expression is ignored. (These
       ;; are as for the Racket 'expr' non-terminal, in the same order,
-      ;; too. With the exception of 'begin', which we care about.
+      ;; too.) Note that we should only have (begin expr ...+) forms,
+      ;; and not anything containing non-expressions, since those
+      ;; should have gotten spliced into the module body.
       (id
        (identifier? #'id)
        (void))
@@ -444,6 +438,8 @@
       ((case-lambda . _)
        (void))
       ((if c t e)
+       (void))
+      ((begin . _)
        (void))
       ((begin0 . _)
        (void))
