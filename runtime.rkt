@@ -14,16 +14,13 @@ enough to be easily analyzable, and compilable to C++.
  racket/stxparam
  (for-syntax "annos-util.rkt" "util.rkt" racket/syntax)) 
 
+;; #<undefined>
+(define undefined (letrec ((x x)) x))
+
 ;; Yes we are providing this. If the programmer wants to hack our core
 ;; language, they may. The idea is to express core language as
 ;; (#%magnolisp 'pass) or (#%magnolisp 'call p) or such.
-(define* #%magnolisp list)
-
-(define (make-undefined)
-  (letrec ((x x)) x))
-
-;; #<undefined>
-(define undefined (make-undefined))
+(define* #%magnolisp (lambda args undefined))
 
 ;; A form that annotates not an identifier, but any datum. The
 ;; annotations are stored as a list of syntax in a syntax property of
