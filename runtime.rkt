@@ -83,7 +83,7 @@ enough to be easily analyzable, and compilable to C++.
      (function-impl (f p ...) (a ...) (void)))
     ((_ (f p ...) (a ...) b)
      (begin
-       (define (f p ...) b)
+       (define f (#%plain-lambda (p ...) b))
        (anno! f a ...)))))
     
 (define-annos-wrapper* function)
