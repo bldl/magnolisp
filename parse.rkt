@@ -601,12 +601,13 @@
       
       ((#%plain-app p-expr . a-expr)
        (let ()
-         (unless (identifier? #'p-expr)
+         (define f-ast (parse-expr #'p-expr))
+         (unless (Var? f-ast)
            ;; No first-class functions in Magnolisp.
            (raise-syntax-error #f "expected identifier"
                                stx #'p-expr))
          (syntaxed stx Apply
-          (parse-expr #'p-expr)
+          f-ast
           (map
            parse-expr
            (syntax->list #'a-expr)))))
@@ -623,7 +624,7 @@
        (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote))
        (make-Literal stx #'lit))
       
-      ((#%top . id) ;; module-level variable
+      ((#%top . id) ;; module-level variable (can prevent shadowing)
        (identifier? #'id)
        (syntaxed stx Var #'id))
       
