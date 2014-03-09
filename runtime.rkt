@@ -2,26 +2,10 @@
 
 #|
 
-This runtime implements Magnolisp language, and such language is not
-meant to be used in macro programming. This is because the runtime
-language must be restricted enough to be easily analyzable, and
-compilable to C++.
-
-We cannot introduce new core language into Racket, and so we must be
-able to express foreign syntax in terms of Racket syntax, without
-using macros or runtime values. This is not really a problem since
-unique identifiers for functions can be given here, and our syntax can
-be expressed in terms of application of such functions. We use '%core'
-as our special function. We can also record annotations for our
-declared names, into a separate table. We can also use syntax
-properties to signify our own syntax.
-
-We cannot do much quoting to make sure that we retain binding
-information, and to make sure that macros get expanded. Again, no
-problem, as we can use 'lambda' as a container for code.
-
-Be mindful of not using the Magnolisp reader extensions here, since
-this code is not in Magnolisp, only for Magnolisp.
+This module implements the (default) concrete syntax of the Magnolisp
+language, and such language is not meant to be used in macro
+programming. This is because the runtime language must be restricted
+enough to be easily analyzable, and compilable to C++.
 
 |#
 
@@ -31,9 +15,9 @@ this code is not in Magnolisp, only for Magnolisp.
  (for-syntax "annos-util.rkt" "util.rkt" racket/syntax)) 
 
 ;; Yes we are providing this. If the programmer wants to hack our core
-;; language, they may. The idea is to express core language as (%core
-;; 'pass) or (%core 'call p) or such.
-(define* %core list)
+;; language, they may. The idea is to express core language as
+;; (#%magnolisp 'pass) or (#%magnolisp 'call p) or such.
+(define* #%magnolisp list)
 
 (define (make-undefined)
   (letrec ((x x)) x))
@@ -132,7 +116,7 @@ this code is not in Magnolisp, only for Magnolisp.
   (syntax-rules ()
     ((_ t (a ...))
      (begin
-       (define t (%core 'foreign-type))
+       (define t (#%magnolisp 'foreign-type))
        (anno! t a ...)))))
 
 (define-annos-wrapper* typedef)

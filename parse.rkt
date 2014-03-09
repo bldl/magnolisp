@@ -8,7 +8,7 @@
          "annos-util.rkt"
          "ast-magnolisp.rkt"
          "compiler-util.rkt"
-         (only-in "runtime.rkt" %core)
+         (only-in "runtime.rkt" #%magnolisp)
          (rename-in "strategy.rkt" [id id-rw])
          "util.rkt"
          "util/case.rkt"
@@ -185,7 +185,7 @@
   raw-mp-h)
 
 (define (core-id? x)
-  (matches-global-id? #'%core x))
+  (matches-global-id? #'#%magnolisp x))
 
 (define-syntax-class core-id
   (pattern x #:when (core-id? #'x)))
@@ -341,7 +341,7 @@
 
   (define (parse-define-value ctx stx id-stx e-stx)
     ;;(writeln (list 'parse-define-value e-stx (syntax->datum e-stx)))
-    ;;(writeln (identifier-binding #'%core 0))
+    ;;(writeln (identifier-binding #'#%magnolisp 0))
     (kernel-syntax-case e-stx #f
       ((#%plain-app c (q k))
        (and (core-id? #'c)
