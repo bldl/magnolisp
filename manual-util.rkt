@@ -25,3 +25,8 @@ Utilities for authoring manual.scrbl.
 (define-subscript-var* rkt-nt "rkt")
 (define-subscript-var* ign-nt "ign")
 (define-subscript-var* rkt-ign-nt "rkt,ign")
+
+(define-syntax* (stxprop-flag stx)
+  (syntax-case stx ()
+    ((_ flag)
+     #`(subscript (racket '#,(syntax->datum #'flag) ≠ #f)))))

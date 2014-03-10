@@ -263,29 +263,63 @@ For example:
 As far as the Magnolisp compiler is concerned, a Magnolisp program is fully expanded if it conforms to the following grammar. Any non-terminal marked with the subscript ``rkt'' is as documented in the ``Fully Expanded Programs'' section of The Racket Reference. Any non-terminal marked with the subscript ``ign'' is for language that is ignored by the Magnolisp compiler, but which may be useful when evaluating as Racket.
 
 @racketgrammar*[
-#:literals (begin begin-for-syntax define-values define-syntaxes values #%plain-app #%provide #%require)
-[module-begin-form (#,racket-module-begin module-level-form ...)]
-[module-level-form (#%provide #,(rkt-nt raw-provide-spec) ...)
-		   (#%require #,(rkt-nt raw-require-spec) ...)
-		   #,(rkt-ign-nt submodule-form)
-                   (begin module-level-form ...)
-		   #,(ign-nt begin-for-syntax-form)
-                   module-level-def
-                   #,(ign-nt define-syntaxes-form)
-                   #,(rkt-ign-nt expr)
-                   #,(ign-nt in-racket-form)
-		   ]
-[begin-for-syntax-form (begin-for-syntax module-level-form ...)]
-[define-syntaxes-form (define-syntaxes (id ...) expr)]
-[module-level-def (define-values (id) def-expr)
+#:literals (begin begin-for-syntax call/ec define-values define-syntaxes if let-values letrec-syntaxes+values quote values #%expression #%magnolisp #%plain-app #%plain-lambda #%provide #%require #%top)
+[module-begin-form (#,racket-module-begin mgl-modlv-form ...)]
+[mgl-modlv-form (#%provide #,(rkt-nt raw-provide-spec) ...)
+		(#%require #,(rkt-nt raw-require-spec) ...)
+		#,(rkt-ign-nt submodule-form)
+                (begin mgl-modlv-form ...)
+		#,(ign-nt begin-for-syntax-form)
+                module-level-def
+                #,(ign-nt define-syntaxes-form)
+                #,(rkt-ign-nt expr)
+                #,(ign-nt in-racket-form)]
+[begin-for-syntax-form (begin-for-syntax #,(rkt-nt module-level-form) ...)]
+[define-syntaxes-form (define-syntaxes (trans-id ...) #,(rkt-nt expr))]
+[module-level-def (define-values (id) mgl-expr)
 		  (define-values (id ...) 
-                     (#%plain-app values def-expr ...))]
+                    (#%plain-app values mgl-expr ...))]
+[mgl-expr id
+          (#%plain-lambda #,(rkt-nt formals) mgl-expr)
+	  (if mgl-expr mgl-expr mgl-expr)
+	  (let-values ([(id) mgl-expr]) mgl-expr)
+	  (letrec-syntaxes+values
+              ([(trans-id ...) #,(rkt-ign-nt expr)] ...)
+              ([(id) mgl-expr])
+            mgl-expr)
+	  #,(racket (#,(racket quote) _datum))
+          call-local-ec
+	  (#%plain-app #%magnolisp (quote foreign-type))
+	  (#%plain-app id-expr mgl-expr ...)
+          (#%top . id)
+          (#%expression mgl-expr)
+          in-racket-form]
+[call-local-ec (#,(stxprop-flag local-ec) #%plain-app call/ec
+                 (#%plain-lambda (k) stat ...))]
+[id-expr id (#%top . id) (#%expression id-expr)]
 ]
 
 where:
 
+@specsubform[id]{
+An identifier.}
+
+@specsubform[trans-id]{
+An identifier with a @emph{transformer binding}.}
+
+@specsubform[datum]{
+A piece of literal data. A @(racket (#,(racket quote) _datum)) form is a literal in Magnolisp, and its type must be possible to infer from context.}
+
 @specsubform[in-racket-form]{
-Any Racket module top-level form that has the syntax property @racket['in-racket] set to a true value. These are ignored by the Magnolisp compiler. The @racket[begin-for-racket] form is implemented through this mechanism.}
+Any Racket form that has the syntax property @racket['in-racket] set to a true value. These are ignored by the Magnolisp compiler where possible, and it is an error if they persist in contexts where they ultimately cannot be ignored. The @racket[begin-racket] and @racket[begin-for-racket] forms are implemented through this mechanism.}
+
+@specsubform[call-local-ec]{
+A restricted form of @racket[call/ec] invocation, which is flagged with the syntax property @racket['local-ec]. The semantic restriction is that non-local escapes (beyond the enclosing function's body) are not allowed.}
+
+@warning{The parsing of type declarations is not presently as permissive as the above grammar indicates. It more or less assumes syntax as produced by @racket[typedef].}
+
+@defthing[#%magnolisp any/c]{
+A value binding whose identifier is used to uniquely identify some Magnolisp core syntactic forms. The value of the variable does not matter when compiling an Magnolisp, as it is never used. For purposes of evaluating as Racket, it holds some function that may be applied to any number of arguments, and which produces a single, undefined value.}
 
 @section{Evaluation}
 
