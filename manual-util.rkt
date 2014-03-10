@@ -26,6 +26,12 @@ Utilities for authoring manual.scrbl.
 (define-subscript-var* ign-nt "ign")
 (define-subscript-var* rkt-ign-nt "rkt,ign")
 
+(define-syntax* (indirect-id stx)
+  (syntax-case stx ()
+    ((_ id)
+     #`(elem (racket id)
+             (subscript (racketvarfont "id-expr"))))))
+
 (define-syntax* (stxprop-flag stx)
   (syntax-case stx ()
     ((_ flag)

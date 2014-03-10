@@ -28,6 +28,9 @@ api-doc :
 
 DIST_HOME := $(PWD)/dist
 
+rm-dist :
+	-rm -r $(DIST_HOME)
+
 # for this rule to produce .pdf, must do setup first, it seems
 pdf :
 	-mkdir $(DIST_HOME)
@@ -49,7 +52,7 @@ pkg :
 	cp -ai ./ $(MIRROR_DIR)/
 	( cd $(MIRROR_DIR) && git clean -dxff && rm -rf $(MIRROR_DIR)/.git && raco pkg create --format tgz --dest $(DIST_HOME) --from-dir $(MIRROR_DIR) )
 
-website : pdf pkg
+website : rm-dist pdf pkg
 	chmod -R a+rX $(DIST_HOME)
 
 setup :
