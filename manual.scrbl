@@ -3,14 +3,6 @@
 	  (for-label magnolisp/prelude magnolisp/runtime
                      (except-in racket/base do #%module-begin)))
 
-@(begin ;; trick from Racket docs
-   (define-syntax-rule (bind id-1 id-2)
-     (begin
-       (require (for-label racket/base))
-       (define id-1 (racket do))
-       (define id-2 (racket #%module-begin))))
-   (bind racket-do racket-module-begin))
-
 @(define the-eval (make-base-eval))
 @(the-eval '(require magnolisp/prelude magnolisp/runtime))
 
@@ -277,7 +269,7 @@ Any non-terminal marked with the subscript ``rkt'' is as documented in the ``Ful
 		  (define-values (id ...) 
                     (#%plain-app #,(indirect-id values) mgl-expr ...))]
 [mgl-expr id
-          (#%plain-lambda #,(rkt-nt formals) mgl-expr)
+          (#%plain-lambda (id ...) mgl-expr)
 	  (if mgl-expr mgl-expr mgl-expr)
 	  (let-values ([(id) mgl-expr]) mgl-expr)
 	  (letrec-syntaxes+values
