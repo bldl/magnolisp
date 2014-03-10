@@ -1,8 +1,7 @@
 #lang scribble/doc
 @(require scribble/eval scribble/manual "manual-util.rkt"
-	  (for-label magnolisp/runtime
-                     (except-in racket/base do #%module-begin)
-                     syntax/modresolve))
+	  (for-label magnolisp/prelude magnolisp/runtime
+                     (except-in racket/base do #%module-begin)))
 
 @(begin ;; trick from Racket docs
    (define-syntax-rule (bind id-1 id-2)
@@ -12,12 +11,8 @@
        (define id-2 (racket #%module-begin))))
    (bind racket-do racket-module-begin))
 
-@(define (warning . str)
-   (list "(" (italic "Warning: ") str ")"))
-
 @(define the-eval (make-base-eval))
-@(the-eval '(require magnolisp/reader-ext magnolisp/runtime))
-@;(the-eval '(current-readtable magnolisp-readtable))
+@(the-eval '(require magnolisp/prelude magnolisp/runtime))
 
 @title{Magnolisp}
 
@@ -192,7 +187,7 @@ A statement that causes any enclosing @racket[do] block (which must exist) to yi
 
 @subsection{Predicate Expressions}
 
-@(declare-exporting magnolisp/runtime)
+@(defmodule magnolisp/prelude)
 
 A @deftech{predicate expression} is simply an expression of type @racket[predicate], which is the only built-in type in Magnolisp.
 

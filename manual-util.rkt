@@ -8,6 +8,9 @@ Utilities for authoring manual.scrbl.
 
 (require "util.rkt" scribble/manual)
 
+(define* (warning . str)
+  (list "(" (italic "Warning: ") str ")"))
+
 (define-syntax* (subscript-var stx)
   (syntax-case stx ()
     ((_ nt s)
