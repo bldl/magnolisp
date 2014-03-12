@@ -296,7 +296,19 @@ external dependencies for the program/library, as well as the .cpp and
 ;; if the module path does not specify an existing module. Only sets
 ;; 'pt' and 'annos' fields.
 (define (load-mod-from-submod r-mp mp)
-  (define sub-mp `(submod ,r-mp magnolisp-info))
+  ;; Visit the module to determine if it even exists, and is a valid
+  ;; module. This must succeed.
+  (dynamic-require r-mp (void)
+                   (thunk
+                    (error 'load-mod-from-submod
+                           "no such module: ~s (~a)" mp r-mp)))
+  (define (make-sub-mp mp name)
+    (match mp
+      ((list 'submod outer sub ...)
+       `(submod ,outer ,@sub ,name))
+      (_
+       `(submod ,mp ,name))))
+  (define sub-mp (make-sub-mp r-mp 'magnolisp-info))
   (define annos
     (may-fail
      (dynamic-require sub-mp 'm-annos (thunk #f))))
@@ -393,16 +405,19 @@ external dependencies for the program/library, as well as the .cpp and
 
 (define (syntax-source-resolve-module stx)
   (define src (syntax-source-module stx #f))
-  (cond
-   ((not src) #f)
-   ((resolved-module-path? src) (resolved-module-path-name src))
-   ((symbol? src) src)
-   ((path? src) src)
-   ((module-path-index? src)
-    (resolved-module-path-name (module-path-index-resolve src)))
-   (else
-    (error 'syntax-source-resolve-module
-           "unexpected syntax-source-module ~s for ~s" src stx))))
+  (define res
+    (cond
+     ((not src) #f)
+     ((resolved-module-path? src) (resolved-module-path-name src))
+     ((symbol? src) src)
+     ((path? src) src)
+     ((module-path-index? src)
+      (resolved-module-path-name (module-path-index-resolve src)))
+     (else
+      (error 'syntax-source-resolve-module
+             "unexpected syntax-source-module ~s for ~s" src stx))))
+  ;;(writeln `(syntax-source-resolve-module for ,(syntax-e stx) loc ,src resolved ,res : ,stx))
+  res)  
 
 ;; Takes a free-id-table and module information, and returns an
 ;; immutable-free-id-table with resolved Var and NameT nodes. I.e.,
@@ -419,7 +434,7 @@ external dependencies for the program/library, as well as the .cpp and
 
     (define (get-mod-for-id stx)
       (define r-mp (syntax-source-resolve-module stx))
-      ;;(writeln r-mp)
+      ;;(writeln `(mod for id ,(syntax-e stx) is ,r-mp))
       (if r-mp
           (values r-mp (hash-ref mods r-mp #f))
           (get-mod)))
@@ -672,7 +687,9 @@ external dependencies for the program/library, as well as the .cpp and
 ;; 'ep-mp-lst' module paths should be either absolute ones, or '(file
 ;; ...)' paths relative to the working directory (no module relative
 ;; paths as entry points).
-(define* (compile-modules . ep-mp-lst)
+(define* (compile-modules
+          #:relative-to [rel-to-path-v #f]
+          . ep-mp-lst)
   ;;(writeln ep-mp-lst)
 
   (define mods (make-hash)) ;; r-mp -> Mod
@@ -689,6 +706,7 @@ external dependencies for the program/library, as well as the .cpp and
     (unless mod ;; not yet loaded
       ;;(writeln (list 'loading-submod-of r-mp mp))
       (set! mod (load-mod-from-submod r-mp mp))
+      ;;(writeln `(LOADED ,r-mp ,mp ,mod))
 
       (when (Mod? mod) ;; is a Magnolisp module
         (define annos (Mod-annos mod))
@@ -705,9 +723,9 @@ external dependencies for the program/library, as well as the .cpp and
         ;; then collect further information from it.
         (when (or (not ep?) (and eps-in-mod (not (dict-empty? eps-in-mod))))
           (define pt (Mod-pt mod)) ;; parse tree
-          ;;(pretty-print (syntax->datum pt)) ;;(exit)
+          ;;(pretty-print (syntax->datum pt)) (exit)
           ;;(print-with-select-syntax-properties '(in-racket local-ec) pt) (exit)
-          ;;(pretty-print (syntax->datum/free-id pt))
+          ;;(pretty-print (syntax->datum/free-id pt)) (exit)
           (define-values (defs provs reqs)
             (parse-defs-from-module pt annos r-mp))
           (when eps-in-mod
@@ -730,7 +748,7 @@ external dependencies for the program/library, as well as the .cpp and
 
   ;; Load all the "entry" modules.
   (for ((mp ep-mp-lst))
-    (load #t mp #f))
+    (load #t mp rel-to-path-v))
 
   ;; Keep loading dependencies until all loaded.
   (let loop ()

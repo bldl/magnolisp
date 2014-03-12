@@ -1,6 +1,7 @@
 #lang scribble/doc
 @(require scribble/eval scribble/manual "manual-util.rkt"
-	  (for-label magnolisp/prelude magnolisp/runtime
+	  (for-label syntax/modresolve
+	             magnolisp/prelude magnolisp/runtime
                      (except-in racket/base do #%module-begin)))
 
 @(define the-eval (make-base-eval))
@@ -40,11 +41,13 @@ For defining macros and doing transformation time computation, the relevant Rack
 
 In Magnolisp, it is possible to declare @racket[function]s, types (with @racket[typedef]), and @racket[var]iables; of these, variable definitions are not allowed at the top level. The Magnolisp binding forms are in the @racketmodname[magnolisp/runtime] library. The @racketmodname[magnolisp] language provides @racketmodname[magnolisp/runtime] at phase level 0.
 
-As Magnolisp has no standard library, it is ultimately necessary to define primitive types and functions (flagged as @racketid[foreign]) in order to be able to compile programs that do anything interesting.
+As Magnolisp has almost no standard library, it is ultimately necessary to define primitive types and functions (flagged as @racketid[foreign]) in order to be able to compile programs that do anything useful.
 
 @defform/subs[(function (id arg ...) maybe-annos maybe-body)
               ([maybe-body code:blank expr])]{
 Declares a function. The (optional) body of a function is a single expression, which must produce a single value.
+
+Unlike in Racket, no @emph{tail-call optimization} may be assumed even when a recursive function application appears in @emph{tail position}.
 
 Providing a body is optional in the case where the function is declared as @racket[foreign], in which case the compiler will ignore any body @racket[expr]. When a function without a body is invoked as Racket, the result is @|void-const|. When a @racket[foreign] function with a body is invoked as Racket, the body may be implemented in full Racket, typically to ``simulate'' the behavior of the C++ implementation. To implement a function body in Racket instead of Magnolisp, enclose the body expression within a @racket[begin-racket] form.
 
@@ -343,11 +346,17 @@ Programs written in Magnolisp can be evaluated in the usual Racket way, provided
 The Magnolisp implementation includes a compiler targeting C++. The @racketmodname[magnolisp/compiler-api] library provides an API for invoking the compiler.
 
 @deftogether[(
-@defproc[(compile-modules [module-path-v module-path?] ...) compilation-state?]
+@defproc[(compile-modules 
+          [module-path-v module-path?] ...
+          [#:relative-to rel-to-path-v 
+                         (or/c path-string? (-> any) false/c) #f])
+         compilation-state?]
 @defproc[(compile-files [path-s path-string?] ...) compilation-state?]
 )]{
 Invoke the compiler front end for analysing a Magnolisp program, whose ``entry modules'' are specified either as module paths or files. Any specified modules that are not in the @racketmodname[magnolisp] language are effectively ignored, as they do not contain any @racket[export]ed Magnolisp definitions.
 Both functions return an opaque compilation state object, which may be passed to @racket[generate-files] for code generation.
+
+The optional argument @racket[rel-to-path-v] is as for @racket[resolve-module-path]. It is only relevant for relative module paths, and indicates to which path such paths should be considered relative.
 
 Any @racket[path-s] is mapped to a @racket[`(file ,path-s)] module path, coercing @racket[path-s] to a string if necessary.
 }

@@ -59,4 +59,5 @@ setup :
 	raco setup magnolisp
 
 test :
-	raco test tests/run-*.rkt
+	#raco test tests/run-*.rkt
+	raco test tests/run-compiler-on-files.rkt
