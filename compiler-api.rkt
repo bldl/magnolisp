@@ -188,12 +188,12 @@ external dependencies for the program/library, as well as the .cpp and
 (define (defs-rm-LetExpr defs)
   (define del-lst '())
 
-  ;; Complex case. Turn LetExpr into a BlockExpr + Let.
+  ;; Complex case. Turn LetExpr into a BlockExpr + LetStat.
   (define (rw-complex ast)
     (match-define (LetExpr a dv e) ast)
     (define n-ast
       (BlockExpr a (list
-                    (Let #hasheq((let-kind . let))
+                    (LetStat #hasheq((let-kind . let))
                          (list dv)
                          (list (annoless Return e))))))
     ;;(pretty-print n-ast)

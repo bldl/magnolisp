@@ -309,7 +309,7 @@
   (define (make-Literal stx datum-stx)
     (syntaxed stx Literal datum-stx))
   
-  (define (make-Let ctx stx kind binds-stx exprs-stx)
+  (define (make-LetStat ctx stx kind binds-stx exprs-stx)
     (define i-e-lst (syntax->list binds-stx))
     (define b-ast-lst
       (apply append
@@ -337,7 +337,7 @@
                   (not-magnolisp stx i-e)]))))
     (define e-stx-lst (syntax->list exprs-stx))
     (define e-ast-lst (map parse-stat e-stx-lst))
-    (Let (hasheq 'stx stx 'let-kind kind) b-ast-lst e-ast-lst))
+    (LetStat (hasheq 'stx stx 'let-kind kind) b-ast-lst e-ast-lst))
 
   (define (parse-define-value ctx stx id-stx e-stx)
     ;;(writeln (list 'parse-define-value e-stx (syntax->datum e-stx)))
@@ -525,7 +525,7 @@
        (and (identifier? #'let-kw)
             (or (free-identifier=? #'let-kw #'let-values)
                 (free-identifier=? #'let-kw #'letrec-values)))
-       (make-Let 'stat stx
+       (make-LetStat 'stat stx
                  (syntax-e #'let-kw) #'binds #'exprs))
 
       ((set! id expr)

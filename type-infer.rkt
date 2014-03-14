@@ -415,7 +415,7 @@
        (void))
       ((BlockStat _ ss)
        (for-each ti-stat ss))
-      ((Let _ bs ss)
+      ((LetStat _ bs ss)
        (for-each ti-def bs)
        (for-each ti-stat ss))
       ((IfStat _ c t e)

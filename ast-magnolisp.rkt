@@ -261,7 +261,7 @@ It is rather important for all Ast derived node types to be
 ;; 'defs' contains DefVar terms. 'let-kind annotation has either
 ;; 'let-values or 'letrec-values; we mostly do not care, since Racket
 ;; has done name resolution.
-(define-ast* Let Ast ((list-of-term defs) (list-of-term ss)))
+(define-ast* LetStat Ast ((list-of-term defs) (list-of-term ss)))
 
 ;; We only allow a limited form of 'let' expressions.
 (define-ast* LetExpr Ast ((just-term def) (just-term e)))
@@ -445,20 +445,20 @@ It is rather important for all Ast derived node types to be
 ;;;
 
 (define* (StatCont? ast)
-  (any-pred-holds BlockExpr? BlockStat? Let? ast))
+  (any-pred-holds BlockExpr? BlockStat? LetStat? ast))
 
 (define-match-expander* StatCont
   (syntax-rules ()
     [(_ a ss)
      (or (BlockStat a ss)
          (BlockExpr a ss)
-         (Let a _ ss))]))
+         (LetStat a _ ss))]))
 
 (define* (StatCont-ss ast)
   (match ast
     ((BlockStat _ ss) ss)
     ((BlockExpr _ ss) ss)
-    ((Let _ _ ss) ss)
+    ((LetStat _ _ ss) ss)
     (_ #f)))
 
 (define* (set-StatCont-ss ast n-ss)
@@ -467,8 +467,8 @@ It is rather important for all Ast derived node types to be
      (BlockExpr a n-ss))
     ((BlockStat a ss)
      (BlockStat a n-ss))
-    ((Let a bs ss)
-     (Let a bs n-ss))))
+    ((LetStat a bs ss)
+     (LetStat a bs n-ss))))
 
 (define* (StatCont-copy ast n-a n-ss)
   (match ast
@@ -476,8 +476,8 @@ It is rather important for all Ast derived node types to be
      (BlockExpr n-a n-ss))
     ((BlockStat a ss)
      (BlockStat n-a n-ss))
-    ((Let a bs ss)
-     (Let n-a bs n-ss))))
+    ((LetStat a bs ss)
+     (LetStat n-a bs n-ss))))
 
 ;;; 
 ;;; types
@@ -531,11 +531,11 @@ It is rather important for all Ast derived node types to be
 ;;; simplification
 ;;; 
 
-(define ast-empty-Let->BlockStat
+(define ast-empty-LetStat->BlockStat
   (topdown
    (lambda (ast)
      (match ast
-       ((Let a (list) ss)
+       ((LetStat a (list) ss)
         (BlockStat a ss))
        (_ ast)))))
 
@@ -592,7 +592,7 @@ It is rather important for all Ast derived node types to be
 
 (define* ast-simplify
   (compose1->
-   ast-empty-Let->BlockStat
+   ast-empty-LetStat->BlockStat
    ast-nested-BlockStat->BlockStat
    ast-rm-dead-code
    ast-simplify-BlockExpr))
@@ -651,7 +651,7 @@ It is rather important for all Ast derived node types to be
                  (export ,(get-export-name-as-symbol a))
                  (foreign ,(get-foreign-name-as-symbol a)))
         ,(ast->sexp b)))
-    ((Let a ds bs)
+    ((LetStat a ds bs)
      (define n (hash-ref a 'let-kind 'let))
      `(,n (,@(map ast->sexp ds))
           ,@(map ast->sexp bs)))
