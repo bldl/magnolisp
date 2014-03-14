@@ -1,7 +1,8 @@
 #lang racket/base
 
-(require racket/contract racket/match racket/stxparam
-         (for-syntax racket/base syntax/define))
+(require racket/contract racket/generic racket/match racket/stxparam
+         (for-syntax racket/base racket/syntax
+                     syntax/define syntax/parse))                     
 
 (provide define* define-for-syntax* define-syntax*)
 
@@ -110,6 +111,28 @@
   (begin
     (require n ...)
     (provide (all-from-out n ...))))
+
+(define-syntax* (define-generics* stx)
+  (define-splicing-syntax-class opts
+    (pattern
+     (~seq (~or (~optional (~seq #:defaults _:expr))
+                (~optional (~seq #:fast-defaults _:expr))
+                (~optional (~seq #:fallbacks _:expr))
+                (~optional (~seq #:defined-predicate _:id))
+                (~optional (~seq #:defined-table _:id))
+                (~seq #:derive-property _:expr _:expr)) ...)))
+  (syntax-parse stx
+    [(_ name pre:opts (meth:id . formals) ... post:opts)
+     (with-syntax ([gen (format-id stx "gen:~a" #'name)]
+                   [pred (format-id stx "~a?" #'name)]
+                   [c (format-id stx "~a/c" #'name)])
+       ;;#''(name gen pred c pre (meth . formals) ... post)
+       #`(begin
+           (define-generics name
+             #,@(syntax->list #'pre)
+             (meth . formals) ...
+             #,@(syntax->list #'post))
+           (provide gen pred c meth ...)))]))
 
 #|
 

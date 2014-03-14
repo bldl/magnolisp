@@ -47,19 +47,15 @@ Meta-Compilation of Language Abstractions (2006).
 
 |#
 
-(require "util.rkt")
-(require racket/generic)
+(require "util.rkt" racket/generic)
 
 ;;; 
 ;;; Subterm access interface.
 ;;; 
 
-(define-generics strategic
+(define-generics* strategic
   (for-each-subterm s strategic)
   (subterm-all s strategic))
-
-;; There seems to be no "generics-out" provide spec.
-(provide gen:strategic for-each-subterm subterm-all)
 
 ;;; 
 ;;; Strategies for lists.
