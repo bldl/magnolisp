@@ -278,15 +278,16 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; module
 ;;; 
 
-;; [pt syntax?] is the parse tree, as loaded from the submodule.
-;; [annos id-table?] are the annotations, as loaded from the
-;; submodule. A non-Magnolisp module simply gets null values for the
-;; above, since it contains no Magnolisp syntax. [defs id-table?]
+;; [r-mp resolve-module-path-result?] is the paths as used for loading
+;; the module. [pt syntax?] is the parse tree, as loaded from the
+;; submodule. [annos id-table?] are the annotations, as loaded from
+;; the submodule. A non-Magnolisp module simply gets null values for
+;; the above, since it contains no Magnolisp syntax. [defs id-table?]
 ;; contains Def objects for parsed modules. [provs id-table?] maps
 ;; each internally bound ID to a list of exported IDs. [reqs (listof
 ;; syntax?)] is a list of #%require specs. [syms (hash/c symbol?
 ;; Def?)] maps top-level names to definitions.
-(struct Mod (pt annos defs provs reqs syms) #:transparent)
+(struct Mod (r-mp pt annos defs provs reqs syms) #:transparent)
 
 ;;; 
 ;;; import resolution
@@ -304,7 +305,7 @@ external dependencies for the program/library, as well as the .cpp and
                            "no such module: ~s (~a)" mp r-mp)))
   (define (make-sub-mp mp name)
     (match mp
-      ((list 'submod outer sub ...)
+      ((list 'submod outer sub ..1)
        `(submod ,outer ,@sub ,name))
       (_
        `(submod ,mp ,name))))
@@ -323,7 +324,8 @@ external dependencies for the program/library, as well as the .cpp and
     (if annos
         (dynamic-require sub-mp 'm-ast)
         #'(#%module-begin)))
-  (Mod pt
+  (Mod r-mp
+       pt
        (or annos (make-immutable-free-id-table #:phase 0))
        (make-immutable-free-id-table #:phase 0)
        (make-immutable-free-id-table #:phase 0)
@@ -353,7 +355,7 @@ external dependencies for the program/library, as well as the .cpp and
 
 (define (merge-defs mods)
   (define all-defs (make-free-id-table #:phase 0))
-  (for (([r-mp mod] mods))
+  (for (([rr-mp mod] mods))
     (define defs (Mod-defs mod))
     (dict-for-each
      defs
@@ -403,21 +405,31 @@ external dependencies for the program/library, as well as the .cpp and
    (lambda (id def)
      (def-display-Var-bindings def))))
 
-(define (syntax-source-resolve-module stx)
+(define-with-contract
+  (-> syntax? (or/c resolved-module-path? #f))
+  (syntax-source-resolve-module stx)
   (define src (syntax-source-module stx #f))
   (define res
     (cond
      ((not src) #f)
-     ((resolved-module-path? src) (resolved-module-path-name src))
-     ((symbol? src) src)
-     ((path? src) src)
+     ((resolved-module-path? src) src)
+     ((symbol? src) (make-resolved-module-path src))
+     ((path? src)
+      (unless (complete-path? src)
+        (error
+         'syntax-source-resolve-module
+         "syntax-source-module ~s for ~s: assumed complete-path?"
+         src stx))
+      (make-resolved-module-path src))
      ((module-path-index? src)
-      (resolved-module-path-name (module-path-index-resolve src)))
+      (module-path-index-resolve src))
      (else
-      (error 'syntax-source-resolve-module
-             "unexpected syntax-source-module ~s for ~s" src stx))))
+      (error
+       'syntax-source-resolve-module
+       "syntax-source-module ~s for ~s: unexpected value type"
+       src stx))))
   ;;(writeln `(syntax-source-resolve-module for ,(syntax-e stx) loc ,src resolved ,res : ,stx))
-  res)  
+  res)
 
 ;; Takes a free-id-table and module information, and returns an
 ;; immutable-free-id-table with resolved Var and NameT nodes. I.e.,
@@ -425,18 +437,20 @@ external dependencies for the program/library, as well as the .cpp and
 ;; references that resolve to definitions contained in the specified
 ;; modules.
 (define (defs-resolve-names defs mods)
-  ;;(pretty-print mods)
+  ;;(pretty-print mods) (exit)
   
   (define (rw-def def)
+    ;;(writeln `(resolving ,(Def-id def) in ,(ast-anno-must def 'rr-mp)))
+    
     (define (get-mod)
-      (define r-mp (ast-anno-must def 'r-mp))
-      (values r-mp (hash-ref mods r-mp)))
+      (define rr-mp (ast-anno-must def 'rr-mp))
+      (values rr-mp (hash-ref mods rr-mp)))
 
     (define (get-mod-for-id stx)
-      (define r-mp (syntax-source-resolve-module stx))
-      ;;(writeln `(mod for id ,(syntax-e stx) is ,r-mp))
-      (if r-mp
-          (values r-mp (hash-ref mods r-mp #f))
+      (define rr-mp (syntax-source-resolve-module stx))
+      ;;(writeln `(mod for id ,(syntax-e stx) is ,rr-mp))
+      (if rr-mp
+          (values rr-mp (hash-ref mods rr-mp #f))
           (get-mod)))
 
     (define (rw-ref ast)
@@ -449,10 +463,12 @@ external dependencies for the program/library, as well as the .cpp and
       ;; should identify a known builtin that the compiler supports
       ;; (that will be checked later).
       (define b (identifier-binding id))
+      ;;(writeln `(rw-ref ,ast ,b))
       (define def-id #f)
       (cond
        ((not b)
-        (define-values [mp mod] (get-mod-for-id id))
+        (define-values (rr-mp mod) (get-mod-for-id id))
+        ;;(writeln `(get-mod-for-id ,rr-mp ,mod for ,id))
         (unless mod
           (error 'defs-resolve-names
                  "cannot determine module for unbound reference: ~s" id))
@@ -460,7 +476,7 @@ external dependencies for the program/library, as well as the .cpp and
         (define def (hash-ref syms (syntax-e id) #f))
         (unless def
           (error 'defs-resolve-names
-                 "no definition in ~a for unbound reference: ~s" mp id))
+                 "no definition in ~a for unbound reference: ~s" rr-mp id))
         (set! def-id (Def-id def)))
        ((eq? b 'lexical)
         (define def (dict-ref defs id #f))
@@ -472,13 +488,10 @@ external dependencies for the program/library, as well as the .cpp and
        ((list? b)
         (define mpi (first b))
         ;;(writeln (module-path-index-resolve mpi))
-        (define r-mp 
-          (resolved-module-path-name
-           (module-path-index-resolve mpi)))
-        ;;(writeln `(r-mp ,r-mp))
-        ;;(writeln `(mods keys ,(hash-keys mods)))
-        (define mod (hash-ref mods r-mp #f))
-        ;;(writeln `(mod ,mod))
+        (define rr-mp 
+          (module-path-index-resolve mpi))
+        ;;(writeln `(rr-mp ,rr-mp))
+        (define mod (hash-ref mods rr-mp #f))
         (when mod
           (define sym (second b))
           (define syms (Mod-syms mod))
@@ -486,7 +499,7 @@ external dependencies for the program/library, as well as the .cpp and
           (unless def
             (error 'defs-resolve-names
                    "no definition in ~a for module-level name ~a: ~s"
-                   r-mp sym id))
+                   rr-mp sym id))
           (set! def-id (Def-id def))
           (assert (free-identifier=? id def-id))))
        (else
@@ -546,8 +559,12 @@ external dependencies for the program/library, as well as the .cpp and
           (dict-set defs-in-mod id n-def)))
   defs-in-mod)
 
-;; Returns (and/c hash? hash-eq? immutable?).
-(define (build-sym-def-for-mod mod)
+;; Returns (and/c hash? hash-eq? immutable?), mapping each top-level
+;; symbol in the module [Mod? mod] to the corresponding definition
+;; Def?.
+(define-with-contract
+  (-> Mod? (hash/c symbol? Def?))
+  (build-sym-def-for-mod mod)
   (define defs (Mod-defs mod))
   (define sym-def #hasheq())
   (dict-for-each
@@ -557,15 +574,21 @@ external dependencies for the program/library, as well as the .cpp and
        (set! sym-def (hash-set sym-def (syntax-e id) def)))))
   sym-def)
 
-(define (build-sym-def-for-mods mods)
-  (define h (make-hash))
-  (for (([r-mp mod] mods))
+(define-with-contract
+  (-> (hash/c resolved-module-path? Mod?)
+      (hash/c resolved-module-path? (hash/c symbol? Def?)))
+  (build-sym-def-for-mods mods)
+  (define h (make-hasheq))
+  (for (([rr-mp mod] mods))
     (define sym-def (build-sym-def-for-mod mod))
-    (hash-set! h r-mp sym-def))
+    (hash-set! h rr-mp sym-def))
   h)
 
-(define (build-sym-prov-for-mod mod)
-  (define provs (Mod-provs mod))
+;; Constructs a map from exported to internal symbols.
+(define-with-contract
+  (-> Mod? (hash/c symbol? symbol?))
+  (build-sym-prov-for-mod mod)
+  (define provs (Mod-provs mod)) ;; internal ID -> listof(exported ID)
   (define sym-prov (make-hasheq))
   (dict-for-each
    provs
@@ -575,47 +598,63 @@ external dependencies for the program/library, as well as the .cpp and
        (hash-set! sym-prov (syntax-e id) i-sym))))
   sym-prov)
 
-(define (build-sym-prov-for-mods mods)
-  (define h (make-hash))
-  (for (([r-mp mod] mods))
+;; Constructs a map from exported to internal symbols, for each
+;; module.
+(define-with-contract
+  (-> (hash/c resolved-module-path? Mod?)
+      (hash/c resolved-module-path? (hash/c symbol? symbol?)))
+  (build-sym-prov-for-mods mods)
+  (define h (make-hasheq))
+  (for (([rr-mp mod] mods))
     (define v (build-sym-prov-for-mod mod))
-    (hash-set! h r-mp v))
+    (hash-set! h rr-mp v))
   h)
 
-(define (build-l-to-mp-i-for-mods sym-prov-for-mods mods)
-  (define l-to-mp-i-for-mods (make-hash))
-  (for (([parent-r-mp mod] mods))
-    (define req-lst (Mod-reqs mod))
-    ;;(pretty-print (list 'req-specs parent-r-mp req-lst))
+;; sym-prov-for-mods is a map from exported to internal symbols, for
+;; each module. Returns a map from local symbols to imports, for each
+;; module. Import info includes information about exporting module and
+;; the exported symbol.
+(define-with-contract
+  (-> (hash/c resolved-module-path? (hash/c symbol? symbol?))
+      (hash/c resolved-module-path? Mod?)
+      (hash/c resolved-module-path?
+              (hash/c symbol? (cons/c resolved-module-path? symbol?))))
+  (build-l-to-mp-i-for-mods sym-prov-for-mods mods)
+  (define l-to-mp-i-for-mods (make-hasheq))
+  (for (((rel-rr-mp mod) mods))
+    (define rel-r-mp (Mod-r-mp mod))
+    (define req-lst (Mod-reqs mod)) ;; listof(require specs)
+    ;;(pretty-print (list 'req-specs rel-rr-mp req-lst))
     (define reqs-per-mp
       (req-specs->reqs-per-mp req-lst))
-    ;;(pretty-print (list 'reqs-per-mp parent-r-mp reqs-per-mp))
-    (define l-to-mp-i (make-hasheq))
+    ;;(pretty-print (list 'reqs-per-mp rel-rr-mp reqs-per-mp))
+    (define l-to-mp-i (make-hasheq)) ;; local ID -> import info
     (for (([mp reqs] reqs-per-mp))
-      (define r-mp (resolve-module-path mp parent-r-mp))
-      (define mp-syms (hash-keys (hash-ref sym-prov-for-mods r-mp)))
+      (define r-mp (resolve-module-path mp rel-r-mp))
+      (define rr-mp (r-mp->rr-mp r-mp))
+      (define mp-syms ;; symbols exported from mp
+        (hash-keys (hash-ref sym-prov-for-mods rr-mp)))
       (for ((req reqs))
         (cond
          ((eq? req 'all)
           (for ((sym mp-syms))
-            (hash-set! l-to-mp-i sym (cons r-mp sym))))
+            (hash-set! l-to-mp-i sym (cons rr-mp sym))))
          ((list? req)
           (for ((id req))
             (define sym (syntax-e id))
-            (hash-set! l-to-mp-i sym (cons r-mp sym))))
+            (hash-set! l-to-mp-i sym (cons rr-mp sym))))
          ((pair? req)
           (hash-set! l-to-mp-i (syntax-e (car req))
-                     (cons r-mp
-                           (syntax-e (cdr req)))))
+                     (cons rr-mp (syntax-e (cdr req)))))
          (else (assert #f)))))
-    (hash-set! l-to-mp-i-for-mods parent-r-mp l-to-mp-i))
+    (hash-set! l-to-mp-i-for-mods rel-rr-mp l-to-mp-i))
   l-to-mp-i-for-mods)
 
-;; 'mods' is a (hash/c resolve-module-path-result? Mod?) of all the
+;; 'mods' is a (hash/c resolved-module-path? Mod?) of all the
 ;; modules under consideration. From them we extract all the 'reqs',
 ;; and resolve, for each module, (hash/c symbol? Def?), where the
 ;; definitions may come from other modules. The symbol in the Def may
-;; be different. Each Def has an 'r-mp' annotation, which may be used
+;; be different. Each Def has an 'rr-mp' annotation, which may be used
 ;; to identify the originating module of the definition. This routine
 ;; also supports re-exports. We collect this information for all
 ;; top-level Magnolisp bindings that are visible in each module,
@@ -639,22 +678,21 @@ external dependencies for the program/library, as well as the .cpp and
 
   ;; For each module, maps each top-level name to its Def, which may
   ;; be in a different module.
-  (define syms-for-mods #hash())
+  (define syms-for-mods #hasheq())
   
   ;; Computes symbols for the specified module.
-  (define (build-syms-for-mod r-mp)
-    (define mod (hash-ref mods r-mp))
+  (define (build-syms-for-mod rr-mp)
+    (define mod (hash-ref mods rr-mp))
     ;; Initialize with local Defs.
-    (define l-to-def (hash-ref sym-def-for-mods r-mp))
-    ;;(pretty-print (list 'initial 'syms-for-mod r-mp l-to-def))
+    (define l-to-def (hash-ref sym-def-for-mods rr-mp))
+    ;;(pretty-print (list 'initial 'syms-for-mod rr-mp l-to-def))
     ;; Get all required symbols.
-    (define l-to-mp-i (hash-ref l-to-mp-i-for-mods r-mp))
+    (define l-to-mp-i (hash-ref l-to-mp-i-for-mods rr-mp))
     ;; Resolve Def for any symbol that has no local, overriding Def.
-    (for (([l-sym mp-i] l-to-mp-i))
+    (for (((l-sym mp-i) l-to-mp-i))
       (unless (hash-has-key? l-to-def l-sym)
-        (define req-r-mp (car mp-i))
-        (define i-sym (cdr mp-i))
-        (define i-syms (get-syms-for-mod! req-r-mp))
+        (define-values-from-cons (req-rr-mp i-sym) mp-i)
+        (define i-syms (get-syms-for-mod! req-rr-mp))
         (define i-def (hash-ref i-syms i-sym))
         (set! l-to-def (hash-set l-to-def l-sym i-def))))
     ;;(pretty-print (list 'syms-for-mod r-mp l-to-def))
@@ -662,19 +700,19 @@ external dependencies for the program/library, as well as the .cpp and
 
   ;; Sets 'syms-for-mods' for the specified module, and possibly also
   ;; for its dependencies.
-  (define (get-syms-for-mod! r-mp)
-    (define syms (hash-ref syms-for-mods r-mp #f))
+  (define (get-syms-for-mod! rr-mp)
+    (define syms (hash-ref syms-for-mods rr-mp #f))
     (unless syms ;; not yet computed
-      (set! syms (build-syms-for-mod r-mp))
-      (set! syms-for-mods (hash-set syms-for-mods r-mp syms)))
+      (set! syms (build-syms-for-mod rr-mp))
+      (set! syms-for-mods (hash-set syms-for-mods rr-mp syms)))
     syms)
 
-  (for ((r-mp (hash-keys mods)))
-    (get-syms-for-mod! r-mp))
+  (for ((rr-mp (hash-keys mods)))
+    (get-syms-for-mod! rr-mp))
 
-  (for/hash (([r-mp mod] mods))
-    (define syms (hash-ref syms-for-mods r-mp))
-    (values r-mp (struct-copy Mod mod (syms syms)))))
+  (for/hash (([rr-mp mod] mods))
+    (define syms (hash-ref syms-for-mods rr-mp))
+    (values rr-mp (struct-copy Mod mod (syms syms)))))
 
 ;;; 
 ;;; compilation
@@ -692,21 +730,22 @@ external dependencies for the program/library, as well as the .cpp and
           . ep-mp-lst)
   ;;(writeln ep-mp-lst)
 
-  (define mods (make-hash)) ;; r-mp -> Mod
+  (define mods (make-hasheq)) ;; rr-mp -> Mod
   (define eps-in-prog (make-free-id-table #:phase 0))
   (define dep-q null) ;; deps queued for loading
 
   (define (add-deps! deps)
     (set! dep-q (append dep-q deps)))
-  
+
   (define (load ep? mp rel-to-path-v)
     ;;(writeln `(load ,ep? ,mp ,rel-to-path-v))
     (define r-mp (resolve-module-path mp rel-to-path-v))
-    (define mod (hash-ref mods r-mp #f))
+    (define rr-mp (r-mp->rr-mp r-mp))
+    (define mod (hash-ref mods rr-mp #f))
     (unless mod ;; not yet loaded
       ;;(writeln (list 'loading-submod-of r-mp mp))
       (set! mod (load-mod-from-submod r-mp mp))
-      ;;(writeln `(LOADED ,r-mp ,mp ,mod))
+      ;;(writeln `(LOADED ,rr-mp ,r-mp ,mp ,mod)) (exit)
 
       (when (Mod? mod) ;; is a Magnolisp module
         (define annos (Mod-annos mod))
@@ -727,7 +766,8 @@ external dependencies for the program/library, as well as the .cpp and
           ;;(print-with-select-syntax-properties '(in-racket local-ec) pt) (exit)
           ;;(pretty-print (syntax->datum/free-id pt)) (exit)
           (define-values (defs provs reqs)
-            (parse-defs-from-module pt annos r-mp))
+            (parse-defs-from-module pt annos rr-mp))
+          ;;(pretty-print reqs) (exit)
           (when eps-in-mod
             (set! defs (defs-annotate-export-names defs eps-in-mod)))
           ;;(pretty-print (dict->list defs)) (exit)
@@ -744,7 +784,7 @@ external dependencies for the program/library, as well as the .cpp and
                         (list (syntax->datum raw-mp) r-mp))
                       raw-mp-lst))))
 
-      (hash-set! mods r-mp mod)))
+      (hash-set! mods rr-mp mod)))
 
   ;; Load all the "entry" modules.
   (for ((mp ep-mp-lst))
@@ -756,6 +796,7 @@ external dependencies for the program/library, as well as the .cpp and
       (define mp-lst dep-q)
       (set! dep-q null)
       (for ((mp-and-rel mp-lst))
+        ;;(writeln mp-and-rel)
         (apply load #f mp-and-rel))
       (loop)))
 
@@ -765,7 +806,8 @@ external dependencies for the program/library, as well as the .cpp and
   ;; dependency).
   (define-values (predicate-id TRUE-id FALSE-id)
     (let* ((r-mp (resolve-module-path 'magnolisp/prelude #f))
-           (mod (hash-ref mods r-mp #f)))
+           (rr-mp (r-mp->rr-mp r-mp))
+           (mod (hash-ref mods rr-mp #f)))
       (define (get-id sym)
         (if (not mod)
             (datum->syntax #'here sym)

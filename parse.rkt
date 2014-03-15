@@ -16,6 +16,7 @@
          racket/dict
          racket/function
          racket/list
+         racket/match
          racket/pretty
          syntax/id-table
          syntax/kerncase
@@ -69,6 +70,32 @@
 ;;; parsing
 ;;; 
 
+;; Confusingly, 'resolve-module-path' does not appear to (always)
+;; return a 'resolved-module-path?'. This predicate may be used
+;; instead. It reflects the contract for the return value of
+;; 'resolve-module-path'.
+(define* (resolve-module-path-result? x)
+  (matches? x
+   (? path?)
+   (? symbol?)
+   (list 'submod (or (? path?) (? symbol?)) (? symbol?) ..1)))
+
+;; Turns resolve-module-path result format into
+;; make-resolved-module-path result format.
+(define-with-contract*
+  (-> resolve-module-path-result? resolved-module-path?)
+  (r-mp->rr-mp r-mp)
+  (define (f path)
+    (simplify-path (cleanse-path path)))
+  (make-resolved-module-path
+   (match r-mp
+     ((? path?) (f r-mp))
+     ((? symbol?) r-mp)
+     ((list 'submod
+            (and (or (? path?) (? symbol?)) p)
+            (? symbol? subs) ..1)
+      (cons (if (path? p) (f p) p) subs)))))
+      	
 ;; Reference: Typed Racket implementation of same.
 (define (resolve-provides prov-lst)
   (define provide-tbl
@@ -195,9 +222,9 @@
 
 ;; Returns defs, provides, and requires in module.
 (define-with-contract*
-  (-> syntax? immutable-id-table? resolve-module-path-result?
+  (-> syntax? immutable-id-table? resolved-module-path?
       (values immutable-id-table? immutable-id-table? (listof syntax?)))
-  (parse-defs-from-module modbeg-stx annos r-mp)
+  (parse-defs-from-module modbeg-stx annos rr-mp)
 
   (define defs-in-mod (make-immutable-free-id-table #:phase 0))
   (define prov-lst null)
@@ -210,7 +237,7 @@
     (set! defs-in-mod (dict-set defs-in-mod id def)))
   
   (define (provide! stx-lst)
-    ;;(pretty-print (list r-mp 'provide! stx-lst))
+    ;;(pretty-print (list rr-mp 'provide! stx-lst))
     (set! prov-lst (append prov-lst stx-lst)))
 
   ;; Records #%require specs, which may look like:
@@ -242,7 +269,7 @@
     (define global? (eq? ctx 'module-level))
     (define ann-h (dict-ref annos id-stx #hasheq()))
     ;;(writeln (list 'annos ann-h (hash? ann-h) (immutable? ann-h)))
-    (set! ann-h (hash-set* ann-h 'stx stx 'r-mp r-mp 'top global?))
+    (set! ann-h (hash-set* ann-h 'stx stx 'rr-mp rr-mp 'top global?))
     ;;(writeln `(annos for ,id-stx ,(hash-count ann-h)))
     ann-h)
 

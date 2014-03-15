@@ -225,10 +225,10 @@ It is rather important for all Ast derived node types to be
 ;;; 
 
 ;; Any recorded annotations from definitions are put into 'annos' from
-;; the bound-id-table. All defs have an [r-mp
-;; resolve-module-path-result?] annotation, specifying the defining
-;; module. At least all the global defs have a [top boolean?]
-;; annotation, which specifies whether a definition is top-level.
+;; the bound-id-table. All defs have an [rr-mp resolved-module-path?]
+;; annotation, specifying the defining module. At least all the global
+;; defs have a [top boolean?] annotation, which specifies whether a
+;; definition is top-level.
 (abstract-struct* Def Ast
   (id) ;; syntax?
   #:transparent)

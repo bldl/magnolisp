@@ -43,6 +43,16 @@
   (apply-values f-expr gen-expr)
   (call-with-values (thunk gen-expr) f-expr))
 
+(define-syntax-rule*
+  (define-values-from-list (id ...) lst-expr)
+  (define-values (id ...) (apply values lst-expr)))
+
+(define-syntax-rule*
+  (define-values-from-cons (id-1 id-2) cons-expr)
+  (define-values (id-1 id-2)
+    (let ((x cons-expr))
+      (values (car x) (cdr x)))))
+
 ;; Like 'map', but if 'f' returns a value indicating failure, then
 ;; stops and returns #f. By default any false value indicates failure.
 ;; Does not accept multiple list arguments.
@@ -59,16 +69,6 @@
 
 (define-syntax-rule* (matches? e pat ...)
   (match e (pat #t) ... (_ #f)))
-
-;; Confusingly, 'resolve-module-path' does not appear to (always)
-;; return a 'resolved-module-path?'. This predicate may be used
-;; instead. It reflects the contract for the return value of
-;; 'resolve-module-path'.
-(define* (resolve-module-path-result? x)
-  (matches? x
-   (? path?)
-   (? symbol?)
-   (list 'submod (or (? path?) (? symbol?)) (? symbol?) ...)))
 
 (define* (path-basename fn)
   (define-values (p f dir?) (split-path fn))
