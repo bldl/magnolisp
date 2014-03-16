@@ -244,7 +244,7 @@ external dependencies for the program/library, as well as the .cpp and
          #:fields (list (list "context" e-id))))
       (Return a (rw e)))
      (else
-      (subterm-all rw ast))))
+      (all-rw-term rw ast))))
 
   (rw ast))
 

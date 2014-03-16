@@ -11,10 +11,7 @@ generic traversal strategies.
 
 Everything here apart from failure values and 'one', 'some', and 'all'
 operators are generic, and some of those are also implemented in terms
-of interfaces. Unfortunately such interfaces cannot be defined for
-existing datatypes. Perhaps we should define this module as a 'unit'
-or somesuch parameterizable construct to allow these operations to be
-freely specified.
+of interfaces.
 
 We have some additions here, such as 'must' to function as a sort of
 an assertion. If a 'must' succeed strategy fails it is an error, and
@@ -54,67 +51,142 @@ Meta-Compilation of Language Abstractions (2006).
 ;;; 
 
 (define-generics* strategic
-  (for-each-subterm s strategic)
-  (subterm-all s strategic))
+  (all-visit-term s strategic)
+  (all-rw-term s strategic)
+  ;;(some-rw-term s strategic)
+  ;;(one-rw-term s strategic)
+  )
+
+(define (some-rw-term s strategic) ;; xxx
+  (error 'unimplemented))
+(define (one-rw-term s strategic) ;; xxx
+  (error 'unimplemented))
 
 ;;; 
-;;; Strategies for lists.
-;;; 
+;;; List access operations.
+;;;
 
-;; We cannot implement custom interfaces for lists. You may invoke
-;; these subterm traversal strategies instead as required, for
-;; immediate "local" traversals within terms containing list data. We
-;; could later provide operations for vectors, boxes, and immutable
-;; hash tables, for instance.
+;; Implementations of gen:strategic operations for lists. We do not
+;; actually include the list type into gen:strategic, but these
+;; operations may be useful in implementing gen:strategic operations
+;; for user-defined types.
 
-;; (list
-;;  ((list-one number?) '())
-;;  ((list-one number?) '(x y z))
-;;  ((list-one number?) '(x 2 y 4))) ; => '(#f #f (x #t y 4))
-(define* (list-one s)
-  (lambda (lst)
-    (let loop ((r '()) (lst lst))
-      (if (null? lst)
-          #f
-          (let* ((h (car lst))
-                 (t (cdr lst))
-                 (c (s h)))
-            (if c
-                (append (reverse r) (cons c t))
-                (loop (cons h r) t)))))))
+;; Like 'for-each', except that does not accept multiple list
+;; arguments.
+(define* (all-visit-list s lst)
+  (for-each s lst))
 
-;; (list
-;;  ((list-some number?) '())
-;;  ((list-some number?) '(x y z))
-;;  ((list-some number?) '(x 2 y 4))) ; => '(#f #f (x #t y #t))
-(define* (list-some s)
-  (lambda (lst)
-    (define found #f)
-    (let ((r (for/list ((x lst))
-                 (let ((y (s x)))
-                   (if y
-                       (begin (set! found #t) y)
-                       x)))))
-      (and found r))))
+;; Like 'map', except that: does not accept multiple list arguments;
+;; and if 's' returns #f, then stops mapping and returns #f.
+(define* (all-rw-list s lst)
+  (let next ((res-lst '())
+             (lst lst))
+    (if (null? lst)
+        (reverse res-lst)
+        (let ((res (s (car lst))))
+          (and res
+               (next (cons res res-lst) (cdr lst)))))))
 
-;; This is an 'all' for lists, where elements are "subterms". As 'map'
-;; in Stratego.
-;;
-;; (list
-;;  ((list-all number?) '())
-;;  ((list-all number?) '(1 2 3))
-;;  ((list-all number?) '(x 2 y 4))) ; => '(() (#t #t #t) #f)
-(define* (list-all s)
-  (lambda (lst)
-    (map-while s lst)))
+;; Like 'map', except that: does not accept multiple list arguments;
+;; does not change elements for which 's' returns #f; and if 's'
+;; returns #f for all elements, then returns #f.
+(define* (some-rw-list s lst)
+  (define some? #f)
+  (define res (map (lambda (x)
+                     (define y (s x))
+                     (if y (begin (set! some? #t) y) x))
+                   lst))
+  (and some? res))
+
+(define* (one-rw-list s lst)
+  (let next ((res-lst '())
+             (lst lst))
+    (if (null? lst)
+        #f
+        (let* ((x (car lst))
+               (xs (cdr lst))
+               (res (s x)))
+          (if res
+              (append (reverse res-lst) (cons res xs))
+              (next (cons x res-lst) xs))))))
 
 ;;; 
-;;; Rewrites.
+;;; Primitive traversal operators for lists.
 ;;; 
 
-(define* (fail ast) #f)
+(define-syntax-rule
+  (define-strategy* n f)
+  (define* (n s)
+    (lambda (ast)
+      (f s ast))))
 
-(define* (id ast) ast)
+;; These subterm traversals may be invoked for immediate "local"
+;; traversals within terms containing list data. We could later
+;; provide operations for vectors, boxes, and immutable hash tables,
+;; for instance.
+
+(module+ test
+  (require rackunit))
+
+(define-strategy* one/list one-rw-list)
+
+(module+ test
+  (check-equal?
+   (list
+    ((one/list number?) '())
+    ((one/list number?) '(x y z))
+    ((one/list number?) '(x 2 y 4)))
+   '(#f #f (x #t y 4))))
+
+(define-strategy* some/list some-rw-list)
+
+(module+ test
+  (check-equal?
+   (list
+    ((some/list number?) '())
+    ((some/list number?) '(x y z))
+    ((some/list number?) '(x 2 y 4)))
+   '(#f #f (x #t y #t))))
+
+;; This is an 'all' for lists, where elements are "subterms".
+(define-strategy* all/list all-rw-list)
+
+(module+ test
+  (check-equal?
+   (list
+    ((all/list number?) '())
+    ((all/list number?) '(1 2 3))
+    ((all/list number?) '(x 2 y 4)))
+   '(() (#t #t #t) #f)))
+
+(define-strategy* all-visit/list all-visit-list)
+
+(module+ test
+  (check-equal?
+   '(#f #f #t)
+   (let ()
+     (define lst null)
+     ((all-visit/list
+       (lambda (x)
+         (set! lst (cons x lst))))
+      '(#t #f #f))
+     lst)))
+
+;;; 
+;;; Primitive traversal operators.
+;;; 
+
+(define* (fail-rw ast) #f)
+(define* (id-rw ast) ast)
+
+(define-strategy* all-visit all-visit-term)
+(define-strategy* all all-rw-term)
+(define-strategy* some some-rw-term)
+(define-strategy* one one-rw-term)
+
+;;; 
+;;; Strategy combinators.
+;;; 
 
 ;; Note quite the Stratego 'rec', but close, and handles the common
 ;; case.
@@ -149,7 +221,7 @@ Meta-Compilation of Language Abstractions (2006).
     (void)))
 
 (define* (try s)
-  (alt s id))
+  (alt s id-rw))
 
 (define* repeat
   (rec again s
@@ -172,24 +244,7 @@ Meta-Compilation of Language Abstractions (2006).
            (error msg v ...))))))
 
 ;;; 
-;;; One-level traversals.
-;;; 
-
-;; xxx one
-;; xxx some
-
-;; While most strategies here are generic, this one is only supported
-;; for terms that implement the required operation.
-(define* (all s)
-  (lambda (ast)
-    (subterm-all s ast)))
-
-(define* (all-visit s)
-  (lambda (ast)
-    (for-each-subterm s ast)))
-
-;;; 
-;;; Tree traversals.
+;;; Tree traversal strategy combinators. 
 ;;; 
 
 (define* topdown

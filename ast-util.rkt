@@ -69,9 +69,9 @@ want to define the base node type using the provided macro.
 ;; level. Forward references to module-level variables (without
 ;; access) are fine.
 
-(define-for-syntax (make-for-each-subterm nn-stx f-stx-lst)
+(define-for-syntax (make-all-visit-term nn-stx f-stx-lst)
   (define nn-sym (syntax-e nn-stx))
-  #`(define (for-each-subterm s ast)
+  #`(define (all-visit-term s ast)
       #,@(map
           (lambda (f-stx)
             (syntax-case f-stx (no-term just-term list-of-term)
@@ -105,14 +105,14 @@ want to define the base node type using the provided macro.
     f-stx-lst)))
 
 ;; E.g. output
-;; (define (subterm-all s ast)
+;; (define (all-rw-term s ast)
 ;;   (let-and var (s (Define-var ast))
 ;;            body (map-while s (Define-body ast))
 ;;            (struct-copy Define ast (var var) (body body))))
-(define-for-syntax (make-subterm-all nn-stx f-stx-lst)
+(define-for-syntax (make-all-rw-term nn-stx f-stx-lst)
   (define nn-sym (syntax-e nn-stx))
   (define r-f-lst (get-relevant-fields f-stx-lst))
-  #`(define (subterm-all s ast)
+  #`(define (all-rw-term s ast)
       (let-and
        #,@(apply
            append
@@ -142,8 +142,8 @@ want to define the base node type using the provided macro.
             r-f-lst)))))
 
 (define-for-syntax (make-strategic nn-stx f-stx-lst)
-  (list (make-for-each-subterm nn-stx f-stx-lst)
-        (make-subterm-all nn-stx f-stx-lst)))
+  (list (make-all-visit-term nn-stx f-stx-lst)
+        (make-all-rw-term nn-stx f-stx-lst)))
 
 ;;; 
 ;;; concrete AST node definition

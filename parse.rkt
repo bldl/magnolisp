@@ -9,7 +9,7 @@
          "ast-magnolisp.rkt"
          "compiler-util.rkt"
          (only-in "runtime.rkt" #%magnolisp)
-         (rename-in "strategy.rkt" [id id-rw])
+         "strategy.rkt"
          "util.rkt"
          "util/case.rkt"
          racket/contract

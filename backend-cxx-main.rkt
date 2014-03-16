@@ -151,7 +151,7 @@ C++ back end.
   ;; Rewrites subterms of 'ast', updating 'r' in the process.
   (define (rw-all r ast)
     (let ((ast
-           (subterm-all
+           (all-rw-term
             (lambda (ast)
               (let-values (((sub-r ast) (rw r ast)))
                 (set! r sub-r)
