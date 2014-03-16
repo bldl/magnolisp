@@ -53,20 +53,6 @@
     (let ((x cons-expr))
       (values (car x) (cdr x)))))
 
-;; Like 'map', but if 'f' returns a value indicating failure, then
-;; stops and returns #f. By default any false value indicates failure.
-;; Does not accept multiple list arguments.
-(define* (map-while f lst (failed? false?))
-  (let next ((res-lst '())
-             (lst lst))
-    (if (null? lst)
-        (reverse res-lst)
-        (let* ((elem (car lst))
-               (res (f elem)))
-          (if (failed? res)
-              #f
-              (next (cons res res-lst) (cdr lst)))))))
-
 (define-syntax-rule* (matches? e pat ...)
   (match e (pat #t) ... (_ #f)))
 

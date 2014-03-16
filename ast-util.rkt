@@ -107,7 +107,7 @@ want to define the base node type using the provided macro.
 ;; E.g. output
 ;; (define (all-rw-term s ast)
 ;;   (let-and var (s (Define-var ast))
-;;            body (map-while s (Define-body ast))
+;;            body (all-rw-list s (Define-body ast))
 ;;            (struct-copy Define ast (var var) (body body))))
 (define-for-syntax (make-all-rw-term nn-stx f-stx-lst)
   (define nn-sym (syntax-e nn-stx))
@@ -130,7 +130,7 @@ want to define the base node type using the provided macro.
                   ((eq? kind 'just)
                    #`(s (#,get-stx ast)))
                   ((eq? kind 'list)
-                   #`(map-while s (#,get-stx ast)))))))
+                   #`(all-rw-list s (#,get-stx ast)))))))
             r-f-lst))
        (struct-copy
         #,nn-stx ast
