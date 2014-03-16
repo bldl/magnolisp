@@ -70,32 +70,6 @@
 ;;; parsing
 ;;; 
 
-;; Confusingly, 'resolve-module-path' does not appear to (always)
-;; return a 'resolved-module-path?'. This predicate may be used
-;; instead. It reflects the contract for the return value of
-;; 'resolve-module-path'.
-(define* (resolve-module-path-result? x)
-  (matches? x
-   (? path?)
-   (? symbol?)
-   (list 'submod (or (? path?) (? symbol?)) (? symbol?) ..1)))
-
-;; Turns resolve-module-path result format into
-;; make-resolved-module-path result format.
-(define-with-contract*
-  (-> resolve-module-path-result? resolved-module-path?)
-  (r-mp->rr-mp r-mp)
-  (define (f path)
-    (simplify-path (cleanse-path path)))
-  (make-resolved-module-path
-   (match r-mp
-     ((? path?) (f r-mp))
-     ((? symbol?) r-mp)
-     ((list 'submod
-            (and (or (? path?) (? symbol?)) p)
-            (? symbol? subs) ..1)
-      (cons (if (path? p) (f p) p) subs)))))
-      	
 ;; Reference: Typed Racket implementation of same.
 (define (resolve-provides prov-lst)
   (define provide-tbl
