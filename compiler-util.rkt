@@ -53,6 +53,7 @@
 ;;        (x-id #'x))
 ;;   (let ((x 1))
 ;;     (syntax->datum/free-id #`(x x #,x-id y))))
+;; See also: identifier-binding-symbol
 (define* (syntax->datum/free-id stx)
   (define n 0)
   (define h (make-free-id-table #:phase 0))
@@ -79,6 +80,44 @@
         (syntax->datum x))))
      (else
       (error 'syntax->datum/free-id "unsupported: ~s" x))))
+  (f stx))
+
+(define (id->datum id-stx)
+  (define b (identifier-binding id-stx))
+  (define name (syntax-e id-stx))
+  (define (mpi->datum mpi)
+    (define-values (m b) (module-path-index-split mpi))
+    (list m b))
+  (cond
+   ((not b) `[,name : #f])
+   ((eq? b 'lexical) `[,name : lexical])
+   ((list? b) `[,name : ,@(mpi->datum (first b)) ,(second b)])
+   (else
+    (raise-result-error 'identifier-binding
+     "documented identifier-binding result" b))))
+
+(define* (syntax->datum/binding stx
+                                #:conv [id->datum id->datum]
+                                #:pred [p? (lambda (x) #t)])
+  (define (f x)
+    (cond
+     ((null? x)
+      null)
+     ((pair? x)
+      (cons (f (car x)) (f (cdr x))))
+     ((syntax? x)
+      (define uw (syntax-e x))
+      (cond
+       ((pair? uw)
+        (f uw))
+       ((symbol? uw)
+        (if (p? uw) (id->datum x) uw))
+       (else
+        ;; Composite types other than pairs (vectors, boxes, etc.) not
+        ;; supported at this time.
+        (syntax->datum x))))
+     (else
+      (error 'syntax->datum/binding "unsupported: ~s" x))))
   (f stx))
 
 (define-with-contract*
