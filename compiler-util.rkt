@@ -96,6 +96,22 @@
     (raise-result-error 'identifier-binding
      "documented identifier-binding result" b))))
 
+;; Tries to make it easy to see at a glance which IDs have bindings
+;; and which do not, and what kind they are.
+(define* (id->datum/phase id)
+  (define (pick-glyph)
+    (define b-0 (identifier-binding id 0))
+    (define b-1 (identifier-binding id 1))
+    (cond
+     ((not (or b-0 b-1)) "ø")
+     ((eq? b-0 'lexical) (assert (eq? b-1 'lexical)) "$")
+     (else
+      (format "~a~a"
+              (if b-0 (begin (assert (list? b-0)) "£") "")
+              (if b-1 (begin (assert (list? b-1)) "€") "")))))
+  (string->symbol
+   (format "~a~a" (syntax-e id) (pick-glyph))))
+
 (define* (syntax->datum/binding stx
                                 #:conv [id->datum id->datum]
                                 #:pred [p? (lambda (x) #t)])
