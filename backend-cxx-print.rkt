@@ -3,8 +3,7 @@
 #|
 |#
 
-(require "ast-magnolisp.rkt" "backend-util.rkt"
-         "pgf.rkt" "util.rkt")
+(require "ast-magnolisp.rkt" "backend-util.rkt" "util.rkt")
 
 (define (join sep lst)
   (string-join lst sep))

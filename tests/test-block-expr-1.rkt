@@ -12,5 +12,9 @@
 (function (id x)
   x)
 
-(function (h) #an(export)
+(function (h-1) #an(export)
   (do (void) (return (f))))
+
+(function (h-2) #an(export)
+  (do (var v (f)) (return v)))
+

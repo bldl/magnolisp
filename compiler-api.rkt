@@ -488,8 +488,8 @@ external dependencies for the program/library, as well as the .cpp and
               (get-id 'FALSE))))
   
   (define all-defs (merge-defs mods))
-  ;;(pretty-print (dict->list all-defs)) (exit)
   (set! all-defs (defs-resolve-names all-defs mods))
+  ;;(pretty-print (dict->list all-defs)) (exit)
   (set! all-defs (defs-optimize-if TRUE-id FALSE-id all-defs))
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
   (set! all-defs (defs-rm-DefStx all-defs))
@@ -503,7 +503,7 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-type-infer predicate-id all-defs))
   ;;(pretty-print (dict-values all-defs)) (exit)
   
-  ;;(all-defs-display-Var-bindings all-defs)
+  ;;(all-defs-display-Var-bindings all-defs) (exit)
   ;;(mods-display-Var-bindings mods)
   ;;(pretty-print (list 'entry-points (dict-map eps-in-prog (compose car cons))))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
@@ -584,7 +584,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; 
 
 (module* main #f
-  (define st (compile-files "tests/test-foreign-2.rkt"))
+  (define st (compile-files "tests/test-block-expr-2.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))
                        (cxx (cc hh))

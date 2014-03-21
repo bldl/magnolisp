@@ -290,6 +290,7 @@ Import and name resolution.
          src stx))
       (make-resolved-module-path src))
      ((module-path-index? src)
+      ;;(writeln `(split mpi for ,(syntax-e stx) : ,@(values-of (module-path-index-split src))))
       (module-path-index-resolve src))
      (else
       (error
@@ -356,10 +357,11 @@ Import and name resolution.
         (set! def-id (Def-id def))
         (assert (free-identifier=? id def-id)))
        ((list? b)
+        ;;(writeln `(is a list for ,id))
         (define mpi (first b))
+        ;;(writeln `(split mpi for ,(syntax-e id) is ,(values-of (module-path-index-split mpi))))
         ;;(writeln (module-path-index-resolve mpi))
-        (define rr-mp 
-          (module-path-index-resolve mpi))
+        (define rr-mp (module-path-index-resolve mpi))
         ;;(writeln `(rr-mp ,rr-mp))
         (define mod (hash-ref mods rr-mp #f))
         (when mod

@@ -44,7 +44,7 @@ same variables at the same phase level).
          (for-syntax
           racket/dict racket/pretty syntax/id-table syntax/quote
           typed-racket/utils/disarm ;; probably considered internal
-          "syntax-quote.rkt" "util.rkt"))
+          "compiler-util.rkt" "syntax-quote.rkt" "util.rkt"))
 
 (begin-for-syntax
  ;; Given [h hash?], returns syntax for an expression that produces an
@@ -100,6 +100,10 @@ same variables at the same phase level).
          (let ((mb-stx
                 #'(mb sm . bodies)))
            ;;(pretty-print (syntax->datum mb-stx))
+           ;;(pretty-print (syntax->datum/free-id mb-stx))
+           ;;(pretty-print (syntax->datum/binding ast))
+           ;;(pretty-print (syntax->datum/binding ast #:conv id->datum/phase))
+           ;;(pretty-print (syntax->datum/binding mb-stx #:pred (lambda (x) (memq x '(equal? r.equal?)))))
            mb-stx))))))
 
 (define-syntax (module-begin stx)

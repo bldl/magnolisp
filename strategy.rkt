@@ -197,14 +197,11 @@ Meta-Compilation of Language Abstractions (2006).
 
 ;; Note that (and e ...) defines left-to-right evaluation order, and
 ;; also that (and) == #t.
-(define-syntax* seq
-  (syntax-rules ()
-    ((_ s ...)
-     (lambda (ast)
-       (and (begin
-              (set! ast (s ast))
-              ast) ...
-              ast)))))
+(define-syntax-rule* (seq s ...)
+  (lambda (ast)
+    (and (begin (set! ast (s ast))
+                ast) ...
+         ast)))
 
 ;; Note that (or e ...) defines left-to-right evaluation order, and
 ;; also that (or) == #f.
