@@ -2,19 +2,6 @@
 
 #|
 
-When not being required for compilation or for editor support or such,
-we need nothing but the standard Racket behavior.
-
-For when being required for compilation, we must make sure that we
-also make available compilation-related metadata in a submodule, which
-could be called 'magnolisp-info' or something. We take care to preserve type
-information, and put it into said module. We also want to put an AST
-in there.
-
-The evaluator ignores type annotations (it does not even load them),
-whereas the compiler requires a fully typed program (although not all
-types have to be written out explicitly -- think 'auto' in C++).
-
 We have some options for preserving type information, but we opt for
 having the expansion itself generate a table as well as code to
 persist the type information. It is notable that an id-table can be
@@ -25,10 +12,6 @@ do our best to preserve this information for any syntax objects we
 include in our metadata. Should we discover errors only once we start
 actual compilation or linking, then we need to be able to still report
 errors properly.
-
-When required for evaluation, we display the value of module top-level
-expressions, whereas otherwise we do not. This can be useful for
-testing.
 
 To record metadata for the compiler, we use code that runs in phase
 level 1, but concerns phase level 0. Since the recording code lives in

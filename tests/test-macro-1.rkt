@@ -13,9 +13,10 @@
   (default e f d)
   (do
     (var ret e)
-    (return (if (equal ret f)
-                d
-                ret))))
+    (return
+     (if (equal ret f)
+         d
+         ret))))
 
 (function (f x)
   (#:annos export)
@@ -23,4 +24,3 @@
 
 (default 1 1 7)
 (default 2 1 7)
-
