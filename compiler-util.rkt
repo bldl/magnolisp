@@ -233,6 +233,7 @@
   s)
 
 (define* (string->internal-cxx-id s #:default [default #f])
+  (set! s (string-underscorify s))
   (set! s (regexp-replace #rx"^[^a-zA-Z_]+" s ""))
   (set! s (translate-id-string s))
   (set! s (regexp-replace* #rx"[^a-zA-Z0-9_]+" s ""))
