@@ -20,7 +20,7 @@
 
 (function (f x)
   (#:annos export)
-  (default (compute x) 0 7))
+  (default (compute x) 0 (compute 42)))
 
 (default 1 1 7)
 (default 2 1 7)
