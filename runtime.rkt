@@ -76,12 +76,12 @@ enough to be easily analyzable, and compilable to C++.
 
 (define-syntax function-impl
   (syntax-rules ()
-    ((_ (f p ...) (a ...))
-     (function-impl (f p ...) (a ...) (void)))
-    ((_ (f p ...) (a ...) b)
+    [(_ (f p ...) (a ...))
+     (function-impl (f p ...) (a ...) (void))]
+    [(_ (f p ...) (a ...) b)
      (begin
        (define f (#%plain-lambda (p ...) b))
-       (anno! f a ...)))))
+       (anno! f a ...))]))
     
 (define-annos-wrapper* function)
 

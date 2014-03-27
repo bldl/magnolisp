@@ -619,6 +619,10 @@
          (define d-ast (make-DefVar 'expr stx #'n #'v))
          (define e-ast (parse-expr #'e))
          (syntaxed stx LetExpr d-ast e-ast)))
+
+      ;; xxx undocumented, and similar forms should probably be allowed
+      ((letrec-values () e)
+       (parse-expr #'e))
        
       ;; 'quote', as it comes in, appears to be unbound for us.
       ((q lit)
