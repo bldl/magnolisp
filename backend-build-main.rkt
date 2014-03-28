@@ -7,15 +7,10 @@ code for them.
 
 |#
 
-(require "ast-magnolisp.rkt" "compiler-util.rkt"
+(require "ast-magnolisp.rkt" "backend-build-writer.rkt"
+         "backend-util.rkt" "compiler-util.rkt"
          "util.rkt" "util/order.rkt"
          data/order data/splay-tree)
-
-;;; 
-;;; special values 
-;;;
-
-(concrete-struct* hexnum (num) #:transparent)
 
 ;;; 
 ;;; parsing
@@ -238,3 +233,24 @@ code for them.
     (when b (add! (Def-id def) b)))
   
   lst)
+
+;;; 
+;;; code generation
+;;;
+
+(define-with-contract*
+  (-> symbol? list? path-string? output-port? boolean? void?)
+  (generate-build-file kind attrs path-stem out banner?)
+
+  (define-values (writer sfx pfx) (get-writer-etc kind))
+  (define path (path-add-suffix path-stem sfx))
+  (define filename (path-basename-as-string path))
+  
+  (write-generated-output
+   path out
+   (thunk
+    (when banner?
+      (display-banner pfx filename))
+    (writer path attrs)))
+
+  (void))

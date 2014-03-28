@@ -3,9 +3,14 @@
 #|
 |#
 
-(require "backend-build-parser.rkt"
-         "backend-util.rkt"
+(require "backend-util.rkt"
          "util.rkt")
+
+;;; 
+;;; special values 
+;;;
+
+(concrete-struct* hexnum (num) #:transparent)
 
 ;;;
 ;;; local utilities
@@ -221,7 +226,7 @@
 ;;; driver routines
 ;;;
 
-(define (get-writer-etc kind)
+(define* (get-writer-etc kind)
   (define tbl `((c ,write-c-file ".h" "//")
                 (gnu-make ,write-gmake-file ".mk" "#")
                 (qmake ,write-qmake-file ".pri" "#")
@@ -230,23 +235,6 @@
   (assert p)
   (values (second p) (third p) (fourth p)))
 
-(define-with-contract*
-  (-> symbol? list? path-string? output-port? boolean? void?)
-  (generate-build-file kind attrs path-stem out banner?)
-
-  (define-values (writer sfx pfx) (get-writer-etc kind))
-  (define path (path-add-suffix path-stem sfx))
-  (define filename (path-basename-as-string path))
-  
-  (write-generated-output
-   path out
-   (thunk
-    (when banner?
-      (display-banner pfx filename))
-    (writer path attrs)))
-
-  (void))
-  
 #|
 
 Copyright 2009 Helsinki Institute for Information Technology (HIIT)

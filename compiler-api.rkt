@@ -515,8 +515,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; code generation
 ;;; 
 
-(require "backend-build-parser.rkt")
-(require "backend-build-writer.rkt")
+(require "backend-build-main.rkt")
 (require "backend-cxx-main.rkt")
 
 (define (string-file-id? s)
