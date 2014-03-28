@@ -549,13 +549,29 @@
           #:fields `(("binding"
                       ,(or (stx-binding-info stx) 'unbound)))))))
 
+  ;; All the arguments are syntax objects.
+  (define (parse-let-expr stx kind binds e)
+    (kernel-syntax-case binds #f
+     (()
+      (parse-expr (syntax-track-origin e stx kind)))
+     ((((n) v))
+      (identifier? #'n)
+      (let ()
+        (define d-ast (make-DefVar 'expr stx #'n #'v))
+        (define e-ast (parse-expr e))
+        (define as (hasheq 'stx stx 'let-kind (syntax-e kind)))
+        (LetExpr as d-ast e-ast)))
+     (_
+      (raise-language-error
+       #f "illegal let expression" stx))))
+  
   ;; Inserts bindings into 'defs-in-mod' as a side effect. Returns an
   ;; Ast object for non top-level things.
   (define (parse-expr stx)
     ;;(stx-print-if-type-annoed stx)
     ;;(writeln (list ctx stx))
     
-    (kernel-syntax-case* stx #f (values)
+    (kernel-syntax-case stx #f
 
       (_
        (syntax-property stx 'in-racket)
@@ -613,17 +629,20 @@
            parse-expr
            (syntax->list #'a-expr)))))
 
-      ((let-values (((n) v)) e)
-       (identifier? #'n)
-       (let ()
-         (define d-ast (make-DefVar 'expr stx #'n #'v))
-         (define e-ast (parse-expr #'e))
-         (syntaxed stx LetExpr d-ast e-ast)))
+      ((let-values binds e)
+       (parse-let-expr stx (car (syntax-e stx)) #'binds #'e))
+      
+      ((letrec-values binds e)
+       (parse-let-expr stx (car (syntax-e stx)) #'binds #'e))
+      
+      ;; The letrec-syntaxes+values ID we get here is either top-level
+      ;; or unbound, according to identifier-binding. This form is
+      ;; local-expand result language.
+      ((let-kw _ binds e)
+       (and (identifier? #'let-kw)
+            (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
+       (parse-let-expr stx (car (syntax-e stx)) #'binds #'e))
 
-      ;; xxx undocumented, and similar forms should probably be allowed
-      ((letrec-values () e)
-       (parse-expr #'e))
-       
       ;; 'quote', as it comes in, appears to be unbound for us.
       ((q lit)
        (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote))
@@ -633,17 +652,6 @@
        (identifier? #'id)
        (syntaxed stx Var #'id))
       
-      ;; The letrec-syntaxes+values ID we get here is either top-level
-      ;; or unbound, according to identifier-binding. This form is
-      ;; local-expand result language.
-      ((let-kw _ v-binds body ...)
-       (and (identifier? #'let-kw)
-            (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
-       (parse-expr
-        (syntax-track-origin
-         (syntax/loc stx (letrec-values v-binds body ...))
-         stx #'let-kw)))
-
       (id
        (identifier? #'id)
        (syntaxed stx Var #'id))

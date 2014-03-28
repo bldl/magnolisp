@@ -274,7 +274,14 @@ Any non-terminal marked with the subscript ``rkt'' is as documented in the ``Ful
 [mgl-expr id
           (#%plain-lambda (id ...) mgl-expr)
 	  (if mgl-expr mgl-expr mgl-expr)
+	  (let-values () mgl-expr)
+	  (letrec-values () mgl-expr)
+	  (letrec-syntaxes+values
+              ([(trans-id ...) #,(rkt-ign-nt expr)] ...)
+              ()
+            mgl-expr)
 	  (let-values ([(id) mgl-expr]) mgl-expr)
+	  (letrec-values ([(id) mgl-expr]) mgl-expr)
 	  (letrec-syntaxes+values
               ([(trans-id ...) #,(rkt-ign-nt expr)] ...)
               ([(id) mgl-expr])
