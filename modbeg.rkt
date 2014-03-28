@@ -26,7 +26,7 @@ same variables at the same phase level).
 (require "annos-store.rkt"
          (for-syntax
           racket/dict racket/pretty syntax/id-table syntax/quote
-          typed-racket/utils/disarm ;; probably considered internal
+          ;;typed-racket/utils/disarm ;; probably considered internal
           "compiler-util.rkt" "syntax-quote.rkt" "util.rkt"))
 
 (begin-for-syntax
@@ -56,7 +56,7 @@ same variables at the same phase level).
                 ts))))
 
  (define (make-definfo-submodule ast)
-   (set! ast (disarm* ast))
+   ;;(set! ast (disarm* ast))
    ;;(set! ast (syntax-disarm ast (current-code-inspector)))
    ;;(writeln (syntax-tainted? ast))
    ;;(set! ast (strip-phase-1+ ast))
