@@ -21,6 +21,12 @@
    (thunk (compile-mgl-mod mod))
    (format "failed to compile program ~a" mod)))
 
+(define (check-not-compile-mgl-mod mod exn-predicate)
+  (check-exn
+   exn-predicate
+   (thunk (compile-mgl-mod mod))
+   (format "no expected failure compiling program ~a" mod)))
+
 (module m1 magnolisp
   (function (f)
     (#:annos export (type (fn predicate)))
@@ -28,3 +34,16 @@
   (provide f))
 
 (check-compile-mgl-mod '(submod "." m1))
+
+(module m2 magnolisp
+  (function (f)
+    (#:annos export
+             (build (+= mixed-bad 1 "2"))
+             (type (fn predicate)))
+    true)
+  (define x 1)
+  (provide x))
+
+(check-not-compile-mgl-mod
+ '(submod "." m2)
+ #rx"type mismatch")
