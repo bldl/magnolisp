@@ -620,6 +620,7 @@ It is rather important for all Ast derived node types to be
   (cond
    ((symbol? x) x)
    ((identifier? x) (syntax-e x))
+   ((Id? x) (Id-name x))
    (else (unsupported x))))
 
 (define (?->symbol x)
