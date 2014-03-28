@@ -529,20 +529,18 @@
        (make-LetStat 'stat stx
                  (syntax-e #'let-kw) #'binds #'exprs))
 
-      ((set! id expr)
-       (identifier? #'id)
-       (syntaxed stx Assign (parse-expr #'id) (parse-expr #'expr)))
-
       ;; The letrec-syntaxes+values ID we get here is either top-level
       ;; or unbound, according to identifier-binding. This form is
       ;; local-expand result language.
-      ((let-kw _ v-binds body ...)
+      ((let-kw _ binds . exprs)
        (and (identifier? #'let-kw)
             (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
-       (parse-stat
-        (syntax-track-origin
-         (syntax/loc stx (letrec-values v-binds body ...))
-         stx #'let-kw)))
+       (make-LetStat 'stat stx
+                 (syntax-e #'let-kw) #'binds #'exprs))
+
+      ((set! id expr)
+       (identifier? #'id)
+       (syntaxed stx Assign (parse-expr #'id) (parse-expr #'expr)))
 
       (_ (raise-language-error
           #f "illegal syntax in statement context" stx
