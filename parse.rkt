@@ -384,16 +384,11 @@
            (raise-language-error
             #f
             (format "expected ~a values" (length id-lst))
-            stx))
-         (define def-lst
-           (map
-            (lambda (id-stx v-stx)
-              (syntax-track-origin
-               (quasisyntax/loc stx
-                 (define-values (#,id-stx) #,v-stx))
-               stx (car (syntax-e stx))))
-            id-lst v-lst))
-         (for-each parse-module-level def-lst)))
+            stx (third (syntax->list stx))))
+         (for-each
+          (lambda (id-stx e-stx)
+            (parse-define-value 'module-level stx id-stx e-stx))
+          id-lst v-lst)))
 
       ;; Must come after the ((define-values (id ...) (#%plain-app
       ;; values v ...)) pattern.
