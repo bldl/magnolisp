@@ -224,12 +224,6 @@
           (append req-lst
                   (filter for-runtime-require? stx-lst))))
   
-  (define (not-magnolisp stx [sub-stx #f])
-    (raise-language-error
-     #f "syntax not supported in Magnolisp" stx sub-stx
-     #:fields `(("binding"
-                 ,(or (stx-binding-info stx) 'unbound)))))
-
   (define (redefinition id old-def new-stx)
     (error 'parse-defs-from-module
            "redefinition of ~a: ~a and ~a"
@@ -310,36 +304,58 @@
   (define (make-Literal stx datum-stx)
     (syntaxed stx Literal datum-stx))
   
-  (define (make-LetStat ctx stx kind binds-stx exprs-stx)
-    (define i-e-lst (syntax->list binds-stx))
-    (define b-ast-lst
-      (apply append
-             (for/list ((i-e i-e-lst))
-               ;;(pretty-print `(parsing ,(syntax->datum i-e)))
-               (kernel-syntax-case* i-e #f (values)
-                 [((id ...) (#%plain-app values v ...))
-                  (let ()
-                    (define id-lst (syntax->list #'(id ...)))
-                    (assert (andmap identifier? id-lst))
-                    (define v-lst (syntax->list #'(v ...)))
-                    (unless (= (length v-lst) (length id-lst))
-                      (raise-language-error
-                       #f
-                       (format "expected ~a values" (length id-lst))
-                       stx))
-                    (map
-                     (lambda (id-stx v-stx)
-                       (make-DefVar ctx stx id-stx v-stx))
-                     id-lst v-lst))]
-                 [((id) v)
-                  (identifier? #'id)
-                  (list (make-DefVar ctx stx #'id #'v))]
-                 [_
-                  (not-magnolisp stx i-e)]))))
+  (define (make-LetStat stx kind-stx binds-stx exprs-stx)
+    (define kind (syntax-e kind-stx))
     (define e-stx-lst (syntax->list exprs-stx))
     (define e-ast-lst (map parse-stat e-stx-lst))
-    (LetStat (hasheq 'stx stx 'let-kind kind) b-ast-lst e-ast-lst))
+    (define i-e-lst (syntax->list binds-stx))
 
+    (define (wrap-in-let dv ast-lst)
+      (define as (hasheq 'stx stx 'let-kind kind))
+      (list (LetStat as dv ast-lst)))
+
+    (define (wrap-in-let* dv-lst ast-lst)
+      (for/fold ([ast-lst ast-lst]) ([dv (reverse dv-lst)])
+        (wrap-in-let dv ast-lst)))
+    
+    (define ast-lst
+      (for/fold ([ast-lst e-ast-lst]) ([i-e (reverse i-e-lst)])
+        ;;(pretty-print `(BINDING ,(syntax->datum i-e)))
+        (kernel-syntax-case* i-e #f (values)
+          [((id ...) (#%plain-app values v ...))
+           (let ()
+             (define id-lst (syntax->list #'(id ...)))
+             (assert (andmap identifier? id-lst))
+             (define v-lst (syntax->list #'(v ...)))
+             (unless (= (length v-lst) (length id-lst))
+               (raise-language-error
+                #f
+                (format "expected ~a values" (length id-lst))
+                stx))
+             (define dv-lst
+               (map
+                (lambda (id-stx v-stx)
+                  (make-DefVar 'stat i-e id-stx v-stx))
+                id-lst v-lst))
+             (wrap-in-let* dv-lst ast-lst))]
+          [(() stat)
+           (cons (parse-stat #'stat) ast-lst)]
+          [((id) v)
+           (identifier? #'id)
+           (let ()
+             (define dv (make-DefVar 'stat i-e #'id #'v))
+             (wrap-in-let dv ast-lst))]
+          [_
+           (raise-language-error
+            #f "illegal syntax for a let binding form"
+            stx i-e
+            #:fields `(("binding"
+                        ,(or (stx-binding-info i-e) 'unbound))))])))
+    
+    (if (= (length ast-lst) 1)
+        (first ast-lst)
+        (syntaxed stx BlockStat ast-lst)))
+    
   (define (parse-define-value ctx stx id-stx e-stx)
     ;;(writeln (list 'parse-define-value e-stx (syntax->datum e-stx)))
     ;;(writeln (identifier-binding #'#%magnolisp 0))
@@ -485,7 +501,9 @@
        (syntax-property stx 'in-racket)
        (syntaxed stx BlockStat null))
       
-      ((begin . bs)
+      ((begin-kw . bs)
+       (and (identifier? #'begin-kw)
+            (module-or-top-identifier=? #'begin-kw #'begin))
        (syntaxed stx BlockStat
                  (map parse-stat
                       (syntax->list #'bs))))
@@ -521,8 +539,7 @@
        (and (identifier? #'let-kw)
             (or (free-identifier=? #'let-kw #'let-values)
                 (free-identifier=? #'let-kw #'letrec-values)))
-       (make-LetStat 'stat stx
-                 (syntax-e #'let-kw) #'binds #'exprs))
+       (make-LetStat stx #'let-kw #'binds #'exprs))
 
       ;; The letrec-syntaxes+values ID we get here is either top-level
       ;; or unbound, according to identifier-binding. This form is
@@ -530,8 +547,7 @@
       ((let-kw _ binds . exprs)
        (and (identifier? #'let-kw)
             (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
-       (make-LetStat 'stat stx
-                 (syntax-e #'let-kw) #'binds #'exprs))
+       (make-LetStat stx #'let-kw #'binds #'exprs))
 
       ((set! id expr)
        (identifier? #'id)

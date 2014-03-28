@@ -259,9 +259,8 @@ C++ back end.
                                     (annoless Var (cdr tgt))
                                     (expr->cxx e))
                           (annoless Goto (car tgt)))))
-      ((LetStat a dvs ss)
-       (BlockStat a (append (map def->cxx dvs)
-                            (map stat->cxx ss))))
+      ((LetStat a dv ss)
+       (BlockStat a (cons (def->cxx dv) (map stat->cxx ss))))
       ((Assign a lhs rhs)
        (Assign a (expr->cxx lhs) (expr->cxx rhs)))
       (_
@@ -329,11 +328,10 @@ C++ back end.
     (topdown
      (lambda (ast)
        (cond
-        ((and (LetStat? ast) (ormap Defun? (LetStat-defs ast)))
-         (match-define (LetStat a bs ss) ast)
-         (define-values (fun-bs var-bs) (partition Defun? bs))
-         (for-each do-Defun fun-bs)
-         (LetStat a var-bs ss))
+        ((and (LetStat? ast) (Defun? (LetStat-def ast)))
+         (match-define (LetStat a b ss) ast)
+         (do-Defun b)
+         (BlockStat a ss))
         (else
          ast)))))
   

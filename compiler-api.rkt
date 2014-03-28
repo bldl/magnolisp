@@ -184,9 +184,10 @@ external dependencies for the program/library, as well as the .cpp and
     (match-define (LetExpr a dv e) ast)
     (define n-ast
       (BlockExpr a (list
-                    (LetStat #hasheq((let-kind . let))
-                         (list dv)
-                         (list (annoless Return e))))))
+                    (LetStat
+                     (hasheq 'let-kind (ast-anno-must ast 'let-kind))
+                     dv
+                     (list (annoless Return e))))))
     ;;(pretty-print n-ast)
     n-ast)
   

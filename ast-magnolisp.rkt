@@ -258,12 +258,13 @@ It is rather important for all Ast derived node types to be
 ;; For functions with no Magnolisp body.
 (define-ast* NoBody Ast ())
 
-;; 'defs' contains DefVar terms. 'let-kind annotation has either
-;; 'let-values or 'letrec-values; we mostly do not care, since Racket
-;; has done name resolution.
-(define-ast* LetStat Ast ((list-of-term defs) (list-of-term ss)))
+;; 'def' contains a DefVar term. 'let-kind annotation has either
+;; 'let-values or 'letrec-values or 'letrec-syntaxes+values; we mostly
+;; do not care, since Racket has done name resolution.
+(define-ast* LetStat Ast ((just-term def) (list-of-term ss)))
 
-;; We only allow a limited form of 'let' expressions.
+;; We only allow a limited form of 'let' expressions. There is a
+;; 'let-kind annotation.
 (define-ast* LetExpr Ast ((just-term def) (just-term e)))
 
 ;; Sequence of statements.
@@ -531,14 +532,6 @@ It is rather important for all Ast derived node types to be
 ;;; simplification
 ;;; 
 
-(define ast-empty-LetStat->BlockStat
-  (topdown
-   (lambda (ast)
-     (match ast
-       ((LetStat a (list) ss)
-        (BlockStat a ss))
-       (_ ast)))))
-
 (define ast-nested-BlockStat->BlockStat
   (topdown
    (repeat
@@ -592,7 +585,6 @@ It is rather important for all Ast derived node types to be
 
 (define* ast-simplify
   (compose1->
-   ast-empty-LetStat->BlockStat
    ast-nested-BlockStat->BlockStat
    ast-rm-dead-code
    ast-simplify-BlockExpr))
@@ -653,7 +645,7 @@ It is rather important for all Ast derived node types to be
         ,(ast->sexp b)))
     ((LetStat a ds bs)
      (define n (hash-ref a 'let-kind 'let))
-     `(,n (,@(map ast->sexp ds))
+     `(,n (,(ast->sexp ds))
           ,@(map ast->sexp bs)))
     ((BlockStat _ ss)
      `(block-stat ,@(map ast->sexp ss)))
