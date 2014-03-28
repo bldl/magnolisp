@@ -250,23 +250,6 @@ external dependencies for the program/library, as well as the .cpp and
   (rw ast))
 
 ;;; 
-;;; build options
-;;; 
-
-(define (defs-collect-build-annos defs)
-  (define lst null)
-
-  (define (add! id-stx build-stx)
-    (set! lst (cons (list id-stx build-stx) lst)))
-  
-  (for (((id def) (in-dict defs)))
-    (assert (Def? def))
-    (define b (ast-anno-maybe def 'build))
-    (when b (add! id b)))
-  
-  lst)
-
-;;; 
 ;;; program contents resolution
 ;;; 
 
@@ -511,6 +494,8 @@ external dependencies for the program/library, as well as the .cpp and
 
   ;;(pretty-print (dict-map all-defs (lambda (x y) (ast->sexp y))))
 
+  (set! all-defs (defs-id->ast all-defs))
+  
   (St mods all-defs eps-in-prog))
 
 ;; Compiles the modules defined in the specified files. Returns a
@@ -561,7 +546,7 @@ external dependencies for the program/library, as well as the .cpp and
       ((list _ (list (? symbol? kinds) ...))
        (unless (null? kinds)
          (set! kinds (remove-duplicates kinds eq?))
-         (define defs (defs-id->ast (St-defs st)))
+         (define defs (St-defs st))
          (define path-stem (build-path outdir basename))
          (generate-cxx-file kinds defs path-stem out banner?)))))
 

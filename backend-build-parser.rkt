@@ -7,7 +7,8 @@ code for them.
 
 |#
 
-(require "compiler-util.rkt" "util.rkt" "util/order.rkt"
+(require "ast-magnolisp.rkt" "compiler-util.rkt"
+         "util.rkt" "util/order.rkt"
          data/order data/splay-tree)
 
 ;;; 
@@ -77,7 +78,7 @@ code for them.
 ;; Set elements are also ordered, and must all be of the same value
 ;; type.
 (define-with-contract*
-  (-> (listof (list/c identifier? syntax?))
+  (-> (listof (list/c Id? syntax?))
       ordered-dict?)
   (parse-analyze-build-annos/ir build-lst)
   
@@ -85,17 +86,17 @@ code for them.
                              #:key-contract opt-name?
                              #:value-contract ir-opt-value/c))
 
-  (define (to-name id-stx n-stx)
+  (define (to-name id-ast n-stx)
     (define s (symbol->string (syntax-e n-stx)))
     (unless (opt-name? s)
       (raise-syntax-error
        #f
        (format "illegal build option name for definition ~a"
-               (syntax-e id-stx))
+               (Id-name id-ast))
        n-stx))
     s)
 
-  (define (to-value id-stx opt-stx v-stx)
+  (define (to-value id-ast opt-stx v-stx)
     (define v
       (syntax-case v-stx ()
         ((#:hex h-v)
@@ -111,7 +112,7 @@ code for them.
        opt-stx
        v-stx
        #:continued
-       (format "(for declaration ~a)" (syntax-e id-stx))))
+       (format "(for declaration ~a)" (Id-name id-ast))))
     (when (and (symbol? v) (not (allowed-symbol? v)))
       (raise-language-error
        #f
@@ -119,24 +120,24 @@ code for them.
        opt-stx
        v-stx
        #:continued
-       (format "(for declaration ~a)" (syntax-e id-stx))))
+       (format "(for declaration ~a)" (Id-name id-ast))))
     (values p? v))
   
-  (define (set-value-opt! id-stx opt-stx n-stx v-stx)
-    (define n (to-name id-stx n-stx))
-    (define-values (p? v) (to-value id-stx opt-stx v-stx))
+  (define (set-value-opt! id-ast opt-stx n-stx v-stx)
+    (define n (to-name id-ast n-stx))
+    (define-values (p? v) (to-value id-ast opt-stx v-stx))
     (if (dict-has-key? h n)
         (let ()
           (define x-v (dict-ref h n))
           (unless (equal? x-v v)
             (error 'parse-analyze-build-annos
                    "conflicting redefinition of build option ~a for definition ~a (previously: ~s): ~s"
-                   n (syntax-e id-stx) x-v v-stx)))
+                   n (Id-name id-ast) x-v v-stx)))
         (dict-set! h n v)))
 
-  (define (set-set-opt! id-stx opt-stx n-stx v-stx-lst)
+  (define (set-set-opt! id-ast opt-stx n-stx v-stx-lst)
     (assert (not (null? v-stx-lst)))
-    (define n (to-name id-stx n-stx))
+    (define n (to-name id-ast n-stx))
     (define-values (type-p? v-h)
       (if (dict-has-key? h n)
           (let ((p (dict-ref h n)))
@@ -144,16 +145,16 @@ code for them.
             (unless (ordered-dict? v-h)
               (error 'parse-analyze-build-annos
                      "conflicting use of operator += with build option ~a for definition ~a (previously defined as non-set ~s): ~s"
-                     n (syntax-e id-stx) v-h opt-stx))
+                     n (Id-name id-ast) v-h opt-stx))
             (values type-p? v-h))
           (values #f #f)))
     (for ((v-stx v-stx-lst))
-      (define-values (p? v) (to-value id-stx opt-stx v-stx))
+      (define-values (p? v) (to-value id-ast opt-stx v-stx))
       (if type-p?
           (unless (type-p? v)
             (raise-syntax-error
              #f
-             (format "type mismatch for definition ~a build option ~a value (expected ~a)" (syntax-e id-stx) n (object-name type-p?))
+             (format "type mismatch for definition ~a build option ~a value (expected ~a)" (Id-name id-ast) n (object-name type-p?))
              opt-stx v-stx))
           (set!-values
            (type-p? v-h)
@@ -161,17 +162,17 @@ code for them.
       (dict-set! v-h v #t))
     (dict-set! h n (cons type-p? v-h)))
 
-  (define (parse-opt! id-stx build-stx opt-stx)
+  (define (parse-opt! id-ast build-stx opt-stx)
     (syntax-case opt-stx ()
       (n
        (identifier? #'n)
-       (set-value-opt! id-stx opt-stx #'n #'#t))
+       (set-value-opt! id-ast opt-stx #'n #'#t))
       ((n v)
        (identifier? #'n)
-       (set-value-opt! id-stx opt-stx #'n #'v))
+       (set-value-opt! id-ast opt-stx #'n #'v))
       ((p n v more-v ...)
        (and (eq? '+= (syntax-e #'p)) (identifier? #'n))
-       (set-set-opt! id-stx opt-stx #'n
+       (set-set-opt! id-ast opt-stx #'n
                      (syntax->list #'(v more-v ...))))
       (_
        (raise-language-error
@@ -180,13 +181,13 @@ code for them.
         build-stx
         opt-stx
         #:continued
-        (format "(for declaration ~a)" (syntax-e id-stx))))))
+        (format "(for declaration ~a)" (Id-name id-ast))))))
 
-  (define (parse-build! id-stx build-stx)
+  (define (parse-build! id-ast build-stx)
     (syntax-case build-stx ()
       ((_ . opt)
        (for-each
-        (fix parse-opt! id-stx build-stx)
+        (fix parse-opt! id-ast build-stx)
         (syntax->list #'opt)))
       (_
        (raise-language-error
@@ -194,11 +195,11 @@ code for them.
         "illegal (build ...) annotation form"
         build-stx
         #:continued
-        (format "(for declaration ~a)" (syntax-e id-stx))))))
+        (format "(for declaration ~a)" (Id-name id-ast))))))
   
   (for ((build build-lst))
-    (define-values (id-stx build-stx) (apply values build))
-    (parse-build! id-stx build-stx))
+    (define-values (id-ast build-stx) (apply values build))
+    (parse-build! id-ast build-stx))
     
   h)
 
@@ -206,7 +207,7 @@ code for them.
 ;; part of the signature could be more accurately given as (list/c
 ;; opt-name? (or/c opt-value-atom/c (listof opt-value-atom/c))).
 (define-with-contract*
-  (-> (listof (list/c identifier? syntax?))
+  (-> (listof (list/c Id? syntax?))
       (listof (list/c string? opt-value/c)))
   (parse-analyze-build-annos build-lst)
 
@@ -218,3 +219,22 @@ code for them.
   (define h (parse-analyze-build-annos/ir build-lst))
   (for/list (((n v) (in-dict h)))
     (list n (if (pair? v) (mk-lst v) v))))
+
+;;; 
+;;; collection
+;;;
+
+(define-with-contract*
+  (-> hash? (listof (list/c Id? syntax?)))
+  (defs-collect-build-annos defs)
+  (define lst null)
+
+  (define (add! id build-stx)
+    (set! lst (cons (list id build-stx) lst)))
+  
+  (for (((id def) (in-dict defs)))
+    (assert (Def? def))
+    (define b (ast-anno-maybe def 'build))
+    (when b (add! (Def-id def) b)))
+  
+  lst)
