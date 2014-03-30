@@ -82,23 +82,40 @@
       (error 'syntax->datum/free-id "unsupported: ~s" x))))
   (f stx))
 
-(define (id->datum id-stx)
+(define (mpi->datum/split mpi)
+  (define (mpi->datum mpi [root? #f])
+    (define-values (m b) (module-path-index-split mpi))
+    (cond
+     ((and root? (not (or m b))) '(self))
+     ((not m) null)
+     ((not b) (list m))
+     ((module-path-index? b) (append (mpi->datum b) (list m)))
+     ((resolved-module-path? b) (list b m))
+     (else (raise-result-error
+            'module-path-index-split "documented result" 0 m b))))
+  (mpi->datum mpi #t))
+
+(define (mpi->datum/resolve mpi)
+  (resolved-module-path-name (module-path-index-resolve mpi)))
+
+(define (id->datum id-stx #:conv-mpi mpi->datum)
   (define b (identifier-binding id-stx))
   (define name (syntax-e id-stx))
-  (define (mpi->datum mpi)
-    (define-values (m b) (module-path-index-split mpi))
-    (list m b))
   (cond
    ((not b) `[,name : #f])
    ((eq? b 'lexical) `[,name : lexical])
-   ((list? b) `[,name : ,@(mpi->datum (first b)) ,(second b)])
+   ((list? b)
+    (define mpi (first b))
+    (define sym (second b))
+    `[,name : ,(mpi->datum mpi)
+            ,@(if (eq? sym name) '() `(RENAMED FROM ,sym))])
    (else
     (raise-result-error 'identifier-binding
      "documented identifier-binding result" b))))
 
 ;; Tries to make it easy to see at a glance which IDs have bindings
 ;; and which do not, and what kind they are.
-(define* (id->datum/phase id)
+(define* (id->datum/phase id #:conv-mpi dummy)
   (define (pick-glyph)
     (define b-0 (identifier-binding id 0))
     (define b-1 (identifier-binding id 1))
@@ -113,7 +130,8 @@
    (format "~a~a" (syntax-e id) (pick-glyph))))
 
 (define* (syntax->datum/binding stx
-                                #:conv [id->datum id->datum]
+                                #:conv-id [id->datum id->datum]
+                                #:conv-mpi [mpi->datum mpi->datum/resolve]
                                 #:pred [p? (lambda (x) #t)])
   (define (f x)
     (cond
@@ -127,7 +145,7 @@
        ((pair? uw)
         (f uw))
        ((symbol? uw)
-        (if (p? uw) (id->datum x) uw))
+        (if (p? uw) (id->datum x #:conv-mpi mpi->datum) uw))
        (else
         ;; Composite types other than pairs (vectors, boxes, etc.) not
         ;; supported at this time.
@@ -264,13 +282,13 @@
     (define lst
       (for/list ((prop props))
         (define v (syntax-property stx prop))
-        (and v (cons prop v))))
+        (and v `(,prop = ,v))))
     (filter identity lst))
 
   (define (print-for stx)
     (define vs (props-for stx))
     (unless (null? vs)
-      (writeln `(PROPS ,vs ,stx))))
+      (writeln `(PROPS ,@vs PRESENT IN ,stx))))
   
   (define (f stx)
     (define lst (syntax->list stx))

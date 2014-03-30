@@ -85,7 +85,7 @@ same variables at the same phase level).
            ;;(pretty-print (syntax->datum mb-stx))
            ;;(pretty-print (syntax->datum/free-id mb-stx))
            ;;(pretty-print (syntax->datum/binding ast))
-           ;;(pretty-print (syntax->datum/binding sm-stx #:conv id->datum/phase))
+           ;;(pretty-print (syntax->datum/binding sm-stx #:conv-id id->datum/phase))
            ;;(pretty-print (syntax->datum/binding sm-stx #:pred (lambda (x) (memq x '(equal? r.equal?)))))
            mb-stx))))))
 

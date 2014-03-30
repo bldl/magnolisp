@@ -23,10 +23,11 @@ specified syntax properties. Very similar to quote-syntax/keep-srcloc.
        [(vector? n) #`(vector . #,(for/list ([i (in-vector n)])
                                     (loop i)))]
        [(prefab-struct-key n)
-        #`(make-prefab-struct '#,(prefab-struct-key n)
-                              . #,(for/list ([i (in-list (cdr (vector->list 
-                                                               (struct->vector n))))])
-                                    (loop i)))]
+        #`(make-prefab-struct
+           '#,(prefab-struct-key n)
+           . #,(for/list ([i (in-list (cdr (vector->list 
+                                            (struct->vector n))))])
+                 (loop i)))]
        [else #`(quote #,n)])))
 
   (define (convert e keep? keep)
