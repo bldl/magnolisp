@@ -33,23 +33,30 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; identifier -> Id conversion
 ;;;
 
-(define (defs-id->ast defs)
-  (define id->bind
-    (for/dict
-     (make-immutable-free-id-table #:phase 0)
-     ([(id def) (in-dict defs)])
-     (let* ((name (syntax-e id))
-            (bind (gensym name)))
-       (values id bind))))
+(define-with-contract
+  (-> immutable-free-id-table? immutable-free-id-table?)
+  (make-id->bind defs)
+  (for/dict
+   (make-immutable-free-id-table #:phase 0)
+   ([(id def) (in-dict defs)])
+   (let* ((name (syntax-e id))
+          (bind (gensym name)))
+     (values id bind))))
 
+(define-with-contract
+  (-> immutable-free-id-table? identifier? Id?)
+  (conv-id->ast id->bind id)
+  (define def-id (or (syntax-property id 'def-id) id))
+  (define bind (dict-ref id->bind def-id #f))
+  (unless bind
+    (error 'conv-id->ast
+           "unbound identifier ~a: ~s"
+           (syntax-e id) id))
+  (identifier->ast id #:bind bind))
+
+(define (defs-id->ast defs [id->bind (make-id->bind defs)])
   (define (mk-id id)
-    (define def-id (or (syntax-property id 'def-id) id))
-    (define bind (dict-ref id->bind def-id #f))
-    (unless bind
-      (error 'defs-id->ast
-             "unbound identifier ~a: ~s"
-             (syntax-e id) id))
-    (identifier->ast id #:bind bind))
+    (conv-id->ast id->bind id))
 
   (define (rw-annos annos)
     (define type-ast (hash-ref annos 'type-ast #f))
@@ -412,6 +419,7 @@ external dependencies for the program/library, as well as the .cpp and
         (when (or (not ep?) (and eps-in-mod (not (dict-empty? eps-in-mod))))
           (define pt (Mod-pt mod)) ;; parse tree
           ;;(pretty-print (syntax->datum pt)) (exit)
+          ;;(pretty-print (syntax->datum/binding pt #:pred (lambda (x) (memq x '(equal? r.equal?))))) (exit)
           ;;(print-with-select-syntax-properties '(in-racket local-ec) pt) (exit)
           ;;(pretty-print (syntax->datum/free-id pt)) (exit)
           (define-values (defs provs reqs)

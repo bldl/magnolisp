@@ -129,11 +129,15 @@ It is rather important for all Ast derived node types to be
   (string<? (ast-identifier->string x)
             (ast-identifier->string y)))
 
+;; Creates a fresh identifier with the specified basename 'sym' that
+;; is not (yet) ast-identifier=? to any other.
 (define-with-contract*
   (->* () ((or/c symbol? string?)) Id?)
   (fresh-ast-identifier [sym 'g])
   (annoless Id sym (gensym sym)))
 
+;; Converts the specified syntax object identifier to an Id one,
+;; making it ast-identifier=? to 'other' (if any is given).
 (define-with-contract*
   (->* (identifier?) (#:bind (or/c symbol? Id?)) Id?)
   (identifier->ast id #:bind [other #f])
@@ -144,51 +148,11 @@ It is rather important for all Ast derived node types to be
                 (else (gensym name))))
   (Id (hasheq 'stx id) name bind))
 
-;; Use (make-immutable-free-id-table #:phase 0) to create initial
-;; state.
+;; Looks up a definition corresponding to the specified identifier.
 (define-with-contract*
-  (-> immutable-free-id-table? identifier? 
-      (values immutable-free-id-table? Id?))
-  (identifier->ast/stateful id->bind id)
-  (define name (syntax-e id))
-  (define def-id (or (syntax-property id 'def-id) id))
-  (define bind (dict-ref id->bind def-id #f))
-  (unless bind
-    (set! bind (gensym name))
-    (set! id->bind (dict-set id->bind def-id bind)))
-  (values id->bind
-          (Id (hasheq 'stx id) name bind)))
-
-(define-with-contract*
-  (-> hash? Id? any/c)
+  (-> hash? Id? (or/c Def? #f))
   (ast-identifier-lookup bind->def id)
-  (define def (hash-ref bind->def (Id-bind id) #f))
-  def)
-
-;; Returns #f instead of Id in the bind? = #t case if already bound,
-;; or in the bind? = #f case if unbound. Otherwise returns a
-;; functionally modified Id, in addition to the updated state.
-(define-with-contract*
-  (-> hash? hash? boolean? Id?
-      (values hash? hash? (or/c Id? #f)))
-  (ast-identifier-assign-name name->num bind->name bind? id)
-  (match-define (Id a n b) id)
-  (cond
-   (bind?
-    (cond
-     ((hash-has-key? bind->name b)
-      (values name->num bind->name #f))
-     (else
-      (define-values (name->num+ name)
-        (next-gensym name->num (string->symbol n)))
-      (values name->num+
-              (hash-set bind->name b name)
-              (Id a name b)))))
-   (else
-    (define name (hash-ref bind->name b #f))
-    (values name->num bind->name
-            (and name
-                 (Id a name b))))))
+  (hash-ref bind->def (Id-bind id) #f))
 
 ;;; 
 ;;; type expressions
