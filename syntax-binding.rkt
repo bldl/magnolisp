@@ -3,7 +3,9 @@
 #|
 
 Routines for preserving identifier-binding information as a custom
-syntax property.
+syntax property. Information is only recorded for identifiers that
+have a binding at phase level 0, and only when the original definition
+is also at phase level 0.
 
 |#
 
@@ -11,38 +13,15 @@ syntax property.
 
 (provide add-binding-properties)
 
-(define (mpi->datum mpi)
-  (define r-mp (module-path-index-resolve mpi))
-  (define path (resolved-module-path-name r-mp))
-  (match path
-    ((? symbol?) path)
-    ((? path?) (path->string path))
-    ((list (and (or (? path?) (? symbol?)) p)
-           (? symbol? subs) ..1)
-     (cons (if (path? p) (path->string p) p) subs))
-    (else
-     (raise-result-error
-      'resolved-module-path-name
-      "documented result" path))))
+;;; 
+;;; generic utilities
+;;; 
 
-(define (mk-binding-datum b)
-  (cond
-   ((not b) b)
-   ((eq? b 'lexical) b)
-   ((list? b)
-    (define source-mod (first b))
-    (define source-id (second b))
-    (define source-phase (fifth b))
-    (define import-phase (sixth b))
-    (and (= 0 source-phase import-phase)
-         (list (mpi->datum source-mod) source-id)))
-   (else
-    (raise-argument-error
-     'mk-binding-datum
-     "identifier-binding value" b))))
-
-;; xxx this routine is mostly generic, and we could refactor that into a syntax rewriting routine
-(define (add-binding-properties stx)
+;; Applies the rewrite 'f' to all identifier? objects in the syntax
+;; tree 'stx', which is traversed recursively. (The eq? based
+;; optimizations here are similar to those in the syntax/quote library
+;; of Racket.)
+(define (rw-ids-in-syntax-tree f stx)
   (define (rw-syntax-pair d) ;; (-> cons? cons?)
     (cons (rw-syntax (car d)) (rw-syntax-cdr (cdr d))))
   
@@ -59,8 +38,7 @@ syntax property.
     (define d (syntax-e stx))
     (cond
      [(symbol? d)
-      (define b (identifier-binding stx 0))
-      (syntax-property stx 'binding (mk-binding-datum b))]
+      (f stx)]
      [(pair? d)
       (define n-d (rw-syntax-pair d))
       (if (and (eq? (car d) (car n-d))
@@ -98,6 +76,52 @@ syntax property.
      [else
       stx]))
   (rw-syntax stx))
+
+;;; 
+;;; add-binding-properties
+;;; 
+
+(define (mpi->datum mpi)
+  (define r-mp (module-path-index-resolve mpi))
+  (define path (resolved-module-path-name r-mp))
+  (match path
+    ((? symbol?) path)
+    ((? path?) (path->string path))
+    ((list (and (or (? path?) (? symbol?)) p)
+           (? symbol? subs) ..1)
+     (cons (if (path? p) (path->string p) p) subs))
+    (else
+     (raise-result-error
+      'resolved-module-path-name
+      "documented result" path))))
+
+(define (mk-binding-datum b)
+  (cond
+   ((not b) b)
+   ((eq? b 'lexical) b)
+   ((list? b)
+    (define source-mod (first b))
+    (define source-id (second b))
+    (define source-phase (fifth b))
+    (and (= 0 source-phase)
+         (list (mpi->datum source-mod) source-id)))
+   (else
+    (raise-argument-error
+     'mk-binding-datum
+     "identifier-binding value" b))))
+
+(define (add-binding-properties stx)
+  (define (f stx)
+    (define b (identifier-binding stx 0))
+    (define dat (mk-binding-datum b))
+    (if dat
+        (syntax-property stx 'binding dat)
+        stx))
+  (rw-ids-in-syntax-tree f stx))
+
+;;; 
+;;; testing
+;;;
 
 (module* main #f
   (require racket/pretty "compiler-util.rkt")
