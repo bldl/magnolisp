@@ -183,16 +183,6 @@ external dependencies for the program/library, as well as the .cpp and
   (rw ast))
 
 ;;; 
-;;; DefStx
-;;; 
-
-(define (defs-rm-DefStx defs)
-  (for/dict
-   (make-immutable-free-id-table #:phase 0)
-   ([(id def) (in-dict defs)] #:unless (DefStx? def))
-   (values id def)))
-
-;;; 
 ;;; IfExpr and IfStat
 ;;; 
 
@@ -516,12 +506,12 @@ external dependencies for the program/library, as well as the .cpp and
   ;;(pretty-print (dict->list all-defs)) (exit)
   (set! all-defs (defs-optimize-if TRUE-stx FALSE-stx all-defs))
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
-  (set! all-defs (defs-rm-DefStx all-defs))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (define def-lst (dict-values all-defs))
   (define id->bind (make-id->bind def-lst))
   (set! def-lst (map (fix ast-id->ast id->bind) def-lst))
+  (set! def-lst (for/list ([def def-lst] #:unless (DefStx? def)) def))
   (set! def-lst (map ast-rm-LetExpr def-lst))
   (set! def-lst (map ast-LetLocalEc->BlockExpr def-lst))
   (set! def-lst (map ast-simplify def-lst))
