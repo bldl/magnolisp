@@ -33,6 +33,9 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; identifier -> Id conversion
 ;;;
 
+;; Before invoking this, be sure to ensure that 'defs' is up-to-date,
+;; also wrt to its local definitions (see
+;; defs-table-update-locals/stx).
 (define-with-contract
   (-> immutable-free-id-table? immutable-free-id-table?)
   (make-id->bind defs)
@@ -50,11 +53,33 @@ external dependencies for the program/library, as well as the .cpp and
   (define bind (dict-ref id->bind def-id #f))
   (unless bind
     (error 'conv-id->ast
-           "unbound identifier ~a: ~s"
-           (syntax-e id) id))
+           "unbound identifier ~a: ~s\n def-id = ~s\nentries = ~a"
+           (syntax-e id) id
+           (syntax-property id 'def-id)
+           (dict-count id->bind)))
   (identifier->ast id #:bind bind))
 
-(define (defs-id->ast defs [id->bind (make-id->bind defs)])
+;; Like above, but adds an entry into the table if the identifier is
+;; not present.
+(define-with-contract
+  (-> immutable-free-id-table? identifier?
+      (values immutable-free-id-table? Id?))
+  (conv-id->ast/update id->bind id)
+  (define def-id (or (syntax-property id 'def-id) id))
+  (define bind (dict-ref id->bind def-id #f))
+  (unless bind
+    (set! bind (gensym (syntax-e id)))
+    (set! id->bind (dict-set id->bind id bind)))
+  (values id->bind (identifier->ast id #:bind bind)))
+
+;; Updates the value of id->bind.
+(define-syntax-rule
+  (conv-id->ast/update! id->bind id-stx)
+  (let-values ([(t id) (conv-id->ast/update id->bind id-stx)])
+    (set! id->bind t)
+    id))
+
+(define (defs-id->ast defs id->bind)
   (define (mk-id id)
     (conv-id->ast id->bind id))
 
@@ -149,7 +174,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; IfExpr and IfStat
 ;;; 
 
-(define (defs-optimize-if TRUE-id FALSE-id defs)
+(define (defs-optimize-if TRUE-stx FALSE-stx defs)
   (define (make-f-pred id)
     (lambda (ast)
       (and (Apply? ast)
@@ -157,8 +182,8 @@ external dependencies for the program/library, as well as the .cpp and
              (and (Var? f)
                   (free-identifier=? (Var-id f) id))))))
 
-  (define TRUE? (make-f-pred TRUE-id))
-  (define FALSE? (make-f-pred FALSE-id))
+  (define TRUE? (make-f-pred TRUE-stx))
+  (define FALSE? (make-f-pred FALSE-stx))
   
   (define-match-expander SomeIf
     (syntax-rules ()
@@ -461,7 +486,7 @@ external dependencies for the program/library, as well as the .cpp and
 
   ;; Make note of interesting prelude definitions (if it is even a
   ;; dependency).
-  (define-values (predicate-id TRUE-id FALSE-id)
+  (define-values (predicate-stx TRUE-stx FALSE-stx)
     (let* ((r-mp (resolve-module-path 'magnolisp/prelude #f))
            (rr-mp (r-mp->rr-mp r-mp))
            (mod (hash-ref mods rr-mp #f)))
@@ -482,7 +507,7 @@ external dependencies for the program/library, as well as the .cpp and
   (define all-defs (merge-defs mods))
   (set! all-defs (defs-resolve-names all-defs mods))
   ;;(pretty-print (dict->list all-defs)) (exit)
-  (set! all-defs (defs-optimize-if TRUE-id FALSE-id all-defs))
+  (set! all-defs (defs-optimize-if TRUE-stx FALSE-stx all-defs))
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
   (set! all-defs (defs-rm-DefStx all-defs))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
@@ -492,6 +517,13 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs ((make-for-all-defs ast-simplify) all-defs))
   (set! all-defs (defs-de-racketize all-defs))
   ;;(pretty-print (dict->list all-defs)) (exit)
+  ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values all-defs))))
+  (set! all-defs (defs-table-update-locals/stx all-defs))
+  (define id->bind (make-id->bind all-defs))
+  ;;(pretty-print (dict->list id->bind)) (exit)
+  (set! all-defs (defs-id->ast all-defs id->bind))
+  (define predicate-id (conv-id->ast/update! id->bind predicate-stx))
+  ;;(pretty-print (dict-values all-defs)) (exit)
   (set! all-defs (defs-type-infer predicate-id all-defs))
   ;;(pretty-print (dict-values all-defs)) (exit)
   
@@ -500,7 +532,6 @@ external dependencies for the program/library, as well as the .cpp and
   ;;(pretty-print (list 'entry-points (dict-map eps-in-prog (compose car cons))))
   ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
 
-  (set! all-defs (defs-id->ast all-defs))
   ;;(pretty-print (map ast->sexp (dict-values all-defs)))
   
   (St mods all-defs eps-in-prog))

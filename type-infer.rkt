@@ -4,8 +4,7 @@
 |#
 
 (require "ast-magnolisp.rkt" "compiler-util.rkt"
-         "strategy.rkt" "util.rkt"
-         syntax/id-table)
+         "strategy.rkt" "util.rkt")
 
 ;;; 
 ;;; generic passes
@@ -13,14 +12,16 @@
 
 ;; This pass may be used to synchronize the definitions table with
 ;; updated local definitions (such as Param) after changes have been
-;; made within the global definitions.
-(define (defs-update-defs-table defs)
+;; made within the global definitions. The 'put' operation shall be
+;; used to update the table - its abstract signature is (-> table id
+;; Def? table).
+(define (defs-table-update-locals put defs)
   (define f
     (topdown-visit
      (lambda (ast)
        (when (ast-local-def? ast)
          (define id (Def-id ast))
-         (set! defs (dict-set defs id ast))))))
+         (set! defs (put defs id ast))))))
   
   (for (((id def) (in-dict defs)))
     (unless (ast-local-def? def)
@@ -28,9 +29,18 @@
 
   defs)
 
+(define* defs-table-update-locals/stx
+  (fix defs-table-update-locals dict-set))
+
+(define defs-table-update-locals/Id
+  (fix defs-table-update-locals ast-identifier-put))
+
 ;;; 
 ;;; utilities
 ;;; 
+
+(define (DefNameT-from-id id)
+  (ast-annotated id DefNameT id))
 
 (define (local-Defun? ast)
   (and (Defun? ast)
@@ -51,8 +61,7 @@
     ((Defun _ _ t _ _)
      t)
     ((ForeignTypeDecl _ id _)
-     (self-syntaxed DefNameT id))
-    ))
+     (DefNameT-from-id id))))
 
 (define (def-set-type def t)
   (match def
@@ -67,8 +76,10 @@
 
 (define (lookup-type-from-defs defs x)
   (assert (Var? x))
-  (define def-id (get-def-id-or-fail x))
-  (define def (dict-ref defs def-id))
+  (define def (ast-identifier-lookup defs (Var-id x)))
+  (unless def
+    (raise-language-error/ast
+     "reference to unbound name" x))
   (def-get-type def))
 
 ;; Returns #f for nodes that have no type.
@@ -87,9 +98,7 @@
    ((VarT? x) #t)
    ((VarT? y) #t)
    ((and (NameT? x) (NameT? y))
-    (free-identifier=?
-     (get-def-id-or-fail x)
-     (get-def-id-or-fail y)))
+    (ast-identifier=? (NameT-id x) (NameT-id y)))
    ((and (FunT? x) (FunT? y))
     (define x-rt (FunT-rt x))
     (define y-rt (FunT-rt y))
@@ -183,21 +192,13 @@
 
 (define (defs-add-VarT defs)
   ;; First add types for bindings.
-  (set! defs
-        (for/dict
-         (make-immutable-free-id-table #:phase 0)
-         (((id def) (in-dict defs)))
-         (values id (def-add-VarT def))))
+  (set! defs (defs-map-each-def/Id defs def-add-VarT))
 
   ;; Sync local definitions info into 'defs' table.
-  (set! defs (defs-update-defs-table defs))
+  (set! defs (defs-table-update-locals/Id defs))
 
   ;; Now add types to expressions.
-  (set! defs
-        (for/dict
-         (make-immutable-free-id-table #:phase 0)
-         (((id def) (in-dict defs)))
-         (values id (ast-expr-add-VarT defs def))))
+  (set! defs (defs-map-each-def/Id defs (fix ast-expr-add-VarT defs)))
 
   defs)
 
@@ -205,11 +206,15 @@
 ;;; constraint solver
 ;;; 
 
-;; Simplifies type 't' using any applicable substitions in 'h'
-;; (applied recursively). As a side effect, may update 'h' for
-;; purposes for memoization. Returns the simplified type. Note that
-;; eq? may be used to determine if any simplification took place.
-(define (subst h t) ;; (-> hash? Type? Type?)
+;; Simplifies type 't' using any applicable substitions in 'h', which
+;; maps VarT symbols to type expressions. Substitutions are applied
+;; recursively. As a side effect, may update 'h' for purposes for
+;; memoization. Returns the simplified type. Note that eq? may be used
+;; to determine if any simplification took place.
+(define-with-contract
+  (-> hash? Type? Type?)
+  (subst h t)
+  
   ;; 'ix' of last successful lookup.
   (define last-ix 0)
   
@@ -268,9 +273,7 @@
       (hash-set! h y-sym x)
       #t)
      ((and (NameT? x) (NameT? y))
-      (free-identifier=?
-       (get-def-id-or-fail x)
-       (get-def-id-or-fail y)))
+      (ast-identifier=? (NameT-id x) (NameT-id y)))
      ((and (FunT? x) (FunT? y))
       (define x-rt (FunT-rt x))
       (define y-rt (FunT-rt y))
@@ -330,20 +333,24 @@
 ;;; API
 ;;; 
 
-;; Takes an immutable-free-id-table containing just the program, and
+;; Takes a definition table containing just the program, and
 ;; checks/infers its types. 'defs' itself is used as the type
 ;; environment. The input may contain AnyT values, long as their
 ;; meaning can be inferred. Returns a fully typed program, with
 ;; definitions having resolved type fields (where appropriate), and
 ;; expressions having resolved 'type-ast' annotations.
-(define* (defs-type-infer predicate-id defs)
+(define-with-contract*
+  (-> Id? hash? hash?)
+  (defs-type-infer predicate-id defs)
+  
   ;;(pretty-print (dict->list defs))
-  ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values defs))))
 
-  (define predicate-NameT (self-syntaxed DefNameT predicate-id))
+  (define predicate-NameT (DefNameT-from-id predicate-id))
   
   (define lookup (fix lookup-type-from-defs defs))
 
+  ;; A mutable fact database of sorts, with VarT symbols as keys, and
+  ;; (possibly incomplete) type expressions as values.
   (define var-h (make-hasheq))
 
   ;; Possibly adds a constraint between types 'x' and 'y'. Returns #t
@@ -548,10 +555,6 @@
   (for (((id def) (in-dict defs)))
     (ti-def def))
 
-  (set! defs
-        (for/dict
-         (make-immutable-free-id-table #:phase 0)
-         (((id def) (in-dict defs)))
-         (values id (ast-rm-VarT var-h def))))
+  (set! defs (defs-map-each-def/Id defs (fix ast-rm-VarT var-h)))
   
   defs)

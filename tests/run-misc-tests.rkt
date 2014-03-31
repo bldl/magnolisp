@@ -41,9 +41,16 @@
              (build (+= mixed-bad 1 "2"))
              (type (fn predicate)))
     true)
-  (define x 1)
-  (provide x))
+  (define x 1))
 
 (check-not-compile-mgl-mod
  '(submod "." m2)
  #rx"type mismatch")
+
+(module m3 magnolisp
+  (function (f) (#:annos export) 1))
+
+(check-not-compile-mgl-mod
+ '(submod "." m3)
+ #rx"program is not fully typed")
+

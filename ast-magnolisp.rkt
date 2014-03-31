@@ -27,6 +27,9 @@ It is rather important for all Ast derived node types to be
 (define* (self-syntaxed typ stx)
   (syntaxed stx typ stx))
 
+(define* (ast-annotated ast typ . arg*)
+  (apply typ (Ast-annos ast) arg*))
+
 (define* (ast-anno-must ast k)
   (let* ((annos (Ast-annos ast)))
     (hash-ref annos k)))
@@ -153,6 +156,20 @@ It is rather important for all Ast derived node types to be
   (-> hash? Id? (or/c Def? #f))
   (ast-identifier-lookup bind->def id)
   (hash-ref bind->def (Id-bind id) #f))
+
+;; Stores a definition corresponding to the specified Identifier.
+(define-with-contract*
+  (-> hash? Id? Def? hash?)
+  (ast-identifier-put bind->def id def)
+  (hash-set bind->def (Id-bind id) def))
+
+(define-with-contract*
+  (-> hash? procedure? hash?)
+  (defs-map-each-def/Id defs rw)
+  (for/dict
+   #hasheq()
+   (((base def) (in-dict defs)))
+   (values base (rw def))))
 
 ;;; 
 ;;; type expressions
