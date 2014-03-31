@@ -328,15 +328,13 @@ external dependencies for the program/library, as well as the .cpp and
         (writeln (list (syntax-e var-id) ast (identifier-binding var-id) def-id)))))
    def))
 
-(define (Def-all-referred-def-ids def)
-  (define defs (make-free-id-table #:phase 0))
+(define (def-all-used-id-binds def)
+  (define defs (make-hasheq))
   ((topdown-visit
     (lambda (ast)
-      (when (name-ref? ast)
-        (define def-id (get-def-id ast))
-        ;;(writeln `(name-ref ,ast ,def-id))
-        (when def-id
-          (dict-set! defs def-id #t)))))
+      (define id (name-ref-id/maybe ast))
+      (when id
+        (hash-set! defs (Id-bind id) #t))))
    def)
   (dict-keys defs))
 
@@ -357,24 +355,32 @@ external dependencies for the program/library, as well as the .cpp and
    (lambda (id def)
      (def-display-Var-bindings def))))
 
-;; Drops all bindings from 'all-defs' that are not reachable via at
-;; least one of the entry points in 'eps'. This relies on name
-;; references (within the codebase) having been resolved. Returns the
-;; trimmed down definitions as a free-id-table.
-(define (defs-drop-unreachable all-defs eps)
-  (define processed-defs (make-free-id-table #:phase 0))
-  (let loop ((ids-to-process (dict-keys eps)))
+;; Drops all top-level definitions in 'tl-def-lst' that are not used
+;; via at least one of the entry points in 'eps' (which has 'Id'
+;; 'bind' values as keys). This relies on name references (within the
+;; codebase) having been resolved. Returns the trimmed down
+;; definitions.
+(define-with-contract
+  (-> (listof Def?)
+      (set/c symbol? #:cmp 'eq)
+      (listof Def?))
+  (defs-drop-unreachable tl-def-lst eps)
+  (define globals (build-global-defs-table tl-def-lst))
+  (define processed-ids (mutable-seteq))
+  (define processed-defs null)
+  (let loop ((ids-to-process (set->list eps)))
     (unless (null? ids-to-process)
-      (define id (car ids-to-process))
-      (set! ids-to-process (cdr ids-to-process))
-      (unless (dict-has-key? processed-defs id)
-        (define def (dict-ref all-defs id))
-        (dict-set! processed-defs id def)
-        (define refs-in-def (Def-all-referred-def-ids def))
-        (set! ids-to-process
-              (append ids-to-process refs-in-def)))
-      (loop ids-to-process)))
-  ;;(pretty-print `(original-defs ,(dict-count all-defs) ,(dict-keys all-defs) retained-defs ,(dict-count processed-defs) ,(dict-keys processed-defs)))
+      (define next-ids null)
+      (for ((id-bind ids-to-process))
+        (unless (set-member? processed-ids id-bind)
+          (set-add! processed-ids id-bind)
+          (define def (dict-ref globals id-bind #f))
+          (when def
+            (set! processed-defs (cons def processed-defs))
+            (define refs-in-def (def-all-used-id-binds def))
+            (set! next-ids (append next-ids refs-in-def)))))
+      (loop next-ids)))
+  ;;(pretty-print `(original-defs ,(dict-count globals) ,(dict-keys globals) retained-defs ,(dict-count processed-defs) ,(dict-keys processed-defs)))
   processed-defs)
 
 ;; defs-in-mod is an immutable id-table, whereas eps-in-mod is an
@@ -505,13 +511,16 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-resolve-names all-defs mods))
   ;;(pretty-print (dict->list all-defs)) (exit)
   (set! all-defs (defs-optimize-if TRUE-stx FALSE-stx all-defs))
-  (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (define def-lst (dict-values all-defs))
   (set! def-lst (for/list ([def def-lst] #:unless (DefStx? def)) def))
   (define id->bind (make-id->bind def-lst))
   (set! def-lst (map (fix ast-id->ast id->bind) def-lst))
+  (define eps-in-prog/Id
+    (for/seteq ([(id x) (in-dict eps-in-prog)])
+      (dict-ref id->bind id)))
+  (set! def-lst (defs-drop-unreachable def-lst eps-in-prog/Id))
   (set! def-lst (map ast-rm-LetExpr def-lst))
   (set! def-lst (map ast-LetLocalEc->BlockExpr def-lst))
   (set! def-lst (map ast-simplify def-lst))

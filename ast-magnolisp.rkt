@@ -413,6 +413,10 @@ It is rather important for all Ast derived node types to be
                     #:init (make-immutable-free-id-table #:phase 0)
                     #:put dict-set))
 
+(define* (build-global-defs-table tl-def-lst)
+  (for/hasheq ([def tl-def-lst])
+    (values (Id-bind (Def-id def)) def)))
+
 ;;; 
 ;;; definition IDs
 ;;; 
@@ -490,6 +494,14 @@ It is rather important for all Ast derived node types to be
    ((Var? ast) (Var-id ast))
    ((NameT? ast) (NameT-id ast))
    (else (unsupported ast))))
+
+(define-with-contract*
+  (-> Ast? (or/c Id? #f))
+  (name-ref-id/maybe ast)
+  (cond
+   ((Var? ast) (Var-id ast))
+   ((NameT? ast) (NameT-id ast))
+   (else #f)))
 
 ;;; 
 ;;; expressions
