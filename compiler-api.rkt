@@ -86,7 +86,7 @@ external dependencies for the program/library, as well as the .cpp and
     (set! id->bind t)
     id))
 
-(define (defs-id->ast defs id->bind)
+(define (ast-id->ast id->bind ast)
   (define (mk-id id)
     (conv-id->ast id->bind id))
 
@@ -115,11 +115,8 @@ external dependencies for the program/library, as well as the .cpp and
           (NameT a id-ast))
          (else
           (ast-rw-annos ast))))))
-  
-  (for/hasheq ([(id def) (in-dict defs)])
-    (let ((bind (dict-ref id->bind id #f)))
-      (assert bind)
-      (values bind (rw def)))))
+
+  (rw ast))
 
 ;;; 
 ;;; definition table utilities
@@ -536,16 +533,16 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-rm-LetExpr all-defs))
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (set! all-defs ((make-for-all-defs/stx ast-LetLocalEc->BlockExpr) all-defs))
-  (set! all-defs ((make-for-all-defs/stx ast-simplify) all-defs))
+  (define def-lst (dict-values all-defs))
+  (define id->bind (make-id->bind def-lst))
+  (set! def-lst (map (fix ast-id->ast id->bind) def-lst))
+  (set! def-lst (map ast-simplify def-lst))
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values all-defs))))
   ;;(pretty-print (dict->list all-defs)) (exit)
   ;;(pretty-print (dict->list all-defs)) (exit)
-  (define id->bind (make-id->bind (dict-values all-defs)))
   ;;(pretty-print (dict->list id->bind)) (exit)
-  (set! all-defs (defs-id->ast all-defs id->bind))
   (define predicate-id (conv-id->ast/update! id->bind predicate-stx))
   ;;(pretty-print (dict-values all-defs)) (exit)
-  (define def-lst (dict-values all-defs))
   (set! def-lst (map de-racketize def-lst))
   (defs-check-Apply-target def-lst)
   (set! all-defs (build-defs-table def-lst))
