@@ -186,16 +186,16 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; IfExpr and IfStat
 ;;; 
 
-(define (defs-optimize-if TRUE-stx FALSE-stx defs)
+(define (defs-optimize-if TRUE-id FALSE-id defs)
   (define (make-f-pred id)
     (lambda (ast)
       (and (Apply? ast)
            (let ((f (Apply-f ast)))
              (and (Var? f)
-                  (free-identifier=? (Var-id f) id))))))
+                  (ast-identifier=? (Var-id f) id))))))
 
-  (define TRUE? (make-f-pred TRUE-stx))
-  (define FALSE? (make-f-pred FALSE-stx))
+  (define TRUE? (make-f-pred TRUE-id))
+  (define FALSE? (make-f-pred FALSE-id))
   
   (define-match-expander SomeIf
     (syntax-rules ()
@@ -214,7 +214,7 @@ external dependencies for the program/library, as well as the .cpp and
            (else ast)))
          (_ ast)))))
 
-  ((make-for-all-defs/stx rw) defs))
+  (map rw defs))
 
 ;;; 
 ;;; LetExpr
@@ -510,13 +510,15 @@ external dependencies for the program/library, as well as the .cpp and
   (define all-defs (merge-defs mods))
   (set! all-defs (defs-resolve-names all-defs mods))
   ;;(pretty-print (dict->list all-defs)) (exit)
-  (set! all-defs (defs-optimize-if TRUE-stx FALSE-stx all-defs))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (define def-lst (dict-values all-defs))
   (set! def-lst (for/list ([def def-lst] #:unless (DefStx? def)) def))
   (define id->bind (make-id->bind def-lst))
   (set! def-lst (map (fix ast-id->ast id->bind) def-lst))
+  (define TRUE-id (conv-id->ast/update! id->bind TRUE-stx))
+  (define FALSE-id (conv-id->ast/update! id->bind FALSE-stx))
+  (set! def-lst (defs-optimize-if TRUE-id FALSE-id def-lst))
   (define eps-in-prog/Id
     (for/seteq ([(id x) (in-dict eps-in-prog)])
       (dict-ref id->bind id)))
