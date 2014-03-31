@@ -7,50 +7,11 @@
          "strategy.rkt" "util.rkt")
 
 ;;; 
-;;; generic passes
-;;;
-
-;; This pass may be used to synchronize the definitions table with
-;; updated local definitions (such as Param) after changes have been
-;; made within the global definitions. The 'put' operation shall be
-;; used to update the table - its abstract signature is (-> table id
-;; Def? table).
-(define (defs-table-update-locals put defs)
-  (define f
-    (topdown-visit
-     (lambda (ast)
-       (when (ast-local-def? ast)
-         (define id (Def-id ast))
-         (set! defs (put defs id ast))))))
-  
-  (for (((id def) (in-dict defs)))
-    (unless (ast-local-def? def)
-      (f def)))
-
-  defs)
-
-(define* defs-table-update-locals/stx
-  (fix defs-table-update-locals dict-set))
-
-(define defs-table-update-locals/Id
-  (fix defs-table-update-locals ast-identifier-put))
-
-;;; 
 ;;; utilities
 ;;; 
 
 (define (DefNameT-from-id id)
   (ast-annotated id DefNameT id))
-
-(define (local-Defun? ast)
-  (and (Defun? ast)
-       (not (ast-anno-must ast 'top))))
-
-;; In IR we do not allow global DefVars.
-(define (ast-local-def? ast)
-  (any-pred-holds
-   Param? DefVar? local-Defun?
-   ast))
 
 (define (def-get-type def)
   (match def

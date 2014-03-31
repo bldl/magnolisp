@@ -33,18 +33,25 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; identifier -> Id conversion
 ;;;
 
-;; Before invoking this, be sure to ensure that 'defs' is up-to-date,
-;; also wrt to its local definitions (see
-;; defs-table-update-locals/stx).
 (define-with-contract
-  (-> immutable-free-id-table? immutable-free-id-table?)
-  (make-id->bind defs)
-  (for/dict
-   (make-immutable-free-id-table #:phase 0)
-   ([(id def) (in-dict defs)])
-   (let* ((name (syntax-e id))
-          (bind (gensym name)))
-     (values id bind))))
+  (-> list? immutable-free-id-table?)
+  (make-id->bind tl-def-lst)
+
+  (define id->bind (make-immutable-free-id-table #:phase 0))
+  
+  (define f
+    (topdown-visit
+     (lambda (ast)
+       (define id (binding-or-use-id ast))
+       (when id
+         (let ((def-id (or (syntax-property id 'def-id) id)))
+           (unless (dict-has-key? id->bind def-id)
+             (define bind (gensym (syntax-e def-id)))
+             (set! id->bind (dict-set id->bind def-id bind))))))))
+  
+  (for-each f tl-def-lst)
+
+  id->bind)
 
 (define-with-contract
   (-> immutable-free-id-table? identifier? Id?)
@@ -114,36 +121,53 @@ external dependencies for the program/library, as well as the .cpp and
       (assert bind)
       (values bind (rw def)))))
 
-;;;
-;;; de-Racketization
+;;; 
+;;; definition table utilities
 ;;;
 
 ;; A combinator that applies the rewrite 'rw' to each definition in
 ;; the passed set of definitions.
-(define (make-for-all-defs rw)
+(define (make-for-all-defs/stx rw)
   (lambda (defs)
     (for/dict
      (make-immutable-free-id-table #:phase 0)
      (([id def] (in-dict defs)))
      (values id (rw def)))))
 
-(define (de-racketize defs ast)
+;;;
+;;; de-Racketization
+;;;
+
+(define-with-contract
+  (-> list? void?)
+  (defs-check-Apply-target def-lst)
+  (define bind->def (build-defs-table def-lst))
+  (for-each
+   (topdown-visit
+    (lambda (ast)
+      (match ast
+        ((Apply _ e _)
+         (assert (Var? e))
+         (define id (Var-id e))
+         (define def (ast-identifier-lookup bind->def id))
+         ;; Base namespace names may be unresolved. (For now.)
+         (when def
+           (unless (matches? def (or (DefVar _ _ _ (? Lambda?))
+                                     (Defun _ _ _ _ _)))
+             (raise-language-error/ast
+              "application target does not name a function"
+              ast e))))
+        (_ (void)))))
+   def-lst))
+
+(define-with-contract
+  (-> Def? Def?)
+  (de-racketize ast)
+  
   (define rw
     (topdown
      (lambda (ast)
        (match ast
-         ((Apply _ e _)
-          (assert (Var? e))
-          (define id (Var-id e))
-          (define def (dict-ref defs id #f))
-          ;; Base namespace names may be unresolved.
-          (when def
-            (unless (matches? def (DefVar _ _ _ (? Lambda?)))
-              (raise-language-error/ast
-               "application target does not name a function"
-               ast e)))
-          ast)
-
          ((DefVar a1 n t (Lambda a2 p b))
           ;; Retain annos from the binding, which has any information
           ;; associated with the binding. It should also have the
@@ -155,10 +179,8 @@ external dependencies for the program/library, as well as the .cpp and
           (Defun a1 n t p b))
          
          (_ ast)))))
+  
   (rw ast))
-
-(define (defs-de-racketize defs)
-  ((make-for-all-defs (fix de-racketize defs)) defs))
 
 ;;; 
 ;;; DefStx
@@ -202,7 +224,7 @@ external dependencies for the program/library, as well as the .cpp and
            (else ast)))
          (_ ast)))))
 
-  ((make-for-all-defs rw) defs))
+  ((make-for-all-defs/stx rw) defs))
 
 ;;; 
 ;;; LetExpr
@@ -245,7 +267,7 @@ external dependencies for the program/library, as well as the .cpp and
            (rw-complex ast))
           (_ #f))))))
   
-  (define rw (make-for-all-defs ast-rm-LetExpr))
+  (define rw (make-for-all-defs/stx ast-rm-LetExpr))
 
   (define n-defs (rw defs))
   (for ((id del-lst))
@@ -513,17 +535,20 @@ external dependencies for the program/library, as well as the .cpp and
   ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
   (set! all-defs (defs-rm-LetExpr all-defs))
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
-  (set! all-defs ((make-for-all-defs ast-LetLocalEc->BlockExpr) all-defs))
-  (set! all-defs ((make-for-all-defs ast-simplify) all-defs))
-  (set! all-defs (defs-de-racketize all-defs))
-  ;;(pretty-print (dict->list all-defs)) (exit)
+  (set! all-defs ((make-for-all-defs/stx ast-LetLocalEc->BlockExpr) all-defs))
+  (set! all-defs ((make-for-all-defs/stx ast-simplify) all-defs))
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values all-defs))))
-  (set! all-defs (defs-table-update-locals/stx all-defs))
-  (define id->bind (make-id->bind all-defs))
+  ;;(pretty-print (dict->list all-defs)) (exit)
+  ;;(pretty-print (dict->list all-defs)) (exit)
+  (define id->bind (make-id->bind (dict-values all-defs)))
   ;;(pretty-print (dict->list id->bind)) (exit)
   (set! all-defs (defs-id->ast all-defs id->bind))
   (define predicate-id (conv-id->ast/update! id->bind predicate-stx))
   ;;(pretty-print (dict-values all-defs)) (exit)
+  (define def-lst (dict-values all-defs))
+  (set! def-lst (map de-racketize def-lst))
+  (defs-check-Apply-target def-lst)
+  (set! all-defs (build-defs-table def-lst))
   (set! all-defs (defs-type-infer predicate-id all-defs))
   ;;(pretty-print (dict-values all-defs)) (exit)
   

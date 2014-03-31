@@ -4,7 +4,7 @@
 
 (function (equal x y)
   (#:annos (type (fn int int predicate)) foreign)
-  (equal? x y))
+  (begin-racket (equal? x y)))
 
 (function (default e f d) #an(export)
   (do

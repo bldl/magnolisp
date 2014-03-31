@@ -54,3 +54,15 @@
  '(submod "." m3)
  #rx"program is not fully typed")
 
+(module m4 magnolisp
+  (function (f)
+    (#:annos export (type (fn predicate)))
+    (do
+      (var x true)
+      (var y (x))
+      (return x)))
+  (define x 3))
+
+(check-not-compile-mgl-mod
+ '(submod "." m4)
+ #rx"application target")

@@ -164,6 +164,12 @@ It is rather important for all Ast derived node types to be
   (hash-set bind->def (Id-bind id) def))
 
 (define-with-contract*
+  (-> hash? procedure? void?)
+  (defs-for-each-def/Id defs f)
+  (for (((base def) (in-dict defs)))
+    (f def)))
+
+(define-with-contract*
   (-> hash? procedure? hash?)
   (defs-map-each-def/Id defs rw)
   (for/dict
@@ -235,6 +241,8 @@ It is rather important for all Ast derived node types to be
 ;;; 
 ;;; other Magnolisp
 ;;; 
+
+(define-ast* CompilationUnit Ast ((list-of-term lst))) 
 
 ;; For functions with no Magnolisp body.
 (define-ast* NoBody Ast ())
@@ -341,6 +349,68 @@ It is rather important for all Ast derived node types to be
 (define-ast* TlVerbatim Ast ((no-term s)))
 
 ;;; 
+;;; definition table management
+;;;
+
+(define* (local-Defun? ast)
+  (and (Defun? ast)
+       (not (ast-anno-must ast 'top))))
+
+;; In IR we do not allow global DefVars.
+(define* (ast-local-def? ast)
+  (any-pred-holds
+   Param? DefVar? local-Defun?
+   ast))
+
+;; This pass may be used to synchronize the definitions table with
+;; updated local definitions (such as Param) after changes have been
+;; made within the global definitions. The 'put' operation shall be
+;; used to update the table - its abstract signature is (-> table id
+;; Def? table).
+(define (defs-table-update-locals put defs)
+  (define f
+    (topdown-visit
+     (lambda (ast)
+       (when (ast-local-def? ast)
+         (define id (Def-id ast))
+         (set! defs (put defs id ast))))))
+  
+  (for (((id def) (in-dict defs)))
+    (unless (ast-local-def? def)
+      (f def)))
+
+  defs)
+
+(define* defs-table-update-locals/stx
+  (fix defs-table-update-locals dict-set))
+
+(define* defs-table-update-locals/Id
+  (fix defs-table-update-locals ast-identifier-put))
+
+(define* (build-defs-table tl-def-lst
+                           #:init [defs #hasheq()]
+                           #:put [put ast-identifier-put])
+  (define (put! def)
+    (set! defs (put defs (Def-id def) def)))
+  
+  (define f
+    (topdown-visit
+     (lambda (ast)
+       (when (Def? ast)
+         (put! ast)))))
+  
+  (for-each f tl-def-lst)
+
+  defs)
+
+(define-with-contract*
+  (-> list? immutable-free-id-table?)
+  (build-defs-table/stx tl-def-lst)
+  (build-defs-table tl-def-lst
+                    #:init (make-immutable-free-id-table #:phase 0)
+                    #:put dict-set))
+
+;;; 
 ;;; definition IDs
 ;;; 
 
@@ -396,6 +466,15 @@ It is rather important for all Ast derived node types to be
 ;;; 
 ;;; names
 ;;; 
+
+;; If 'ast' is a definition or a name reference, returns the
+;; identifier being bound or referenced. No 'def-id' lookup is done.
+(define* (binding-or-use-id ast)
+  (cond
+   ((Def? ast) (Def-id ast))
+   ((Var? ast) (Var-id ast))
+   ((NameT? ast) (NameT-id ast))
+   (else #f)))
 
 (define* (name-ref? ast)
   (or (Var? ast) (NameT? ast)))
