@@ -533,7 +533,7 @@
       ((#%plain-app k e)
        (and (syntax-property stx 'local-ec)
             (identifier? #'k))
-       (syntaxed stx AppLocalEc #'k (parse-expr #'e)))
+       (syntaxed stx AppLocalEc (self-syntaxed Label #'k) (parse-expr #'e)))
       
       ((let-kw binds . exprs)
        (and (identifier? #'let-kw)
@@ -620,7 +620,7 @@
             (identifier? #'kall)
             (free-identifier=? #'kall #'call/ec))
        (syntaxed stx
-        LetLocalEc #'k
+        LetLocalEc (self-syntaxed Label #'k)
         (map
          parse-stat
          (syntax->list #'(b ...)))))

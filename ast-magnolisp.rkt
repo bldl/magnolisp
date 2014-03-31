@@ -287,11 +287,14 @@ It is rather important for all Ast derived node types to be
 ;; Transient. Corresponds to a let/ec that only escapes to a local,
 ;; immediately surrounding call/cc continuation. 'k' is a label (an
 ;; ID) naming the continuation.
-(define-ast* LetLocalEc Ast ((no-term k) (list-of-term ss)))
+(define-ast* LetLocalEc Ast ((just-term k) (list-of-term ss)))
 
 ;; Escapes to the named LetLocalEc continuation 'k' (an ID) with the
 ;; value given by expression 'e'.
-(define-ast* AppLocalEc Ast ((no-term k) (just-term e)))
+(define-ast* AppLocalEc Ast ((just-term k) (just-term e)))
+
+;; Label, either a binding or use context.
+(define-ast* Label Ast ((no-term id)))
 
 ;; Block expression. Contains statements.
 (define-ast* BlockExpr Ast ((list-of-term ss)))
@@ -473,6 +476,7 @@ It is rather important for all Ast derived node types to be
   (cond
    ((Def? ast) (Def-id ast))
    ((Var? ast) (Var-id ast))
+   ((Label? ast) (Label-id ast))
    ((NameT? ast) (NameT-id ast))
    (else #f)))
 

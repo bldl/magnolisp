@@ -113,6 +113,9 @@ external dependencies for the program/library, as well as the .cpp and
          ((NameT a id)
           (define id-ast (mk-id id))
           (NameT a id-ast))
+         ((Label a id)
+          (define id-ast (mk-id id))
+          (Label a id-ast))
          (else
           (ast-rw-annos ast))))))
 
@@ -280,20 +283,20 @@ external dependencies for the program/library, as well as the .cpp and
   
   (define (rw ast)
     (match ast
-     ((LetLocalEc a k ss)
+     ((LetLocalEc a (Label _ k) ss)
       (parameterize ((enclosing-id k))
         (BlockExpr a (map rw ss))))
-     ((AppLocalEc a k e)
+     ((AppLocalEc a (Label _ k) e)
       (define e-id (enclosing-id))
       (unless e-id
         (raise-language-error/ast
          "local escape without enclosing context"
          ast))
-      (unless (free-identifier=? e-id k)
+      (unless (ast-identifier=? e-id k)
         (raise-language-error/ast
          "local escape beyond its context"
          ast k
-         #:fields (list (list "context" e-id))))
+         #:fields (list (list "context" (ast-displayable e-id)))))
       (Return a (rw e)))
      (else
       (all-rw-term rw ast))))
@@ -532,10 +535,10 @@ external dependencies for the program/library, as well as the .cpp and
   ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
   (set! all-defs (defs-rm-LetExpr all-defs))
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
-  (set! all-defs ((make-for-all-defs/stx ast-LetLocalEc->BlockExpr) all-defs))
   (define def-lst (dict-values all-defs))
   (define id->bind (make-id->bind def-lst))
   (set! def-lst (map (fix ast-id->ast id->bind) def-lst))
+  (set! def-lst (map ast-LetLocalEc->BlockExpr def-lst))
   (set! def-lst (map ast-simplify def-lst))
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values all-defs))))
   ;;(pretty-print (dict->list all-defs)) (exit)
