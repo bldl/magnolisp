@@ -230,49 +230,34 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; LetExpr
 ;;; 
 
-(define (defs-rm-LetExpr defs)
-  (define del-lst '())
-
-  ;; Complex case. Turn LetExpr into a BlockExpr + LetStat.
-  (define (rw-complex ast)
-    (match-define (LetExpr a dv e) ast)
-    (define n-ast
-      (BlockExpr a (list
-                    (LetStat
-                     (hasheq 'let-kind (ast-anno-must ast 'let-kind))
-                     dv
-                     (list (annoless Return e))))))
-    ;;(pretty-print n-ast)
-    n-ast)
-  
-  (define ast-rm-LetExpr
-    (topdown
-     (repeat
-      (lambda (ast)
-        (match ast
-          ((LetExpr _ (DefVar a1 bn t v) (Var _ rn))
-           (if (free-identifier=? bn rn)
-               ;; Simple case. Just retain expression 'v'.
-               (let ()
-                 (set! del-lst (cons bn del-lst))
-                 (define a2 (Ast-annos v))
-                 (define a (hash-merge a1 a2))
-                 (when (Literal? v)
-                   (set! a (hash-set a 'type-ast t)))
-                 (define n-ast (ast-set-annos v a))
-                 ;;(writeln (list n-ast (Ast-annos n-ast)))
-                 n-ast)
-               (rw-complex ast)))
-          ((? LetExpr?)
-           (rw-complex ast))
-          (_ #f))))))
-  
-  (define rw (make-for-all-defs/stx ast-rm-LetExpr))
-
-  (define n-defs (rw defs))
-  (for ((id del-lst))
-    (set! n-defs (dict-remove n-defs id)))
-  n-defs)
+(define ast-rm-LetExpr
+  (topdown
+   (repeat
+    (lambda (ast)
+      (match ast
+        ;; Simple case. Just retain expression 'v'.
+        [(LetExpr _ (DefVar a1 bn t v) (Var _ rn))
+         #:when (ast-identifier=? bn rn)
+         (define a2 (Ast-annos v))
+         (define a (hash-merge a1 a2))
+         (when (Literal? v)
+           (set! a (hash-set a 'type-ast t)))
+         (define n-ast (ast-set-annos v a))
+         ;;(writeln (list n-ast (Ast-annos n-ast)))
+         n-ast]
+        ;; Complex case. Turn LetExpr into a BlockExpr + LetStat.
+        [(? LetExpr?)
+         (match-define (LetExpr a dv e) ast)
+         (define n-ast
+           (BlockExpr
+            a
+            (list
+             (LetStat
+              (hasheq 'let-kind (ast-anno-must ast 'let-kind))
+              dv
+              (list (annoless Return e))))))
+         n-ast]
+        [_ #f])))))
 
 ;;; 
 ;;; local escapes
@@ -533,11 +518,11 @@ external dependencies for the program/library, as well as the .cpp and
   (set! all-defs (defs-drop-unreachable all-defs eps-in-prog))
   (set! all-defs (defs-rm-DefStx all-defs))
   ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
-  (set! all-defs (defs-rm-LetExpr all-defs))
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (define def-lst (dict-values all-defs))
   (define id->bind (make-id->bind def-lst))
   (set! def-lst (map (fix ast-id->ast id->bind) def-lst))
+  (set! def-lst (map ast-rm-LetExpr def-lst))
   (set! def-lst (map ast-LetLocalEc->BlockExpr def-lst))
   (set! def-lst (map ast-simplify def-lst))
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values all-defs))))
