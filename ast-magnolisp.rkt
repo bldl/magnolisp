@@ -19,8 +19,8 @@ It is rather important for all Ast derived node types to be
 ;;; 
 
 (define-view* Ast #:fields (annos))
-(define-view* Type #:fields (annos))
-(define-view* Def #:fields (annos id))
+(define-view* Type #:fields ())
+(define-view* Def #:fields (id))
 
 (define* (annoless typ . arg*)
   (apply typ #hasheq() arg*))
@@ -191,10 +191,6 @@ It is rather important for all Ast derived node types to be
 
 ;; 'id' is an ID
 (define-ast* NameT (Ast Type) ((no-term annos) (no-term id)))
-
-;; these are always computed;
-;; for these, 'id' is also 'def-id'
-;; xxx (define-ast* DefNameT NameT ())
 
 ;; 'ats' are the param types, and 'rt' is the return type
 (define-ast* FunT (Ast Type) ((no-term annos)
@@ -442,8 +438,6 @@ It is rather important for all Ast derived node types to be
     (get-def-id (Def-id x)))
    ((Var? x)
     (get-def-id (Var-id x)))
-   ((DefNameT? x)
-    (NameT-id x))
    ((NameT? x)
     (get-def-id (NameT-id x)))
    (else
@@ -460,7 +454,7 @@ It is rather important for all Ast derived node types to be
     (syntax-property x 'def-id def-id))
    ((Def? x)
     (define id (set-def-id (Def-id x) def-id))
-    (dynamic-struct-copy Def x (id id)))
+    (Def-copy x id))
    ((Var? x)
     (define id (set-def-id (Var-id x) def-id))
     (struct-copy Var x (id id)))
@@ -777,3 +771,37 @@ It is rather important for all Ast derived node types to be
 
 (define* (ast-pp ast)
   (pretty-print (ast->sexp ast)))
+
+;;; 
+;;; tests
+;;; 
+
+(module+ test
+  (require rackunit)
+  (let ((ast (annoless Var (fresh-ast-identifier))))
+    (check-true (Var? ast))
+    (check-true (Ast? ast))
+    (check-true (Id? (Var-id ast)))
+    (check-true (hash? (Ast-annos ast)))
+    (check-true (Ast? (set-Ast-annos ast #hasheq())))
+    (let ((a (Ast-annos ast)))
+      (check-eq? a (Ast-annos (set-Ast-annos ast a))))
+    (let ((a #hasheq((foo . bar))))
+      (check-eq? a (Ast-annos (set-Ast-annos ast a)))
+      (check-eq? a (Ast-annos (Ast-copy ast a)))))
+  (let ((ast (annoless Param (fresh-ast-identifier)
+                       (annoless NameT (fresh-ast-identifier 't)))))
+    (check-true (Param? ast))
+    (check-true (Def? ast))
+    (check-true (Ast? ast))
+    (check-true (Id? (Def-id ast)))
+    (let* ((id (fresh-ast-identifier))
+           (n-ast (set-Def-id ast id)))
+      (check-pred Param? n-ast)
+      (check-pred Id? (Def-id n-ast))
+      (check-not-eq? (Def-id ast) (Def-id n-ast)))
+    (let* ((id (fresh-ast-identifier))
+           (n-ast (Def-copy ast id)))
+      (check-pred Param? n-ast)
+      (check-pred Id? (Def-id n-ast))
+      (check-not-eq? (Def-id ast) (Def-id n-ast)))))

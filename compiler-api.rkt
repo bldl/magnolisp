@@ -106,7 +106,7 @@ external dependencies for the program/library, as well as the .cpp and
          ((? Def?)
           (define id (Def-id ast))
           (define id-ast (mk-id id))
-          (dynamic-struct-copy Def ast (id id-ast)))
+          (Def-copy ast id-ast))
          ((Var a id)
           (define id-ast (mk-id id))
           (Var (or (rw-annos a) a) id-ast))
@@ -120,19 +120,6 @@ external dependencies for the program/library, as well as the .cpp and
           (ast-rw-annos ast))))))
 
   (rw ast))
-
-;;; 
-;;; definition table utilities
-;;;
-
-;; A combinator that applies the rewrite 'rw' to each definition in
-;; the passed set of definitions.
-(define (make-for-all-defs/stx rw)
-  (lambda (defs)
-    (for/dict
-     (make-immutable-free-id-table #:phase 0)
-     (([id def] (in-dict defs)))
-     (values id (rw def)))))
 
 ;;;
 ;;; de-Racketization
@@ -516,6 +503,7 @@ external dependencies for the program/library, as well as the .cpp and
   (set! def-lst (for/list ([def def-lst] #:unless (DefStx? def)) def))
   (define id->bind (make-id->bind def-lst))
   (set! def-lst (map (fix ast-id->ast id->bind) def-lst))
+  ;;(pretty-print def-lst) (exit)
   (define TRUE-id (conv-id->ast/update! id->bind TRUE-stx))
   (define FALSE-id (conv-id->ast/update! id->bind FALSE-stx))
   (set! def-lst (defs-optimize-if TRUE-id FALSE-id def-lst))

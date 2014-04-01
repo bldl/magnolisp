@@ -11,7 +11,7 @@
 ;;; 
 
 (define (DefNameT-from-id id)
-  (ast-annotated id DefNameT id))
+  (ast-annotated id NameT id))
 
 (define (def-get-type def)
   (match def
