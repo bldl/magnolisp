@@ -2,44 +2,27 @@
 
 #|
 
-All AST node types must be defined as #:transparent. You will probably
-want to define the base node type using the provided macro.
+Assumptions for AST node types:
+
+- each type must be defined as #:transparent
+  (this is done by the macros here)
+
+- the first field of each node is for annotations,
+  and named 'annos', and declared as 'no-term'
+
+- no inheritance is used in defining the types
 
 |#
 
-(require "strategy.rkt" "util.rkt" "util/struct.rkt")
-(require racket/generic unstable/struct)
-(require (for-syntax racket/function racket/list racket/syntax))
+(require "ast-view.rkt" "strategy.rkt"
+         "util.rkt" "util/struct.rkt"
+         racket/generic unstable/struct
+         (for-syntax racket/function racket/list
+                     racket/syntax syntax/parse))
 
 ;;; 
-;;; syntax-derived annotations
+;;; annotations
 ;;; 
-
-;; Creates a hasheq of the properties of the given syntax object
-;; 'stx'.
-(define* (stx-props stx)
-  (for/hasheq ((k (syntax-property-symbol-keys stx)))
-              (values k (syntax-property stx k))))
-
-;;;
-;;; base AST node definition
-;;;
-
-(define (ast-write v out mode)
-  (define n (struct-symbol v))
-  (define fvs (struct->list v #:on-opaque 'return-false))
-  (unless fvs
-    ;; Important not to 'write' v here, would lead to infinite
-    ;; recursion. For the same reason cannot pass #:on-opaque 'error
-    ;; to struct->list.
-    (error 'ast-write "non-opaque struct ~a" n))
-  (write (cons n (cdr fvs)) out))
-
-(define-syntax-rule* (define-ast-base* n more ...)
-  (abstract-struct* n (annos)
-                    #:property prop:custom-write ast-write
-                    #:transparent
-                    more ...))
 
 (define* (ast-get-annos v)
   (car (struct->list v)))
@@ -59,6 +42,20 @@ want to define the base node type using the provided macro.
   (let ((a (ast-get-annos v)))
     (let ((v (begin b ...)))
       (ast-set-annos v a))))
+
+;;;
+;;; printing
+;;;
+
+(define (ast-write v out mode)
+  (define n (struct-symbol v))
+  (define fvs (struct->list v #:on-opaque 'return-false))
+  (unless fvs
+    ;; Important not to 'write' v here, would lead to infinite
+    ;; recursion. For the same reason cannot pass #:on-opaque 'error
+    ;; to struct->list.
+    (error 'ast-write "non-opaque struct ~a" n))
+  (write (cons n (cdr fvs)) out))
 
 ;;; 
 ;;; gen:strategic
@@ -150,23 +147,35 @@ want to define the base node type using the provided macro.
 ;;; 
 
 (define-syntax* (define-ast* stx)
-  (syntax-case stx ()
-    ((_ name parent ((t field) ...) #:singleton (arg ...))
-     (with-syntax ((the-name
-                    (format-id stx "the-~a" (syntax-e #'name))))
-       #`(singleton-struct*
-          name (the-name arg ...) parent (field ...)
-          #:methods gen:strategic
-          (#,@(make-strategic
-               #'name
-               (syntax->list #'((t field) ...))))
-          #:transparent)))
-    ((_ name parent ((t field) ...) modif ...)
-     #`(begin
-         (concrete-struct* name parent (field ...)
-           #:methods gen:strategic
-           (#,@(make-strategic
-                #'name
-                (syntax->list #'((t field) ...))))
-           #:transparent modif ...)))
-    ))
+  (define-syntax-class ft
+    (pattern (~or (~datum no-term)
+                  (~datum just-term)
+                  (~datum list-of-term))))
+  (syntax-parse stx
+    [(_ name:id (view:id ...) ((t:ft fld:id) ...)
+        (~optional (~seq #:singleton (arg:expr ...)))
+        (~optional (~seq #:custom-write writer:expr))
+        (~optional (~seq #:struct-options (opt ...+))))
+     (define singleton? (attribute arg))
+     (quasisyntax/loc stx
+       (#,(if singleton? #'singleton-struct* #'concrete-struct*)
+        name
+        #,@(if singleton?
+               (with-syntax ((the-name
+                              (format-id stx "the-~a" (syntax-e #'name))))
+                 (list #'(the-name arg ...)))
+               null)
+        (fld ...)
+        #:property prop:custom-write #,(if (attribute writer)
+                                           #'writer
+                                           #'ast-write)
+        #:methods gen:strategic (#,@(make-strategic
+                                     #'name
+                                     (syntax->list #'((t fld) ...))))
+        #,@(apply append
+                  (for/list ([view-id (syntax->list #'(view ...))])
+                    (generate-view-methods #'name view-id)))
+        #:transparent
+        #,@(if (attribute opt)
+               (syntax->list #'(opt ...))
+               null)))]))

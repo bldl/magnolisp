@@ -9,14 +9,18 @@ It is rather important for all Ast derived node types to be
 
 |#
 
-(require "ast-util.rkt" "compiler-util.rkt" "strategy.rkt"
-         "util.rkt" "util/struct.rkt" syntax/id-table)
+(require "ast-util.rkt" "ast-view.rkt"
+         "compiler-util.rkt" "strategy.rkt"
+         "util.rkt" "util/struct.rkt"
+         syntax/id-table)
 
 ;;; 
 ;;; abstract node
 ;;; 
 
-(define-ast-base* Ast)
+(define-view* Ast #:fields (annos))
+(define-view* Type #:fields (annos))
+(define-view* Def #:fields (annos id))
 
 (define* (annoless typ . arg*)
   (apply typ #hasheq() arg*))
@@ -115,8 +119,8 @@ It is rather important for all Ast derived node types to be
 ;; [name symbol?] is the name of the identifier. [bind symbol?] is
 ;; used for comparison with other identifiers, and solely determines
 ;; if two identifiers access the same binding.
-(define-ast* Id Ast ((no-term name) (no-term bind))
-  #:property prop:custom-write id-write)
+(define-ast* Id (Ast) ((no-term annos) (no-term name) (no-term bind))
+  #:custom-write id-write)
 
 (define-with-contract*
   (-> Id? Id? boolean?)
@@ -181,175 +185,182 @@ It is rather important for all Ast derived node types to be
 ;;; type expressions
 ;;; 
 
-(abstract-struct* Type Ast () #:transparent)
+(define-ast* AnyT (Ast Type) ((no-term annos)) #:singleton (#hasheq()))
 
-(define-ast* AnyT Type () #:singleton (#hasheq()))
-
-(define-ast* VarT Type ((no-term sym)))
+(define-ast* VarT (Ast Type) ((no-term annos) (no-term sym)))
 
 ;; 'id' is an ID
-(define-ast* NameT Type ((no-term id)))
+(define-ast* NameT (Ast Type) ((no-term annos) (no-term id)))
 
 ;; these are always computed;
 ;; for these, 'id' is also 'def-id'
-(define-ast* DefNameT NameT ())
+;; xxx (define-ast* DefNameT NameT ())
 
 ;; 'ats' are the param types, and 'rt' is the return type
-(define-ast* FunT Type ((list-of-term ats) (just-term rt)))
+(define-ast* FunT (Ast Type) ((no-term annos)
+                              (list-of-term ats) (just-term rt)))
 
 ;; C++ only;
 ;; 'id' is an ID
-(define-ast* CxxNameT Type ((no-term id)))
+(define-ast* CxxNameT (Ast Type) ((no-term annos) (no-term id)))
 
 ;; C++ only
-(define-ast* ConstT Type ((just-term t)))
+(define-ast* ConstT (Ast Type) ((no-term annos) (just-term t)))
 
 ;; C++ only
-(define-ast* RefT Type ((just-term t)))
+(define-ast* RefT (Ast Type) ((no-term annos) (just-term t)))
 
 ;;; 
 ;;; definitions
 ;;; 
 
 ;; Any recorded annotations from definitions are put into 'annos' from
-;; the bound-id-table. All defs have an [rr-mp resolved-module-path?]
+;; the id-table. All Def objects have an [rr-mp resolved-module-path?]
 ;; annotation, specifying the defining module. At least all the global
 ;; defs have a [top boolean?] annotation, which specifies whether a
 ;; definition is top-level.
-(abstract-struct* Def Ast
-  (id) ;; syntax?
-  #:transparent)
 
 ;; Variable definition.
-(define-ast* DefVar Def ((just-term t) (just-term body)))
+(define-ast* DefVar (Ast Def) ((no-term annos) (no-term id)
+                               (just-term t) (just-term body)))
 
 ;; Syntax definition.
-(define-ast* DefStx Def ())
+(define-ast* DefStx (Ast Def) ((no-term annos) (no-term id)))
 
 ;; Function parameter declaration.
-(define-ast* Param Def ((just-term t)))
+(define-ast* Param (Ast Def) ((no-term annos) (no-term id) (just-term t)))
 
 ;; Function declaration. 't' is the function type.
-(define-ast* Defun Def ((just-term t) (list-of-term params) (just-term body)))
+(define-ast* Defun (Ast Def) ((no-term annos) (no-term id)
+                              (just-term t) (list-of-term params)
+                              (just-term body)))
 
 ;; 't' is a Magnolisp type expression.
-(define-ast* TypeAlias Def ((just-term t)))
+(define-ast* TypeAlias (Ast Def) ((no-term annos) (no-term id) (just-term t)))
 
 ;; 'cxx-t' is a C++ type expression.
-(define-ast* ForeignTypeDecl Def ((just-term cxx-t)))
+(define-ast* ForeignTypeDecl (Ast Def) ((no-term annos) (no-term id)
+                                        (just-term cxx-t)))
 
 ;;; 
 ;;; other Magnolisp
 ;;; 
 
-(define-ast* CompilationUnit Ast ((list-of-term lst))) 
+(define-ast* CompilationUnit (Ast) ((no-term annos) (list-of-term lst))) 
 
 ;; For functions with no Magnolisp body.
-(define-ast* NoBody Ast ())
+(define-ast* NoBody (Ast) ((no-term annos)))
 
 ;; 'def' contains a DefVar term. 'let-kind annotation has either
 ;; 'let-values or 'letrec-values or 'letrec-syntaxes+values; we mostly
 ;; do not care, since Racket has done name resolution.
-(define-ast* LetStat Ast ((just-term def) (list-of-term ss)))
+(define-ast* LetStat (Ast) ((no-term annos) (just-term def) (list-of-term ss)))
 
 ;; We only allow a limited form of 'let' expressions. There is a
 ;; 'let-kind annotation.
-(define-ast* LetExpr Ast ((just-term def) (just-term e)))
+(define-ast* LetExpr (Ast) ((no-term annos) (just-term def) (just-term e)))
 
 ;; Sequence of statements.
-(define-ast* BlockStat Ast ((list-of-term ss)))
+(define-ast* BlockStat (Ast) ((no-term annos) (list-of-term ss)))
 
 ;; Variable reference.
-(define-ast* Var Ast ((no-term id)))
+(define-ast* Var (Ast) ((no-term annos) (no-term id)))
 
 ;; Function value.
-(define-ast* Lambda Ast ((list-of-term params) (just-term body)))
+(define-ast* Lambda (Ast) ((no-term annos) (list-of-term params) (just-term body)))
 
 ;; Assignment.
-(define-ast* Assign Ast ((just-term lv) (just-term rv)))
+(define-ast* Assign (Ast) ((no-term annos) (just-term lv) (just-term rv)))
 
 ;; If expression.
-(define-ast* IfExpr Ast ((just-term c) (just-term t) (just-term e)))
+(define-ast* IfExpr (Ast) ((no-term annos) (just-term c) (just-term t) (just-term e)))
 
 ;; If statement.
-(define-ast* IfStat Ast ((just-term c) (just-term t) (just-term e)))
+(define-ast* IfStat (Ast) ((no-term annos) (just-term c) (just-term t) (just-term e)))
 
 ;; A literal datum.
-(define-ast* Literal Ast ((no-term datum)))
+(define-ast* Literal (Ast) ((no-term annos) (no-term datum)))
 
 ;; Function (or predicate) application, with function expression, and
 ;; argument expressions.
-(define-ast* Apply Ast ((just-term f) (list-of-term args)))
+(define-ast* Apply (Ast) ((no-term annos) (just-term f) (list-of-term args)))
 
 ;; Procedure call. A statement.
-(define-ast* Call Ast ((just-term f) (list-of-term args)))
+(define-ast* Call (Ast) ((no-term annos) (just-term f) (list-of-term args)))
 
 ;; Transient. Corresponds to a let/ec that only escapes to a local,
 ;; immediately surrounding call/cc continuation. 'k' is a label (an
 ;; ID) naming the continuation.
-(define-ast* LetLocalEc Ast ((just-term k) (list-of-term ss)))
+(define-ast* LetLocalEc (Ast) ((no-term annos) (just-term k) (list-of-term ss)))
 
 ;; Escapes to the named LetLocalEc continuation 'k' (an ID) with the
 ;; value given by expression 'e'.
-(define-ast* AppLocalEc Ast ((just-term k) (just-term e)))
+(define-ast* AppLocalEc (Ast) ((no-term annos) (just-term k) (just-term e)))
 
 ;; Label, either a binding or use context.
-(define-ast* Label Ast ((no-term id)))
+(define-ast* Label (Ast) ((no-term annos) (no-term id)))
 
 ;; Block expression. Contains statements.
-(define-ast* BlockExpr Ast ((list-of-term ss)))
+(define-ast* BlockExpr (Ast) ((no-term annos) (list-of-term ss)))
 
 ;; Return statement. For now we only support single value returns. The
 ;; semantics are to escape from a surrounding BlockExpr.
-(define-ast* Return Ast ((just-term e)))
+(define-ast* Return (Ast) ((no-term annos) (just-term e)))
 
-(define-ast* RacketExpr Ast ())
+(define-ast* RacketExpr (Ast) ((no-term annos)))
 
 ;;; 
 ;;; C++
 ;;;
 
 ;; kind is either 'user or 'system.
-(define-ast* Include Ast ((no-term kind) (no-term s)))
+(define-ast* Include (Ast) ((no-term annos) (no-term kind) (no-term s)))
 
 ;; 'rtype' is the return type, only.
-(define-ast* CxxDefun Def ((no-term modifs) (just-term rtype) (list-of-term params) (list-of-term ss)))
+(define-ast* CxxDefun (Ast Def) ((no-term annos) (no-term id)
+                                 (no-term modifs) (just-term rtype)
+                                 (list-of-term params) (list-of-term ss)))
 
 ;; A C++ function prototype declaration. No body, and some modifiers
 ;; may have to be different to the function definition.
-(define-ast* Proto Def ((no-term modifs) (just-term rtype) (list-of-term params)))
+(define-ast* Proto (Ast Def) ((no-term annos) (no-term id)
+                              (no-term modifs) (just-term rtype)
+                              (list-of-term params)))
 
-(define-ast* CxxReturnNone Ast ())
+(define-ast* CxxReturnNone (Ast) ((no-term annos)))
 
-(define-ast* CxxReturnOne Ast ((just-term e)))
+(define-ast* CxxReturnOne (Ast) ((no-term annos) (just-term e)))
 
-(define-ast* CxxIfSugar Ast ((just-term c) (just-term t)))
+(define-ast* CxxIfSugar (Ast) ((no-term annos) (just-term c) (just-term t)))
 
-(define-ast* CxxParam Def ((just-term t)))
+(define-ast* CxxParam (Ast Def) ((no-term annos) (no-term id)
+                                 (just-term t)))
 
-(define-ast* CxxDeclVar Def ((just-term t)))
+(define-ast* CxxDeclVar (Ast Def) ((no-term annos) (no-term id)
+                                   (just-term t)))
 
 ;; Statement expression (GCC extension).
-(define-ast* GccStatExpr Ast ((list-of-term ss) (just-term e)))
+(define-ast* GccStatExpr (Ast) ((no-term annos) (list-of-term ss) (just-term e)))
 
 ;; Local label declaration (GCC extension). A statement.
-(define-ast* GccLabelDecl Ast ((no-term n)))
+(define-ast* GccLabelDecl (Ast) ((no-term annos) (no-term n)))
 
 ;; Label for the following statements. Itself a statement.
-(define-ast* CxxLabel Ast ((no-term n)))
+(define-ast* CxxLabel (Ast) ((no-term annos) (no-term n)))
 
 ;; Where 'n' is a label. A statement.
-(define-ast* Goto Ast ((no-term n)))
+(define-ast* Goto (Ast) ((no-term annos) (no-term n)))
 
 ;; Parenthesized expression.
-(define-ast* Parens Ast ((just-term e)))
+(define-ast* Parens (Ast) ((no-term annos) (just-term e)))
 
-(define-ast* UnaryOp Ast ((no-term op) (just-term e)))
-(define-ast* BinaryOp Ast ((no-term op) (just-term e1) (just-term e2)))
-(define-ast* TrinaryOp Ast ((no-term op) (just-term e1) (just-term e2) (just-term e3)))
+(define-ast* UnaryOp (Ast) ((no-term annos) (no-term op) (just-term e)))
+(define-ast* BinaryOp (Ast) ((no-term annos) (no-term op) (just-term e1) (just-term e2)))
+(define-ast* TrinaryOp (Ast) ((no-term annos) (no-term op) (just-term e1)
+                              (just-term e2) (just-term e3)))
 
 ;; Top-level verbatim string.
-(define-ast* TlVerbatim Ast ((no-term s)))
+(define-ast* TlVerbatim (Ast) ((no-term annos) (no-term s)))
 
 ;;; 
 ;;; definition table management
