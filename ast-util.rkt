@@ -21,27 +21,14 @@ Assumptions for AST node types:
                      racket/syntax syntax/parse))
 
 ;;; 
-;;; annotations
-;;; 
+;;; generic access
+;;;
 
-(define* (ast-get-annos v)
-  (car (struct->list v)))
+;; We could access annotations like this as well, but that would be
+;; inefficient.
 
 (define* (ast-get-fields v)
   (cdr (struct->list v)))
-
-(define* (ast-set-annos v a)
-  (define ctor (struct-make-constructor v))
-  (apply ctor a (ast-get-fields v)))
-
-(define* (ast-add-anno ast k v)
-  (define annos (ast-get-annos ast))
-  (ast-set-annos ast (hash-set annos k v)))
-
-(define-syntax-rule* (preserve-annos v b ...)
-  (let ((a (ast-get-annos v)))
-    (let ((v (begin b ...)))
-      (ast-set-annos v a))))
 
 ;;;
 ;;; printing

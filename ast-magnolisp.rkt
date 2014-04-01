@@ -15,12 +15,33 @@ It is rather important for all Ast derived node types to be
          syntax/id-table)
 
 ;;; 
-;;; abstract node
+;;; abstract nodes
 ;;; 
 
 (define-view* Ast #:fields (annos))
 (define-view* Type #:fields ())
 (define-view* Def #:fields (id))
+
+;;; 
+;;; annotations
+;;; 
+
+(define-syntax-rule* (preserve-annos v b ...)
+  (let ((a (Ast-annos v)))
+    (let ((v (begin b ...)))
+      (set-Ast-annos v a))))
+
+(define* (ast-anno-set ast k v)
+  (define annos (Ast-annos ast))
+  (set-Ast-annos ast (hash-set annos k v)))
+
+(define* (ast-anno-must ast k)
+  (let* ((annos (Ast-annos ast)))
+    (hash-ref annos k)))
+
+(define* (ast-anno-maybe ast k)
+  (let* ((annos (Ast-annos ast)))
+    (hash-ref annos k #f)))
 
 (define* (annoless typ . arg*)
   (apply typ #hasheq() arg*))
@@ -34,18 +55,9 @@ It is rather important for all Ast derived node types to be
 (define* (ast-annotated ast typ . arg*)
   (apply typ (Ast-annos ast) arg*))
 
-(define* (ast-anno-must ast k)
-  (let* ((annos (Ast-annos ast)))
-    (hash-ref annos k)))
-
-(define* (ast-anno-maybe ast k)
-  (let* ((annos (Ast-annos ast)))
-    (hash-ref annos k #f)))
-
-(define* (ast-anno-set ast k v)
-  (define old-annos (Ast-annos ast))
-  (define new-annos (hash-set old-annos k v))
-  (ast-set-annos ast new-annos))
+;;; 
+;;; original syntax, display, and reporting
+;;; 
 
 (define-with-contract*
   (-> Ast? (or/c syntax? #f))
