@@ -521,6 +521,42 @@ It is rather important for all Ast derived node types to be
    (else #f)))
 
 ;;; 
+;;; Id replacing AST rewrite
+;;;
+
+(define* (ast-rw-Ids rw-id ast)
+  (define (rw-annos annos)
+    (define type-ast (hash-ref annos 'type-ast #f))
+    (and type-ast
+         (hash-set annos 'type-ast (rw type-ast))))
+
+  (define (ast-rw-annos ast)
+    (define annos (rw-annos (Ast-annos ast)))
+    (if annos (set-Ast-annos ast annos) ast))
+  
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         ((? Def?)
+          (define id (Def-id ast))
+          (define id-ast (rw-id id))
+          (Def-copy ast id-ast))
+         ((Var a id)
+          (define id-ast (rw-id id))
+          (Var (or (rw-annos a) a) id-ast))
+         ((NameT a id)
+          (define id-ast (rw-id id))
+          (NameT a id-ast))
+         ((Label a id)
+          (define id-ast (rw-id id))
+          (Label a id-ast))
+         (else
+          (ast-rw-annos ast))))))
+
+  (rw ast))
+
+;;; 
 ;;; expressions
 ;;; 
 

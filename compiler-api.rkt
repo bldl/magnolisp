@@ -90,36 +90,7 @@ external dependencies for the program/library, as well as the .cpp and
   (define (mk-id id)
     (conv-id->ast id->bind id))
 
-  (define (rw-annos annos)
-    (define type-ast (hash-ref annos 'type-ast #f))
-    (and type-ast
-         (hash-set annos 'type-ast (rw type-ast))))
-
-  (define (ast-rw-annos ast)
-    (define annos (rw-annos (Ast-annos ast)))
-    (if annos (set-Ast-annos ast annos) ast))
-  
-  (define rw
-    (topdown
-     (lambda (ast)
-       (match ast
-         ((? Def?)
-          (define id (Def-id ast))
-          (define id-ast (mk-id id))
-          (Def-copy ast id-ast))
-         ((Var a id)
-          (define id-ast (mk-id id))
-          (Var (or (rw-annos a) a) id-ast))
-         ((NameT a id)
-          (define id-ast (mk-id id))
-          (NameT a id-ast))
-         ((Label a id)
-          (define id-ast (mk-id id))
-          (Label a id-ast))
-         (else
-          (ast-rw-annos ast))))))
-
-  (rw ast))
+  (ast-rw-Ids mk-id ast))
 
 ;;;
 ;;; de-Racketization
