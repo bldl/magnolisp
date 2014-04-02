@@ -233,12 +233,29 @@
     (when-let old-def (get-def-in-mod id)
               (redefinition id old-def new-stx)))
 
-  (define (mk-annos ctx stx id-stx)
-    (define global? (eq? ctx 'module-level))
+  ;; Looks up annotations (from annotation table) for declaration
+  ;; 'stx' (binding 'id-stx') in context 'ctx' (a symbol). Returns AST
+  ;; node annotations as a (hash/c symbol? any/c).
+  ;;
+  ;; The 'foreign?' argument indicates whether 'foreign' annotations
+  ;; (if any) should be parsed. (Otherwise they will be left in as
+  ;; syntax.)
+  (define (mk-annos ctx stx id-stx #:foreign? [foreign? #f])
     (define ann-h (dict-ref annos id-stx #hasheq()))
-    ;;(writeln (list 'annos ann-h (hash? ann-h) (immutable? ann-h)))
-    (set! ann-h (hash-set* ann-h 'stx stx 'rr-mp rr-mp 'top global?))
-    ;;(writeln `(annos for ,id-stx ,(hash-count ann-h)))
+    ;;(writeln `(raw annos for ,(syntax-e id-stx) are ,@(apply append (for/list (((k v) ann-h)) `(,k = ,v)))))
+    (define global? (eq? ctx 'module-level))
+    (define foreign
+      (and foreign?
+           (let-and foreign-stx (hash-ref ann-h 'foreign #f)
+             (let-and foreign-name (parse-cxx-name-anno foreign-stx)
+               foreign-name))))
+    (set! ann-h
+          (hash-set* ann-h
+                     'stx stx
+                     'rr-mp rr-mp
+                     'top global?
+                     'foreign foreign))
+    ;;(writeln `(parsed annos for ,(syntax-e id-stx) are ,@(apply append (for/list (((k v) ann-h)) `(,k = ,v)))))
     ann-h)
 
   (define (lookup-type id-stx)
@@ -250,23 +267,10 @@
                   (parse-type type-stx)))))
     (or (f) the-AnyT))
 
-  ;; Parses annotations specific to variable declarations. Also for
-  ;; function declarations, in practice. Presently only 'foreign'
-  ;; declarations (which make no sense for variables, and will be
-  ;; ignored).
-  (define (parse-add-DefVar-annos id-stx ann-h)
-    (define foreign-stx (hash-ref ann-h 'foreign #f))
-    (when foreign-stx
-      (define foreign-name (parse-cxx-name-anno foreign-stx))
-      (when foreign-name
-        (set! ann-h (hash-set ann-h 'foreign foreign-name))))
-    ann-h)
-  
   (define (make-DefVar ctx stx id-stx e-stx)
     (check-redefinition id-stx stx)
     (define ast (parse-expr e-stx))
-    (define ann-h (mk-annos ctx stx id-stx))
-    (set! ann-h (parse-add-DefVar-annos id-stx ann-h))
+    (define ann-h (mk-annos ctx stx id-stx #:foreign? #t))
     (define t (lookup-type id-stx))
     (define def (DefVar ann-h id-stx t ast))
     (set-def-in-mod! id-stx def)
