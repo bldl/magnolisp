@@ -161,7 +161,7 @@ Assumptions for AST node types:
                                      (syntax->list #'((t fld) ...))))
         #,@(apply append
                   (for/list ([view-id (syntax->list #'(view ...))])
-                    (generate-view-methods #'name view-id)))
+                    (generate-view-methods #'name view-id singleton?)))
         #:transparent
         #,@(if (attribute opt)
                (syntax->list #'(opt ...))

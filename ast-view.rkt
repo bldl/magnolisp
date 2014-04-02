@@ -65,7 +65,7 @@ E.g.,
 ;; resulting list of syntax objects is intended to be spliced into a
 ;; (struct ...) declaration. E.g., (generate-view-methods #'C #'V)
 ;; -> (list #'#:methods #'gen:V (...)).
-(define-for-syntax* (generate-view-methods conc-id view-id)
+(define-for-syntax* (generate-view-methods conc-id view-id [singleton? #f])
   (define view-name (syntax-e view-id))
   (define conc-name (syntax-e conc-id))
   (define fld-id-lst
@@ -87,14 +87,21 @@ E.g.,
         (with-syntax ([v-setter-id
                        (format-id view-id "set-~a-~a" view-name fld-name)]
                       [fld fld-id])
+          (if singleton?
           #'(define (v-setter-id view fld)
-              (struct-copy conc view [fld fld]))))
+              (error 'v-setter-id "cannot copy a singleton (~a)" 'conc))
+          #'(define (v-setter-id view fld)
+              (struct-copy conc view [fld fld])))))
       (list getter-impl setter-impl))
     (define method-impl-lst
       (cons
-       (with-syntax ([(fld ...) fld-id-lst])
-         #`(define (#,(format-id view-id "~a-copy" view-name) view fld ...)
-             (struct-copy conc view [fld fld] ...)))
+       (with-syntax ([(fld ...) fld-id-lst]
+                     [v-copy (format-id view-id "~a-copy" view-name)])
+         (if singleton?
+         #'(define (v-copy view fld ...)
+             (error 'v-copy "cannot copy a singleton (~a)" 'conc))
+         #'(define (v-copy view fld ...)
+             (struct-copy conc view [fld fld] ...))))
        (apply append
               (map make-accessor-impls fld-id-lst))))
     (list
