@@ -87,6 +87,17 @@
   (unless e
     (raise-assertion-error 'assert "~s" (quote e))))
 
+(define-syntax* cond-or-fail
+  (syntax-rules (else)
+    [(_ clause ... (else body ...))
+     (cond clause ... (else body ...))]
+    [(_ clause ...)
+     (cond
+      clause ...
+      (else
+       (raise-assertion-error
+        'cond-or-fail "no matching 'cond' clause")))]))
+
 (define* (hash-merge! h . others)
   (for ((other others))
     (for (([k v] other))

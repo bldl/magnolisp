@@ -17,6 +17,11 @@ is also at phase level 0.
 ;;; generic utilities
 ;;; 
 
+(define (atom? x)
+  (ormap
+   (lambda (p?) (p? x))
+   (list symbol? keyword? string? bytes? number? boolean? regexp?)))
+
 ;; Applies the rewrite 'f' to all identifier? objects in the syntax
 ;; tree 'stx', which is traversed recursively. (The eq? based
 ;; optimizations here are similar to those in the syntax/quote library
@@ -81,7 +86,32 @@ is also at phase level 0.
                           (prefab-struct-key d) new-l)))
             (datum->syntax stx s stx stx)))]
 
-     ;; xxx immutable hashes to be supported
+     [(hash? d)
+      (define make
+        (cond
+         [(hash-eq? d) make-immutable-hasheq]
+         [(hash-eqv? d) make-immutable-hasheqv]
+         [(hash-equal? d) make-immutable-hash]
+         [else
+          (error 'rw-ids-in-syntax-tree
+                 "expected (or/c hash-eq? hash-eqv? hash-equal?): ~s" d)]))
+      (define changed? #f)
+      (define n-lst
+        (for/list ([(k v) d])
+          ;; 'k' may or may not be syntax, 'v' always is.
+          (define n-k (cond
+                       [(syntax? k) (rw-syntax k)]
+                       [(atom? k) k] ;; cannot contain IDs
+                       [else
+                        (error 'rw-ids-in-syntax-tree
+                               "unsupported hash key: ~s" k)]))
+          (define n-v (rw-syntax v))
+          (unless (and (eq? k n-k) (eq? v n-v))
+            (set! changed? #t))
+          (cons n-k n-v)))
+      (if changed?
+        (datum->syntax stx (make n-lst) stx stx)
+        stx)]
 
      [else
       stx]))
@@ -170,6 +200,12 @@ is also at phase level 0.
                     #'#(1 (2 #&#(3 car) #&cdr) ())
                     #'#s(Obj 1)
                     #'#s(Obj car)
+                    #'#hasheq()
+                    #'#hasheq((foo . 1))
+                    #'#hasheq((foo . car))
+                    #'#hasheqv((1 . 2))
+                    #'#hasheqv((1 . 2) (3 . car))
+                    #'#hash(("foo" . car) ("bar" . cdr))
                     ))
          (f (list identity mod-id)))
     (define n-stx (rw-ids-in-syntax-tree f stx))
