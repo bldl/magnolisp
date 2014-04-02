@@ -1,9 +1,9 @@
-#lang racket
+#lang racket/base
 
 #|
 |#
 
-(require "module.rkt" data/order)
+(require "module.rkt" data/order racket/bool)
 
 (define* number-order
   (order 'number-order number? = <))

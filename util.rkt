@@ -1,4 +1,6 @@
-#lang racket
+#lang racket/base
+
+(require racket/dict racket/match (for-syntax racket/base))
 
 (require "util/module.rkt")
 (provide (all-from-out "util/module.rkt"))

@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 |#
@@ -39,7 +39,7 @@
 
 (require
  unstable/struct ;; exports get-struct-info for syntax
- (for-syntax racket/syntax
+ (for-syntax racket/base racket/syntax
              syntax/id-table syntax/parse))
 
 ;; 'e' must be an expression of structure. Say it is of type T. Then

@@ -1,10 +1,10 @@
-#lang racket
+#lang racket/base
 
 #|
 
 |#
 
-(require racket/system)
+(require racket/list racket/port racket/system)
 
 ;; E.g.
 ;; (exe-filter "foo bar" '("/bin/cat"))

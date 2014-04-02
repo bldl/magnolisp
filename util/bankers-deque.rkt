@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -12,7 +12,7 @@ concatenation and iteration.
 
 |#
 
-(require "module.rkt")
+(require "module.rkt" racket/function racket/list)
 
 (define* dq-factor (make-parameter 7))
 

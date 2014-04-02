@@ -1,6 +1,6 @@
-#lang racket
+#lang racket/base
 
-(require "module.rkt")
+(require racket/pretty "module.rkt")
 
 (define* println
   (case-lambda
