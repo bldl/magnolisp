@@ -23,7 +23,11 @@ is also at phase level 0.
 ;; of Racket.)
 (define (rw-ids-in-syntax-tree f stx)
   (define (rw-syntax-pair d) ;; (-> cons? cons?)
-    (cons (rw-syntax (car d)) (rw-syntax-cdr (cdr d))))
+    (define a (rw-syntax (car d)))
+    (define b (rw-syntax-cdr (cdr d)))
+    (if (and (eq? a (car d)) (eq? b (cdr d)))
+        d
+        (cons a b)))
   
   (define (rw-syntax-cdr x)
     (cond
@@ -39,14 +43,16 @@ is also at phase level 0.
     (cond
      [(symbol? d)
       (f stx)]
+
      [(pair? d)
       (define n-d (rw-syntax-pair d))
-      (if (and (eq? (car d) (car n-d))
-               (eq? (cdr d) (cdr n-d)))
+      (if (eq? d n-d)
           stx
           (datum->syntax stx n-d stx stx))]
+
      [(null? d)
       stx]
+
      [(vector? d)
       (define n-d
         (for/list ([i (in-vector d)])
@@ -55,13 +61,15 @@ is also at phase level 0.
                     [n (in-list n-d)])
             (eq? i n))
           stx
-          (datum->syntax stx n-d stx stx))]
+          (datum->syntax stx (apply vector-immutable n-d) stx stx))]
+
      [(box? d)
       (define v (unbox d))
       (define n-v (rw-syntax v))
       (if (eq? v n-v)
           stx
           (datum->syntax stx (box-immutable n-v) stx stx))]
+
      [(prefab-struct-key d)
       (define l (cdr (vector->list (struct->vector d))))
       (define new-l (for/list ([i (in-list l)])
@@ -72,9 +80,12 @@ is also at phase level 0.
           (let ((s (apply make-prefab-struct
                           (prefab-struct-key d) new-l)))
             (datum->syntax stx s stx stx)))]
+
      ;; xxx immutable hashes to be supported
+
      [else
       stx]))
+  
   (rw-syntax stx))
 
 ;;; 
@@ -129,3 +140,43 @@ is also at phase level 0.
     (pretty-print (syntax->datum/binding stx))
     (set! stx (add-binding-properties stx))
     (print-with-select-syntax-properties '(binding) stx)))
+
+(module* test #f
+  (require racket/function rackunit "util.rkt")
+
+  (define (contain-id? stx)
+    (define has? #f)
+    (define (f stx)
+      (set! has? #t)
+      stx)
+    (rw-ids-in-syntax-tree f stx)
+    has?)
+  
+  (define (mod-id id)
+    (syntax-property id 'foo 'bar))
+  
+  (let ((id #'car))
+    (check-not-eq? id mod-id))
+
+  (for* ((stx (list #'1
+                    #'car
+                    #'(1 2 3)
+                    #'(1 car 3)
+                    #'#&car
+                    #'(1 (2 #&(car cdr) 3) 4)
+                    #'#&(1 #&(2 3) 4)
+                    #'#(1 2 3)
+                    #'#(1 car 3)
+                    #'#(1 (2 #&#(3 car) #&cdr) ())
+                    #'#s(Obj 1)
+                    #'#s(Obj car)
+                    ))
+         (f (list identity mod-id)))
+    (define n-stx (rw-ids-in-syntax-tree f stx))
+    (define ids? (contain-id? stx))
+    (when (or (eq? f identity) (not ids?))
+      (check-eq? stx n-stx "changed although ID did not"))
+    (when (and (eq? f mod-id) ids?)
+      (check-not-eq? stx n-stx "did not change although ID should have"))
+    (writeln (list f (syntax->datum stx) (syntax->datum n-stx) (eq? stx n-stx)))
+    (check-equal? (syntax->datum stx) (syntax->datum n-stx))))

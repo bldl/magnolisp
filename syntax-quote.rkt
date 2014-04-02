@@ -87,7 +87,7 @@ specified syntax properties. Very similar to quote-syntax/keep-srcloc.
               s))]
        [else #`(quote #,e)])))
 
-  (define (keep-properties e-stx #:properties [ps '(paren-shape)])
+  (define (keep-properties e-stx #:properties [ps '(origin paren-shape)])
     (define (keep? stx)
       (ormap (lambda (n) (syntax-property stx n)) ps))
     (define (keep e-stx p-stx)
