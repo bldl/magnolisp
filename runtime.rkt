@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -12,7 +12,8 @@ enough to be easily analyzable, and compilable to C++.
 (require
  "annos-store.rkt" "util.rkt"
  racket/stxparam
- (for-syntax "annos-util.rkt" "util.rkt" racket/syntax)) 
+ (for-syntax "annos-util.rkt" "util.rkt"
+             racket/base racket/syntax)) 
 
 ;; #<undefined>
 (define undefined (letrec ((x x)) x))

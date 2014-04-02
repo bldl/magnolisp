@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -18,8 +18,9 @@ T), where 'T' can be any type expression.
 
 |#
 
-(require "util.rkt")
 (require syntax/readerr syntax/strip-context syntax/stx)
+
+(provide magnolisp-readtable with-magnolisp-readtable)
 
 (define (make-loc-stx src line col pos)
   (datum->syntax #f #f (list src line col pos #f)))
@@ -116,7 +117,7 @@ T), where 'T' can be any type expression.
 ;;; reader extension
 ;;; 
 
-(define* magnolisp-readtable
+(define magnolisp-readtable
   (make-readtable
    (current-readtable)
    #\^ 'non-terminating-macro read-type-anno
@@ -127,7 +128,7 @@ T), where 'T' can be any type expression.
 ;;; helpers
 ;;; 
 
-(define-syntax-rule* (with-magnolisp-readtable es ...)
+(define-syntax-rule (with-magnolisp-readtable es ...)
   (parameterize ((current-readtable magnolisp-readtable))
     es ...))
 
@@ -136,6 +137,7 @@ T), where 'T' can be any type expression.
 ;;; 
 
 (module* main #f
+  (require "util.rkt")
   (with-magnolisp-readtable
    (for ((s (list
              "^T"
@@ -148,4 +150,4 @@ T), where 'T' can be any type expression.
              )))
        (define in (open-input-string s))
      (for/list ((obj (in-port read in)))
-         (writeln obj)))))
+       (writeln obj)))))

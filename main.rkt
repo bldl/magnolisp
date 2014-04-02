@@ -2,10 +2,7 @@
 
 #|
 
-Defines a Racket module language for Magnolisp. Implements an
-evaluator on top of Racket in your usual way, provided that the Racket
-backend is being targeted. This can be useful for testing and as a
-simulator, to avoid having to build everything via C++.
+Defines a Racket module language for Magnolisp.
 
 We export racket/base as the macro programming language, and we also
 provide racket/base as runtime language at present as well. Such
@@ -17,7 +14,6 @@ Magnolisp for-syntax.
 
 |#
 
-;;(provide (except-out (all-from-out racket/base) #%module-begin do))
 (provide (except-out (all-from-out racket/base) #%module-begin))
 
 (require "modbeg.rkt")
@@ -27,6 +23,4 @@ Magnolisp for-syntax.
 (provide (for-syntax (all-from-out racket/base)))
 
 (require "runtime.rkt")
-;;(provide (except-out (all-from-out "runtime.rkt") mgl-do))
-;;(provide (rename-out [mgl-do do]))
 (provide (all-from-out "runtime.rkt"))
