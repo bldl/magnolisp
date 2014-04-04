@@ -11,6 +11,8 @@
   (syntax-case stx ()
     [(_ e #:listed (sym ...))
      (syntax-preserve/loc+listed (syntax->datum #'(sym ...)) #'e)]
+    [(_ e #:all)
+     (syntax-preserve/loc+all #'e)]
     [(_ e)
      (syntax-preserve/loc+none #'e)]))
 
@@ -28,4 +30,12 @@
     (quote-syntax/keep-properties [y] #:listed (paren-shape)))
   (check-pred syntax? stx-for-p)
   (check-pred syntax-position stx-for-p)
-  (check-not-false (syntax-property stx-for-p 'paren-shape)))
+  (check-not-false (syntax-property stx-for-p 'paren-shape))
+
+  (define stx-for-a
+    (quote-syntax/keep-properties [y] #:all))
+  (check-pred syntax? stx-for-a)
+  (check-pred syntax-position stx-for-a)
+  (check-not-false (syntax-property stx-for-a 'paren-shape)))
+
+  

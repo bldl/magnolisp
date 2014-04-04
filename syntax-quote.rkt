@@ -9,15 +9,13 @@ supports hash literals and allows one to choose what to preserve.
 |#
 
 (provide syntax-preserve
-         keep-position?
-         keep-position
-         keep-syntax?
-         keep-syntax
-         keep-paren-shape?
-         keep-paren-shape)
+         keep-position? keep-position
+         keep-syntax? keep-syntax
+         keep-paren-shape? keep-paren-shape)
 
 (require (for-template racket/base))
 
+;; A selection of likely atomic key types for hashes.
 (define (atom? x)
   (ormap
    (lambda (p?) (p? x))

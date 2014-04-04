@@ -42,6 +42,17 @@
           #`(syntax-property #,dat '#,n #,(val->stx v))
           dat))))
 
+(define* (keep-all-properties? stx)
+  (not (null? (syntax-property-symbol-keys stx))))
+
+(define* (make-keep-all-properties val->stx)
+  (lambda (stx dat)
+    (for/fold ([dat dat]) ([n (syntax-property-symbol-keys stx)])
+      (define v (syntax-property stx n))
+      (if v
+          #`(syntax-property #,dat '#,n #,(val->stx v))
+          dat))))
+
 (define* (syntax-preserve/loc+none stx)
   (syntax-preserve keep-position? keep-position stx))
 
@@ -51,6 +62,12 @@
   (define keep? (keep?-> keep-position? keep-props?))
   (define keep (keep-> keep-position keep-props))
   (syntax-preserve keep? keep stx))  
+
+(define* (syntax-preserve/loc+all stx)
+  (define keep-props (make-keep-all-properties default-val->stx))
+  (define keep? (keep?-> keep-position? keep-all-properties?))
+  (define keep (keep-> keep-position keep-props))
+  (syntax-preserve keep? keep stx))
 
 (module* test #f
   (require racket rackunit)
@@ -100,6 +117,7 @@
                   keep-noloc+parens
                   keep-stripped
                   syntax-preserve/loc+none
+                  syntax-preserve/loc+all
                   keep-loc+parens
                   keep-none
                   )])
