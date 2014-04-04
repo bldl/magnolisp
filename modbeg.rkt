@@ -27,7 +27,7 @@ same variables at the same phase level).
          (for-syntax
           racket/dict racket/pretty syntax/id-table syntax/quote
           ;;typed-racket/utils/disarm ;; probably considered internal
-          "compiler-util.rkt" "syntax-quote.rkt" "util.rkt"))
+          "ast-serialize.rkt" "compiler-util.rkt" "util.rkt"))
 
 (begin-for-syntax
  ;; Given [h hash?], returns syntax for an expression that produces an
@@ -69,7 +69,7 @@ same variables at the same phase level).
           (make-immutable-free-id-table
            #,(syntax-for-id-table-dict definfo-table-b definfo-table-f)
            #:phase 0))
-        (define m-ast (quote-syntax/keep-properties #,ast (in-racket local-ec origin paren-shape)))
+        (define m-ast (quote-syntax/keep-properties #,ast #:listed (in-racket local-ec origin paren-shape)))
         (provide m-id-count m-annos m-ast))))
  ) ;; end begin-for-syntax
 
