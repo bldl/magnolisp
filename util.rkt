@@ -58,11 +58,6 @@
 (define-syntax-rule* (matches? e pat ...)
   (match e (pat #t) ... (_ #f)))
 
-(define* (atom? x)
-  (any-pred-holds
-   symbol? keyword? string? bytes? number? boolean? regexp?
-   x))
-
 (define* (path-basename fn)
   (define-values (p f dir?) (split-path fn))
   f)

@@ -27,7 +27,7 @@ same variables at the same phase level).
          (for-syntax
           racket/dict racket/pretty syntax/id-table syntax/quote
           ;;typed-racket/utils/disarm ;; probably considered internal
-          "ast-serialize.rkt" "compiler-util.rkt" "util.rkt"))
+          "compiler-util.rkt" "util.rkt" "syntax-quote-macros.rkt"))
 
 (begin-for-syntax
  ;; Given [h hash?], returns syntax for an expression that produces an
