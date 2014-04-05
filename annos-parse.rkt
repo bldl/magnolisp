@@ -6,7 +6,7 @@ Routines for parsing annotation values into AST nodes.
 
 |#
 
-(require "ast-magnolisp.rkt" "compiler-util.rkt" "util.rkt"
+(require "ast-magnolisp.rkt" "app-util.rkt" "util.rkt"
          racket/contract syntax/parse)
 
 ;;; 

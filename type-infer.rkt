@@ -4,7 +4,7 @@
 |#
 
 (require "ast-magnolisp.rkt"
-         "compiler-rewrites.rkt" "compiler-util.rkt"
+         "compiler-rewrites.rkt" "app-util.rkt"
          "strategy.rkt" "util.rkt")
 
 ;;; 

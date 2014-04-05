@@ -10,7 +10,7 @@ It is rather important for all Ast derived node types to be
 |#
 
 (require "ast-util.rkt" "ast-view.rkt"
-         "compiler-util.rkt" "strategy.rkt"
+         "app-util.rkt" "strategy.rkt"
          "util.rkt" "util/struct.rkt"
          racket/contract racket/dict racket/function racket/match
          syntax/id-table)

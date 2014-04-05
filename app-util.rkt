@@ -1,6 +1,10 @@
 #lang racket/base
 
 #|
+
+Application-specific utilities shared by both the #lang and the
+compiler.
+
 |#
 
 (require "racket-5-compat.rkt" "util.rkt"

@@ -5,7 +5,7 @@
 |#
 
 (require "ast-magnolisp.rkt" "ast-view.rkt"
-         "compiler-util.rkt" "strategy.rkt" "util.rkt"
+         "app-util.rkt" "strategy.rkt" "util.rkt"
          syntax/id-table)
 
 ;;; 

@@ -26,7 +26,7 @@ same variables at the same phase level).
 (require "annos-store.rkt"
          (for-syntax
           racket/dict racket/pretty syntax/id-table syntax/quote
-          "compiler-util.rkt" "util.rkt" "syntax-quote-macros.rkt"))
+          "app-util.rkt" "util.rkt" "syntax-quote-macros.rkt"))
 
 (begin-for-syntax
  ;; Given [h hash?], returns syntax for an expression that produces an

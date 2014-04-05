@@ -18,7 +18,7 @@ optimization.
 |#
 
 (require "annos-parse.rkt" "ast-magnolisp.rkt" "ast-util.rkt"
-         "compiler-rewrites.rkt" "compiler-util.rkt"
+         "compiler-rewrites.rkt" "app-util.rkt"
          "parse.rkt" "strategy.rkt" "util.rkt" "util/struct.rkt"
          syntax/id-table syntax/moddep)
 

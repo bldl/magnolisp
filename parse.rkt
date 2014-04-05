@@ -7,7 +7,7 @@
 (require "annos-parse.rkt"
          "annos-util.rkt"
          "ast-magnolisp.rkt"
-         "compiler-util.rkt"
+         "app-util.rkt"
          (only-in "runtime.rkt" #%magnolisp)
          "util.rkt"
          "util/case.rkt"

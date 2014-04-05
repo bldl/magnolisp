@@ -7,7 +7,7 @@ immutable hasheq.
 
 |#
 
-(require "compiler-util.rkt" "util.rkt" racket/contract)
+(require "app-util.rkt" "util.rkt" racket/contract)
 
 (define-with-contract*
   (-> any/c boolean?)

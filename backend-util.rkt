@@ -1,6 +1,9 @@
 #lang racket
 
 #|
+
+Utilities useful for implementing compiler back ends.
+
 |#
 
 (require "util.rkt")
