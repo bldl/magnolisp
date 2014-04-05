@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -8,7 +8,7 @@ information is only accessed at macro expansion time.
 |#
 
 (require (for-syntax "annos-util.rkt" "compiler-util.rkt" "util.rkt"
-                     racket/contract racket/dict racket/pretty
+                     racket/base racket/contract racket/dict racket/pretty
                      syntax/id-table))
 
 ;;; 

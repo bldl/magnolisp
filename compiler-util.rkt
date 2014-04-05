@@ -1,9 +1,10 @@
-#lang racket
+#lang racket/base
 
 #|
 |#
 
 (require "racket-5-compat.rkt" "util.rkt"
+         racket/contract racket/dict racket/function racket/list racket/pretty
          syntax/id-table syntax/stx)
 
 (define* (next-gensym r sym)
