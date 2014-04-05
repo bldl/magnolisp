@@ -34,7 +34,7 @@ E.g.,
 (require "util.rkt" racket/generic
          (for-syntax racket/pretty racket/syntax syntax/parse))
 
-(define-syntax* (define-view* stx)
+(define-for-syntax (make-define-view def-gen-id stx)
   (syntax-parse stx
     [(_ view:id #:fields (fld:id ...))
      (let ()
@@ -53,12 +53,19 @@ E.g.,
           #`(#,(format-id stx "~a-copy" view-name) view fld ...)
           (apply append (map make-accessor-sigs fld-ids))))
        (with-syntax ([(method ...) method-sig-lst]
+                     [def-gen def-gen-id]
                      [view-info (format-id stx "view:~a" view-name)])
          #'(begin
              (define-syntax view-info
                (list #'fld ...))
-             (define-generics* view
+             (def-gen view
                method ...))))]))
+
+(define-syntax* (define-view stx)
+  (make-define-view #'define-generics stx))
+
+(define-syntax* (define-view* stx)
+  (make-define-view #'define-generics* stx))
 
 ;; Generates syntax for specifying the implementation of the methods
 ;; of the specified view for the specified concrete struct type. The
