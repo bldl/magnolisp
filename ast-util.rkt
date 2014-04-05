@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -14,11 +14,12 @@ Assumptions for AST node types:
 
 |#
 
-(require "ast-view.rkt" "strategy.rkt"
+(require "ast-serialize.rkt" "ast-view.rkt" "strategy.rkt"
          "util.rkt" "util/struct.rkt"
          racket/generic unstable/struct
-         (for-syntax racket/function racket/list
-                     racket/syntax syntax/parse))
+         (for-syntax racket/base racket/function racket/list
+                     racket/syntax syntax/parse)
+         (for-template racket/base "ast-serialize.rkt"))
 
 ;;; 
 ;;; generic access
@@ -130,6 +131,37 @@ Assumptions for AST node types:
         (make-all-rw-term nn-stx f-stx-lst)))
 
 ;;; 
+;;; gen:syntactifiable
+;;; 
+
+(define-for-syntax (make-syntactifiable/singleton singleton-id)
+  (list
+   (with-syntax ((the-name singleton-id))
+     #'(define (syntactifiable-mkstx x)
+         #'the-name))))
+
+(define-for-syntax (make-syntactifiable conc-id fld-id-lst)
+  (define obj-id (generate-temporary 'obj))
+  (define super-id (generate-temporary 'mkstx))
+  (define get-id-lst (for/list ([fld-id fld-id-lst])
+                       (format-id conc-id "~a-~a"
+                                  (syntax-e conc-id)
+                                  (syntax-e fld-id))))
+  (with-syntax ([super super-id]
+                [ctor conc-id]
+                [obj obj-id]
+                [qs #'quasisyntax]
+                [us #'unsyntax])
+    (with-syntax ([(e ...)
+                   (for/list ([get-id get-id-lst])
+                     (with-syntax ([get get-id])
+                       #'(us (super (get obj)))))])
+      (list
+       #'(define/generic super syntactifiable-mkstx)
+       #'(define (syntactifiable-mkstx obj)
+           (qs (ctor e ...)))))))
+            
+;;; 
 ;;; concrete AST node definition
 ;;; 
 
@@ -144,18 +176,24 @@ Assumptions for AST node types:
         (~optional (~seq #:custom-write writer:expr))
         (~optional (~seq #:struct-options (opt ...+))))
      (define singleton? (attribute arg))
+     (define singleton-id
+       (and singleton? (format-id stx "the-~a" (syntax-e #'name))))
      (quasisyntax/loc stx
        (#,(if singleton? #'singleton-struct* #'concrete-struct*)
         name
         #,@(if singleton?
-               (with-syntax ((the-name
-                              (format-id stx "the-~a" (syntax-e #'name))))
+               (with-syntax ((the-name singleton-id))
                  (list #'(the-name arg ...)))
                null)
         (fld ...)
         #:property prop:custom-write #,(if (attribute writer)
                                            #'writer
                                            #'ast-write)
+        #:methods gen:syntactifiable
+        (#,@(if singleton?
+                (make-syntactifiable/singleton singleton-id)
+                (make-syntactifiable
+                 #'name (syntax->list #'(fld ...)))))
         #:methods gen:strategic (#,@(make-strategic
                                      #'name
                                      (syntax->list #'((t fld) ...))))
@@ -166,3 +204,42 @@ Assumptions for AST node types:
         #,@(if (attribute opt)
                (syntax->list #'(opt ...))
                null)))]))
+
+;;; 
+;;; testing
+;;; 
+
+(module* test #f
+  (require racket rackunit)
+
+  (define-view Ast #:fields (annos))
+
+  (define-ast* Singleton (Ast) ((no-term annos)) #:singleton (#hasheq()))
+  (define-ast* Empty (Ast) ((no-term annos)))
+  (define-ast* Object (Ast) ((no-term annos) (just-term one) (list-of-term many)))
+
+  (define empty (Empty #hasheq()))
+  (define object (Object #hasheq() the-Singleton (list the-Singleton empty)))
+  
+  (for ([dat (list the-Singleton
+                   `(,the-Singleton)
+                   `(1 ,the-Singleton 3)
+                   (Empty #hasheq())
+                   object
+                   (box object)
+                   (hasheq 'empty empty 'singleton the-Singleton)
+                   (Empty (hasheq 'stx #'(Empty #hasheq())))
+                   (Empty (hasheq 'origin (list #'foo #'bar)))
+                   )])
+    (writeln `(ORIGINAL VALUE ,dat))
+    (define stx (syntactifiable-mkstx dat))
+    ;;(writeln stx)
+    (writeln `(MARSHALLED SYNTAX ,(syntax->datum stx)))
+    (define val (eval-syntax stx))
+    (writeln `(UNMARSHALED VALUE ,val))
+    (when (Ast? val)
+      (define annos (Ast-annos val))
+      (unless (hash-empty? annos)
+        (writeln `(UNMARSHALED ANNOS ,annos)))))
+
+  (void))
