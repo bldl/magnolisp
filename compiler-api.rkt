@@ -15,17 +15,10 @@ Compiles only the 'entry-point' operations of the specified modules,
 and their dependencies. This essentially means full program/library
 optimization.
 
-Generates a single .cpp, .hpp, and .mk output file. The header file
-only declares the entry-point operations, and the abstract types they
-depend upon. The implementation file has an non-entry-points declared
-as internal (e.g., static). The GNU Make include file lists the
-external dependencies for the program/library, as well as the .cpp and
-.hpp files.
-
 |#
 
 (require "annos-parse.rkt" "ast-magnolisp.rkt" "ast-util.rkt"
-         "compiler-util.rkt"
+         "compiler-rewrites.rkt" "compiler-util.rkt"
          "parse.rkt" "strategy.rkt" "util.rkt" "util/struct.rkt"
          syntax/id-table syntax/moddep)
 
@@ -576,7 +569,7 @@ external dependencies for the program/library, as well as the .cpp and
 ;;; testing
 ;;; 
 
-(module* main #f
+(module* test #f
   (define st (compile-files "tests/test-block-expr-2.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))

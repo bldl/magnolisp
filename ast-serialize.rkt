@@ -12,7 +12,7 @@ weakness properties of collection types may also not be preserved.
 |#
 
 (require racket/generic
-         "syntax-quote.rkt" "syntax-quote-extras.rkt" "util.rkt"
+         "syntax-quote-main.rkt" "syntax-quote-extras.rkt" "util.rkt"
          (for-template racket/base))
                      
 (define (quotable? x)

@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -32,7 +32,7 @@ E.g.,
 |#
 
 (require "util.rkt" racket/generic
-         (for-syntax racket/pretty racket/syntax syntax/parse))
+         (for-syntax racket/base racket/pretty racket/syntax syntax/parse))
 
 (define-for-syntax (make-define-view def-gen-id stx)
   (syntax-parse stx

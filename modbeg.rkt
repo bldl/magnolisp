@@ -26,7 +26,6 @@ same variables at the same phase level).
 (require "annos-store.rkt"
          (for-syntax
           racket/dict racket/pretty syntax/id-table syntax/quote
-          ;;typed-racket/utils/disarm ;; probably considered internal
           "compiler-util.rkt" "util.rkt" "syntax-quote-macros.rkt"))
 
 (begin-for-syntax

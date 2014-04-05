@@ -9,7 +9,6 @@
          "ast-magnolisp.rkt"
          "compiler-util.rkt"
          (only-in "runtime.rkt" #%magnolisp)
-         "strategy.rkt"
          "util.rkt"
          "util/case.rkt"
          racket/contract

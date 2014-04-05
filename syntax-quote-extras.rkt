@@ -3,7 +3,7 @@
 #|
 |#
 
-(require "syntax-quote.rkt" "util.rkt"
+(require "syntax-quote-main.rkt" "util.rkt"
          (for-template racket/base))
 
 (define-syntax* keep?->

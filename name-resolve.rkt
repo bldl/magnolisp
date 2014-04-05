@@ -6,7 +6,8 @@ Import and name resolution.
 
 |#
 
-(require "ast-magnolisp.rkt" "parse.rkt" "strategy.rkt" "util.rkt"
+(require "ast-magnolisp.rkt" "compiler-rewrites.rkt"
+         "parse.rkt" "strategy.rkt" "util.rkt"
          syntax/id-table syntax/modresolve)
 
 ;;; 
