@@ -5,6 +5,10 @@
 The definitions in this module are mostly exported for-syntax, as the
 information is only accessed at macro expansion time.
 
+One would not normally refer to #:phase 0 (or any other phase level by
+number), but here we do assume that any Magnolisp actually is phase
+level 0.
+
 |#
 
 (require (for-syntax "annos-util.rkt" "app-util.rkt" "util.rkt"
@@ -17,9 +21,26 @@ information is only accessed at macro expansion time.
 
 (begin-for-syntax
 
- (define* definfo-table-f (make-free-id-table #:phase 0))
  (define* definfo-table-b (make-bound-id-table #:phase 0))
+ (define* definfo-table-f (make-free-id-table #:phase 0))
 
+ ;; Gets a merged version of definfo-table-b and definfo-table-f.
+ (define-with-contract*
+   (-> immutable-free-id-table?)
+   (get-stored-definfo)
+
+   (define m-d (make-immutable-free-id-table #:phase 0))
+
+   (for ((d (list definfo-table-b definfo-table-f)))
+     (set! m-d
+           (for/fold ([r-d m-d]) ([(id new-h) (in-dict d)])
+             (dict-update r-d id
+                          (lambda (old-h)
+                            (hash-merge-2 old-h new-h))
+                          #hasheq()))))
+
+   m-d)
+ 
  ;; Adds the specified annotations for the specified binding. Full
  ;; annotation forms must be given. The name of each annotation must
  ;; be extractable from the respective form.
@@ -28,6 +49,7 @@ information is only accessed at macro expansion time.
  (define-with-contract*
    (->* (identifier? (listof syntax?)) (#:bound? boolean?) void?)
    (set-definfo! id-stx stx-lst #:bound? [bound? #f])
+   
    (define assocs (map
                    (lambda (stx)
                      (define n (form-get-name stx))

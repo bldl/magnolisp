@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -25,52 +25,69 @@ same variables at the same phase level).
 
 (require "annos-store.rkt"
          (for-syntax
-          racket/dict racket/pretty syntax/id-table syntax/quote
-          "app-util.rkt" "util.rkt" "syntax-quote-macros.rkt"))
+          racket/base racket/dict racket/list racket/pretty
+          syntax/id-table syntax/modresolve syntax/quote
+          "app-util.rkt" "ast-magnolisp.rkt" "ast-serialize.rkt"
+          "parse.rkt" "util.rkt"))
 
-(begin-for-syntax
- ;; Given [h hash?], returns syntax for an expression that produces an
- ;; (and/c hash? hash-eq? immutable?) value. The hash table values are
- ;; assumed to be syntax objects, and they are preserved as such.
- (define (syntax-for-hasheq h)
-   #`(make-immutable-hasheq
-      (list #,@(hash-map
-                h
-                (lambda (n-sym val-stx)
-                  #`(cons '#,n-sym (quote-syntax/keep-properties #,val-stx)))))))
- 
- ;; Given id-tables [ts (listof dict?)], returns syntax for an
- ;; expression that produces something for which the dict? predicate
- ;; returns true. The table values are assumed to be syntax objects,
- ;; and they are preserved as such.
- (define (syntax-for-id-table-dict . ts)
-   #`(list #,@(apply
-               append
-               (map
-                (lambda (t)
-                  (dict-map
-                   t
-                   (lambda (id-stx h)
-                     #`(cons #'#,id-stx #,(syntax-for-hasheq h)))))
-                ts))))
+(define-for-syntax (make-definfo-submodule modbeg-stx)
+   (define annos (get-stored-definfo))
+   ;;(pretty-print (dict->list info))
+   ;;(pretty-print (syntax->datum modbeg-stx))
+   ;;(pretty-print (syntax->datum/binding modbeg-stx #:conv-id id->datum/phase))
+   (define-values (defs provs reqs)
+     (parse-defs-from-module modbeg-stx annos #f)) ;; xxx rr-mp is obsolete
+   ;;(pretty-print (dict->list defs)) (exit)
 
- (define (make-definfo-submodule ast)
-   ;;(set! ast (disarm* ast))
-   ;;(set! ast (syntax-disarm ast (current-code-inspector)))
-   ;;(writeln (syntax-tainted? ast))
-   ;;(set! ast (strip-phase-1+ ast))
-   ;;(pretty-print (syntax->datum ast))
+   (define id->bind (make-free-id-table #:phase 0))
+   (define bind->binding (make-hasheq))
+   (define next-r #hasheq())
+
+   (define c-mp
+     (let ((x (current-module-path-for-load)))
+       (if (syntax? x) (syntax->datum x) x)))
+   ;;(writeln (list '(CURRENT-module-path-for-load) c-mp (current-load-relative-directory)))
+   (define rel-to-path-v
+     (resolve-module-path
+      c-mp
+      ;;(lambda () (current-load-relative-directory)) ;; not liked by Racket
+      #f))
+   ;;(writeln (list 'REL-to-path-v rel-to-path-v))
+   
+   (define (rw-id id)
+     (define bind (dict-ref id->bind id #f))
+     (unless bind
+       (set!-values (next-r bind) (next-gensym next-r (syntax-e id)))
+       (dict-set! id->bind id bind))
+     (define b (identifier-binding id 0))
+     (define bi
+       (if (not (list? b))
+           b
+           (let ([mpi (first b)]
+                 [sym (second b)]
+                 [ph (sixth b)])
+             ;; Not bound as Magnolisp if the source phase level is not 0.
+             (and (eqv? ph 0)
+                  (let ((mp (resolve-module-path-index mpi rel-to-path-v)))
+                    (list mp sym))))))
+     (define old-bi (hash-ref bind->binding bind #f))
+     (when (and old-bi (not (equal? bi old-bi)))
+       (error 'make-definfo-submodule
+              "differing bindings for the same ID: ~s != ~s (~s)"
+              old-bi bi id))
+     (hash-set! bind->binding bind bi)
+     (identifier->ast id #:bind bind))
+   
+   (define def-lst
+     (for/list ([(id def) (in-dict defs)])
+       (ast-rw-Ids rw-id def)))
+     
    #`(begin-for-syntax
-      (module* magnolisp-info #f
-        (define m-id-count #,(+ (dict-count definfo-table-b)
-                                (dict-count definfo-table-f)))
-        (define m-annos
-          (make-immutable-free-id-table
-           #,(syntax-for-id-table-dict definfo-table-b definfo-table-f)
-           #:phase 0))
-        (define m-ast (quote-syntax/keep-properties #,ast #:listed (in-racket local-ec origin paren-shape)))
-        (provide m-id-count m-annos m-ast))))
- ) ;; end begin-for-syntax
+      (module magnolisp-info racket/base
+        (require magnolisp/ast-magnolisp)
+        (define bind->binding #,(syntactifiable-mkstx bind->binding))
+        (define def-lst #,(syntactifiable-mkstx def-lst))
+        (provide bind->binding def-lst))))
 
 (define-syntax (base-module-begin stx)
   (syntax-case stx ()
@@ -81,6 +98,7 @@ same variables at the same phase level).
        (with-syntax (((mb . bodies) ast)
                      (sm sm-stx))
          (let ((mb-stx #'(mb sm . bodies)))
+           ;;(pretty-print (syntax->datum sm-stx))
            ;;(pretty-print (syntax->datum mb-stx))
            ;;(pretty-print (syntax->datum/free-id mb-stx))
            ;;(pretty-print (syntax->datum/binding ast))

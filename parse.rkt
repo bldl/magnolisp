@@ -8,7 +8,6 @@
          "annos-util.rkt"
          "ast-magnolisp.rkt"
          "app-util.rkt"
-         (only-in "runtime.rkt" #%magnolisp)
          "util.rkt"
          "util/case.rkt"
          racket/contract
@@ -20,7 +19,9 @@
          syntax/id-table
          syntax/kerncase
          syntax/parse
-         syntax/stx)
+         syntax/stx
+         (for-template racket/base
+                       (only-in "runtime.rkt" #%magnolisp)))
 
 ;;; 
 ;;; debugging utilities
@@ -30,7 +31,7 @@
   (define lst (syntax->list stx))
   (cond
    (lst (for-each print-stx-with-bindings lst))
-   ((identifier? stx) (writeln (list stx (identifier-binding stx))))
+   ((identifier? stx) (writeln (list stx (identifier-binding stx 0))))
    (else (writeln stx))))
 
 (define (stx-print-if-type-annoed stx)
@@ -55,7 +56,7 @@
      ((identifier? stx)
       (when (free-identifier=? find-stx stx)
         (writeln (list (or msg (format "~a" (syntax->datum stx)))
-                       stx (identifier-binding stx)))))))
+                       stx (identifier-binding stx 0)))))))
   (f stx))
 
 (define (stx-binding-info stx)
@@ -63,7 +64,7 @@
   (and (pair? p)
        (let ((id (car p)))
          (and (identifier? id)
-              (identifier-binding id)))))
+              (identifier-binding id 0)))))
 
 ;;; 
 ;;; parsing
@@ -195,7 +196,7 @@
 
 ;; Returns defs, provides, and requires in module.
 (define-with-contract*
-  (-> syntax? immutable-id-table? resolved-module-path?
+  (-> syntax? immutable-id-table? any/c ;; xxx was resolved-module-path?
       (values immutable-id-table? immutable-id-table? (listof syntax?)))
   (parse-defs-from-module modbeg-stx annos rr-mp)
 
@@ -324,7 +325,7 @@
     (define ast-lst
       (for/fold ([ast-lst e-ast-lst]) ([i-e (reverse i-e-lst)])
         ;;(pretty-print `(BINDING ,(syntax->datum i-e)))
-        (kernel-syntax-case* i-e #f (values)
+        (kernel-syntax-case*/phase i-e 0 (values)
           [((id ...) (#%plain-app values v ...))
            (let ()
              (define id-lst (syntax->list #'(id ...)))
@@ -362,7 +363,7 @@
   (define (parse-define-value ctx stx id-stx e-stx)
     ;;(writeln (list 'parse-define-value e-stx (syntax->datum e-stx)))
     ;;(writeln (identifier-binding #'#%magnolisp 0))
-    (kernel-syntax-case e-stx #f
+    (kernel-syntax-case/phase e-stx 0
       ((#%plain-app c (q k))
        (and (core-id? #'c)
             (quote? #'q)
@@ -372,7 +373,7 @@
        (make-DefVar ctx stx id-stx e-stx))))
 
   (define (parse-module-begin stx)
-    (kernel-syntax-case stx #f
+    (kernel-syntax-case/phase stx 0
       ((#%module-begin . bs)
        (for-each
         parse-module-level
@@ -384,7 +385,7 @@
                       ,(or (stx-binding-info stx) 'unbound)))))))
 
   (define (parse-module-level stx)
-    (kernel-syntax-case* stx #f (values)
+    (kernel-syntax-case*/phase stx 0 (values)
       (_
        (syntax-property stx 'in-racket)
        (void))
@@ -417,12 +418,16 @@
          ;;(writeln (syntax->datum stx))
          (parse-define-value 'module-level stx #'id #'e)))
 
+      ((define-syntaxes . _)
+       (void))
+      #;
       ((define-syntaxes (id ...) _)
        (let ()
          (define id-lst (syntax->list #'(id ...)))
          (assert (andmap identifier? id-lst))
          (for ((id id-lst))
            (make-DefStx 'module-level stx id))))
+      ;; xxx should no longer need to store
 
       ((#%provide . specs)
        (provide! (syntax->list #'specs)))
@@ -493,13 +498,15 @@
             (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
        (void))
       
-      (_ (raise-language-error
-          #f "illegal syntax at module level" stx
-          #:fields `(("binding"
-                      ,(or (stx-binding-info stx) 'unbound)))))))
+      (_
+      ;;(let ((id (car (syntax-e stx)))) (writeln `(cmp ,id ,(free-identifier=? #'module id 0 0))))
+       (raise-language-error
+        #f "illegal syntax at module level" stx
+        #:fields `(("binding"
+                    ,(or (stx-binding-info stx) 'unbound)))))))
   
   (define (parse-stat stx)
-    (kernel-syntax-case* stx #f (values)
+    (kernel-syntax-case*/phase stx 0 (values)
       (_
        (syntax-property stx 'in-racket)
        (syntaxed stx BlockStat null))
@@ -563,7 +570,7 @@
 
   ;; All the arguments are syntax objects.
   (define (parse-let-expr stx kind binds e)
-    (kernel-syntax-case binds #f
+    (kernel-syntax-case/phase binds 0
      (()
       (parse-expr (syntax-track-origin e stx kind)))
      ((((n) v))
@@ -583,7 +590,7 @@
     ;;(stx-print-if-type-annoed stx)
     ;;(writeln (list ctx stx))
     
-    (kernel-syntax-case stx #f
+    (kernel-syntax-case/phase stx 0
 
       (_
        (syntax-property stx 'in-racket)
