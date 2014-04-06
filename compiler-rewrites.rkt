@@ -227,8 +227,8 @@
 
 (define* (get-export-name x)
   (cond
-   ((hash? x) (hash-ref x 'export-name #f))
-   ((Def? x) (ast-anno-maybe x 'export-name))
+   ((hash? x) (hash-ref x 'export #f))
+   ((Def? x) (ast-anno-maybe x 'export))
    (else
     (raise-argument-error
      'get-export-name

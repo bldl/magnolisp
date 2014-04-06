@@ -10,51 +10,6 @@ Routines for parsing annotation values into AST nodes.
          racket/contract syntax/parse)
 
 ;;; 
-;;; utilities
-;;; 
-
-;; 'h' is a hash of annotations.
-(define (anno->datum h id-stx anno-name
-                     default/no-anno default/no-value
-                     pred?
-                     #:expect [expect-s #f])
-  (define anno-stx (hash-ref h anno-name #f))
-  (if (not anno-stx)
-      default/no-anno
-      (syntax-case anno-stx ()
-        (n
-         (identifier? #'n)
-         (begin
-           (assert (eq? anno-name (syntax-e #'n)))
-           default/no-value))
-        ((_ v-pat)
-         (begin
-           (define v-stx #'v-pat)
-           (define v (syntax->datum v-stx))
-           (unless (pred? v)
-             (raise-language-error
-              anno-name
-              (cond
-               (expect-s
-                (format "expected ~a value" expect-s))
-               ((object-name pred?) =>
-                (lambda (x)
-                  (format "expected ~a value" x)))
-               (else
-                "illegal value"))
-              anno-stx v-stx
-              #:continued
-              (format "(annotation of definition ~a)" (syntax-e id-stx))))
-           v))
-        (_
-         (raise-language-error
-          anno-name
-          "expected a single value for annotation"
-          anno-stx
-          #:continued
-          (format "(annotation of definition ~a)" (syntax-e id-stx)))))))
-
-;;; 
 ;;; entry point flag
 ;;; 
 

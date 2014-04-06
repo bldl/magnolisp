@@ -168,6 +168,9 @@ It is rather important for all Ast derived node types to be
                 (else (gensym name))))
   (Id (hasheq 'stx id) name bind))
 
+(define* (set-Id-bind id bind)
+  (struct-copy Id id [bind bind]))
+
 ;; Looks up a definition corresponding to the specified identifier.
 (define-with-contract*
   (-> hash? Id? (or/c Def? #f))

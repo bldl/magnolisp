@@ -20,3 +20,5 @@
 
 (f 1)
 (f 2)
+
+(provide (rename-out [f g]))

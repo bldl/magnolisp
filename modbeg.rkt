@@ -79,15 +79,17 @@ same variables at the same phase level).
      (identifier->ast id #:bind bind))
    
    (define def-lst
-     (for/list ([(id def) (in-dict defs)])
+     (for/list ([(id def) (in-dict defs)]
+                #:when (ast-anno-maybe def 'top)) ;;xxx should not even put there
        (ast-rw-Ids rw-id def)))
      
    #`(begin-for-syntax
       (module magnolisp-info racket/base
         (require magnolisp/ast-magnolisp)
+        (define r-mp #,(syntactifiable-mkstx rel-to-path-v))
         (define bind->binding #,(syntactifiable-mkstx bind->binding))
         (define def-lst #,(syntactifiable-mkstx def-lst))
-        (provide bind->binding def-lst))))
+        (provide r-mp bind->binding def-lst))))
 
 (define-syntax (base-module-begin stx)
   (syntax-case stx ()

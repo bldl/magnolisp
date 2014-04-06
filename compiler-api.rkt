@@ -17,73 +17,11 @@ optimization.
 
 |#
 
-(require "annos-parse.rkt" "ast-magnolisp.rkt" "ast-util.rkt"
-         "compiler-rewrites.rkt" "app-util.rkt"
-         "parse.rkt" "strategy.rkt" "util.rkt" "util/struct.rkt"
-         syntax/id-table syntax/moddep)
-
-;;; 
-;;; identifier -> Id conversion
-;;;
-
-(define-with-contract
-  (-> list? immutable-free-id-table?)
-  (make-id->bind tl-def-lst)
-
-  (define id->bind (make-immutable-free-id-table #:phase 0))
-  
-  (define f
-    (topdown-visit
-     (lambda (ast)
-       (define id (binding-or-use-id ast))
-       (when id
-         (let ((def-id (or (syntax-property id 'def-id) id)))
-           (unless (dict-has-key? id->bind def-id)
-             (define bind (gensym (syntax-e def-id)))
-             (set! id->bind (dict-set id->bind def-id bind))))))))
-  
-  (for-each f tl-def-lst)
-
-  id->bind)
-
-(define-with-contract
-  (-> immutable-free-id-table? identifier? Id?)
-  (conv-id->ast id->bind id)
-  (define def-id (or (syntax-property id 'def-id) id))
-  (define bind (dict-ref id->bind def-id #f))
-  (unless bind
-    (error 'conv-id->ast
-           "unbound identifier ~a: ~s\n def-id = ~s\nentries = ~a"
-           (syntax-e id) id
-           (syntax-property id 'def-id)
-           (dict-count id->bind)))
-  (identifier->ast id #:bind bind))
-
-;; Like above, but adds an entry into the table if the identifier is
-;; not present.
-(define-with-contract
-  (-> immutable-free-id-table? identifier?
-      (values immutable-free-id-table? Id?))
-  (conv-id->ast/update id->bind id)
-  (define def-id (or (syntax-property id 'def-id) id))
-  (define bind (dict-ref id->bind def-id #f))
-  (unless bind
-    (set! bind (gensym (syntax-e id)))
-    (set! id->bind (dict-set id->bind id bind)))
-  (values id->bind (identifier->ast id #:bind bind)))
-
-;; Updates the value of id->bind.
-(define-syntax-rule
-  (conv-id->ast/update! id->bind id-stx)
-  (let-values ([(t id) (conv-id->ast/update id->bind id-stx)])
-    (set! id->bind t)
-    id))
-
-(define (ast-id->ast id->bind ast)
-  (define (mk-id id)
-    (conv-id->ast id->bind id))
-
-  (ast-rw-Ids mk-id ast))
+(require "annos-parse.rkt" "app-util.rkt"
+         "ast-magnolisp.rkt" "ast-util.rkt"
+         "compiler-rewrites.rkt" "parse.rkt" "strategy.rkt"
+         "util.rkt" "util/struct.rkt"
+         syntax/moddep)
 
 ;;;
 ;;; de-Racketization
@@ -242,43 +180,42 @@ optimization.
 
 (define* compilation-state? St?)
 
-(define (collect-entry-points annos)
-  (define eps (make-free-id-table #:phase 0))
-  (dict-for-each
-   annos
-   (lambda (id h)
-     (define ep (parse-export id h))
-     (when ep
-       (dict-set! eps id ep))))
-  eps)
-
-(define (id-table-add-lst! t lst)
-  (for ((id lst))
-    (dict-set! t id #t)))
-
 (define (merge-defs mods)
-  (define all-defs (make-free-id-table #:phase 0))
-  (for (([rr-mp mod] mods))
-    (define defs (Mod-defs mod))
-    (dict-for-each
-     defs
-     (lambda (id def)
-       (when (dict-has-key? all-defs id)
-         (error 'merge-defs
-                "ID ~s bound (for runtime) in more than one module" id))
-       (dict-set! all-defs id def))))
+  (define all-defs (make-hasheq)) ;; bind -> Def
+  (define next-r #hasheq())
+  (define x-binds (make-hash)) ;; (cons/c rr-mp sym) -> bind
+  (for ([(rr-mp mod) mods])
+    (define def-lst (Mod-def-lst mod))
+    (define bind->binding (Mod-bind->binding mod))
+    (define m->p-bind (make-hasheq)) ;; local bind -> global bind
+    (define (rw-id id)
+      (define m-bind (Id-bind id))
+      (define info (hash-ref bind->binding m-bind))
+      (cond-or-fail
+       [(list? info)
+        (define r-mp (first info))
+        (define sym (second info))
+        (define rr-mp (r-mp->rr-mp r-mp))
+        (define p-bind (hash-ref m->p-bind m-bind #f))
+        (unless p-bind
+          (define mp-and-sym (cons rr-mp sym))
+          (set! p-bind (hash-ref x-binds mp-and-sym #f))
+          (unless p-bind
+            (set!-values (next-r p-bind) (next-gensym next-r (Id-name id)))
+            (hash-set! x-binds mp-and-sym p-bind))
+          (hash-set! m->p-bind m-bind p-bind))
+        (set-Id-bind id p-bind)]
+       [(or (eq? 'lexical info) (not info))
+        (define p-bind (hash-ref m->p-bind m-bind #f))
+        (unless p-bind
+          (set!-values (next-r p-bind) (next-gensym next-r (Id-name id)))
+          (hash-set! m->p-bind m-bind p-bind))
+        (set-Id-bind id p-bind)]))
+    (for ([def def-lst])
+      (define n-def (ast-rw-Ids rw-id def))
+      (hash-set! all-defs (Id-bind (Def-id n-def)) n-def)))
   all-defs)
-
-(define (def-display-Var-bindings def)
-  ((topdown-visit
-    (lambda (ast)
-      (when (Var? ast)
-        (define var-id (Var-id ast))
-        (define def-id (get-def-id var-id))
-        (assert (or (not def-id) (def-identifier=? var-id def-id)))
-        (writeln (list (syntax-e var-id) ast (identifier-binding var-id) def-id)))))
-   def))
-
+    
 (define (def-all-used-id-binds def)
   (define defs (make-hasheq))
   ((topdown-visit
@@ -288,23 +225,6 @@ optimization.
         (hash-set! defs (Id-bind id) #t))))
    def)
   (dict-keys defs))
-
-;; For debugging.
-(define (mods-display-Var-bindings mods)
-  (for (((r-mp mod) mods))
-    (writeln `(Vars ,r-mp))
-    (define defs (Mod-defs mod))
-    (dict-for-each
-     defs
-     (lambda (id def)
-       (def-display-Var-bindings def)))))
-
-;; For debugging.
-(define (all-defs-display-Var-bindings all-defs)
-  (dict-for-each
-   all-defs
-   (lambda (id def)
-     (def-display-Var-bindings def))))
 
 ;; Drops all top-level definitions in 'tl-def-lst' that are not used
 ;; via at least one of the entry points in 'eps' (which has 'Id'
@@ -331,24 +251,44 @@ optimization.
             (define refs-in-def (def-all-used-id-binds def))
             (set! next-ids (append next-ids refs-in-def)))))
       (loop next-ids)))
-  ;;(pretty-print `(original-defs ,(dict-count globals) ,(dict-keys globals) retained-defs ,(dict-count processed-defs) ,(dict-keys processed-defs)))
+  ;;(pretty-print `(ORIGINAL-DEFS ,(dict-count globals) ,(dict-keys globals) RETAINED-DEFS ,(length processed-defs) ,(map (compose Id-name Def-id) processed-defs)))
   processed-defs)
 
-;; defs-in-mod is an immutable id-table, whereas eps-in-mod is an
-;; id-table.
-(define (defs-annotate-export-names defs-in-mod eps-in-mod)
-  (for ([(id v) (in-dict eps-in-mod)])
-    (assert v)
-    (define def (dict-ref defs-in-mod id))
-    (when (get-foreign-name def)
-      (raise-language-error/ast
-       "definition marked both as 'export' and 'foreign'"
-       def))
-    (define n-def (ast-anno-set def 'export-name v))
-    (set! defs-in-mod
-          (dict-set defs-in-mod id n-def)))
-  defs-in-mod)
+;;; 
+;;; prelude
+;;; 
 
+;; Loads a map of IDs by name of provided symbol, for the specified
+;; module. This will not work for symbols that have been renamed on
+;; export. Only includes IDs that (1) are defined within the module,
+;; (2) are variables rather than syntax, (3) are exported at phase
+;; level 0, and (4) are Magnolisp. The result will be #f for any Mod
+;; that has not been loaded.
+(define (build-provide-map mods mp)
+  (let* ((r-mp (resolve-module-path mp #f))
+         (rr-mp (r-mp->rr-mp r-mp))
+         (mod (hash-ref mods rr-mp #f)))
+    (and mod
+        (let ()
+          (define syms (mutable-seteq))
+          (define-values (vars stxs) (module->exports rr-mp))
+          ;;(writeln `(exports for ,mp are ,vars))
+          ;;(writeln `(stxs ,stxs))
+          (for ([var vars]
+                #:when (equal? (car var) 0))
+            (for ([sym-and-lst (cdr var)])
+              (define exp-sym (first sym-and-lst))
+              (define origins (second sym-and-lst))
+              ;; If something locally defined has been renamed on export,
+              ;; we cannot see the original name from 'origins'.
+              ;;(writeln `(origins of ,exp-sym in ,mp are ,origins))
+              (when (null? origins)
+                (set-add! syms exp-sym))))
+          (for/hasheq ([def (Mod-def-lst mod)]
+                       #:when (set-member? syms (Id-name (Def-id def))))
+            (define id (Def-id def))
+            (values (Id-name id) id))))))
+                
 ;;; 
 ;;; compilation
 ;;;
@@ -358,67 +298,49 @@ optimization.
 ;; Compiles a program consisting of all the entry points in the
 ;; specified modules, and all dependencies thereof. All of the
 ;; 'ep-mp-lst' module paths should be either absolute ones, or '(file
-;; ...)' paths relative to the working directory (no module relative
-;; paths as entry points).
+;; ...)' paths relative to the working directory, unless
+;; 'rel-to-path-v' is specified for relative path resolution.
 (define* (compile-modules
           #:relative-to [rel-to-path-v #f]
           . ep-mp-lst)
-  ;;(writeln ep-mp-lst)
-
+  ;; resolved-module-path? is eq? comparable
   (define mods (make-hasheq)) ;; rr-mp -> Mod
-  (define eps-in-prog (make-free-id-table #:phase 0))
+  
+  (define eps-in-prog (mutable-seteq)) ;; of bind
+  
   (define dep-q null) ;; deps queued for loading
 
-  (define (add-deps! deps)
-    (set! dep-q (append dep-q deps)))
-
   (define (load ep? mp rel-to-path-v)
-    ;;(writeln `(load ,ep? ,mp ,rel-to-path-v))
     (define r-mp (resolve-module-path mp rel-to-path-v))
-    (define rr-mp (r-mp->rr-mp r-mp))
+    (define rr-mp (r-mp->rr-mp r-mp)) ;; resolved-module-path?
+    ;;(writeln `(load entry: ,ep? mp: ,mp rel: ,rel-to-path-v r-mp: ,r-mp rr-mp: ,rr-mp))
     (define mod (hash-ref mods rr-mp #f))
     (unless mod ;; not yet loaded
       ;;(writeln (list 'loading-submod-of r-mp mp))
       (set! mod (load-mod-from-submod r-mp mp))
-      ;;(writeln `(LOADED ,rr-mp ,r-mp ,mp ,mod)) (exit)
+      ;;(writeln `(LOADED ,rr-mp ,r-mp ,mp ,mod))
 
-      (when (Mod? mod) ;; is a Magnolisp module
-        (define annos (Mod-annos mod))
-        ;;(pretty-print-id-table annos)
+      (define def-lst (Mod-def-lst mod))
+      
+      ;; For entry point modules, use annotations to build a set of
+      ;; entry points. Add these to program entry points.
+      (define eps-in-mod #f) ;; (or/c #f (hash/c bind Def?)) xxx not actually being used
+      (when ep?
+        ;; We only consider top-level things here.
+        (set! eps-in-mod
+              (for/hasheq ([def def-lst]
+                           #:when (ast-anno-maybe def 'export))
+                (define bind (Id-bind (Def-id def)))
+                (set-add! eps-in-prog bind)
+                (values bind def))))
 
-        ;; For entry point modules, use annotations to build a set of
-        ;; entry points. Add these to program entry points.
-        (define eps-in-mod #f)
-        (when ep?
-          (set! eps-in-mod (collect-entry-points annos))
-          (id-table-add-lst! eps-in-prog (dict-keys eps-in-mod)))
-
-        ;; If a module has entry points, or if it is a dependency,
-        ;; then collect further information from it.
-        (when (or (not ep?) (and eps-in-mod (not (dict-empty? eps-in-mod))))
-          (define pt (Mod-pt mod)) ;; parse tree
-          ;;(pretty-print (syntax->datum pt)) (exit)
-          ;;(pretty-print (syntax->datum/binding pt #:pred (lambda (x) (memq x '(equal? r.equal?))))) (exit)
-          ;;(print-with-select-syntax-properties '(in-racket local-ec) pt) (exit)
-          ;;(pretty-print (syntax->datum/free-id pt)) (exit)
-          (define-values (defs provs reqs)
-            (parse-defs-from-module pt annos rr-mp))
-          ;;(pretty-print reqs) (exit)
-          (when eps-in-mod
-            (set! defs (defs-annotate-export-names defs eps-in-mod)))
-          ;;(pretty-print (dict->list defs)) (exit)
-          (set! mod
-                (struct-copy Mod mod
-                             (defs defs) (provs provs) (reqs reqs)))
-          (define raw-mp-lst
-            (req-specs->module-paths reqs))
-          ;;(pretty-print (dict-map defs cons))
-          ;;(pretty-print (list 'provided-ids (dict-map provs list)))
-          ;;(pretty-print (list 'raw-module-paths raw-mp-lst))
-          (add-deps! (map
-                      (lambda (raw-mp)
-                        (list (syntax->datum raw-mp) r-mp))
-                      raw-mp-lst))))
+      ;; Build a list of dependencies for this module from the
+      ;; bind->binding table. Stored as (list dep-r-mp rel-r-mp) per
+      ;; entry.
+      (for ([(bind info) (Mod-bind->binding mod)]
+            #:when (list? info))
+        (define dep-r-mp (first info))
+        (set! dep-q (cons (list dep-r-mp r-mp) dep-q)))
 
       (hash-set! mods rr-mp mod)))
 
@@ -436,45 +358,37 @@ optimization.
         (apply load #f mp-and-rel))
       (loop)))
 
-  (set! mods (mods-fill-in-syms mods))
-
+  ;;(writeln `(eps-in-prog ,eps-in-prog))
+  ;;(writeln `(loaded mods ,(hash-keys mods)))
+  
   ;; Make note of interesting prelude definitions (if it is even a
   ;; dependency).
-  (define-values (predicate-stx TRUE-stx FALSE-stx)
-    (let* ((r-mp (resolve-module-path 'magnolisp/prelude #f))
-           (rr-mp (r-mp->rr-mp r-mp))
-           (mod (hash-ref mods rr-mp #f)))
+  (define-values (predicate-id TRUE-id FALSE-id)
+    (let* ((mp 'magnolisp/prelude)
+           (syms (build-provide-map mods mp)))
       (define (get-id sym)
-        (if (not mod)
-            (datum->syntax #'here sym)
-            (let ((syms (Mod-syms mod)))
-              (define def (hash-ref syms sym #f))
-              (unless def
+        (if (not syms)
+            (fresh-ast-identifier sym)
+            (let ()
+              (define id (hash-ref syms sym #f))
+              (unless id
                 (error 'compile-modules
                        "prelude does not define '~a': ~s"
-                       sym r-mp))
-              (Def-id def))))
+                       sym mp))
+              id)))
       (values (get-id 'predicate)
               (get-id 'TRUE)
               (get-id 'FALSE))))
+
+  ;;(writeln (list predicate-id TRUE-id FALSE-id))
   
   (define all-defs (merge-defs mods))
-  (set! all-defs (defs-resolve-names all-defs mods))
   ;;(pretty-print (dict->list all-defs)) (exit)
-  ;;(pretty-print (dict-map all-defs (lambda (x y) y))) (exit)
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
-  (define def-lst (dict-values all-defs))
-  (set! def-lst (for/list ([def def-lst] #:unless (DefStx? def)) def))
-  (define id->bind (make-id->bind def-lst))
-  (set! def-lst (map (fix ast-id->ast id->bind) def-lst))
-  ;;(pretty-print def-lst) (exit)
-  (define TRUE-id (conv-id->ast/update! id->bind TRUE-stx))
-  (define FALSE-id (conv-id->ast/update! id->bind FALSE-stx))
+  (define def-lst (hash-values all-defs))
+  
   (set! def-lst (defs-optimize-if TRUE-id FALSE-id def-lst))
-  (define eps-in-prog/Id
-    (for/seteq ([(id x) (in-dict eps-in-prog)])
-      (dict-ref id->bind id)))
-  (set! def-lst (defs-drop-unreachable def-lst eps-in-prog/Id))
+  (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
   (set! def-lst (map ast-rm-LetExpr def-lst))
   (set! def-lst (map ast-LetLocalEc->BlockExpr def-lst))
   (set! def-lst (map ast-simplify def-lst))
@@ -482,19 +396,14 @@ optimization.
   ;;(pretty-print (dict->list all-defs)) (exit)
   ;;(pretty-print (dict->list all-defs)) (exit)
   ;;(pretty-print (dict->list id->bind)) (exit)
-  (define predicate-id (conv-id->ast/update! id->bind predicate-stx))
   ;;(pretty-print (dict-values all-defs)) (exit)
   (set! def-lst (map de-racketize def-lst))
   (defs-check-Apply-target def-lst)
+  ;;(pretty-print def-lst)
   (set! all-defs (build-defs-table def-lst))
   (set! all-defs (defs-type-infer predicate-id all-defs))
   ;;(pretty-print (dict-values all-defs)) (exit)
   
-  ;;(all-defs-display-Var-bindings all-defs) (exit)
-  ;;(mods-display-Var-bindings mods)
-  ;;(pretty-print (list 'entry-points (dict-map eps-in-prog (compose car cons))))
-  ;;(for (([k v] mods)) (pretty-print (list 'loaded k v)))
-
   ;;(pretty-print (map ast->sexp (dict-values all-defs)))
   
   (St mods all-defs eps-in-prog))

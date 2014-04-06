@@ -249,11 +249,20 @@
            (let-and foreign-stx (hash-ref ann-h 'foreign #f)
              (let-and foreign-name (parse-cxx-name-anno foreign-stx)
                foreign-name))))
+    (define export
+      (parse-export id-stx ann-h))
+    (when (and foreign export)
+      (raise-language-error
+       #f
+       (format "definition ~a marked both as 'export' and 'foreign'"
+               (syntax-e id-stx))
+       stx))
     (set! ann-h
           (hash-set* ann-h
                      'stx stx
                      'rr-mp rr-mp
                      'top global?
+                     'export export
                      'foreign foreign))
     ;;(writeln `(parsed annos for ,(syntax-e id-stx) are ,@(apply append (for/list (((k v) ann-h)) `(,k = ,v)))))
     ann-h)
