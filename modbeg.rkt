@@ -31,69 +31,64 @@ same variables at the same phase level).
           "parse.rkt" "util.rkt"))
 
 (define-for-syntax (make-definfo-submodule modbeg-stx)
-   (define annos (get-stored-definfo))
-   ;;(pretty-print (dict->list info))
-   ;;(pretty-print (syntax->datum modbeg-stx))
-   ;;(pretty-print (syntax->datum/binding modbeg-stx #:conv-id id->datum/phase))
-   (define-values (defs provs reqs)
-     (parse-defs-from-module modbeg-stx annos #f)) ;; xxx rr-mp is obsolete
-   ;;(pretty-print (dict->list defs)) (exit)
+  (define annos (get-stored-definfo))
+  ;;(pretty-print (dict->list info))
+  ;;(pretty-print (syntax->datum modbeg-stx))
+  ;;(pretty-print (syntax->datum/binding modbeg-stx #:conv-id id->datum/phase))
+  (define-values (defs provs reqs)
+    (parse-defs-from-module modbeg-stx annos #f)) ;; xxx rr-mp is obsolete
+  ;;(pretty-print (dict->list defs)) (exit)
 
-   (define id->bind (make-free-id-table #:phase 0))
-   (define bind->binding (make-hasheq))
-   (define next-r #hasheq())
+  (define id->bind (make-free-id-table #:phase 0))
+  (define bind->binding (make-hasheq))
+  (define next-r #hasheq())
 
-   ;; (current-module-path-for-load) is #f during byte compilation, it
-   ;; seems. Better not try (resolve-module-path ...) in that case.
-   (define c-mp
-     (let ((x (current-module-path-for-load)))
-       (if (syntax? x) (syntax->datum x) x)))
-   ;;(writeln (list '(CURRENT-module-path-for-load) c-mp (current-load-relative-directory)))
-   (define rel-to-path-v
-     (and c-mp
-          (resolve-module-path
-           c-mp
-           ;;(lambda () (current-load-relative-directory)) ;; not liked by Racket
-           #f)))
-   ;;(writeln (list 'REL-to-path-v rel-to-path-v))
-   
-   (define (rw-id id)
-     (define bind (dict-ref id->bind id #f))
-     (unless bind
-       (set!-values (next-r bind) (next-gensym next-r (syntax-e id)))
-       (dict-set! id->bind id bind))
-     (define b (identifier-binding id 0))
-     (define bi
-       (if (not (list? b))
-           b
-           (let ([mpi (first b)]
-                 [sym (second b)]
-                 [ph (sixth b)])
-             ;; Not bound as Magnolisp if the source phase level is not 0.
-             (and (eqv? ph 0)
-                  (let ((r-mp (resolve-module-path-index mpi rel-to-path-v)))
-                    ;;(writeln (list r-mp sym))
-                    (list r-mp sym))))))
-     (define old-bi (hash-ref bind->binding bind #f))
-     (when (and old-bi (not (equal? bi old-bi)))
-       (error 'make-definfo-submodule
-              "differing bindings for the same ID: ~s != ~s (~s)"
-              old-bi bi id))
-     (hash-set! bind->binding bind bi)
-     (identifier->ast id #:bind bind))
-   
-   (define def-lst
-     (for/list ([(id def) (in-dict defs)]
-                #:when (ast-anno-maybe def 'top)) ;;xxx should not even put there
-       (ast-rw-Ids rw-id def)))
-     
-   #`(begin-for-syntax
-      (module magnolisp-info racket/base
-        (require magnolisp/ast-magnolisp)
-        (define r-mp #,(syntactifiable-mkstx rel-to-path-v))
-        (define bind->binding #,(syntactifiable-mkstx bind->binding))
-        (define def-lst #,(syntactifiable-mkstx def-lst))
-        (provide r-mp bind->binding def-lst))))
+  ;;(writeln `(current source ,(current-module-declare-source)))
+  
+  ;; (current-module-declare-name) as well as
+  ;; (current-module-path-for-load) seem to be #f during byte
+  ;; compilation.
+  (define rel-to-path-v (resolved-module-path-name
+                         (current-module-declare-name)))
+  ;; (writeln rel-to-path-v)
+
+  (define (rw-id id)
+    (define bind (dict-ref id->bind id #f))
+    (unless bind
+      (set!-values (next-r bind) (next-gensym next-r (syntax-e id)))
+      (dict-set! id->bind id bind))
+    (define b (identifier-binding id 0))
+    (define bi
+      (if (not (list? b))
+          b
+          (let ([mpi (first b)]
+                [sym (second b)]
+                [ph (sixth b)])
+            ;; Not bound as Magnolisp if the source phase level is not 0.
+            (and (eqv? ph 0)
+                 (let ((r-mp (resolve-module-path-index mpi rel-to-path-v)))
+                   ;;(writeln (list r-mp sym))
+                   (list r-mp sym))))))
+    (define old-bi (hash-ref bind->binding bind #f))
+    (when (and old-bi (not (equal? bi old-bi)))
+      (error 'make-definfo-submodule
+             "differing bindings for the same ID: ~s != ~s (~s)"
+             old-bi bi id))
+    (hash-set! bind->binding bind bi)
+    (identifier->ast id #:bind bind))
+  
+  (define def-lst
+    (for/list ([(id def) (in-dict defs)]
+               #:when (ast-anno-maybe def 'top)) ;;xxx should not even put there
+      (ast-rw-Ids rw-id def)))
+  
+  #`(begin-for-syntax
+     (module magnolisp-info racket/base
+       (require magnolisp/ast-magnolisp)
+       (define r-mp #,(syntactifiable-mkstx rel-to-path-v))
+       (define bind->binding #,(syntactifiable-mkstx bind->binding))
+       (define def-lst #,(syntactifiable-mkstx def-lst))
+       (provide r-mp bind->binding def-lst))))
 
 (define-syntax (base-module-begin stx)
   (syntax-case stx ()
@@ -114,6 +109,11 @@ same variables at the same phase level).
 
 (define-syntax (module-begin stx)
   (syntax-case stx ()
-    ((_ . bodies)
-     (with-syntax ((prelude (datum->syntax stx 'magnolisp/prelude)))
-       #'(base-module-begin (require prelude) . bodies)))))
+    ((orig-mb . bodies)
+     (let ()
+       ;;(writeln (syntax-source-module #'orig-mb #t))
+       ;;(define mpi (syntax-source-module #'orig-mb #f))
+       ;;(writeln (module-path-index-resolve mpi))
+       ;;(writeln `(enclosing #%module-begin is ,#'orig-mb ,(syntax-source #'orig-mb) ,(syntax-source-module #'orig-mb #f) ,(syntax-source-module #'orig-mb #t)))
+       (with-syntax ((prelude (datum->syntax stx 'magnolisp/prelude)))
+         #'(base-module-begin (require prelude) . bodies))))))
