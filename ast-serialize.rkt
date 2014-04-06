@@ -44,7 +44,7 @@ weakness properties of collection types may also not be preserved.
   #`(datum->syntax (quote-syntax #,(datum->syntax stx 'ctx))
                    #,dat #,(syntactifiable-mkstx loc)))
 
-(define kept-properties '(in-racket local-ec origin paren-shape))
+(define kept-properties '(annos origin paren-shape))
 
 (define keep?/syntactifiable
   (keep?-> keep-position?
@@ -65,7 +65,8 @@ weakness properties of collection types may also not be preserved.
     (define (syntactifiable-mkstx x)
       (syntax-preserve/syntactifiable x))]
    [null?
-    #'null]
+    (define (syntactifiable-mkstx x)
+      #'null)]
    [pair?
     (define/generic f syntactifiable-mkstx)
     (define (syntactifiable-mkstx x)
@@ -105,7 +106,7 @@ weakness properties of collection types may also not be preserved.
 (module* test #f
   (require racket rackunit)
 
-  (for ([dat (list #f 1 'x "x" #'x '(1 2 3)
+  (for ([dat (list #f 1 'x "x" #'x '() '(1 2 3)
                    #&7 #(1 2 3)
                    #s(Obj 1) #s(Obj car)
                    #hasheq() #'#hasheq()
