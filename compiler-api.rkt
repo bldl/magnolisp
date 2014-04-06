@@ -311,8 +311,11 @@ optimization.
   (define dep-q null) ;; deps queued for loading
 
   (define (load ep? mp rel-to-path-v)
-    (define r-mp (resolve-module-path mp rel-to-path-v))
+    ;;(writeln `(load mp ,mp))
+    (define r-mp (resolve-module-path/primitive mp rel-to-path-v))
+    ;;(writeln `(load r-mp ,r-mp))
     (define rr-mp (r-mp->rr-mp r-mp)) ;; resolved-module-path?
+    ;;(writeln `(load rr-mp ,rr-mp))
     ;;(writeln `(load entry: ,ep? mp: ,mp rel: ,rel-to-path-v r-mp: ,r-mp rr-mp: ,rr-mp))
     (define mod (hash-ref mods rr-mp #f))
     (unless mod ;; not yet loaded
@@ -340,7 +343,8 @@ optimization.
       (for ([(bind info) (Mod-bind->binding mod)]
             #:when (list? info))
         (define dep-r-mp (first info))
-        (set! dep-q (cons (list dep-r-mp r-mp) dep-q)))
+        (define dep-mp (r-mp->mp dep-r-mp))
+        (set! dep-q (cons (list dep-mp r-mp) dep-q)))
 
       (hash-set! mods rr-mp mod)))
 
@@ -479,7 +483,7 @@ optimization.
 ;;; 
 
 (module* test #f
-  (define st (compile-files "tests/test-block-expr-2.rkt"))
+  (define st (compile-files "tests/test-names-1.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))
                        (cxx (cc hh))

@@ -30,24 +30,50 @@ Module loading.
   (matches? x
    (? path?)
    (? symbol?)
+   (list 'quote (? symbol?)) ;; custom extension
    (list 'submod (or (? path?) (? symbol?)) (? symbol?) ..1)))
 
+;; Like resolve-module-path, but leaves (quote sym) paths as they are,
+;; without resolving. The result is acceptable to dynamic-require.
+(define-with-contract*
+  (-> module-path? any/c resolve-module-path-result?)
+  (resolve-module-path/primitive mp rel-to-path-v)
+  (match mp
+    ((list 'quote (? symbol?)) mp)
+    (_ (resolve-module-path mp rel-to-path-v))))
+
 ;; Turns resolve-module-path result format into
-;; make-resolved-module-path result format.
+;; make-resolved-module-path result format. The result is canonical
+;; and interned, and thus suitable for eq? comparison.
 (define-with-contract*
   (-> resolve-module-path-result? resolved-module-path?)
   (r-mp->rr-mp r-mp)
   (define (f path)
     (simplify-path (cleanse-path path)))
-  (make-resolved-module-path
+  (define (g r-mp)
    (match r-mp
      ((? path?) (f r-mp))
      ((? symbol?) r-mp)
-     ((list 'submod
-            (and (or (? path?) (? symbol?)) p)
-            (? symbol? subs) ..1)
-      (cons (if (path? p) (f p) p) subs)))))
-      	
+     ((list 'quote (? symbol? sym)) sym)
+     ((list 'submod base (? symbol? subs) ..1)
+      (cons (g base) subs))))
+  (make-resolved-module-path (g r-mp)))
+
+;; Turns resolve-module-path result format into a module path, i.e.,
+;; something that could be used with dynamic-require.
+(define-with-contract*
+  (-> resolve-module-path-result? module-path?)
+  (r-mp->mp r-mp)
+  (match r-mp
+    ((? path?) r-mp)
+    ((? symbol?) `(quote ,r-mp))
+    ((list 'submod
+           (and (or (? path?) (? symbol?)) p)
+           (? symbol? subs) ..1)
+     (if (path? p)
+         r-mp
+         `(submod `(quote ,r-mp) ,@subs)))))
+
 ;;; 
 ;;; module
 ;;; 
@@ -95,9 +121,10 @@ Module loading.
      (dynamic-require sub-mp 'r-mp (thunk #f))))
   
   (when original-r-mp
+    #;
     (unless (equal? r-mp original-r-mp)
       (error 'load-mod-from-submod
-             "~a (~a): ~a != ~a (used != recorded)"
+             "~a (~s): ~s != ~s (used != recorded)"
              "resolved module path mismatch"
              mp r-mp original-r-mp))
 

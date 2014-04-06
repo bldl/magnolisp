@@ -43,15 +43,18 @@ same variables at the same phase level).
    (define bind->binding (make-hasheq))
    (define next-r #hasheq())
 
+   ;; (current-module-path-for-load) is #f during byte compilation, it
+   ;; seems. Better not try (resolve-module-path ...) in that case.
    (define c-mp
      (let ((x (current-module-path-for-load)))
        (if (syntax? x) (syntax->datum x) x)))
    ;;(writeln (list '(CURRENT-module-path-for-load) c-mp (current-load-relative-directory)))
    (define rel-to-path-v
-     (resolve-module-path
-      c-mp
-      ;;(lambda () (current-load-relative-directory)) ;; not liked by Racket
-      #f))
+     (and c-mp
+          (resolve-module-path
+           c-mp
+           ;;(lambda () (current-load-relative-directory)) ;; not liked by Racket
+           #f)))
    ;;(writeln (list 'REL-to-path-v rel-to-path-v))
    
    (define (rw-id id)
@@ -68,8 +71,9 @@ same variables at the same phase level).
                  [ph (sixth b)])
              ;; Not bound as Magnolisp if the source phase level is not 0.
              (and (eqv? ph 0)
-                  (let ((mp (resolve-module-path-index mpi rel-to-path-v)))
-                    (list mp sym))))))
+                  (let ((r-mp (resolve-module-path-index mpi rel-to-path-v)))
+                    ;;(writeln (list r-mp sym))
+                    (list r-mp sym))))))
      (define old-bi (hash-ref bind->binding bind #f))
      (when (and old-bi (not (equal? bi old-bi)))
        (error 'make-definfo-submodule
