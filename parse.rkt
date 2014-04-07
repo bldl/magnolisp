@@ -196,9 +196,9 @@
 
 ;; Returns defs, provides, and requires in module.
 (define-with-contract*
-  (-> syntax? immutable-id-table? any/c ;; xxx was resolved-module-path?
+  (-> syntax? immutable-id-table?
       (values immutable-id-table? immutable-id-table? (listof syntax?)))
-  (parse-defs-from-module modbeg-stx annos rr-mp)
+  (parse-defs-from-module modbeg-stx annos)
 
   (define defs-in-mod (make-immutable-free-id-table #:phase 0))
   (define prov-lst null)
@@ -211,7 +211,6 @@
     (set! defs-in-mod (dict-set defs-in-mod id def)))
   
   (define (provide! stx-lst)
-    ;;(pretty-print (list rr-mp 'provide! stx-lst))
     (set! prov-lst (append prov-lst stx-lst)))
 
   ;; Records #%require specs, which may look like:
@@ -260,7 +259,6 @@
     (set! ann-h
           (hash-set* ann-h
                      'stx stx
-                     'rr-mp rr-mp
                      'top global?
                      'export export
                      'foreign foreign))

@@ -35,8 +35,8 @@ same variables at the same phase level).
   ;;(pretty-print (dict->list info))
   ;;(pretty-print (syntax->datum modbeg-stx))
   ;;(pretty-print (syntax->datum/binding modbeg-stx #:conv-id id->datum/phase))
-  (define-values (defs provs reqs)
-    (parse-defs-from-module modbeg-stx annos #f)) ;; xxx rr-mp is obsolete
+  (define-values (defs provs reqs) ;; xxx no longer need provs and reqs
+    (parse-defs-from-module modbeg-stx annos))
   ;;(pretty-print (dict->list defs)) (exit)
 
   (define id->bind (make-free-id-table #:phase 0))
