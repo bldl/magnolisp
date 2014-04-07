@@ -29,10 +29,6 @@ When a @racketmodname[magnolisp] module is evaluated as Racket, any module top-l
 
 The Racket @racket[provide] and @racket[require] forms may be used as normal, also at phase level 0. However, as far as C++ compilation is concerned, these are only used to connect together Magnolisp definitions internally to the compiled program/library. C++ imports and exports are specified separately using the @racketid[foreign] and @racketid[export] annotations.
 
-@warning{Locally scoped @racket[require] or @racket[local-require] directives are not supported for phase level 0 Magnolisp code at present.}
-
-@warning{When a macro expands to an un@racket[provide]d identifier at phase level 0, it is presently necessary to ensure that the location information of the identifier syntax object correctly identifies the source module of the binding.}
-
 For defining macros and doing transformation time computation, the relevant Racket facilities (e.g., @racket[define-syntax], @racket[define-syntax-rule], @racket[begin-for-syntax], @etc) may be used as normal.
 
 @subsection{Defining Forms}
@@ -220,6 +216,16 @@ For example:
        (set! x (begin 2 3)) 
        x))
    (three))
+
+One use case is to @racket[local-require] a Racket definition into a context where a Magnolisp definition by the same name is being implemented. For example:
+
+@(interaction #:eval the-eval
+  (function (equal? x y) 
+    (#:annos (type (fn int int predicate)) foreign)
+    (begin-racket
+      (local-require (only-in racket/base equal?))
+      (equal? x y)))
+  (equal? "foo" "foo"))
 }
 
 @defform[(begin-for-racket Racket-form ...)]{
