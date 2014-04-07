@@ -64,12 +64,13 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
               (path-basename-only-as-string (first fn-lst))))
       (define st (apply compile-files fn-lst))
       (generate-files st
-                       (list (and cxx? '(cxx (cc hh)))       
-                             `(build ,tools))
-                       #:outdir (or out-dir (current-directory))
-                       #:basename out-basename
-                       #:out (and stdout? (current-output-port))
-                       #:banner banner?))
+                      (filter identity
+                       (list (and cxx? '(cxx (cc hh)))
+                             (and (pair? tools) `(build ,tools))))
+                      #:outdir (or out-dir (current-directory))
+                      #:basename out-basename
+                      #:out (and stdout? (current-output-port))
+                      #:banner banner?))
     
     (void))
 
