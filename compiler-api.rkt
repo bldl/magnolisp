@@ -171,7 +171,7 @@ optimization.
 ;;; program contents resolution
 ;;; 
 
-(require "name-resolve.rkt")
+(require "module-load.rkt")
 
 ;; Compilation state. [mods hash?] maps resolved module paths to Mod
 ;; objects. [defs hash?] maps bind symbols to AST nodes. [eps
