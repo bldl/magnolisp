@@ -439,7 +439,7 @@ optimization.
   (->* (St? (listof (cons/c symbol? any/c)))
        (#:outdir path-string?
         #:basename string?
-        #:out output-port?
+        #:out (or/c #f output-port?)
         #:banner boolean?)
        void?)
   (generate-files st backends
