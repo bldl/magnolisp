@@ -30,7 +30,27 @@ same variables at the same phase level).
           "app-util.rkt" "ast-magnolisp.rkt" "ast-serialize.rkt"
           "parse.rkt" "util.rkt"))
 
-(define-for-syntax (make-definfo-submodule rel-to-path-v modbeg-stx)
+(define-for-syntax (make-definfo-submodule orig-mb-id modbeg-stx)
+  (define orig-r-mp
+    (let ((src (syntax-source orig-mb-id)))
+      (and src
+           (let ((mpi (syntax-source-module orig-mb-id #f)))
+             (and mpi
+                  (resolve-module-path-index mpi src))))))
+       
+  (define decl-name (current-module-declare-name))
+  (define rel-to-path-v
+    (cond
+     [decl-name (resolved-module-path-name decl-name)]
+     [else
+      (define src (syntax-source orig-mb-id))
+      (cond
+       [(path? src) src]
+       [else
+        (error 'make-definfo-submodule
+               "cannot determine module path for ~s"
+               orig-mb-id)])]))
+       
   (define annos (get-stored-definfo))
   ;;(pretty-print (dict->list info))
   ;;(pretty-print (syntax->datum modbeg-stx))
@@ -72,11 +92,13 @@ same variables at the same phase level).
     (for/list ([(id def) (in-dict defs)]
                #:when (ast-anno-maybe def 'top)) ;;xxx should not even put there
       (ast-rw-Ids rw-id def)))
+
+  ;;(writeln (list (current-module-declare-source) (current-module-declare-name)))
   
   #`(begin-for-syntax
      (module magnolisp-info racket/base
        (require magnolisp/ast-magnolisp)
-       (define r-mp #,(syntactifiable-mkstx rel-to-path-v))
+       (define r-mp #,(syntactifiable-mkstx orig-r-mp))
        (define bind->binding #,(syntactifiable-mkstx bind->binding))
        (define def-lst #,(syntactifiable-mkstx def-lst))
        (provide r-mp bind->binding def-lst))))
@@ -85,22 +107,10 @@ same variables at the same phase level).
   (syntax-case stx ()
     ((orig-mb . bodies)
      (let ()
-       (define decl-name (current-module-declare-name))
-       (define rel-to-path-v
-         (cond
-          [decl-name (resolved-module-path-name decl-name)]
-          [else
-           (define src (syntax-source #'orig-mb))
-           (cond
-            [(path? src) src]
-            [else
-             (error 'make-definfo-submodule
-                    "cannot determine module path for ~s"
-                    #'orig-mb)])]))
        (define ast (local-expand
                     #`(#%module-begin #,@addition-lst . bodies)
                     'module-begin null))
-       (define sm-stx (make-definfo-submodule rel-to-path-v ast))
+       (define sm-stx (make-definfo-submodule #'orig-mb ast))
        (with-syntax ([(mb . bodies) ast]
                      [sm sm-stx])
          (let ([mb-stx #'(mb sm . bodies)])

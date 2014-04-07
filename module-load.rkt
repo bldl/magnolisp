@@ -113,33 +113,36 @@ Module loading.
        `(submod ,mp ,name))))
   (define sub-mp (make-sub-mp r-mp 'magnolisp-info))
 
-  (define bind->binding #hasheq())
-  (define def-lst null)
-  
-  (define original-r-mp
+  (define def-lst #f)
+
+  ;; Using 'may-fail' here as there may be no submodule.
+  (define bind->binding
     (may-fail
-     (dynamic-require sub-mp 'r-mp (thunk #f))))
-  
-  (when original-r-mp
-    #;
-    (unless (equal? r-mp original-r-mp)
+     (dynamic-require
+      sub-mp 'bind->binding
+      (thunk #f))))
+
+  (when bind->binding
+    (define original-r-mp
+      (dynamic-require
+       sub-mp 'r-mp
+       (thunk
+        (error 'load-mod-from-submod
+               "missing symbol 'r-mp for Magnolisp module ~s" mp))))
+
+    (when (and original-r-mp (not (equal? r-mp original-r-mp)))
       (error 'load-mod-from-submod
              "~a (~s): ~s != ~s (used != recorded)"
              "resolved module path mismatch"
              mp r-mp original-r-mp))
 
-    (set! bind->binding
-          (dynamic-require
-           sub-mp 'bind->binding
-           (thunk
-            (error 'load-mod-from-submod
-                   "no 'bind->binding for Magnolisp module ~a" mp)))) 
-    
     (set! def-lst
           (dynamic-require
            sub-mp 'def-lst
            (thunk
             (error 'load-mod-from-submod
-                   "no 'def-lst for Magnolisp module ~a" mp)))))
+                   "missing symbol 'def-lst for Magnolisp module ~a" mp)))))
   
-  (Mod r-mp bind->binding def-lst))
+  (Mod r-mp
+    (or bind->binding #hasheq())
+    (or def-lst null)))
