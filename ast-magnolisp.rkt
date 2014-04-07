@@ -236,9 +236,6 @@ It is rather important for all Ast derived node types to be
 (define-ast* DefVar (Ast Def) ((no-term annos) (no-term id)
                                (just-term t) (just-term body)))
 
-;; Syntax definition.
-(define-ast* DefStx (Ast Def) ((no-term annos) (no-term id)))
-
 ;; Function parameter declaration.
 (define-ast* Param (Ast Def) ((no-term annos) (no-term id) (just-term t)))
 

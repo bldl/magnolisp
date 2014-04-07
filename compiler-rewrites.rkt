@@ -361,8 +361,6 @@
   (match ast
     ((DefVar _ id t v)
      `(var ,(->symbol id) ,(ast->sexp t) ,(ast->sexp v)))
-    ((DefStx _ id)
-     `(define-syntax ,(->symbol id)))
     ((Param _ id t)
      (->symbol id))
     ((NoBody _)

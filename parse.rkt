@@ -285,13 +285,6 @@
     (set-def-in-mod! id-stx def)
     def)
 
-  (define (make-DefStx ctx stx id-stx)
-    (check-redefinition id-stx stx)
-    (define ann-h (mk-annos ctx stx id-stx))
-    (define def (DefStx ann-h id-stx))
-    (set-def-in-mod! id-stx def)
-    def)
-
   (define (make-ForeignTypeDecl ctx stx id-stx)
     (check-redefinition id-stx stx)
     (define id-annos (dict-ref annos id-stx #f))
@@ -429,14 +422,6 @@
 
       ((define-syntaxes . _)
        (void))
-      #;
-      ((define-syntaxes (id ...) _)
-       (let ()
-         (define id-lst (syntax->list #'(id ...)))
-         (assert (andmap identifier? id-lst))
-         (for ((id id-lst))
-           (make-DefStx 'module-level stx id))))
-      ;; xxx should no longer need to store
 
       ((#%provide . specs)
        (provide! (syntax->list #'specs)))
