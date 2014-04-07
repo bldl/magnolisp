@@ -30,7 +30,7 @@ same variables at the same phase level).
           "app-util.rkt" "ast-magnolisp.rkt" "ast-serialize.rkt"
           "parse.rkt" "util.rkt"))
 
-(define-for-syntax (make-definfo-submodule modbeg-stx)
+(define-for-syntax (make-definfo-submodule rel-to-path-v modbeg-stx)
   (define annos (get-stored-definfo))
   ;;(pretty-print (dict->list info))
   ;;(pretty-print (syntax->datum modbeg-stx))
@@ -42,15 +42,6 @@ same variables at the same phase level).
   (define id->bind (make-free-id-table #:phase 0))
   (define bind->binding (make-hasheq))
   (define next-r #hasheq())
-
-  ;;(writeln `(current source ,(current-module-declare-source)))
-  
-  ;; (current-module-declare-name) as well as
-  ;; (current-module-path-for-load) seem to be #f during byte
-  ;; compilation.
-  (define rel-to-path-v (resolved-module-path-name
-                         (current-module-declare-name)))
-  ;; (writeln rel-to-path-v)
 
   (define (rw-id id)
     (define bind (dict-ref id->bind id #f))
@@ -90,15 +81,29 @@ same variables at the same phase level).
        (define def-lst #,(syntactifiable-mkstx def-lst))
        (provide r-mp bind->binding def-lst))))
 
-(define-syntax (base-module-begin stx)
+(define-for-syntax (modify-mb stx addition-lst)
   (syntax-case stx ()
-    ((_ . bodies)
-     (let* ((ast (local-expand #'(#%module-begin . bodies)
-                               'module-begin null))
-            (sm-stx (make-definfo-submodule ast)))
-       (with-syntax (((mb . bodies) ast)
-                     (sm sm-stx))
-         (let ((mb-stx #'(mb sm . bodies)))
+    ((orig-mb . bodies)
+     (let ()
+       (define decl-name (current-module-declare-name))
+       (define rel-to-path-v
+         (cond
+          [decl-name (resolved-module-path-name decl-name)]
+          [else
+           (define src (syntax-source #'orig-mb))
+           (cond
+            [(path? src) src]
+            [else
+             (error 'make-definfo-submodule
+                    "cannot determine module path for ~s"
+                    #'orig-mb)])]))
+       (define ast (local-expand
+                    #`(#%module-begin #,@addition-lst . bodies)
+                    'module-begin null))
+       (define sm-stx (make-definfo-submodule rel-to-path-v ast))
+       (with-syntax ([(mb . bodies) ast]
+                     [sm sm-stx])
+         (let ([mb-stx #'(mb sm . bodies)])
            ;;(pretty-print (syntax->datum sm-stx))
            ;;(pretty-print (syntax->datum mb-stx))
            ;;(pretty-print (syntax->datum/free-id mb-stx))
@@ -107,13 +112,9 @@ same variables at the same phase level).
            ;;(pretty-print (syntax->datum/binding sm-stx #:pred (lambda (x) (memq x '(equal? r.equal?)))))
            mb-stx))))))
 
+(define-syntax (base-module-begin stx)
+  (modify-mb stx null))
+
 (define-syntax (module-begin stx)
-  (syntax-case stx ()
-    ((orig-mb . bodies)
-     (let ()
-       ;;(writeln (syntax-source-module #'orig-mb #t))
-       ;;(define mpi (syntax-source-module #'orig-mb #f))
-       ;;(writeln (module-path-index-resolve mpi))
-       ;;(writeln `(enclosing #%module-begin is ,#'orig-mb ,(syntax-source #'orig-mb) ,(syntax-source-module #'orig-mb #f) ,(syntax-source-module #'orig-mb #t)))
-       (with-syntax ((prelude (datum->syntax stx 'magnolisp/prelude)))
-         #'(base-module-begin (require prelude) . bodies))))))
+  (with-syntax ((prelude (datum->syntax stx 'magnolisp/prelude)))
+    (modify-mb stx (list #'(require prelude)))))

@@ -48,7 +48,8 @@
  #rx"type mismatch")
 
 (module m3 magnolisp
-  (function (f) (#:annos export) 1))
+  (function (f) (#:annos export) 1)
+  (define x 3)) ;; xxx if do not have this last (unused) definition, then some things are not defined, and we do not get syntax-source-module for #%module-begin either, may be related
 
 (check-not-compile-mgl-mod
  '(submod "." m3)
