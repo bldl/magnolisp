@@ -117,14 +117,6 @@
      "(or/c identifier? Def? Var? NameT?)"
      0 x def-id))))
 
-(define* (get-def-id-or-fail x)
-  ;;(writeln x)
-  (define def-id (get-def-id x))
-  (unless def-id
-    (raise-language-error/ast
-     "reference to unbound name" x))
-  def-id)
-
 ;;; 
 ;;; names
 ;;; 
@@ -305,20 +297,23 @@
       (else
        ast)))))
 
-(define ast-simplify-BlockExpr
-  (topdown
-   (repeat
-    (lambda (ast)
-      (match ast
-        ((BlockExpr _ (list (Return a e)))
-         e)
-        (_ #f))))))
+(define ast-simplify-multi-innermost
+  (innermost
+   (match-lambda
+    [(BlockExpr _ (list (Return a e)))
+     e]
+    [(BlockExpr _ (list (IfStat a c (Return t-a t-e) (Return e-a e-e))))
+     (IfExpr a c t-e e-e)]
+    [(BlockStat _ (list s))
+     s]
+    [else #f])))
 
 (define* ast-simplify
   (compose1->
    ast-nested-BlockStat->BlockStat
    ast-rm-dead-code
-   ast-simplify-BlockExpr))
+   ast-simplify-multi-innermost
+   ))
 
 ;;; 
 ;;; AST dumping
