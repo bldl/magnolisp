@@ -83,9 +83,10 @@ Module loading.
 ;; from the submodule; a non-Magnolisp module simply gets a null value
 ;; for its 'def-lst', since it contains no Magnolisp syntax.
 ;; [bind->binding hash?] contains binding information for Magnolisp
-;; identifiers appearing in the module.
+;; identifiers appearing in the module. [ep? boolean?] indicates
+;; whether the module is an entry point one.
 (concrete-struct* Mod
-                  (r-mp bind->binding def-lst)
+                  (r-mp bind->binding def-lst ep?)
                   #:transparent)
 
 ;;; 
@@ -95,14 +96,14 @@ Module loading.
 ;; Loads the specified module. It is an error if the module path does
 ;; not specify an existing module.
 (define-with-contract*
-  (-> resolve-module-path-result? module-path? Mod?)
-  (load-mod-from-submod r-mp mp)
+  (-> resolve-module-path-result? module-path? boolean? Mod?)
+  (Mod-load r-mp mp ep?)
   
   ;; Visit the module to determine if it even exists, and is a valid
   ;; module. This must succeed.
   (dynamic-require r-mp (void)
                    (thunk
-                    (error 'load-mod-from-submod
+                    (error 'Mod-load
                            "no such module: ~s (~a)" mp r-mp)))
   
   (define (make-sub-mp mp name)
@@ -127,11 +128,11 @@ Module loading.
       (dynamic-require
        sub-mp 'r-mp
        (thunk
-        (error 'load-mod-from-submod
+        (error 'Mod-load
                "missing symbol 'r-mp for Magnolisp module ~s" mp))))
 
     (when (and original-r-mp (not (equal? r-mp original-r-mp)))
-      (error 'load-mod-from-submod
+      (error 'Mod-load
              "~a (~s): ~s != ~s (used != recorded)"
              "resolved module path mismatch"
              mp r-mp original-r-mp))
@@ -140,9 +141,10 @@ Module loading.
           (dynamic-require
            sub-mp 'def-lst
            (thunk
-            (error 'load-mod-from-submod
+            (error 'Mod-load
                    "missing symbol 'def-lst for Magnolisp module ~a" mp)))))
   
   (Mod r-mp
     (or bind->binding #hasheq())
-    (or def-lst null)))
+    (or def-lst null)
+    ep?))

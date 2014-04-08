@@ -52,12 +52,13 @@ same variables at the same phase level).
                orig-mb-id)])]))
        
   (define annos (get-stored-definfo))
-  ;;(pretty-print (dict->list info))
+  ;;(pretty-print (dict->list annos))
   ;;(pretty-print (syntax->datum modbeg-stx))
   ;;(pretty-print (syntax->datum/binding modbeg-stx #:conv-id id->datum/phase))
   (define-values (defs provs reqs) ;; xxx no longer need provs and reqs
     (parse-defs-from-module modbeg-stx annos))
-  ;;(pretty-print (dict->list defs)) (exit)
+  ;;(pretty-print defs) (exit)
+  ;;(pretty-print (map (lambda (def) (cons def (ast-anno-maybe def 'export))) (dict-values defs)))
 
   (define id->bind (make-free-id-table #:phase 0))
   (define bind->binding (make-hasheq))

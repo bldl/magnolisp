@@ -180,7 +180,11 @@ optimization.
 
 (define* compilation-state? St?)
 
-(define (merge-defs mods)
+(define-with-contract
+  (-> hash? (values hash? (set/c symbol? #:cmp 'eq)))
+  (merge-defs mods)
+  
+  (define eps-in-prog (mutable-seteq)) ;; of bind
   (define all-defs (make-hasheq)) ;; bind -> Def
   (define next-r #hasheq())
   (define x-binds (make-hash)) ;; (cons/c rr-mp sym) -> bind
@@ -212,40 +216,52 @@ optimization.
           (set!-values (next-r p-bind) (next-gensym next-r (Id-name id)))
           (hash-set! m->p-bind m-bind p-bind))
         (set-Id-bind id p-bind)]))
-    (for ([def def-lst])
-      (define n-def (ast-rw-Ids rw-id def))
-      (hash-set! all-defs (Id-bind (Def-id n-def)) n-def))
+    (define n-def-lst
+      (for/list ([def def-lst])
+        (define n-def (ast-rw-Ids rw-id def))
+        (hash-set! all-defs (Id-bind (Def-id n-def)) n-def)
+        n-def))
     ;;(pretty-print `(,rr-mp x-binds ,x-binds m->p-bind ,m->p-bind))
-    (void))
+    (when (Mod-ep? mod)
+      (for ([def n-def-lst]
+            #:when (ast-anno-maybe def 'export))
+        (define bind (Id-bind (Def-id def)))
+        (set-add! eps-in-prog bind)))
+    (void)) ;; end (for ([(rr-mp mod) mods])
   ;;(pretty-print all-defs)
-  all-defs)
-    
-(define (def-all-used-id-binds def)
-  (define defs (make-hasheq))
+  (values all-defs eps-in-prog))
+
+;; Returns a list of all Id-bind's appearing within a Def.
+(define-with-contract
+  (-> Def? (listof symbol?))
+  (def-all-used-id-binds def)
+  
+  (define binds (mutable-seteq)) ;; (set/c bind)
   ((topdown-visit
     (lambda (ast)
       (define id (name-ref-id/maybe ast))
       (when id
-        (hash-set! defs (Id-bind id) #t))))
+        (set-add! binds (Id-bind id)))))
    def)
-  (dict-keys defs))
+  (set->list binds))
 
 ;; Drops all top-level definitions in 'tl-def-lst' that are not used
 ;; via at least one of the entry points in 'eps' (which has 'Id'
-;; 'bind' values as keys). This relies on name references (within the
-;; codebase) having been resolved. Returns the trimmed down
+;; 'bind' values as keys). Returns the trimmed down collection of
 ;; definitions.
 (define-with-contract
   (-> (listof Def?)
       (set/c symbol? #:cmp 'eq)
       (listof Def?))
   (defs-drop-unreachable tl-def-lst eps)
-  (define globals (build-global-defs-table tl-def-lst))
-  (define processed-ids (mutable-seteq))
-  (define processed-defs null)
+
+  (define globals (build-global-defs-table tl-def-lst)) ;; bind -> Def?
+  ;;(pretty-print `(ORIGINAL-DEFS ,globals eps ,eps))
+  (define processed-ids (mutable-seteq)) ;; (set/c bind)
+  (define processed-defs null) ;; (listof Def?)
   (let loop ((ids-to-process (set->list eps)))
     (unless (null? ids-to-process)
-      (define next-ids null)
+      (define next-ids null) ;; (listof bind)
       (for ((id-bind ids-to-process))
         (unless (set-member? processed-ids id-bind)
           (set-add! processed-ids id-bind)
@@ -255,7 +271,7 @@ optimization.
             (define refs-in-def (def-all-used-id-binds def))
             (set! next-ids (append next-ids refs-in-def)))))
       (loop next-ids)))
-  ;;(pretty-print `(ORIGINAL-DEFS ,(dict-count globals) ,(dict-keys globals) RETAINED-DEFS ,(length processed-defs) ,(map (compose Id-name Def-id) processed-defs)))
+  ;;(pretty-print `(ORIGINAL-DEFS ,(dict-count globals) ,(dict-keys globals) RETAINED-DEFS ,(length processed-defs) ,(map (compose Id-bind Def-id) processed-defs)))
   processed-defs)
 
 ;;; 
@@ -310,8 +326,6 @@ optimization.
   ;; resolved-module-path? is eq? comparable
   (define mods (make-hasheq)) ;; rr-mp -> Mod
   
-  (define eps-in-prog (mutable-seteq)) ;; of bind
-  
   (define dep-q null) ;; deps queued for loading
 
   (define (load ep? mp rel-to-path-v)
@@ -324,20 +338,11 @@ optimization.
     (define mod (hash-ref mods rr-mp #f))
     (unless mod ;; not yet loaded
       ;;(writeln (list 'loading-submod-of r-mp mp))
-      (set! mod (load-mod-from-submod r-mp mp))
+      (set! mod (Mod-load r-mp mp ep?))
       ;;(writeln `(LOADED ,rr-mp ,r-mp ,mp ,mod))
 
       (define def-lst (Mod-def-lst mod))
       
-      ;; For entry point modules, use annotations to build a set of
-      ;; entry points. Add these to program entry points.
-      (when ep?
-        (for ([def def-lst]
-              #:when (ast-anno-maybe def 'export))
-          (define bind (Id-bind (Def-id def)))
-          (set-add! eps-in-prog bind)
-          (values bind def)))
-
       ;; Build a list of dependencies for this module from the
       ;; bind->binding table. Stored as (list dep-r-mp rel-r-mp) per
       ;; entry.
@@ -387,18 +392,21 @@ optimization.
 
   ;;(writeln (list predicate-id TRUE-id FALSE-id))
   
-  (define all-defs (merge-defs mods))
+  (define-values (all-defs eps-in-prog) (merge-defs mods))
   ;;(pretty-print all-defs) (exit)
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (define def-lst (hash-values all-defs))
   
   (set! def-lst (defs-optimize-if TRUE-id FALSE-id def-lst))
-  (pretty-print `(,def-lst ,eps-in-prog)) (exit)
+  ;;(pretty-print `(,def-lst EPS ,eps-in-prog)) (exit)
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
-  (pretty-print def-lst) (exit)
+  ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-rm-LetExpr def-lst))
+  ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-LetLocalEc->BlockExpr def-lst))
+  ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-simplify def-lst))
+  ;;(pretty-print def-lst) (exit)
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values all-defs))))
   ;;(pretty-print (dict->list all-defs)) (exit)
   ;;(pretty-print (dict->list all-defs)) (exit)
