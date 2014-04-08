@@ -8,7 +8,8 @@ compiler.
 |#
 
 (require "racket-5-compat.rkt" "util.rkt"
-         racket/contract racket/dict racket/function racket/list racket/pretty
+         racket/contract racket/dict racket/function
+         racket/list racket/pretty
          syntax/id-table syntax/stx)
 
 (define* (next-gensym r sym)
@@ -31,27 +32,6 @@ compiler.
 (define* (immutable-id-table? x)
   (or (immutable-free-id-table? x)
       (immutable-bound-id-table? x)))
-
-(define* (global-id? id)
-  (and (identifier? id)
-       (not (eq? (identifier-binding id 0) 'lexical))))
-
-;; First argument should be a known global identifier to compare
-;; against. Matching is done at phase level 0.
-(define-with-contract*
-  (-> identifier? any/c boolean?)
-  (matches-global-id? g-id x)
-  (and (global-id? x)
-       (global-id? g-id)
-       (or (free-identifier=? g-id x 0 0)
-           (eq? (syntax-e g-id) (syntax-e x)))))
-
-(define-with-contract*
-  (-> identifier? identifier? boolean?)
-  (def-identifier=? id-1 id-2)
-  (free-identifier=?
-   (or (syntax-property id-1 'def-id) id-1)
-   (or (syntax-property id-2 'def-id) id-2)))
 
 ;; E.g.
 ;; (let* ((x 1)
@@ -267,9 +247,6 @@ compiler.
 ;;; debugging utilities
 ;;; 
 
-(define* (pretty-print-id-table d)
-  (pretty-print (dict-map d cons)))
-
 (define* (show-matches-in-id-table id-stx d)
   (writeln
    (cons
@@ -304,4 +281,3 @@ compiler.
 
   (pretty-print (syntax->datum stx))
   (f stx))
-

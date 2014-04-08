@@ -70,12 +70,6 @@
 ;;; parsing
 ;;; 
 
-(define (core-id? x)
-  (matches-global-id? #'#%magnolisp x))
-
-(define-syntax-class core-id
-  (pattern x #:when (core-id? #'x)))
-
 ;; Returns defs, provides, and requires in module.
 (define-with-contract*
   (-> syntax? immutable-id-table? immutable-id-table?)
@@ -208,13 +202,16 @@
                   (make-DefVar 'stat i-e id-stx v-stx))
                 id-lst v-lst))
              (wrap-in-let* dv-lst ast-lst))]
+          
           [(() stat)
            (cons (parse-stat #'stat) ast-lst)]
+          
           [((id) v)
            (identifier? #'id)
            (let ()
              (define dv (make-DefVar 'stat i-e #'id #'v))
              (wrap-in-let dv ast-lst))]
+          
           [_
            (raise-language-error
             #f "illegal syntax for a let binding form"
@@ -229,11 +226,11 @@
   (define (parse-define-value ctx stx id-stx e-stx)
     ;;(writeln (list 'parse-define-value e-stx (syntax->datum e-stx)))
     ;;(writeln (identifier-binding #'#%magnolisp 0))
-    (kernel-syntax-case/phase e-stx 0
-      ((#%plain-app c (quote k))
-       (and (core-id? #'c)
-            (eq? 'foreign-type (syntax-e #'k)))
+    (kernel-syntax-case*/phase e-stx 0 (#%magnolisp)
+      ((#%plain-app #%magnolisp (quote k))
+       (eq? 'foreign-type (syntax-e #'k))
        (make-ForeignTypeDecl ctx stx id-stx))
+      
       (_
        (make-DefVar ctx stx id-stx e-stx))))
 
@@ -279,9 +276,7 @@
       ;; values v ...)) pattern.
       ((define-values (id) e)
        (identifier? #'id)
-       (let ()
-         ;;(writeln (syntax->datum stx))
-         (parse-define-value 'module-level stx #'id #'e)))
+       (parse-define-value 'module-level stx #'id #'e))
 
       ((define-syntaxes . _)
        (void))
@@ -298,63 +293,76 @@
       ((module* . _)
        (void))
 
+      ;; Any module-level Racket expression is ignored. (These are as
+      ;; for the Racket 'expr' non-terminal, and mostly in the same
+      ;; order, too.) Note that we should only have (begin expr ...+)
+      ;; forms, and not anything containing non-expressions, since
+      ;; those should have gotten spliced into the module body.
+      
       ((#%expression e)
        (void))
       
-      ;; Any other module-level Racket expression is ignored. (These
-      ;; are as for the Racket 'expr' non-terminal, in the same order,
-      ;; too.) Note that we should only have (begin expr ...+) forms,
-      ;; and not anything containing non-expressions, since those
-      ;; should have gotten spliced into the module body.
       (id
        (identifier? #'id)
        (void))
+
       ((#%plain-lambda . _)
        (void))
+
       ((case-lambda . _)
        (void))
+
       ((if c t e)
        (void))
+
       ((begin . _)
        (void))
+
       ((begin0 . _)
        (void))
-      ((let-kw binds . exprs)
-       (and (identifier? #'let-kw)
-            (or (free-identifier=? #'let-kw #'let-values)
-                (free-identifier=? #'let-kw #'letrec-values)))
+      
+      ((let-values . _)
        (void))
+      
+      ((letrec-values . _)
+       (void))
+      
+      ;; Not Racket core language, but may appear here.
+      ((letrec-syntaxes+values . _)
+       (void))
+      
       ((set! id expr)
        (identifier? #'id)
        (void))
+      
       ((quote _)
        (void))
+      
       ((quote-syntax _)
        (void))
-      ((with-continuation-mark expr1 expr2 expr3)
+
+      ((with-continuation-mark . _)
        (void))
+
       ((#%plain-app . _)
        (void))
+
       ((#%top . id) ;; should not appear in a module body
        (identifier? #'id)
        (void))
+
       ((#%variable-reference id)
        (identifier? #'id)
        (void))
+
       ((#%variable-reference (#%top . id))
        (identifier? #'id)
        (void))
+
       ((#%variable-reference)
        (void))
 
-      ;; Not Racket core language, but may appear here.
-      ((let-kw _ v-binds body ...)
-       (and (identifier? #'let-kw)
-            (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
-       (void))
-      
       (_
-      ;;(let ((id (car (syntax-e stx)))) (writeln `(cmp ,id ,(free-identifier=? #'module id 0 0))))
        (raise-language-error
         #f "illegal syntax at module level" stx
         #:fields `(("binding"
@@ -366,9 +374,7 @@
        (syntax-property stx 'in-racket)
        (syntaxed stx BlockStat null))
       
-      ((begin-kw . bs)
-       (and (identifier? #'begin-kw)
-            (module-or-top-identifier=? #'begin-kw #'begin))
+      ((begin . bs)
        (syntaxed stx BlockStat
                  (map parse-stat
                       (syntax->list #'bs))))
@@ -396,23 +402,17 @@
          (syntaxed stx BlockStat null)))
 
       ((#%plain-app k e)
-       (and (syntax-property stx 'local-ec)
-            (identifier? #'k))
+       (and (syntax-property stx 'local-ec) (identifier? #'k))
        (syntaxed stx AppLocalEc (self-syntaxed Label #'k) (parse-expr #'e)))
       
-      ((let-kw binds . exprs)
-       (and (identifier? #'let-kw)
-            (or (free-identifier=? #'let-kw #'let-values)
-                (free-identifier=? #'let-kw #'letrec-values)))
-       (make-LetStat stx #'let-kw #'binds #'exprs))
+      ((let-values binds . exprs)
+       (make-LetStat stx (car (syntax-e stx)) #'binds #'exprs))
 
-      ;; The letrec-syntaxes+values ID we get here is either top-level
-      ;; or unbound, according to identifier-binding. This form is
-      ;; local-expand result language.
-      ((let-kw _ binds . exprs)
-       (and (identifier? #'let-kw)
-            (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
-       (make-LetStat stx #'let-kw #'binds #'exprs))
+      ((letrec-values binds . exprs)
+       (make-LetStat stx (car (syntax-e stx)) #'binds #'exprs))
+
+      ((letrec-syntaxes+values _ binds . exprs)
+       (make-LetStat stx (car (syntax-e stx)) #'binds #'exprs))
 
       ((set! id expr)
        (identifier? #'id)
@@ -445,7 +445,7 @@
     ;;(stx-print-if-type-annoed stx)
     ;;(writeln (list ctx stx))
     
-    (kernel-syntax-case/phase stx 0
+    (kernel-syntax-case*/phase stx 0 (call/ec)
 
       (_
        (syntax-property stx 'in-racket)
@@ -479,11 +479,9 @@
                  (parse-expr #'t)
                  (parse-expr #'e)))
 
-      ((#%plain-app kall
+      ((#%plain-app call/ec
         (#%plain-lambda (k) b ...))
-       (and (syntax-property stx 'local-ec)
-            (identifier? #'kall)
-            (free-identifier=? #'kall #'call/ec))
+       (syntax-property stx 'local-ec)
        (syntaxed stx
         LetLocalEc (self-syntaxed Label #'k)
         (map
@@ -509,17 +507,10 @@
       ((letrec-values binds e)
        (parse-let-expr stx (car (syntax-e stx)) #'binds #'e))
       
-      ;; The letrec-syntaxes+values ID we get here is either top-level
-      ;; or unbound, according to identifier-binding. This form is
-      ;; local-expand result language.
-      ((let-kw _ binds e)
-       (and (identifier? #'let-kw)
-            (module-or-top-identifier=? #'let-kw #'letrec-syntaxes+values))
+      ((letrec-syntaxes+values _ binds e)
        (parse-let-expr stx (car (syntax-e stx)) #'binds #'e))
 
-      ;; 'quote', as it comes in, appears to be unbound for us.
-      ((q lit)
-       (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote))
+      ((quote lit)
        (make-Literal stx #'lit))
       
       ((#%top . id) ;; module-level variable (can prevent shadowing)
