@@ -90,8 +90,7 @@ same variables at the same phase level).
     (identifier->ast id #:bind bind))
   
   (define def-lst
-    (for/list ([(id def) (in-dict defs)]
-               #:when (ast-anno-maybe def 'top)) ;;xxx should not even put there
+    (for/list ([(id def) (in-dict defs)])
       (ast-rw-Ids rw-id def)))
 
   ;;(writeln (list (current-module-declare-source) (current-module-declare-name)))

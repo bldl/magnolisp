@@ -4,22 +4,11 @@
 
 |#
 
-(require "annos-parse.rkt"
-         "annos-util.rkt"
-         "ast-magnolisp.rkt"
-         "app-util.rkt"
-         "util.rkt"
-         "util/case.rkt"
-         racket/contract
-         racket/dict
-         racket/function
-         racket/list
-         racket/match
-         racket/pretty
-         syntax/id-table
-         syntax/kerncase
-         syntax/parse
-         syntax/stx
+(require "annos-parse.rkt" "annos-util.rkt" "ast-magnolisp.rkt" "app-util.rkt"
+         "util.rkt" "util/case.rkt"
+         racket/contract racket/dict racket/function racket/list
+         racket/match racket/pretty
+         syntax/id-table syntax/kerncase syntax/parse syntax/stx
          (for-template racket/base
                        (only-in "runtime.rkt" #%magnolisp)))
 
@@ -93,16 +82,15 @@
               (redefinition id old-def new-stx)))
 
   ;; Looks up annotations (from annotation table) for declaration
-  ;; 'stx' (binding 'id-stx') in context 'ctx' (a symbol). Returns AST
-  ;; node annotations as a (hash/c symbol? any/c).
+  ;; 'stx' (binding 'id-stx'). Returns AST node annotations as a
+  ;; (hash/c symbol? any/c).
   ;;
   ;; The 'foreign?' argument indicates whether 'foreign' annotations
   ;; (if any) should be parsed. (Otherwise they will be left in as
   ;; syntax.)
-  (define (mk-annos ctx stx id-stx #:foreign? [foreign? #f])
+  (define (mk-annos top? stx id-stx #:foreign? [foreign? #f])
     (define ann-h (dict-ref annos id-stx #hasheq()))
     ;;(writeln `(raw annos for ,(syntax-e id-stx) are ,@(apply append (for/list (((k v) ann-h)) `(,k = ,v)))))
-    (define global? (eq? ctx 'module-level))
     (define foreign
       (and foreign?
            (let-and foreign-stx (hash-ref ann-h 'foreign #f)
@@ -119,7 +107,7 @@
     (set! ann-h
           (hash-set* ann-h
                      'stx stx
-                     'top global?
+                     'top top?
                      'export export
                      'foreign foreign))
     ;;(writeln `(parsed annos for ,(syntax-e id-stx) are ,@(apply append (for/list (((k v) ann-h)) `(,k = ,v)))))
@@ -134,16 +122,17 @@
                   (parse-type type-stx)))))
     (or (f) the-AnyT))
 
-  (define (make-DefVar ctx stx id-stx e-stx)
+  (define (make-DefVar stx id-stx e-stx #:top? [top? #f])
     (check-redefinition id-stx stx)
     (define ast (parse-expr e-stx))
-    (define ann-h (mk-annos ctx stx id-stx #:foreign? #t))
+    (define ann-h (mk-annos top? stx id-stx #:foreign? #t))
     (define t (lookup-type id-stx))
     (define def (DefVar ann-h id-stx t ast))
-    (set-def-in-mod! id-stx def)
+    (when top?
+      (set-def-in-mod! id-stx def))
     def)
 
-  (define (make-ForeignTypeDecl ctx stx id-stx)
+  (define (make-ForeignTypeDecl stx id-stx)
     (check-redefinition id-stx stx)
     (define id-annos (dict-ref annos id-stx #f))
     (define foreign-stx (and id-annos (hash-ref id-annos 'foreign #f)))
@@ -153,16 +142,15 @@
        "missing 'foreign' C++ type annotation"
        stx))
     (define cxx-t (parse-cxx-type id-stx foreign-stx))
-    (define ann-h (mk-annos ctx stx id-stx))
+    (define ann-h (mk-annos #t stx id-stx))
     (define def (ForeignTypeDecl ann-h id-stx cxx-t))
     (set-def-in-mod! id-stx def)
     def)
   
-  (define (make-Param ctx stx id-stx)
+  (define (make-Param stx id-stx)
     (check-redefinition id-stx stx)
-    (define ann-h (mk-annos ctx stx id-stx))
+    (define ann-h (mk-annos #f stx id-stx))
     (define def (Param ann-h id-stx the-AnyT))
-    (set-def-in-mod! id-stx def)
     def)
   
   (define (make-Literal stx datum-stx)
@@ -199,7 +187,7 @@
              (define dv-lst
                (map
                 (lambda (id-stx v-stx)
-                  (make-DefVar 'stat i-e id-stx v-stx))
+                  (make-DefVar i-e id-stx v-stx))
                 id-lst v-lst))
              (wrap-in-let* dv-lst ast-lst))]
           
@@ -209,7 +197,7 @@
           [((id) v)
            (identifier? #'id)
            (let ()
-             (define dv (make-DefVar 'stat i-e #'id #'v))
+             (define dv (make-DefVar i-e #'id #'v))
              (wrap-in-let dv ast-lst))]
           
           [_
@@ -229,10 +217,10 @@
     (kernel-syntax-case*/phase e-stx 0 (#%magnolisp)
       ((#%plain-app #%magnolisp (quote k))
        (eq? 'foreign-type (syntax-e #'k))
-       (make-ForeignTypeDecl ctx stx id-stx))
+       (make-ForeignTypeDecl stx id-stx))
       
       (_
-       (make-DefVar ctx stx id-stx e-stx))))
+       (make-DefVar stx id-stx e-stx #:top? #t))))
 
   (define (parse-module-begin stx)
     (kernel-syntax-case/phase stx 0
@@ -431,7 +419,7 @@
      ((((n) v))
       (identifier? #'n)
       (let ()
-        (define d-ast (make-DefVar 'expr stx #'n #'v))
+        (define d-ast (make-DefVar stx #'n #'v))
         (define e-ast (parse-expr e))
         (define as (hasheq 'stx stx 'let-kind (syntax-e kind)))
         (LetExpr as d-ast e-ast)))
@@ -467,7 +455,7 @@
                   ;; Annotations would probably have to be propagated
                   ;; from any binding whose value this lambda is, but
                   ;; that must wait until later.
-                  (make-Param 'expr stx id))
+                  (make-Param stx id))
                 par-id-lst))
          (define e-stx (first e-stx-lst))
          (define e-ast (parse-expr e-stx))
