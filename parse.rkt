@@ -70,121 +70,6 @@
 ;;; parsing
 ;;; 
 
-;; Reference: Typed Racket implementation of same.
-(define (resolve-provides prov-lst)
-  (define provide-tbl
-    (for/fold
-        ([h (make-immutable-free-id-table #:phase 0)])
-        ([p (in-list prov-lst)])
-      (syntax-parse p
-        [in-out:id
-         (dict-update h #'in-out (fix cons #'in-out) null)]
-        [((~datum rename) in out)
-         (dict-update h #'in (fix cons #'out) null)]
-        [_
-         (error 'resolve-provides
-                "unsupported #%provide form: ~s" p)])))
-  provide-tbl)
-
-(define-syntax-class phase-level
-  (pattern lv:exact-integer)
-  (pattern (~and lv (~datum #f))))
-
-(define (for-runtime-require? stx)
-  ;; 'just-meta' forms cannot nest, and the other raw-require-spec
-  ;; non-terminals can only contain phaseless-spec non-terminals.
-  ;; Also, presumably all of the 'for-*' forms have been translated to
-  ;; 'just-meta' forms in full expansion. See documentation for the
-  ;; #%require form.
-  (syntax-parse stx
-    (((~or (~datum for-syntax) (~datum for-template)
-           (~datum for-label)) . _)
-     #f)
-    (((~or (~datum for-meta) (~datum just-meta))
-      lv:phase-level . _)
-     (equal? (syntax-e #'lv.lv) 0))
-    (_
-     #t)))
-
-;; Assumes that 'req-lst' has raw-require-spec syntax objects.
-;; Produces a list of syntax for raw-module-path forms.
-(define-with-contract*
-  (-> (listof syntax?) (listof syntax?))
-  (req-specs->module-paths req-lst)
-  (define require-lst null)
-  (define (raw-module-path! mp)
-    (set! require-lst (cons mp require-lst)))
-  ;; We would be able to quite easily pass around the phase level
-  ;; (recursively), and support all the raw-require-spec forms.
-  (define (parse-raw-require-spec stx)
-    (syntax-parse stx
-      [((~or (~datum for-syntax) (~datum for-template)
-             (~datum for-label) (~datum for-meta)) . _)
-       (unsupported stx)]
-      [((~datum just-meta) lv:phase-level . specs)
-       (for ((spec (syntax->list #'specs)))
-         (parse-raw-require-spec spec))]
-      [phaseless-spec
-       (parse-phaseless-spec #'phaseless-spec)]))
-  (define (parse-phaseless-spec stx)
-    (syntax-parse stx
-      [((~datum only) raw-mp . _)
-       (raw-module-path! #'raw-mp)]
-      [((~datum prefix) pfx raw-mp)
-       (raw-module-path! #'raw-mp)]
-      [((~datum all-except) raw-mp . _)
-       (raw-module-path! #'raw-mp)]
-      [((~datum prefix-all-except) pfx raw-mp . _)
-       (raw-module-path! #'raw-mp)]
-      [((~datum rename) raw-mp . _)
-       (raw-module-path! #'raw-mp)]
-      [raw-mp
-       (raw-module-path! #'raw-mp)]))
-  (for ((stx req-lst))
-    (parse-raw-require-spec stx))
-  (reverse require-lst))
-
-;; Parses passed require specs, returning a hash. The hash maps each
-;; module path into a list of elements, each of which is one of: 'all,
-;; (listof ID), or (cons/c local-ID exported-ID).
-(define-with-contract*
-  (-> (listof syntax?) hash?)
-  (req-specs->reqs-per-mp req-lst)
-  (define raw-mp-h (make-hash))
-  (define (add! mp x)
-    (hash-update! raw-mp-h mp (fix cons x) null))
-  (define (parse-phaseless-spec stx)
-    (syntax-parse stx
-      [((~datum only) raw-mp . ids)
-       (define id-lst (syntax->list #'ids))
-       (unless (null? id-lst)
-         (add! (syntax->datum #'raw-mp) id-lst))]
-      [((~datum rename) raw-mp local-id exported-id)
-       (add! (syntax->datum #'raw-mp)
-             (cons #'local-id #'exported-id))]
-      [((~datum prefix) pfx raw-mp)
-       (unsupported stx)]
-      [((~datum all-except) raw-mp . _)
-       (unsupported stx)]
-      [((~datum prefix-all-except) pfx raw-mp . _)
-       (unsupported stx)]
-      [raw-mp
-       (add! (syntax->datum #'raw-mp) 'all)]))
-  (define (parse-raw-require-spec stx)
-    (syntax-parse stx
-      [((~or (~datum for-syntax) (~datum for-template)
-             (~datum for-label) (~datum for-meta)) . _)
-       (unsupported stx)]
-      [((~datum just-meta) lv:phase-level . specs)
-       (assert (equal? (syntax-e #'lv) 0))
-       (for ((spec (syntax->list #'specs)))
-         (parse-raw-require-spec spec))]
-      [phaseless-spec
-       (parse-phaseless-spec #'phaseless-spec)]))
-  (for ((stx req-lst))
-    (parse-raw-require-spec stx))
-  raw-mp-h)
-
 (define (core-id? x)
   (matches-global-id? #'#%magnolisp x))
 
@@ -196,32 +81,16 @@
 
 ;; Returns defs, provides, and requires in module.
 (define-with-contract*
-  (-> syntax? immutable-id-table?
-      (values immutable-id-table? immutable-id-table? (listof syntax?)))
+  (-> syntax? immutable-id-table? immutable-id-table?)
   (parse-defs-from-module modbeg-stx annos)
 
   (define defs-in-mod (make-immutable-free-id-table #:phase 0))
-  (define prov-lst null)
-  (define req-lst null)
 
   (define (get-def-in-mod id)
     (dict-ref defs-in-mod id #f))
 
   (define (set-def-in-mod! id def)
     (set! defs-in-mod (dict-set defs-in-mod id def)))
-  
-  (define (provide! stx-lst)
-    (set! prov-lst (append prov-lst stx-lst)))
-
-  ;; Records #%require specs, which may look like:
-  ;;   (just-meta 0 (rename "test-6-lib.rkt" h six))
-  ;;   (just-meta 0 (rename "test-6-lib.rkt" seven seven))
-  ;;   (only "test-6-lib.rkt")
-  (define (require! stx-lst)
-    ;;(for-each (compose writeln syntax->datum) stx-lst)
-    (set! req-lst
-          (append req-lst
-                  (filter for-runtime-require? stx-lst))))
   
   (define (redefinition id old-def new-stx)
     (error 'parse-defs-from-module
@@ -421,12 +290,11 @@
       ((define-syntaxes . _)
        (void))
 
-      ((#%provide . specs)
-       (provide! (syntax->list #'specs)))
+      ((#%provide . _)
+       (void))
       
-      ;; Local requires are not supported.
-      ((#%require . specs)
-       (require! (syntax->list #'specs)))
+      ((#%require . _)
+       (void))
       
       ((module . _)
        (void))
@@ -674,6 +542,4 @@
 
   ;;(print-with-select-syntax-properties '(in-racket local-ec) modbeg-stx)
   (parse-module-begin modbeg-stx)
-  (define prov-h (resolve-provides prov-lst))
-  ;;(pretty-print (dict-map prov-h list))
-  (values defs-in-mod prov-h req-lst))
+  defs-in-mod)

@@ -55,7 +55,7 @@ same variables at the same phase level).
   ;;(pretty-print (dict->list annos))
   ;;(pretty-print (syntax->datum modbeg-stx))
   ;;(pretty-print (syntax->datum/binding modbeg-stx #:conv-id id->datum/phase))
-  (define-values (defs provs reqs) ;; xxx no longer need provs and reqs
+  (define defs
     (parse-defs-from-module modbeg-stx annos))
   ;;(pretty-print defs) (exit)
   ;;(pretty-print (map (lambda (def) (cons def (ast-anno-maybe def 'export))) (dict-values defs)))
