@@ -187,6 +187,7 @@ optimization.
   (for ([(rr-mp mod) mods])
     (define def-lst (Mod-def-lst mod))
     (define bind->binding (Mod-bind->binding mod))
+    ;;(pretty-print `(,rr-mp ,(Mod-r-mp mod) bind->binding ,bind->binding))
     (define m->p-bind (make-hasheq)) ;; local bind -> global bind
     (define (rw-id id)
       (define m-bind (Id-bind id))
@@ -201,7 +202,7 @@ optimization.
           (define mp-and-sym (cons rr-mp sym))
           (set! p-bind (hash-ref x-binds mp-and-sym #f))
           (unless p-bind
-            (set!-values (next-r p-bind) (next-gensym next-r (Id-name id)))
+            (set!-values (next-r p-bind) (next-gensym next-r sym))
             (hash-set! x-binds mp-and-sym p-bind))
           (hash-set! m->p-bind m-bind p-bind))
         (set-Id-bind id p-bind)]
@@ -213,7 +214,10 @@ optimization.
         (set-Id-bind id p-bind)]))
     (for ([def def-lst])
       (define n-def (ast-rw-Ids rw-id def))
-      (hash-set! all-defs (Id-bind (Def-id n-def)) n-def)))
+      (hash-set! all-defs (Id-bind (Def-id n-def)) n-def))
+    ;;(pretty-print `(,rr-mp x-binds ,x-binds m->p-bind ,m->p-bind))
+    (void))
+  ;;(pretty-print all-defs)
   all-defs)
     
 (define (def-all-used-id-binds def)
@@ -327,15 +331,12 @@ optimization.
       
       ;; For entry point modules, use annotations to build a set of
       ;; entry points. Add these to program entry points.
-      (define eps-in-mod #f) ;; (or/c #f (hash/c bind Def?)) xxx not actually being used
       (when ep?
-        ;; We only consider top-level things here.
-        (set! eps-in-mod
-              (for/hasheq ([def def-lst]
-                           #:when (ast-anno-maybe def 'export))
-                (define bind (Id-bind (Def-id def)))
-                (set-add! eps-in-prog bind)
-                (values bind def))))
+        (for ([def def-lst]
+              #:when (ast-anno-maybe def 'export))
+          (define bind (Id-bind (Def-id def)))
+          (set-add! eps-in-prog bind)
+          (values bind def)))
 
       ;; Build a list of dependencies for this module from the
       ;; bind->binding table. Stored as (list dep-r-mp rel-r-mp) per
@@ -387,12 +388,14 @@ optimization.
   ;;(writeln (list predicate-id TRUE-id FALSE-id))
   
   (define all-defs (merge-defs mods))
-  ;;(pretty-print (dict->list all-defs)) (exit)
+  ;;(pretty-print all-defs) (exit)
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (define def-lst (hash-values all-defs))
   
   (set! def-lst (defs-optimize-if TRUE-id FALSE-id def-lst))
+  (pretty-print `(,def-lst ,eps-in-prog)) (exit)
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
+  (pretty-print def-lst) (exit)
   (set! def-lst (map ast-rm-LetExpr def-lst))
   (set! def-lst (map ast-LetLocalEc->BlockExpr def-lst))
   (set! def-lst (map ast-simplify def-lst))
@@ -405,6 +408,7 @@ optimization.
   (defs-check-Apply-target def-lst)
   ;;(pretty-print def-lst)
   (set! all-defs (build-defs-table def-lst))
+  ;;(pretty-print all-defs) (exit)
   (set! all-defs (defs-type-infer predicate-id all-defs))
   ;;(pretty-print (dict-values all-defs)) (exit)
   
@@ -483,7 +487,7 @@ optimization.
 ;;; 
 
 (module* test #f
-  (define st (compile-files "tests/test-names-1.rkt"))
+  (define st (compile-files "tests/test-names-3.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))
                        (cxx (cc hh))
