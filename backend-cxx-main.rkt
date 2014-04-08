@@ -373,7 +373,8 @@ C++ back end.
   (values (second p)))
 
 (define-with-contract*
-  (-> (listof symbol?) hash? path-string? output-port? boolean? void?)
+  (-> (listof symbol?) hash? path-string? (or/c #f output-port?)
+      boolean? void?)
   (generate-cxx-file kinds defs path-stem out banner?)
   ;;(pretty-print (defs-id->ast defs)) (exit)
   (define def-lst
