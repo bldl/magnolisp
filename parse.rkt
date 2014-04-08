@@ -76,9 +76,6 @@
 (define-syntax-class core-id
   (pattern x #:when (core-id? #'x)))
 
-(define (quote? x)
-  (matches-global-id? #'quote x))
-
 ;; Returns defs, provides, and requires in module.
 (define-with-contract*
   (-> syntax? immutable-id-table? immutable-id-table?)
@@ -233,9 +230,8 @@
     ;;(writeln (list 'parse-define-value e-stx (syntax->datum e-stx)))
     ;;(writeln (identifier-binding #'#%magnolisp 0))
     (kernel-syntax-case/phase e-stx 0
-      ((#%plain-app c (q k))
+      ((#%plain-app c (quote k))
        (and (core-id? #'c)
-            (quote? #'q)
             (eq? 'foreign-type (syntax-e #'k)))
        (make-ForeignTypeDecl ctx stx id-stx))
       (_
@@ -331,8 +327,7 @@
       ((set! id expr)
        (identifier? #'id)
        (void))
-      ((q lit)
-       (and (identifier? #'q) (module-or-top-identifier=? #'q #'quote))
+      ((quote _)
        (void))
       ((quote-syntax _)
        (void))
