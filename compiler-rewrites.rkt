@@ -118,17 +118,6 @@
    ((NameT? ast) (NameT-id ast))
    (else #f)))
 
-(define* (name-ref? ast)
-  (or (Var? ast) (NameT? ast)))
-
-(define-with-contract*
-  (-> Ast? identifier?)
-  (name-ref-id ast)
-  (cond
-   ((Var? ast) (Var-id ast))
-   ((NameT? ast) (NameT-id ast))
-   (else (unsupported ast))))
-
 (define-with-contract*
   (-> Ast? (or/c Id? #f))
   (name-ref-id/maybe ast)
