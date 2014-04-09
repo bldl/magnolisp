@@ -11,8 +11,8 @@ The compiler ignores module top-level expressions.
 The compiler requires a fully typed program (although not all types
 have to be written out explicitly -- think 'auto' in C++).
 
-Compiles only the 'entry-point' operations of the specified modules,
-and their dependencies. This essentially means full program/library
+Compiles only the 'export' operations of the specified modules, and
+their dependencies. This essentially means full program/library
 optimization.
 
 |#
@@ -22,6 +22,59 @@ optimization.
          "compiler-rewrites.rkt" "parse.rkt" "strategy.rkt"
          "util.rkt" "util/struct.rkt"
          syntax/moddep)
+
+;;; 
+;;; annotation parsing
+;;; 
+
+(define (Def-parse-annos def) ;; Def? -> (values Def? hash?)
+  (define ann-h (Ast-annos def))
+  (define id (Def-id def))
+
+  (define (put! n v)
+    (set! ann-h (hash-set ann-h n v)))
+
+  (put! 'top #t)
+  
+  (define foreign
+    (let-and stx (hash-ref ann-h 'foreign #f)
+      (let ((foreign-name
+             (cond
+              [(ForeignTypeDecl? def)
+               (define foreign (parse-cxx-type id stx))
+               (unless foreign
+                 (raise-language-error/ast
+                  "missing 'foreign' C++ type annotation"
+                  def))
+               (set! def (struct-copy ForeignTypeDecl def [cxx-t foreign]))
+               foreign]
+              [else
+               (let-and foreign-name (parse-cxx-name-anno stx)
+                 foreign-name)])))
+        (put! 'foreign foreign-name))))
+
+  (define export
+    (let-and stx (hash-ref ann-h 'export #f)
+      (put! 'export
+            (let-and export-name (parse-cxx-name-anno stx)
+              export-name)))) ;; (or/c identifier? boolean?)
+  
+  (when (and foreign export)
+    (raise-language-error/ast
+     (format "definition ~a marked both as 'export' and 'foreign'"
+             (ast-displayable/datum id))
+     def))
+
+  (values def ann-h))
+
+(define (parse-compiler-annos mods)
+  (for/hasheq ([(rr-mp mod) mods])
+    (define def-lst (Mod-def-lst mod))
+    (set! def-lst
+          (for/list ([def def-lst])
+            (define-values (n-def annos) (Def-parse-annos def))
+            (set-Ast-annos n-def annos)))
+    (values rr-mp (struct-copy Mod mod [def-lst def-lst]))))
 
 ;;;
 ;;; de-Racketization
@@ -391,7 +444,8 @@ optimization.
               (get-id 'FALSE))))
 
   ;;(writeln (list predicate-id TRUE-id FALSE-id))
-  
+
+  (set! mods (parse-compiler-annos mods))
   (define-values (all-defs eps-in-prog) (merge-defs mods))
   ;;(pretty-print all-defs) (exit)
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)

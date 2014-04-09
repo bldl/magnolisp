@@ -14,7 +14,7 @@
 
 (define* (local-Defun? ast)
   (and (Defun? ast)
-       (not (ast-anno-must ast 'top))))
+       (not (ast-anno-maybe ast 'top))))
 
 ;; In IR we do not allow global DefVars.
 (define* (ast-local-def? ast)

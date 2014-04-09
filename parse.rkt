@@ -4,7 +4,7 @@
 
 |#
 
-(require "annos-parse.rkt" "annos-util.rkt" "ast-magnolisp.rkt" "app-util.rkt"
+(require "annos-util.rkt" "ast-magnolisp.rkt" "app-util.rkt"
          "util.rkt" "util/case.rkt"
          racket/contract racket/dict racket/function racket/list
          racket/match racket/pretty
@@ -56,10 +56,29 @@
               (identifier-binding id 0)))))
 
 ;;; 
+;;; Magnolisp type parsing
+;;; 
+
+(define (parse-type anno-stx)
+  (define (parse-name name-stx)
+    (syntax-parse name-stx
+      #:context anno-stx
+      (name:id
+       (syntaxed name-stx NameT #'name))))
+  
+  (syntax-parse anno-stx
+    ((_ ((~datum fn) p-type ... r-type))
+     (syntaxed (cdr (syntax-e anno-stx))
+               FunT (map parse-name (syntax->list #'(p-type ...)))
+               (parse-name #'r-type)))
+    ((_ name:id)
+     (parse-name #'name))))
+
+;;; 
 ;;; parsing
 ;;; 
 
-;; Returns defs, provides, and requires in module.
+;; Returns top-level defs in module.
 (define-with-contract*
   (-> syntax? immutable-id-table? immutable-id-table?)
   (parse-defs-from-module modbeg-stx annos)
@@ -84,32 +103,11 @@
   ;; Looks up annotations (from annotation table) for declaration
   ;; 'stx' (binding 'id-stx'). Returns AST node annotations as a
   ;; (hash/c symbol? any/c).
-  ;;
-  ;; The 'foreign?' argument indicates whether 'foreign' annotations
-  ;; (if any) should be parsed. (Otherwise they will be left in as
-  ;; syntax.)
-  (define (mk-annos top? stx id-stx #:foreign? [foreign? #f])
+  (define (mk-annos stx id-stx)
     (define ann-h (dict-ref annos id-stx #hasheq()))
     ;;(writeln `(raw annos for ,(syntax-e id-stx) are ,@(apply append (for/list (((k v) ann-h)) `(,k = ,v)))))
-    (define foreign
-      (and foreign?
-           (let-and foreign-stx (hash-ref ann-h 'foreign #f)
-             (let-and foreign-name (parse-cxx-name-anno foreign-stx)
-               foreign-name))))
-    (define export
-      (parse-export id-stx ann-h))
-    (when (and foreign export)
-      (raise-language-error
-       #f
-       (format "definition ~a marked both as 'export' and 'foreign'"
-               (syntax-e id-stx))
-       stx))
-    (set! ann-h
-          (hash-set* ann-h
-                     'stx stx
-                     'top top?
-                     'export export
-                     'foreign foreign))
+    (set! ann-h (hash-set ann-h 'stx stx))
+    (set! ann-h (hash-remove ann-h 'type))
     ;;(writeln `(parsed annos for ,(syntax-e id-stx) are ,@(apply append (for/list (((k v) ann-h)) `(,k = ,v)))))
     ann-h)
 
@@ -125,7 +123,7 @@
   (define (make-DefVar stx id-stx e-stx #:top? [top? #f])
     (check-redefinition id-stx stx)
     (define ast (parse-expr e-stx))
-    (define ann-h (mk-annos top? stx id-stx #:foreign? #t))
+    (define ann-h (mk-annos stx id-stx))
     (define t (lookup-type id-stx))
     (define def (DefVar ann-h id-stx t ast))
     (when top?
@@ -134,22 +132,14 @@
 
   (define (make-ForeignTypeDecl stx id-stx)
     (check-redefinition id-stx stx)
-    (define id-annos (dict-ref annos id-stx #f))
-    (define foreign-stx (and id-annos (hash-ref id-annos 'foreign #f)))
-    (unless foreign-stx
-      (raise-language-error
-       #f
-       "missing 'foreign' C++ type annotation"
-       stx))
-    (define cxx-t (parse-cxx-type id-stx foreign-stx))
-    (define ann-h (mk-annos #t stx id-stx))
-    (define def (ForeignTypeDecl ann-h id-stx cxx-t))
+    (define ann-h (mk-annos stx id-stx))
+    (define def (ForeignTypeDecl ann-h id-stx the-Unresolved))
     (set-def-in-mod! id-stx def)
     def)
   
   (define (make-Param stx id-stx)
     (check-redefinition id-stx stx)
-    (define ann-h (mk-annos #f stx id-stx))
+    (define ann-h (mk-annos stx id-stx))
     (define def (Param ann-h id-stx the-AnyT))
     def)
   

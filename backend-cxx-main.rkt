@@ -346,7 +346,7 @@ C++ back end.
   (for ([(bind def) defs])
     (cond
      ((Defun? def)
-      (when (ast-anno-must def 'top)
+      (when (ast-anno-maybe def 'top)
         (parameterize ((owner-id (Def-id def)))
           (do-Defun def))))
      (else

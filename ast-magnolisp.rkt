@@ -227,10 +227,9 @@ It is rather important for all Ast derived node types to be
 ;;; 
 
 ;; Any recorded annotations from definitions are put into 'annos' from
-;; the id-table. All Def objects have an [rr-mp resolved-module-path?]
-;; annotation, specifying the defining module. At least all the global
-;; defs have a [top boolean?] annotation, which specifies whether a
-;; definition is top-level.
+;; the id-table. At least all the global defs will be given a [top
+;; boolean?] annotation, which specifies whether a definition is
+;; top-level.
 
 ;; Variable definition.
 (define-ast* DefVar (Ast Def) ((no-term annos) (no-term id)
@@ -250,6 +249,8 @@ It is rather important for all Ast derived node types to be
 ;; 'cxx-t' is a C++ type expression.
 (define-ast* ForeignTypeDecl (Ast Def) ((no-term annos) (no-term id)
                                         (just-term cxx-t)))
+
+(define-ast* Unresolved (Ast) ((no-term annos)) #:singleton (#hasheq()))
 
 ;;; 
 ;;; other Magnolisp
