@@ -151,7 +151,7 @@ Unlike Racket, the Magnolisp language makes a distinction between statements and
 
 In Magnolisp, an @racket[if] form is either a statement or expression, depending on context. That is, depending on context the form is either @racket[(if _test-expr _then-expr _else-expr)] or @racket[(if _test-expr _then-stat _else-stat)]. The @racket[when] and @racket[unless] forms are always statements, and contain statements in their body. The @racket[_test-expr] conditional expression must always be of type @racket[predicate], and whether it holds depends on the ``truthiness'' of its value, as interpreted in C++ or Racket (as applicable).
 
-A @racket[(begin _stat ...)] form, in Magnolisp, signifies a sequence of statements, itself constituting a statement.
+A @racket[(begin _stat ...)] form, in Magnolisp, signifies a sequence of statements, itself constituting a statement. Similarly to Racket, to allow declarations to appear within a statement sequence, @racket[(let () _stat ...)] should be used instead.
 
 The @racket[(let ([_id _expr] ...) _body ...+)], @racket[(let* ([_id _expr] ...) _body ...+)], and @racket[(letrec ([_id _expr] ...) _body ...+)] forms are statements in Magnolisp, and the @racket[_body]s must likewise be statements. The named variant of @racket[let] is not supported. A limited form of @racketidfont{let} is supported in expression context---see @racket[let-var].
 
