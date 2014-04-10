@@ -44,7 +44,7 @@ weakness properties of collection types may also not be preserved.
   #`(datum->syntax (quote-syntax #,(datum->syntax stx 'ctx))
                    #,dat #,(syntactifiable-mkstx loc)))
 
-(define kept-properties '(annos origin paren-shape))
+(define kept-properties '(origin paren-shape))
 
 (define keep?/syntactifiable
   (keep?-> keep-position?
