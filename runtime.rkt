@@ -15,8 +15,12 @@ enough to be easily analyzable, and compilable to C++.
  (for-syntax "annos-util.rkt" "util.rkt"
              racket/base racket/syntax)) 
 
-;; #<undefined>
-(define undefined (letrec ((x x)) x))
+;; A value not meant to be referenced. (Starting from Racket v6.0.1,
+;; cannot use #<undefined>.)
+(define undefined
+  (let ()
+    (struct undefined ())
+    (undefined)))
 
 ;; Yes we are providing this. If the programmer wants to hack our core
 ;; language, they may. The idea is to express core language as

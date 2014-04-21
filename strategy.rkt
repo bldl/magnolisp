@@ -189,7 +189,8 @@ Meta-Compilation of Language Abstractions (2006).
 ;;; 
 
 ;; Note quite the Stratego 'rec', but close, and handles the common
-;; case.
+;; case. 'impl' is (-> ast (or/c ast #f)), and has both 's' and itself
+;; (as 'again') in scope.
 (define-syntax-rule* (rec again s impl)
   (lambda (s)
     (letrec ((again impl))
