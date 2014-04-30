@@ -95,13 +95,12 @@ same variables at the same phase level).
 
   ;;(writeln (list (current-module-declare-source) (current-module-declare-name)))
   
-  #`(begin-for-syntax
-     (module magnolisp-info racket/base
-       (require magnolisp/ast-magnolisp)
-       (define r-mp #,(syntactifiable-mkstx orig-r-mp))
-       (define bind->binding #,(syntactifiable-mkstx bind->binding))
-       (define def-lst #,(syntactifiable-mkstx def-lst))
-       (provide r-mp bind->binding def-lst))))
+  #`(module magnolisp-info racket/base
+      (require magnolisp/ast-magnolisp)
+      (define r-mp #,(syntactifiable-mkstx orig-r-mp))
+      (define bind->binding #,(syntactifiable-mkstx bind->binding))
+      (define def-lst #,(syntactifiable-mkstx def-lst))
+      (provide r-mp bind->binding def-lst)))
 
 (define-for-syntax (modify-mb stx)
   (syntax-case stx ()
