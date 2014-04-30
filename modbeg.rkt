@@ -21,7 +21,7 @@ same variables at the same phase level).
 
 |#
 
-(provide module-begin base-module-begin)
+(provide module-begin)
 
 (require "annos-store.rkt"
          (for-syntax
@@ -103,12 +103,12 @@ same variables at the same phase level).
        (define def-lst #,(syntactifiable-mkstx def-lst))
        (provide r-mp bind->binding def-lst))))
 
-(define-for-syntax (modify-mb stx addition-lst)
+(define-for-syntax (modify-mb stx)
   (syntax-case stx ()
     ((orig-mb . bodies)
      (let ()
        (define ast (local-expand
-                    #`(#%module-begin #,@addition-lst . bodies)
+                    #`(#%module-begin . bodies)
                     'module-begin null))
        (define sm-stx (make-definfo-submodule #'orig-mb ast))
        (with-syntax ([(mb . bodies) ast]
@@ -122,9 +122,5 @@ same variables at the same phase level).
            ;;(pretty-print (syntax->datum/binding sm-stx #:pred (lambda (x) (memq x '(equal? r.equal?)))))
            mb-stx))))))
 
-(define-syntax (base-module-begin stx)
-  (modify-mb stx null))
-
 (define-syntax (module-begin stx)
-  (with-syntax ((prelude (datum->syntax stx 'magnolisp/prelude)))
-    (modify-mb stx (list #'(require prelude)))))
+  (modify-mb stx))

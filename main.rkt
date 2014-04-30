@@ -24,3 +24,6 @@ Magnolisp for-syntax.
 
 (require "runtime.rkt")
 (provide (all-from-out "runtime.rkt"))
+
+(require "prelude.rkt")
+(provide (all-from-out "prelude.rkt"))
