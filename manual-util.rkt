@@ -41,7 +41,7 @@ Utilities for authoring manual.scrbl.
   (syntax-case stx ()
     ((_ id)
      #`(elem (racket id)
-             (subscript (racketvarfont "id-expr"))))))
+             (subscript (italic "id-expr"))))))
 
 (define-syntax* (stxprop-flag stx)
   (syntax-case stx ()

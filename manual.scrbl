@@ -1,5 +1,5 @@
-#lang scribble/doc
-@(require scribble/eval scribble/manual "manual-util.rkt"
+#lang scribble/manual
+@(require scribble/eval "manual-util.rkt"
 	  (for-label syntax/modresolve
 	             magnolisp/prelude magnolisp/surface
                      (except-in racket/base do #%module-begin)))
@@ -19,7 +19,7 @@ Magnolisp is an amalgamation of Racket and the likewise experimental programming
 
 @defmodulelang[magnolisp]
 
-The Magnolisp language relies on Racket for its module and macro systems. All of Racket may be used for macro programming. The @racketmodname[racket/base] language is provided by default for phase level 1.
+The Magnolisp language relies on Racket for its module and macro systems. All of Racket may be used for macro programming. The @racketmodname[racket/base] language is provided by default for phase level 1 (compile time).
 
 The @racketmodname[racket/base] definitions (with the exception of the @racket-do form) are also available at phase level 0 by default. They may also be used in runtime code, and evaluated as @racketmodname[magnolisp]. However, only a small subset of Racket can be handled by the Magnolisp compiler, and the compiler will report errors as appropriate for uncompilable language.
 
@@ -47,9 +47,9 @@ Unlike in Racket, no @emph{tail-call optimization} may be assumed even when a re
 
 Providing a body is optional in the case where the function is declared as @racket[foreign], in which case the compiler will ignore any body @racket[expr]. When a function without a body is invoked as Racket, the result is @|void-const|. When a @racket[foreign] function with a body is invoked as Racket, the body may be implemented in full Racket, typically to ``simulate'' the behavior of the C++ implementation. To implement a function body in Racket instead of Magnolisp, enclose the body expression within a @racket[begin-racket] form.
 
-A function with the @racket[export] flag in its annotations indicates that the function is part of the public API of a program that includes the containing module. When a function is used merely as a dependency, any @racket[export] flag is ignored.
+A function with the @racket[export] flag in its annotations indicates that the function is part of the public API of a program that includes the containing module. When a function is used merely as a dependency (i.e., its containing module was not specified as being a part of the program), any @racket[export] flag is ignored.
 
-When a function includes a @racketid[type] annotation, the type expression must be of the form @racket[_fn-type-expr].
+When a function includes a @racketid[type] annotation, the type expression must be of the form @racket[_fn-type-expr] (see @secref{type-expressions}).
 
 For example:
 @(racketblock+eval #:eval the-eval
@@ -62,7 +62,7 @@ For example:
   (function (seven) (#:annos foreign (type (fn int)))
     (begin-racket 1 2 3 4 5 6 7)))
 
-Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in different type contexts.}
+Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in multiple different type contexts within a single program.}
 
 @defform[(typedef id maybe-annos)]{
 Declares a type. Presently only foreign types may be declared, and @racket[id] gives the corresponding Magnolisp name. The @racketid[foreign] annotation should always be provided.
@@ -90,7 +90,8 @@ For example:
 @(interaction #:eval the-eval
   (let-var x (#:annos (type int)) 5
     (add1 x)))
-}
+
+Where one uses other variants of @racketidfont{let}, it is still possible to specify annotations for the bindings with @racket[anno!].}
 
 @subsection{Annotations}
 
@@ -120,21 +121,21 @@ Annotates a literal, which by themselves are untyped in Magnolisp. While the lit
 
 For example:
 @(interaction #:eval the-eval (lit-of int 5))
-}
+
+While generally only declarations require annotations, @racket[lit-of] demonstrates a specific case where it is useful to associate annotations with expressions.}
 
 @defform[(anno! id anno-expr ...)]{
-Explicitly annotates the identifier @racket[id] with the specified annotations. May be used to specify annotations for an identifier that is bound separately, probably by one of the Racket binding forms such as @racket[define], @racket[let], @etc
+Explicitly annotates the identifier @racket[id] with the specified annotations. May be used to specify annotations for an identifier that is bound separately, probably by one of the Racket binding forms such as @racket[define], @racket[let], @etc May appear in any context in which a @racket[begin] form may appear, and in which the annotated identifier is in scope.
 
 For example:
 @(interaction #:eval the-eval
-  (begin
+  (let ()
     (define x 5)
-    (anno! x (type int))))
+    (anno! x (type int))
+    x))
 }
 
-While generally only declarations require annotations, @racket[lit-of] demonstrates a specific case where it is useful to associate annotations with expressions. Simple ``data'' can be stored in syntax properties, but that approach may not be suitable for identifiers that must respect lexical scope (as appearing in type expressions). The @racket[lit-of] form deals with this by binding the literal to a fresh identifier, and annotating it with a @racketid[type] using @racket[anno!].
-
-@subsection{Type Expressions}
+@subsection[#:tag "type-expressions"]{Type Expressions}
 
 @racketgrammar*[
 #:literals (fn)
@@ -161,10 +162,10 @@ The left-hand side expression @racket[_id] must be a reference to a bound variab
 
 In Magnolisp, @racket[(void)] signifies a statement with no effect. Unlike in Racket, arguments are not allowed. The @racket[(values)] form likewise signifies a statement with no effect, when it appears in a statement position. The two differ only when evaluating as Racket, as the former may only appear in a 1-value context, and the latter in a 0-value context.
 
-The @racket[var], @racket[function], and @racket[typedef] declaration forms may appear in a statement position. The same is true of @racket[define] forms that conform to the restricted syntax supported by the Magnolisp compiler.
+The @racket[var], @racket[function], and @racket[typedef] declaration forms may appear in a statement position. The same is true of @racketidfont{define} forms that conform to the restricted syntax supported by the Magnolisp compiler.
 
 @defform[(do stat ...)]{
-An @deftech{expression block} containing a sequence of statements. As the term implies, and expression block is an expression, despite containing statements. The block must produce a single value by @racket[return]ing it. Control must not reach the end of a block expression---the @racket[return] statement must be invoked somewhere before control ``falls out'' of the block. The returned value becomes the value of the containing @racket[do] expression.
+An @deftech{expression block} containing a sequence of statements. As the term implies, an expression block is an expression, despite containing statements. The block must produce a single value by @racket[return]ing it. Control must not reach the end of a block expression---the @racket[return] statement must be invoked somewhere before control ``falls out'' of the block. The returned value becomes the value of the containing @racket[do] expression.
 
 For example:
 @(interaction #:eval the-eval
@@ -181,6 +182,8 @@ A statement that causes any enclosing @racket[do] block (which must exist) to yi
 @(defmodule magnolisp/prelude)
 
 A @deftech{predicate expression} is simply an expression of type @racket[predicate], which is the only built-in type in Magnolisp.
+
+The @racket[predicate] type and its associated operations are defined by the @racketmodname[magnolisp/prelude] module, which serves as the runtime library of Magnolisp. The @racketmodname[magnolisp/prelude] names are bound for phase level 0 in the @racketmodname[magnolisp] language.
 
 @defthing[#:kind "type" predicate any/c]{
 A built-in type. The ``literals'' of this type are @racket[true] and @racket[false]. All conditional expressions in Magnolisp are of this type.
