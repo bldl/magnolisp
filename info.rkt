@@ -7,4 +7,4 @@
 (define category '(experimental))
 (define racket-launcher-libraries '("compiler-cli.rkt"))
 (define racket-launcher-names '("mglc"))
-(define compile-omit-paths '("retired"))
+(define compile-omit-paths '("failing" "retired"))

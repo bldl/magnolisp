@@ -1,11 +1,11 @@
 #lang scribble/doc
 @(require scribble/eval scribble/manual "manual-util.rkt"
 	  (for-label syntax/modresolve
-	             magnolisp/prelude magnolisp/runtime
+	             magnolisp/prelude magnolisp/surface
                      (except-in racket/base do #%module-begin)))
 
 @(define the-eval (make-base-eval))
-@(the-eval '(require magnolisp/prelude magnolisp/runtime))
+@(the-eval '(require magnolisp/prelude magnolisp/surface))
 
 @title{Magnolisp}
 
@@ -33,9 +33,9 @@ For defining macros and doing transformation time computation, the relevant Rack
 
 @subsection{Defining Forms}
 
-@(defmodule magnolisp/runtime)
+@(defmodule magnolisp/surface)
 
-In Magnolisp, it is possible to declare @racket[function]s, types (with @racket[typedef]), and @racket[var]iables; of these, variable definitions are not allowed at the top level. The Magnolisp binding forms are in the @racketmodname[magnolisp/runtime] library. The @racketmodname[magnolisp] language provides @racketmodname[magnolisp/runtime] at phase level 0.
+In Magnolisp, it is possible to declare @racket[function]s, types (with @racket[typedef]), and @racket[var]iables; of these, variable definitions are not allowed at the top level. The Magnolisp binding forms are in the @racketmodname[magnolisp/surface] library. The @racketmodname[magnolisp] language provides @racketmodname[magnolisp/surface] at phase level 0.
 
 As Magnolisp has almost no standard library, it is ultimately necessary to define primitive types and functions (flagged as @racketid[foreign]) in order to be able to compile programs that do anything useful.
 
@@ -94,7 +94,7 @@ For example:
 
 @subsection{Annotations}
 
-@(declare-exporting magnolisp/runtime)
+@(declare-exporting magnolisp/surface)
 
 @racketgrammar*[
 #:literals (export foreign type)
@@ -145,7 +145,7 @@ Type expressions are parsed according to the above grammar, where @racket[_type-
 
 @subsection{Statements and Expressions}
 
-@(declare-exporting magnolisp/runtime)
+@(declare-exporting magnolisp/surface)
 
 Unlike Racket, the Magnolisp language makes a distinction between statements and expressions. Although Magnolisp supports @emph{some} of the Racket language, a given Racket construct must typically appear only in a specific context (either statement or expression context).
 
@@ -200,7 +200,7 @@ There is also shorthand syntax @racket[true] and @racket[false]; said syntaxes e
 
 @subsection{Racket Forms}
 
-@(declare-exporting magnolisp/runtime)
+@(declare-exporting magnolisp/surface)
 
 To use Racket code in a runtime context, you may wrap the code in a form that indicates that the code is only intended for evaluation as Racket. 
 Code so wrapped must be grammatically correct Racket, but not necessarily Magnolisp. The wrapping forms merely switch syntaxes, and have no effect on the namespace used for evaluating the enclosed sub-forms; the surrounding namespace is still in effect. Nesting of the wrapping forms is allowed.
@@ -254,7 +254,7 @@ For example:
 
 @subsection{Fully Expanded Programs}
 
-@(declare-exporting magnolisp/runtime)
+@(declare-exporting magnolisp/surface)
 
 As far as the Magnolisp compiler is concerned, a Magnolisp program is fully expanded if it conforms to the following grammar.
 

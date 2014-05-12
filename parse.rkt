@@ -10,7 +10,7 @@
          racket/match racket/pretty
          syntax/id-table syntax/kerncase syntax/parse syntax/stx
          (for-template racket/base
-                       (only-in "runtime.rkt" #%magnolisp)))
+                       (only-in "surface.rkt" #%magnolisp)))
 
 ;;; 
 ;;; debugging utilities

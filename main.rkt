@@ -17,13 +17,13 @@ Magnolisp for-syntax.
 (provide (except-out (all-from-out racket/base) #%module-begin))
 
 (require "modbeg.rkt")
-(provide (rename-out (module-begin #%module-begin)))
+(provide (rename-out [module-begin #%module-begin]))
 
 (require (for-syntax racket/base))
 (provide (for-syntax (all-from-out racket/base)))
 
-(require "runtime.rkt")
-(provide (all-from-out "runtime.rkt"))
+(require "surface.rkt")
+(provide (all-from-out "surface.rkt"))
 
 (require "prelude.rkt")
 (provide (all-from-out "prelude.rkt"))

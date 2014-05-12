@@ -2,7 +2,7 @@
 
 #|
 
-This module implements the (default) concrete syntax of the Magnolisp
+This module implements the (default) surface syntax of the Magnolisp
 language, and such language is not meant to be used in macro
 programming. This is because the runtime language must be restricted
 enough to be easily analyzable, and compilable to C++.

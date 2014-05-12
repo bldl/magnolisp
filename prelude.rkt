@@ -6,7 +6,7 @@ A library of built-in types and functions in Magnolisp.
 
 |#
 
-(require (for-syntax racket/base) "runtime.rkt")
+(require (for-syntax racket/base) "surface.rkt")
 
 (provide predicate TRUE FALSE true false)
 
