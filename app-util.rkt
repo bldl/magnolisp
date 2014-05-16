@@ -83,7 +83,7 @@ compiler.
 (define (mpi->datum/resolve mpi)
   (resolved-module-path-name (module-path-index-resolve mpi)))
 
-(define (id->datum id-stx #:conv-mpi mpi->datum)
+(define* (id->datum/detailed id-stx #:conv-mpi mpi->datum)
   (define b (identifier-binding id-stx))
   (define name (syntax-e id-stx))
   (cond
@@ -97,6 +97,26 @@ compiler.
    (else
     (raise-result-error 'identifier-binding
      "documented identifier-binding result" b))))
+
+(define* (id->datum/detailed/sym id-stx #:conv-mpi mpi->datum)
+  (define b (identifier-binding id-stx))
+  (define name (syntax-e id-stx))
+  (define v
+    (cond
+     ((not b) #f)
+     ((eq? b 'lexical) "lexical")
+     ((list? b)
+      (define mpi (first b))
+      (define sym (second b))
+      (format "~a~a"
+              (if (eq? sym name) "" (format "was:~a " sym))
+              (mpi->datum mpi)))
+     (else
+      (raise-result-error 'identifier-binding
+                          "documented identifier-binding result" b))))
+  (if (not v)
+      name
+      (string->symbol (format "~s«~a»" name v))))
 
 ;; Tries to make it easy to see at a glance which IDs have bindings
 ;; and which do not, and what kind they are.
@@ -114,8 +134,11 @@ compiler.
   (string->symbol
    (format "~a~a" (syntax-e id) (pick-glyph))))
 
+(define* (id->datum/plain id #:conv-mpi dummy)
+  (syntax-e id))
+  
 (define* (syntax->datum/binding stx
-                                #:conv-id [id->datum id->datum]
+                                #:conv-id [id->datum id->datum/detailed]
                                 #:conv-mpi [mpi->datum mpi->datum/resolve]
                                 #:pred [p? (lambda (x) #t)])
   (define (f x)

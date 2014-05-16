@@ -1,4 +1,4 @@
-This is a work-in-progress implementation of /Magnolisp/, a small, experimental language and implementation. It is experimental in its implementation technique, which is to replace the phase level 0 (runtime) language of [[http://racket-lang.org/][Racket]] with something non-Racket (here: Magnolisp), and translate it into another language (here: C++) for execution.
+This is /Magnolisp/, a small, experimental language and implementation. It is experimental in its implementation technique, which is to replace the phase level 0 (runtime) language of [[http://racket-lang.org/][Racket]] with something non-Racket (here: Magnolisp), and translate it into another language (here: C++) for execution.
 
 The implementation has both an evaluator (implemented in the usual way as a Racket =#lang=) and a source-to-source compiler targeting C++. The motivation for an evaluator is to act as a fast testing facility, a simulator of sorts, whereas for real-world deployment onto interesting platforms C++ source code is required.
 

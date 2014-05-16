@@ -52,7 +52,9 @@ pkg :
 	cp -ai ./ $(MIRROR_DIR)/
 	( cd $(MIRROR_DIR) && git clean -dxff && rm -rf $(MIRROR_DIR)/.git && raco pkg create --format tgz --dest $(DIST_HOME) --from-dir $(MIRROR_DIR) )
 
-website : rm-dist pdf pkg
+website-local :
+
+website : rm-dist pdf pkg website-local
 	chmod -R a+rX $(DIST_HOME)
 
 setup :
