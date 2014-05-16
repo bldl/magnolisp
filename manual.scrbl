@@ -261,7 +261,7 @@ For example:
 
 As far as the Magnolisp compiler is concerned, a Magnolisp program is fully expanded if it conforms to the following grammar.
 
-Any non-terminal marked with the subscript ``rkt'' is as documented in the ``Fully Expanded Programs'' section of The Racket Reference. Any non-terminal marked with the subscript ``ign'' is for language that is ignored by the Magnolisp compiler, but which may be useful when evaluating as Racket. Anything of the form @(indirect-id id) is actually a non-terminal like @racketvarfont{id-expr}, but for the specific identifier @racketvarfont{id}. Form @racket[(#,(stxprop-flag local-ec) _sub-form ...)] means the form @racket[(_sub-form ...)] whose syntax object has the property @racket['local-ec] set to a true value.
+Any non-terminal marked with the subscript ``rkt'' is as documented in the ``Fully Expanded Programs'' section of the Racket Reference. Any non-terminal marked with the subscript ``ign'' is for language that is ignored by the Magnolisp compiler, but which may be useful when evaluating as Racket. Anything of the form @(indirect-id id) is actually a non-terminal like @racketvarfont{id-expr}, but for the specific identifier @racketvarfont{id}. Form @racket[(#,(stxprop-flag local-ec) _sub-form ...)] means the form @racket[(_sub-form ...)] whose syntax object has the property @racket['local-ec] set to a true value.
 
 @racketgrammar*[
 #:literals (begin begin-for-syntax call/ec define-values define-syntaxes if let-values letrec-values letrec-syntaxes+values quote set! values void #%expression #%magnolisp #%plain-app #%plain-lambda #%provide #%require #%top)
@@ -304,14 +304,42 @@ Any non-terminal marked with the subscript ``rkt'' is as documented in the ``Ful
           in-racket-form]
 [stat (if mgl-expr stat stat)
       (begin stat ...)
-      (let-values ([(id ...) mgl-expr] ...)
+
+      (let-values 
+          ([(id ...) 
+            (#%plain-app #,(indirect-id values) mgl-expr ...)] 
+           ...)
         stat ...+)
-      (letrec-values ([(id ...) mgl-expr] ...)
+      (letrec-values 
+          ([(id ...) 
+            (#%plain-app #,(indirect-id values) mgl-expr ...)] 
+           ...)
         stat ...+)
       (letrec-syntaxes+values
           ([(trans-id ...) #,(rkt-ign-nt expr)] ...)
-          ([(id ...) mgl-expr] ...)
+          ([(id ...) 
+            (#%plain-app #,(indirect-id values) mgl-expr ...)] 
+           ...)
         stat ...+)
+
+      (let-values ([() stat] ...)
+        stat ...+)
+      (letrec-values ([() stat] ...)
+        stat ...+)
+      (letrec-syntaxes+values
+          ([(trans-id ...) #,(rkt-ign-nt expr)] ...)
+          ([() stat] ...)
+        stat ...+)
+
+      (let-values ([(id) mgl-expr] ...)
+        stat ...+)
+      (letrec-values ([(id) mgl-expr] ...)
+        stat ...+)
+      (letrec-syntaxes+values
+          ([(trans-id ...) #,(rkt-ign-nt expr)] ...)
+          ([(id) mgl-expr] ...)
+        stat ...+)
+
       (set! id mgl-expr)
       (#%plain-app #,(indirect-id values))
       (#%plain-app #,(indirect-id void))

@@ -406,7 +406,7 @@
     (kernel-syntax-case/phase binds 0
      (()
       (parse-expr e))
-     ((((n) v))
+     (([(n) v])
       (identifier? #'n)
       (let ()
         (define d-ast (make-DefVar stx #'n #'v))
