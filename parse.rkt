@@ -405,7 +405,7 @@
   (define (parse-let-expr stx kind binds e)
     (kernel-syntax-case/phase binds 0
      (()
-      (parse-expr (syntax-track-origin e stx kind)))
+      (parse-expr e))
      ((((n) v))
       (identifier? #'n)
       (let ()
