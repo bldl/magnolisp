@@ -22,6 +22,9 @@ clean-with-raco :
 bin :
 	raco setup --no-zo --no-docs --no-foreign-libs --no-info-domain --no-pkg-deps magnolisp
 
+bytecode :
+	raco setup --no-launcher --no-docs --no-foreign-libs --no-info-domain --no-pkg-deps magnolisp
+
 api-doc :
 	-rm -r doc
 	raco setup --no-zo --no-launcher --no-install --no-post-install magnolisp

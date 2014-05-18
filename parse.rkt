@@ -201,7 +201,7 @@
         (first ast-lst)
         (syntaxed stx BlockStat ast-lst)))
     
-  (define (parse-define-value ctx stx id-stx e-stx)
+  (define (parse-define-value stx id-stx e-stx)
     ;;(writeln (list 'parse-define-value e-stx (syntax->datum e-stx)))
     ;;(writeln (identifier-binding #'#%magnolisp 0))
     (kernel-syntax-case*/phase e-stx 0 (#%magnolisp)
@@ -247,14 +247,14 @@
             stx (third (syntax->list stx))))
          (for-each
           (lambda (id-stx e-stx)
-            (parse-define-value 'module-level stx id-stx e-stx))
+            (parse-define-value stx id-stx e-stx))
           id-lst v-lst)))
 
       ;; Must come after the ((define-values (id ...) (#%plain-app
       ;; values v ...)) pattern.
       ((define-values (id) e)
        (identifier? #'id)
-       (parse-define-value 'module-level stx #'id #'e))
+       (parse-define-value stx #'id #'e))
 
       ((define-syntaxes . _)
        (void))
