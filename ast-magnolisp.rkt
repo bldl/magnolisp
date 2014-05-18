@@ -250,8 +250,6 @@ It is rather important for all Ast derived node types to be
 (define-ast* ForeignTypeDecl (Ast Def) ((no-term annos) (no-term id)
                                         (just-term cxx-t)))
 
-(define-ast* Unresolved (Ast) ((no-term annos)) #:singleton (#hasheq()))
-
 ;;; 
 ;;; other Magnolisp
 ;;; 
@@ -260,6 +258,8 @@ It is rather important for all Ast derived node types to be
 
 ;; For functions with no Magnolisp body.
 (define-ast* NoBody (Ast) ((no-term annos)))
+
+(define-ast* ForeignTypeExpr (Ast) ((no-term annos)))
 
 ;; 'def' contains a DefVar term. 'let-kind annotation has either
 ;; 'let-values or 'letrec-values or 'letrec-syntaxes+values; we mostly

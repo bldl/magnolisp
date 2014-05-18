@@ -372,8 +372,6 @@ A restricted form of @racket[call/ec] invocation, which is flagged with the synt
 @specsubform[local-ec-jump]{
 A restricted form of escape continuation invocation, flagged with the syntax property @racket['local-ec]. The escape must be local.}
 
-@warning{The parsing of type declarations is not presently as permissive as the above grammar indicates. It more or less assumes syntax as produced by @racket[typedef].}
-
 @warning{For some of the @(indirect-id id) non-terminals, the current parser actually assumes a direct @racket[_id].}
 
 @defthing[#%magnolisp any/c]{

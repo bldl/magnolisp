@@ -130,13 +130,6 @@
       (set-def-in-mod! id-stx def))
     def)
 
-  (define (make-ForeignTypeDecl stx id-stx)
-    (check-redefinition id-stx stx)
-    (define ann-h (mk-annos stx id-stx))
-    (define def (ForeignTypeDecl ann-h id-stx the-Unresolved))
-    (set-def-in-mod! id-stx def)
-    def)
-  
   (define (make-Param stx id-stx)
     (check-redefinition id-stx stx)
     (define ann-h (mk-annos stx id-stx))
@@ -203,14 +196,7 @@
     
   (define (parse-define-value stx id-stx e-stx)
     ;;(writeln (list 'parse-define-value e-stx (syntax->datum e-stx)))
-    ;;(writeln (identifier-binding #'#%magnolisp 0))
-    (kernel-syntax-case*/phase e-stx 0 (#%magnolisp)
-      ((#%plain-app #%magnolisp (quote k))
-       (eq? 'foreign-type (syntax-e #'k))
-       (make-ForeignTypeDecl stx id-stx))
-      
-      (_
-       (make-DefVar stx id-stx e-stx #:top? #t))))
+    (make-DefVar stx id-stx e-stx #:top? #t))       
 
   (define (parse-module-begin stx)
     (kernel-syntax-case/phase stx 0
@@ -423,7 +409,7 @@
     ;;(stx-print-if-type-annoed stx)
     ;;(writeln (list ctx stx))
     
-    (kernel-syntax-case*/phase stx 0 (call/ec)
+    (kernel-syntax-case*/phase stx 0 (call/ec #%magnolisp)
 
       (_
        (syntax-property stx 'in-racket)
@@ -457,6 +443,10 @@
                  (parse-expr #'t)
                  (parse-expr #'e)))
 
+      ((#%plain-app #%magnolisp (quote k))
+       (eq? 'foreign-type (syntax-e #'k))
+       (syntaxed stx ForeignTypeExpr))
+      
       ((#%plain-app call/ec
         (#%plain-lambda (k) b ...))
        (syntax-property stx 'local-ec)

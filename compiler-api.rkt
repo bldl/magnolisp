@@ -37,21 +37,22 @@ optimization.
   (put! 'top #t)
   
   (define foreign
-    (let-and stx (hash-ref ann-h 'foreign #f)
-      (let ((foreign-name
-             (cond
-              [(ForeignTypeDecl? def)
-               (define foreign (parse-cxx-type id stx))
-               (unless foreign
+    (let* ((stx (hash-ref ann-h 'foreign #f))
+           (parsed-v
+            (match def
+              [(DefVar a id _ (ForeignTypeExpr _))
+               (define cxx-t (and stx (parse-cxx-type id stx)))
+               (unless cxx-t
                  (raise-language-error/ast
                   "missing 'foreign' C++ type annotation"
                   def))
-               (set! def (struct-copy ForeignTypeDecl def [cxx-t foreign]))
-               foreign]
-              [else
-               (let-and foreign-name (parse-cxx-name-anno stx)
-                 foreign-name)])))
-        (put! 'foreign foreign-name))))
+               (set! def (ForeignTypeDecl a id cxx-t))
+               cxx-t]
+              [_
+               (and stx (parse-cxx-name-anno stx))])))
+      (when parsed-v
+        (put! 'foreign parsed-v))
+      parsed-v))
 
   (define export
     (let-and stx (hash-ref ann-h 'export #f)
