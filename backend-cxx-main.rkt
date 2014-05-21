@@ -50,6 +50,7 @@ C++ back end.
     (set! s (string-append "is_" (second r))))
   (when-let r (regexp-match #rx"^(.*)[=]$" s)
     (set! s (string-append (second r) "_equal")))
+  (set! s (regexp-replace* #rx"^->" s "to_"))
   (set! s (regexp-replace* #rx"->" s "_to_"))
   s)  
 
