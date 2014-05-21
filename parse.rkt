@@ -4,7 +4,7 @@
 
 |#
 
-(require "annos-util.rkt" "ast-magnolisp.rkt" "app-util.rkt"
+(require "ast-magnolisp.rkt" "app-util.rkt"
          "util.rkt" "util/case.rkt"
          racket/contract racket/dict racket/function racket/list
          racket/match racket/pretty
@@ -22,19 +22,6 @@
    (lst (for-each print-stx-with-bindings lst))
    ((identifier? stx) (writeln (list stx (identifier-binding stx 0))))
    (else (writeln stx))))
-
-(define (stx-print-if-type-annoed stx)
-  (define annos (syntax-get-annos stx))
-  (when annos
-    (define type (hash-ref annos 'type #f))
-    (when type
-      (writeln (list 'TYPED stx type)))))
-
-(define (stx-print-all-type-annoed stx)
-  (stx-print-if-type-annoed stx)
-  (define lst (syntax->list stx))
-  (when lst
-   (for-each stx-print-all-type-annoed lst)))
 
 (define (find-id-stx find-stx stx (msg #f))
   (define (f stx)
@@ -56,23 +43,53 @@
               (identifier-binding id 0)))))
 
 ;;; 
-;;; Magnolisp type parsing
+;;; annotation parsing
 ;;; 
 
-(define (parse-type anno-stx)
-  (define (parse-name name-stx)
-    (syntax-parse name-stx
-      #:context anno-stx
-      (name:id
-       (syntaxed name-stx NameT #'name))))
+(define (parse-type-expr t-e)
+  (let loop ([stx t-e])
+    (kernel-syntax-case*/phase stx 0 (#%magnolisp)
+      [(#%plain-app #%magnolisp (quote f) p ... r)
+       (eq? 'fn (syntax-e #'f))
+       (let ()
+         (define p-stx-lst (syntax->list #'(p ...)))
+         (define p-ast-lst (map loop p-stx-lst))
+         (define r-ast (loop #'r))
+         (syntaxed stx FunT p-ast-lst r-ast))]
+      [id
+       (identifier? #'id)
+       (syntaxed stx NameT #'id)]
+      [_
+       (raise-language-error
+        #f "illegal type expression"
+        t-e stx)])))
   
-  (syntax-parse anno-stx
-    ((_ ((~datum fn) p-type ... r-type))
-     (syntaxed (cdr (syntax-e anno-stx))
-               FunT (map parse-name (syntax->list #'(p-type ...)))
-               (parse-name #'r-type)))
-    ((_ name:id)
-     (parse-name #'name))))
+(define (parse-anno-value anno-stx kind dat-stx)
+  (case kind
+    [(type) 
+     (syntaxed anno-stx TypeAnno (parse-type-expr dat-stx))]
+    [else 
+     ;;(writeln dat-stx)
+     (kernel-syntax-case/phase dat-stx 0
+       [(quote dat)
+        (syntaxed anno-stx GenericAnno kind (syntax->datum #'dat))]
+       [(quote-syntax stx)
+        (syntaxed anno-stx GenericAnno kind #'stx)]
+       [_
+        (raise-language-error
+         #f "unsupported data in generic annotation"
+         anno-stx dat-stx)])]))
+    
+(define (parse-anno-expr let-stx anno-stx)
+  (kernel-syntax-case*/phase anno-stx 0 (#%magnolisp)
+    [(#%plain-app #%magnolisp (quote a) (quote k) dat)
+     (and (eq? 'anno (syntax-e #'a)) (identifier? #'k))
+     (let ((kind (syntax-e #'k)))
+       (parse-anno-value anno-stx (syntax-e #'k) #'dat))]
+    [_
+     (raise-language-error
+      #f "illegal syntax in annotation expression context"
+      let-stx anno-stx)]))
 
 ;;; 
 ;;; parsing
@@ -80,8 +97,8 @@
 
 ;; Returns top-level defs in module.
 (define-with-contract*
-  (-> syntax? immutable-id-table? immutable-id-table?)
-  (parse-defs-from-module modbeg-stx annos)
+  (-> syntax? immutable-id-table?)
+  (parse-defs-from-module modbeg-stx)
 
   (define defs-in-mod (make-immutable-free-id-table #:phase 0))
 
@@ -100,31 +117,17 @@
     (when-let old-def (get-def-in-mod id)
               (redefinition id old-def new-stx)))
 
-  ;; Looks up annotations (from annotation table) for declaration
-  ;; 'stx' (binding 'id-stx'). Returns AST node annotations as a
-  ;; (hash/c symbol? any/c).
+  ;; Returns initial annotations for definition 'stx' (binding
+  ;; 'id-stx'). Returns AST node annotations as a (hash/c symbol?
+  ;; any/c).
   (define (mk-annos stx id-stx)
-    (define ann-h (dict-ref annos id-stx #hasheq()))
-    ;;(writeln `(raw annos for ,(syntax-e id-stx) are ,@(apply append (for/list (((k v) ann-h)) `(,k = ,v)))))
-    (set! ann-h (hash-set ann-h 'stx stx))
-    (set! ann-h (hash-remove ann-h 'type))
-    ;;(writeln `(parsed annos for ,(syntax-e id-stx) are ,@(apply append (for/list (((k v) ann-h)) `(,k = ,v)))))
-    ann-h)
-
-  (define (lookup-type id-stx)
-    (define (f)
-      (define anno-h (dict-ref annos id-stx #f))
-      (and anno-h
-           (let ((type-stx (hash-ref anno-h 'type #f)))
-             (and type-stx
-                  (parse-type type-stx)))))
-    (or (f) the-AnyT))
+    (hasheq 'stx stx))
 
   (define (make-DefVar stx id-stx e-stx #:top? [top? #f])
     (check-redefinition id-stx stx)
     (define ast (parse-expr e-stx))
     (define ann-h (mk-annos stx id-stx))
-    (define t (lookup-type id-stx))
+    (define t the-AnyT)
     (define def (DefVar ann-h id-stx t ast))
     (when top?
       (set-def-in-mod! id-stx def))
@@ -468,6 +471,15 @@
           (map
            parse-expr
            (syntax->list #'a-expr)))))
+      
+      ((let-values ([(id) a] ...) e)
+       (syntax-property stx 'annotate)
+       (let ()
+         (define a-stx-lst (syntax->list #'(a ...)))
+         (define a-ast-lst (for/list ((a-stx a-stx-lst))
+                             (parse-anno-expr stx a-stx)))
+         (define e-ast (parse-expr #'e))
+         (syntaxed stx AnnoExpr a-ast-lst e-ast)))
 
       ((let-values binds e)
        (parse-let-expr stx (car (syntax-e stx)) #'binds #'e))

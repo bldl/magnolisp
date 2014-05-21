@@ -3,14 +3,10 @@
 (typedef int #an(foreign))
 (typedef long #an(foreign))
 
-(function (h)
-  5)
+(function (h) #an(export ^(fn long))
+  #ap(^long) 5)
 
-(function (g)
+(function (g) #an(export)
   (let-var x (h) x))
 
 (g)
-
-(anno! g export)
-(anno! h ^(fn long))
-(anno! h export)

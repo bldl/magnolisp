@@ -20,6 +20,7 @@ It is rather important for all Ast derived node types to be
 ;;; 
 
 (define-view* Ast #:fields (annos))
+(define-view* Anno #:fields ())
 (define-view* Type #:fields ())
 (define-view* Def #:fields (id))
 
@@ -31,6 +32,10 @@ It is rather important for all Ast derived node types to be
   (let ((a (Ast-annos v)))
     (let ((v (begin b ...)))
       (set-Ast-annos v a))))
+
+(define* (modify-ast-annos ast f)
+  (let ((a (Ast-annos ast)))
+    (set-Ast-annos ast (f a))))
 
 (define* (ast-anno-set ast k v)
   (define annos (Ast-annos ast))
@@ -212,8 +217,10 @@ It is rather important for all Ast derived node types to be
 (define-ast* FunT (Ast Type) ((no-term annos)
                               (list-of-term ats) (just-term rt)))
 
-;; C++ only;
-;; 'id' is an ID
+;; 'id' is an identifier
+(define-ast* ForeignNameT (Ast Type) ((no-term annos) (no-term id)))
+
+;; 'id' is a symbol
 (define-ast* CxxNameT (Ast Type) ((no-term annos) (no-term id)))
 
 ;; C++ only
@@ -221,6 +228,22 @@ It is rather important for all Ast derived node types to be
 
 ;; C++ only
 (define-ast* RefT (Ast Type) ((no-term annos) (just-term t)))
+
+;;; 
+;;; annotations
+;;; 
+
+;; An expression that annotates expression 'e' with annotations 'as'.
+(define-ast* AnnoExpr (Ast) ((no-term annos) (list-of-term as)
+                             (just-term e)))
+
+;; 't' is a type expression
+(define-ast* TypeAnno (Ast Anno) ((no-term annos) (just-term t)))
+
+;; 'kind' is a symbol naming the annotation type, whereas 'datum' is
+;; its (parsed) value
+(define-ast* GenericAnno (Ast Anno) ((no-term annos) (no-term kind)
+                                     (no-term datum)))
 
 ;;; 
 ;;; definitions
@@ -246,9 +269,9 @@ It is rather important for all Ast derived node types to be
 ;; 't' is a Magnolisp type expression.
 (define-ast* TypeAlias (Ast Def) ((no-term annos) (no-term id) (just-term t)))
 
-;; 'cxx-t' is a C++ type expression.
+;; 'frg-t' is a foreign type expression.
 (define-ast* ForeignTypeDecl (Ast Def) ((no-term annos) (no-term id)
-                                        (just-term cxx-t)))
+                                        (just-term frg-t)))
 
 ;;; 
 ;;; other Magnolisp
@@ -378,9 +401,9 @@ It is rather important for all Ast derived node types to be
 
 (define* (ast-rw-Ids rw-id ast)
   (define (rw-annos annos)
-    (define type-ast (hash-ref annos 'type-ast #f))
-    (and type-ast
-         (hash-set annos 'type-ast (rw type-ast))))
+    (define type (hash-ref annos 'type #f))
+    (and type
+         (hash-set annos 'type (rw type))))
 
   (define (ast-rw-annos ast)
     (define annos (rw-annos (Ast-annos ast)))

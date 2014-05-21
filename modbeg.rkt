@@ -2,11 +2,6 @@
 
 #|
 
-We have some options for preserving type information, but we opt for
-having the expansion itself generate a table as well as code to
-persist the type information. It is notable that an id-table can be
-used even for local names, since identifiers are unique.
-
 Whatever we export should also have some location information, so we
 do our best to preserve this information for any syntax objects we
 include in our metadata. Should we discover errors only once we start
@@ -23,8 +18,7 @@ same variables at the same phase level).
 
 (provide module-begin)
 
-(require "annos-store.rkt"
-         (for-syntax
+(require (for-syntax
           racket/base racket/dict racket/list racket/pretty
           syntax/id-table syntax/modresolve syntax/quote
           "app-util.rkt" "ast-magnolisp.rkt" "ast-serialize.rkt"
@@ -51,12 +45,10 @@ same variables at the same phase level).
                "cannot determine module path for ~s"
                orig-mb-id)])]))
        
-  (define annos (get-stored-definfo))
-  ;;(pretty-print (dict->list annos))
   ;;(pretty-print (syntax->datum modbeg-stx))
   ;;(pretty-print (syntax->datum/binding modbeg-stx #:conv-id id->datum/phase))
   (define defs
-    (parse-defs-from-module modbeg-stx annos))
+    (parse-defs-from-module modbeg-stx))
   ;;(pretty-print defs) (exit)
   ;;(pretty-print (map (lambda (def) (cons def (ast-anno-maybe def 'export))) (dict-values defs)))
 

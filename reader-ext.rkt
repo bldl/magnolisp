@@ -28,6 +28,7 @@ T), where 'T' can be any type expression.
 ;; We do not need and should not have any enrichment while reading
 ;; syntax.
 (define anno-id-stx (strip-context #'anno))
+(define type-id-stx (strip-context #'type))
 
 ;;; 
 ;;; type annotations
@@ -49,7 +50,7 @@ T), where 'T' can be any type expression.
           (format "expected type expression to follow ^ (got: ~s)" t)
           src line col pos #f))
          (quasisyntax/loc (make-loc-stx src line col pos)
-           (type (unsyntax t)))))))
+           ((unsyntax type-id-stx) (unsyntax t)))))))
 
 ;;; 
 ;;; #a annotations

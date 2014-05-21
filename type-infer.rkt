@@ -300,7 +300,7 @@
 ;; environment. The input may contain AnyT values, long as their
 ;; meaning can be inferred. Returns a fully typed program, with
 ;; definitions having resolved type fields (where appropriate), and
-;; expressions having resolved 'type-ast' annotations.
+;; expressions having resolved 'type' annotations.
 (define-with-contract*
   (-> Id? hash? hash?)
   (defs-type-infer predicate-id defs)
@@ -512,7 +512,7 @@
         'ti-expr "supported Ast?" ast))))
 
   (set! defs (defs-add-VarT defs))
-  ;;(defs-dump defs '(type-ast))
+  ;;(defs-dump defs '(type))
 
   (for (((id def) (in-dict defs)))
     (ti-def def))

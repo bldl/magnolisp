@@ -17,64 +17,107 @@ optimization.
 
 |#
 
-(require "annos-parse.rkt" "app-util.rkt"
-         "ast-magnolisp.rkt" "ast-util.rkt"
+(require "app-util.rkt" "ast-magnolisp.rkt" "ast-util.rkt"
          "compiler-rewrites.rkt" "parse.rkt" "strategy.rkt"
          "util.rkt" "util/struct.rkt"
          syntax/moddep)
 
 ;;; 
-;;; annotation parsing
+;;; AnnoExpr removal
 ;;; 
 
-(define (Def-parse-annos def) ;; Def? -> (values Def? hash?)
-  (define ann-h (Ast-annos def))
-  (define id (Def-id def))
+(define (Anno-kind+value ast)
+  (cond
+   ((TypeAnno? ast) (values 'type (TypeAnno-t ast)))
+   ((GenericAnno? ast) (values (GenericAnno-kind ast) (GenericAnno-datum ast)))
+   (else (raise-argument-error 
+          'Anno-kind+value
+          "supported Anno object" ast))))
 
+(define (Anno-ast-lst->h as)
+  (for/hasheq ([anno-ast as])
+    (Anno-kind+value anno-ast)))
+
+(define (Def-process-annos ast)
+  (define ann-h (Ast-annos ast))
+  (define id (Def-id ast))
+  
   (define (put! n v)
     (set! ann-h (hash-set ann-h n v)))
 
   (put! 'top #t)
   
-  (define foreign
-    (let* ((stx (hash-ref ann-h 'foreign #f))
-           (parsed-v
-            (match def
-              [(DefVar a id _ (ForeignTypeExpr _))
-               (define cxx-t (and stx (parse-cxx-type id stx)))
-               (unless cxx-t
-                 (raise-language-error/ast
-                  "missing 'foreign' C++ type annotation"
-                  def))
-               (set! def (ForeignTypeDecl a id cxx-t))
-               cxx-t]
-              [_
-               (and stx (parse-cxx-name-anno stx))])))
-      (when parsed-v
-        (put! 'foreign parsed-v))
-      parsed-v))
+  ;;(pretty-print ann-h)
+  (define foreign (hash-ref ann-h 'foreign #f))
+  (define export (hash-ref ann-h 'export #f))
 
-  (define export
-    (let-and stx (hash-ref ann-h 'export #f)
-      (put! 'export
-            (let-and export-name (parse-cxx-name-anno stx)
-              export-name)))) ;; (or/c identifier? boolean?)
+  (match ast
+    [(DefVar a id _ (ForeignTypeExpr _))
+     (unless foreign
+       (raise-language-error/ast
+        "missing 'foreign' C++ type annotation"
+        ast))
+     ;;(writeln `(foreign ,foreign))
+     (let ((foreign
+            (cond
+             ((equal? #t foreign)
+              (annoless ForeignNameT (datum->syntax #f (Id-name id))))
+             ((identifier? foreign)
+              (syntaxed foreign ForeignNameT foreign))
+             (else
+              (error 'Def-process-annos
+                     "unexpected 'foreign anno ~s" foreign)))))
+       (set! ast (ForeignTypeDecl a id foreign)))]
+    [_ (void)])
   
   (when (and foreign export)
     (raise-language-error/ast
      (format "definition ~a marked both as 'export' and 'foreign'"
              (ast-displayable/datum id))
-     def))
+     ast))
+  
+  (set-Ast-annos ast ann-h))
 
-  (values def ann-h))
+(define-with-contract
+  (-> Def? Def?)
+  (Def-rm-AnnoExpr def)
+  
+  (define rw-merge
+    (topdown
+     (repeat
+      (lambda (ast)
+        (match ast
+          [(AnnoExpr a as-1 (AnnoExpr _ as-2 e))
+           (AnnoExpr a (hash-merge-2 as-2 as-1) e)]
+          [_ #f])))))
+  
+  (define rw-incorporate
+    (topdown
+     (repeat
+      (lambda (ast)
+        ;;(when (DefVar? ast) (writeln ast))
+        (match ast
+          [(DefVar a id t (AnnoExpr _ as e))
+           (define ann-h (Anno-ast-lst->h as))
+           (set! a (hash-merge-2 a ann-h))
+           (when-let n-t (hash-ref a 'type #f)
+             (set! a (hash-remove a 'type))
+             (set! t n-t))
+           (DefVar a id t e)]
+          [(AnnoExpr _ as e)
+           ;;(writeln `(bare AnnoExpr seen ,ast))
+           (define ann-h (Anno-ast-lst->h as))
+           (modify-ast-annos e (lambda (h) (hash-merge-2 h ann-h)))]
+          [_ #f])))))
+  
+  (rw-incorporate (rw-merge def)))
 
-(define (parse-compiler-annos mods)
+(define (mods-rm-AnnoExpr mods)
   (for/hasheq ([(rr-mp mod) mods])
     (define def-lst (Mod-def-lst mod))
     (set! def-lst
           (for/list ([def def-lst])
-            (define-values (n-def annos) (Def-parse-annos def))
-            (set-Ast-annos n-def annos)))
+            (Def-process-annos (Def-rm-AnnoExpr def))))
     (values rr-mp (struct-copy Mod mod [def-lst def-lst]))))
 
 ;;;
@@ -169,13 +212,12 @@ optimization.
     (lambda (ast)
       (match ast
         ;; Simple case. Just retain expression 'v'.
-        [(LetExpr _ (DefVar a1 bn t v) (Var _ rn))
+        [(LetExpr _ (DefVar a1 bn t v) (Var a2 rn))
          #:when (ast-identifier=? bn rn)
-         (define a2 (Ast-annos v))
-         (define a (hash-merge a1 a2))
-         (when (Literal? v)
-           (set! a (hash-set a 'type-ast t)))
-         (define n-ast (set-Ast-annos v a))
+         (define h (hash-merge a2 a1 (Ast-annos v)))
+         (unless (AnyT? t)
+           (set! h (hash-set h 'type t)))
+         (define n-ast (set-Ast-annos v h))
          ;;(writeln (list n-ast (Ast-annos n-ast)))
          n-ast]
         ;; Complex case. Turn LetExpr into a BlockExpr + LetStat.
@@ -291,12 +333,18 @@ optimization.
   (def-all-used-id-binds def)
   
   (define binds (mutable-seteq)) ;; (set/c bind)
-  ((topdown-visit
-    (lambda (ast)
-      (define id (name-ref-id/maybe ast))
-      (when id
-        (set-add! binds (Id-bind id)))))
-   def)
+
+  (define rw
+    (topdown-visit
+     (lambda (ast)
+       (define id (name-ref-id/maybe ast))
+       (when id
+         (set-add! binds (Id-bind id)))
+       (when (ast-expr? ast)
+         (when-let t (expr-get-type ast)
+           (rw t))))))
+  
+  (rw def)
   (set->list binds))
 
 ;; Drops all top-level definitions in 'tl-def-lst' that are not used
@@ -424,6 +472,7 @@ optimization.
 
   ;;(writeln `(eps-in-prog ,eps-in-prog))
   ;;(writeln `(loaded mods ,(hash-keys mods)))
+  ;;(pretty-print `(loaded modules ,mods)) (exit)
   
   ;; Make note of interesting prelude definitions (if it is even a
   ;; dependency).
@@ -446,7 +495,8 @@ optimization.
 
   ;;(writeln (list predicate-id TRUE-id FALSE-id))
 
-  (set! mods (parse-compiler-annos mods))
+  (set! mods (mods-rm-AnnoExpr mods))
+  ;;(pretty-print mods) (exit)
   (define-values (all-defs eps-in-prog) (merge-defs mods))
   ;;(pretty-print all-defs) (exit)
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
@@ -550,7 +600,7 @@ optimization.
 ;;; 
 
 (module* test #f
-  (define st (compile-files "tests/test-names-3.rkt"))
+  (define st (compile-files "tests/test-type-infer-5.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))
                        (cxx (cc hh))

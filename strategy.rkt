@@ -261,6 +261,10 @@ Meta-Compilation of Language Abstractions (2006).
   (rec again s
        (seq-visit (all-visit again) s)))
 
+(define* outermost
+  (rec again s
+       (topdown (try (seq s again)))))
+
 (define* innermost
   (rec again s
        (bottomup (try (seq s again)))))

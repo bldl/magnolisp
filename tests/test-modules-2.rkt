@@ -8,7 +8,7 @@
   (+ x y z))
 
 (function (g x)
-  (#:annos ^(fn Int Int) export (build use-g))
+  (#:annos ^(fn Int Int) export [build use-g])
   (add-prim x (h) (seven)))
 
 (function (private-f x y z)
@@ -16,20 +16,17 @@
 
 (define-values () (values)) ;; okay, ignored
 
-;; type annos do not currently work here, though
-(define-values (f-1 f-2) ;; okay, exactly three values
-  (values (lambda (x) x)
-          (lambda () 2)))
-(anno! f-1 ^(fn Int Int))
-(anno! f-2 ^(fn Int))
+(define-values (f-1 f-2) ;; okay, exactly two values
+  (values #ap(^(fn Int Int)) (lambda (x) x)
+          #ap(^(fn Int)) (lambda () 2)))
 
 (function (use-fs)
   (#:annos export
-           (build x y (fal #f) (+= both #t #f)
+           [build x y (fal #f) (+= both #t #f)
                   (x-h (#:hex #xff)) ;;(+= mixed-bad 1 "2")
                   (z 1) (+= w "a" "b") ;;(bad a^)
                   (v x) (+= ww a b c d e f g h)
-                  (v x)))
+                  (v x)])
   (f-1 (f-2)))
 
 (require (rename-in "lib-modules-2.rkt" [six h]))

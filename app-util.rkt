@@ -12,6 +12,10 @@ compiler.
          racket/list racket/pretty
          syntax/id-table syntax/stx)
 
+;;; 
+;;; gensym
+;;; 
+
 (define* (next-gensym r sym)
   (define num (hash-ref r sym 0))
   (define n-sym
@@ -22,8 +26,9 @@ compiler.
                         (number->string num)))))
   (values (hash-set r sym (+ num 1)) n-sym))
 
-(define-syntax-rule* (unsupported v ...)
-  (error "unsupported" v ...))
+;;; 
+;;; identifier tables
+;;; 
 
 (define* (id-table? x)
   (or (free-id-table? x)
@@ -32,6 +37,22 @@ compiler.
 (define* (immutable-id-table? x)
   (or (immutable-free-id-table? x)
       (immutable-bound-id-table? x)))
+
+;;; 
+;;; debugging utilities
+;;; 
+
+(define* (show-matches-in-id-table id-stx d)
+  (writeln
+   (cons
+    `(looking-for ,(syntax-e id-stx))
+    (dict-map
+     d
+     (lambda (k v)
+       (cond
+        ((bound-identifier=? k id-stx 0) `(bound ,(syntax-e k)))
+        ((free-identifier=? k id-stx 0 0) `(free ,(syntax-e k)))
+        (else #f)))))))
 
 ;; E.g.
 ;; (let* ((x 1)
@@ -162,6 +183,36 @@ compiler.
       (error 'syntax->datum/binding "unsupported: ~s" x))))
   (f stx))
 
+(define* (print-with-select-syntax-properties props stx)
+  (define (props-for stx)
+    (define lst
+      (for/list ((prop props))
+        (define v (syntax-property stx prop))
+        (and v `(,prop = ,v))))
+    (filter identity lst))
+
+  (define (print-for stx)
+    (define vs (props-for stx))
+    (unless (null? vs)
+      (writeln `(PROPS ,@vs PRESENT IN ,stx))))
+  
+  (define (f stx)
+    (define lst (syntax->list stx))
+    (cond
+     (lst (print-for stx)
+          (for-each f lst))
+     (else (print-for stx))))
+
+  (pretty-print (syntax->datum stx))
+  (f stx))
+
+;;; 
+;;; error reporting
+;;; 
+
+(define-syntax-rule* (unsupported v ...)
+  (error "unsupported" v ...))
+
 (define-with-contract*
   (-> syntax? (or/c symbol? #f))
   (form-get-name stx)
@@ -227,80 +278,3 @@ compiler.
          #:constructor (lambda (s cs)
                          (exn:fail:language s cs exprs))))
 
-;;; 
-;;; C++ identifiers
-;;; 
-
-(define* (string-cxx-id? s)
-  (not (or (regexp-match? #rx"^[^a-zA-Z_]" s)
-           (regexp-match? #rx"[^a-zA-Z0-9_]" s)
-           (= (string-length s) 0))))
-
-(define (translate-id-string s)
-  (when-let r (regexp-match #rx"^(.*)[?]$" s)
-    (set! s (string-append "is_" (second r))))
-  (when-let r (regexp-match #rx"^(.*)[=]$" s)
-    (set! s (string-append (second r) "_equal")))
-  (set! s (regexp-replace* #rx"->" s "_to_"))
-  s)  
-
-(define* (string->maybe-cxx-id s)
-  (set! s (translate-id-string s))
-  (set! s (regexp-replace #rx"[!?=]+$" s ""))
-  (set! s (string-underscorify s))
-  (and (string-cxx-id? s) s))
-
-(define* (string->exported-cxx-id o-s)
-  (define s (string->maybe-cxx-id o-s))
-  (unless s
-    (error
-     'string->exported-cxx-id
-     "illegal name for a C++ export: ~s" o-s))
-  s)
-
-(define* (string->internal-cxx-id s #:default [default #f])
-  (set! s (string-underscorify s))
-  (set! s (regexp-replace #rx"^[^a-zA-Z_]+" s ""))
-  (set! s (translate-id-string s))
-  (set! s (regexp-replace* #rx"[^a-zA-Z0-9_]+" s ""))
-  (if (and default (= (string-length s) 0))
-      default s))
-
-;;; 
-;;; debugging utilities
-;;; 
-
-(define* (show-matches-in-id-table id-stx d)
-  (writeln
-   (cons
-    `(looking-for ,(syntax-e id-stx))
-    (dict-map
-     d
-     (lambda (k v)
-       (cond
-        ((bound-identifier=? k id-stx 0) `(bound ,(syntax-e k)))
-        ((free-identifier=? k id-stx 0 0) `(free ,(syntax-e k)))
-        (else #f)))))))
-
-(define* (print-with-select-syntax-properties props stx)
-  (define (props-for stx)
-    (define lst
-      (for/list ((prop props))
-        (define v (syntax-property stx prop))
-        (and v `(,prop = ,v))))
-    (filter identity lst))
-
-  (define (print-for stx)
-    (define vs (props-for stx))
-    (unless (null? vs)
-      (writeln `(PROPS ,@vs PRESENT IN ,stx))))
-  
-  (define (f stx)
-    (define lst (syntax->list stx))
-    (cond
-     (lst (print-for stx)
-          (for-each f lst))
-     (else (print-for stx))))
-
-  (pretty-print (syntax->datum stx))
-  (f stx))
