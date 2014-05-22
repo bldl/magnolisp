@@ -600,7 +600,7 @@ optimization.
 ;;; 
 
 (module* test #f
-  (define st (compile-files "tests/test-packages-3.rkt"))
+  (define st (compile-files "tests/test-simple-1.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))
                        (cxx (cc hh))

@@ -49,7 +49,7 @@
 (define (parse-type-expr t-e)
   (let loop ([stx t-e])
     (kernel-syntax-case*/phase stx 0 (#%magnolisp)
-      [(#%plain-app #%magnolisp (quote f) p ... r)
+      [(if _ (#%plain-app #%magnolisp (quote f) p ... r) _)
        (eq? 'fn (syntax-e #'f))
        (let ()
          (define p-stx-lst (syntax->list #'(p ...)))
@@ -82,7 +82,7 @@
     
 (define (parse-anno-expr let-stx anno-stx)
   (kernel-syntax-case*/phase anno-stx 0 (#%magnolisp)
-    [(#%plain-app #%magnolisp (quote a) (quote k) dat)
+    [(if _ (#%plain-app #%magnolisp (quote a) (quote k) dat) _)
      (and (eq? 'anno (syntax-e #'a)) (identifier? #'k))
      (let ((kind (syntax-e #'k)))
        (parse-anno-value anno-stx (syntax-e #'k) #'dat))]
@@ -440,16 +440,16 @@
          (define e-ast (parse-expr e-stx))
          (syntaxed stx Lambda par-ast-lst e-ast)))
       
+      ((if _ (#%plain-app #%magnolisp (quote k)) aa)
+       (eq? 'foreign-type (syntax-e #'k))
+       (syntaxed stx ForeignTypeExpr))
+      
       ((if c t e)
        (syntaxed stx IfExpr
                  (parse-expr #'c)
                  (parse-expr #'t)
                  (parse-expr #'e)))
 
-      ((#%plain-app #%magnolisp (quote k))
-       (eq? 'foreign-type (syntax-e #'k))
-       (syntaxed stx ForeignTypeExpr))
-      
       ((#%plain-app call/ec
         (#%plain-lambda (k) b ...))
        (syntax-property stx 'local-ec)

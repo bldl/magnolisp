@@ -22,36 +22,41 @@ enough to be easily analyzable, and compilable to C++.
     (undefined)))
 
 ;; Yes we are providing this. If the programmer wants to hack our core
-;; language, they may. The idea is to express core language as
-;; (#%magnolisp 'pass) or (#%magnolisp 'call p) or such.
+;; language, they may.
 (define* #%magnolisp (lambda args undefined))
+
+;; If is not okay to use `(and #f ...)` here, as `and` may insert an
+;; `#%expression` form in the middle, which our parser does not
+;; recognize as the particular core syntax.
+(define-syntax-rule (CORE kind rest ...)
+  (if #f (#%magnolisp kind rest ...) #f))
 
 ;; Function type expression.
 (define-syntax-rule* (fn at ... rt)
-  (#%magnolisp 'fn at ... rt))
+  (CORE 'fn at ... rt))
 
 ;; Type annotation.
 (define-syntax-rule* (type t)
-  (#%magnolisp 'anno 'type t))
+  (CORE 'anno 'type t))
 
 (define-syntax* (export stx)
   (syntax-parse stx
     [_:id
-     #'(#%magnolisp 'anno 'export #t)]
+     #'(CORE 'anno 'export #t)]
     [(_ name:id)
-     #'(#%magnolisp 'anno 'export #'name)]))
+     #'(CORE 'anno 'export #'name)]))
 
 (define-syntax* (foreign stx)
   (syntax-parse stx
     [_:id
-     #'(#%magnolisp 'anno 'foreign #t)]
+     #'(CORE 'anno 'foreign #t)]
     [(_ name:id)
-     #'(#%magnolisp 'anno 'foreign #'name)]))
+     #'(CORE 'anno 'foreign #'name)]))
 
 (define-syntax* (build stx)
   (syntax-case stx ()
     [(_ x ...)
-     #`(#%magnolisp 'anno 'build (quote-syntax #,stx))]))
+     #`(CORE 'anno 'build (quote-syntax #,stx))]))
 
 (define-syntax* (let/annotate stx)
   (syntax-case stx ()
@@ -127,7 +132,7 @@ enough to be easily analyzable, and compilable to C++.
     [(_ t (a ...))
      (define t 
        (let/annotate (a ...)
-         (#%magnolisp 'foreign-type)))]))
+         (CORE 'foreign-type)))]))
 
 (define-annos-wrapper* typedef)
 
