@@ -10,9 +10,9 @@ A library of built-in types and functions in Magnolisp.
 
 (provide predicate TRUE FALSE true false)
 
-(typedef predicate (#:annos (foreign mgl_predicate)))
-(function (TRUE) (#:annos (type (fn predicate)) (foreign mgl_TRUE)) #t)
-(function (FALSE) (#:annos (type (fn predicate)) (foreign mgl_FALSE)) #f)
+(typedef predicate (#:annos [foreign mgl_predicate]))
+(function (TRUE) (#:annos [foreign mgl_TRUE] [type (fn predicate)]) #t)
+(function (FALSE) (#:annos [foreign mgl_FALSE] [type (fn predicate)]) #f)
 
 (define-syntax true
   (syntax-id-rules ()

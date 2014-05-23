@@ -14,16 +14,9 @@ enough to be easily analyzable, and compilable to C++.
          (for-syntax "app-util.rkt" "util.rkt"
                      racket/base racket/syntax syntax/parse)) 
 
-;; A value not meant to be referenced. (Starting from Racket v6.0.1,
-;; cannot use #<undefined>.)
-(define undefined
-  (let ()
-    (struct undefined ())
-    (undefined)))
-
 ;; Yes we are providing this. If the programmer wants to hack our core
 ;; language, they may.
-(define* #%magnolisp (lambda args undefined))
+(define* #%magnolisp #f)
 
 ;; If is not okay to use `(and #f ...)` here, as `and` may insert an
 ;; `#%expression` form in the middle, which our parser does not
