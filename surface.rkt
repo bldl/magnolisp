@@ -116,12 +116,10 @@ enough to be easily analyzable, and compilable to C++.
   (lit-of t d)
   (let/annotate ([type t]) d))
 
-(define-syntax typedef-impl
-  (syntax-rules ()
-    [(_ t (a ...))
-     (define t 
-       (let/annotate (a ...)
-         (CORE 'foreign-type)))]))
+(define-syntax-rule (typedef-impl t (a ...))
+  (define t 
+    (let/annotate (a ...)
+      (CORE 'foreign-type))))
 
 (define-annos-wrapper* typedef)
 
