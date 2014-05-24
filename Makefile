@@ -1,3 +1,5 @@
+PROJ_NAME := magnolisp
+
 default : setup
 
 -include local.mk
@@ -57,7 +59,7 @@ pkg :
 
 website-local :
 
-website : rm-dist pdf pkg website-local
+website : rm-dist html-doc pdf pkg website-local
 	chmod -R a+rX $(DIST_HOME)
 
 setup :
