@@ -54,14 +54,10 @@ enough to be easily analyzable, and compilable to C++.
 (define-syntax* (let/annotate stx)
   (syntax-case stx ()
     [(_ (a ...) e)
-     (let ()
-       (define a-lst (syntax->list #'(a ...)))
-       (define id-lst (map (lambda (a) (generate-temporary 'dummy)) a-lst))
-       (define n-stx 
-         (with-syntax ([(id ...) id-lst])
-           (syntax/loc stx
-             (let-values ([(id) a] ...) e))))
-       (syntax-property n-stx 'annotate #t))]))
+     (syntax-property 
+      (syntax/loc stx
+        (let-values ([() (begin a (values))] ...) e))
+      'annotate #t)]))
 
 ;; A form that annotates not an identifier, but any expression. The
 ;; annotations are stored as expressions in a `let` wrapper.

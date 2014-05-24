@@ -472,7 +472,7 @@
            parse-expr
            (syntax->list #'a-expr)))))
       
-      ((let-values ([(id) a] ...) e)
+      ((let-values ([() (begin a (#%plain-app values))] ...) e)
        (syntax-property stx 'annotate)
        (let ()
          (define a-stx-lst (syntax->list #'(a ...)))
