@@ -9,12 +9,13 @@ Utilities for authoring manual.scrbl.
 (require "util.rkt" scribble/manual)
 
 (begin ;; trick from Racket docs
-  (define-syntax-rule (bind id-1 id-2)
+  (define-syntax-rule (bind id-1 id-2 id-3)
     (begin
       (require (for-label racket/base))
       (define* id-1 (racket do))
-      (define* id-2 (racket #%module-begin))))
-  (bind racket-do racket-module-begin))
+      (define* id-2 (racket #%module-begin))
+      (define* id-3 (racket if))))
+  (bind racket-do racket-module-begin racket-if))
 
 (define* (warning . str)
   (list "(" (italic "Warning: ") str ")"))
@@ -37,13 +38,32 @@ Utilities for authoring manual.scrbl.
 (define-subscript-var* ign-nt "ign")
 (define-subscript-var* rkt-ign-nt "rkt,ign")
 
+(define-syntax-rule* (ign form)
+  (elem form (subscript "ign")))
+
 (define-syntax* (indirect-id stx)
   (syntax-case stx ()
     ((_ id)
      #`(elem (racket id)
              (subscript (italic "id-expr"))))))
 
-(define-syntax* (stxprop-flag stx)
+(define-syntax (flag stx)
   (syntax-case stx ()
-    ((_ flag)
-     #`(subscript (racket '#,(syntax->datum #'flag) ≠ #f)))))
+    ((_ id)
+     #`(racket '#,(syntax->datum #'id) ≠ #f))))
+
+(define-syntax (sub-flag stx)
+  (syntax-case stx ()
+    ((_ id)
+     #`(subscript (flag id)))))
+
+(define-syntax-rule* (ign-flag name form)
+  (elem form (subscript (elem (flag name) ",ign"))))
+
+(define-syntax-rule* 
+  (flagged flag form)
+  (elem form (sub-flag flag)))
+
+(define-syntax-rule*
+  (harnessed form)
+  (racket (#,racket-if #,(ign-nt Racket-expr) form #,(ign-nt Racket-expr))))
