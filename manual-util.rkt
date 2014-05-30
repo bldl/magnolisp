@@ -52,7 +52,7 @@ Utilities for authoring manual.scrbl.
     ((_ id)
      #`(racket '#,(syntax->datum #'id) ≠ #f))))
 
-(define-syntax (sub-flag stx)
+(define-syntax* (sub-flag stx)
   (syntax-case stx ()
     ((_ id)
      #`(subscript (flag id)))))

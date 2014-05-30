@@ -283,7 +283,7 @@ For example:
 
 As far as the Magnolisp compiler is concerned, a Magnolisp program is fully expanded if it conforms to the following grammar.
 
-A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-terminal @racket[_nt] in the ``Fully Expanded Programs'' section of the Racket Reference. A form @(elem (racket _form) (subscript "ign")) denotes language that is ignored by the Magnolisp compiler, but which may be useful when evaluating as Racket. A form @(elem (racket _form) (subscript (racket _property ≠ #f))) means the form @racket[_form] whose syntax object has the property named @racket[_property] set to a true value. Anything of the form @(indirect-id _id) is actually a non-terminal like @racketvarfont{id-expr}, but for the specific identifier @racketvarfont{id}.
+A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-terminal @racket[_nt] in the ``Fully Expanded Programs'' section of the Racket Reference. A form @(elem (racket _form) (subscript "ign")) denotes language that is ignored by the Magnolisp compiler, but which may be useful when evaluating as Racket. A form @(elem (racket _form) (subscript (racket _property ≠ #f))) means the form @racket[_form] whose syntax object has the property named @racket[_property] set to a true value. Form @(elem (racket (_sub-form ...)) (subscript (racket _property ≠ #f))) is alternatively written as @(racket (#,(subscript (racket _property ≠ #f)) _sub-form ...)). Anything of the form @(indirect-id _id) is actually a non-terminal like @racketvarfont{id-expr}, but for the specific identifier @racketvarfont{id}.
 
 @racketgrammar*[
 #:literals (begin begin-for-syntax call/ec define-values define-syntaxes if let-values letrec-values letrec-syntaxes+values quote set! values void #%expression #%magnolisp #%plain-app #%plain-lambda #%provide #%require #%top)
@@ -308,11 +308,11 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
               (#%plain-app #%magnolisp (quote foreign-type))
               #,(ign-nt Racket-expr))
 	  (if mgl-expr mgl-expr mgl-expr)
-          #,(flagged annotate (racket 
-              (let-values ([() (begin mgl-anno-expr 
-                                      (#%plain-app values))] 
-                           ...) 
-                mgl-expr)))
+	  (#,(sub-flag annotate) 
+           let-values ([() (begin mgl-anno-expr 
+                                  (#%plain-app values))] 
+                       ...) 
+             mgl-expr)
 	  (let-values () mgl-expr)
 	  (letrec-values () mgl-expr)
 	  (letrec-syntaxes+values
@@ -331,14 +331,19 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
           (#%top . id)
           (#%expression mgl-expr)
           in-racket-form]
-[local-ec-expr #,(flagged local-ec (racket (#%plain-app #,(indirect-id call/ec) (#%plain-lambda (id) stat ...))))]
+[local-ec-expr (#,(sub-flag local-ec) #%plain-app #,(indirect-id call/ec) 
+                (#%plain-lambda (id) stat ...))]
 [mgl-anno-expr #,(harnessed anno-expr)]
-[anno-expr (#%plain-app #%magnolisp (quote anno) (quote type) type-expr)
-           (#%plain-app #%magnolisp (quote anno) (#,(racket quote) id) anno-val-expr)]
+[anno-expr (#%plain-app #%magnolisp (quote anno) 
+            (quote type) type-expr)
+           (#%plain-app #%magnolisp (quote anno) 
+            (#,(racket quote) id) anno-val-expr)]
 [anno-val-expr #,(racket (#,(racket quote) _datum))
                #,(racket (#,(racket quote-syntax) _datum))]
 [type-expr id fn-type-expr]
-[fn-type-expr #,(harnessed (#%plain-app #%magnolisp 'fn type-expr ...+))]
+[fn-type-expr (if #,(ign-nt Racket-expr)
+                  (#%plain-app #%magnolisp 'fn type-expr ...+)
+                  #,(ign-nt Racket-expr))]
 [stat (if mgl-expr stat stat)
       (begin stat ...)
       (let-values (bind-in-let ...) stat ...+)
