@@ -432,6 +432,34 @@ It is rather important for all Ast derived node types to be
   (rw ast))
 
 ;;; 
+;;; location info dumping
+;;; 
+
+(define* (ast-dump-loc-info ast)
+  (define rw
+    (topdown-visit
+     (lambda (ast)
+       (define sym (struct-symbol ast))
+       (define stx (ast-stx ast))
+       (define src 
+         (and stx
+              (list
+               (let-and p (syntax-source stx)
+                 (if (path? p)
+                     (path-basename-as-string p)
+                     p))
+               (syntax-line stx)
+               (syntax-column stx)
+               (syntax-position stx)
+               (syntax-span stx)
+               (let-and p (syntax-source-module stx #t)
+                 (if (path? p)
+                     (path-basename-as-string p)
+                     p)))))
+       (writeln `(,sym ,src)))))
+  (rw ast))
+       
+;;; 
 ;;; tests
 ;;; 
 

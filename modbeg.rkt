@@ -51,6 +51,7 @@ same variables at the same phase level).
     (parse-defs-from-module modbeg-stx))
   ;;(pretty-print defs) (exit)
   ;;(pretty-print (map (lambda (def) (cons def (ast-anno-maybe def 'export))) (dict-values defs)))
+  ;;(displayln 'ast-before-marshaling) (for (((id def) (in-dict defs))) (ast-dump-loc-info def))
 
   (define id->bind (make-free-id-table #:phase 0))
   (define bind->binding (make-hasheq))

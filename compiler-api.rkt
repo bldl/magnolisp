@@ -473,6 +473,7 @@ optimization.
   ;;(writeln `(eps-in-prog ,eps-in-prog))
   ;;(writeln `(loaded mods ,(hash-keys mods)))
   ;;(pretty-print `(loaded modules ,mods)) (exit)
+  ;;(displayln 'ast-after-marshaling) (for ([(x mod) mods]) (for ([def (Mod-def-lst mod)]) (ast-dump-loc-info def)))
   
   ;; Make note of interesting prelude definitions (if it is even a
   ;; dependency).
