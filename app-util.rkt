@@ -183,6 +183,71 @@ compiler.
       (error 'syntax->datum/binding "unsupported: ~s" x))))
   (f stx))
 
+(define (sym-add-sfx sfx sym)
+  (string->symbol (string-append (symbol->string sym) sfx)))
+
+(define (sym-add-pfx pfx sym)
+  (string->symbol (string-append pfx (symbol->string sym))))
+
+(define* (stx->datum/source f stx)
+  (define src 
+    (or (let-and p (syntax-source stx)
+          (if (path? p)
+              (let ()
+                (define-values (d f d?) (split-path p))
+                f)
+              p))
+        'ø))
+  (define uw (syntax-e stx))
+  (cond
+   [(pair? uw)
+    (cons (string->symbol (format "~a" src)) (f uw))]
+   [(symbol? uw)
+    (string->symbol (format "~a:~a" src uw))]
+   [else
+    (syntax->datum stx)]))
+
+(define* (stx->datum/any-loc? f stx)
+  (define has? (syntax-source stx))
+  (define sigil (if has? '¤ 'ø))
+  (define uw (syntax-e stx))
+  (cond
+   [(pair? uw)
+    (cons sigil (f uw))]
+   [(symbol? uw)
+    (sym-add-pfx (symbol->string sigil) uw)]
+   [else
+    (syntax->datum stx)]))
+
+;; `stx->datum` is invoked as (stx->datum f stx), where `f` can be
+;; used to convert any sub-forms.
+(define* (syntax->datum/loc stx
+                            #:stx->datum [stx->datum stx->datum/any-loc?]
+                            #:pred [p? (lambda (x) #t)])
+  (define (f x)
+    (cond
+     ((null? x)
+      null)
+     ((pair? x)
+      (cons (f (car x)) (f (cdr x))))
+     ((syntax? x)
+      (cond
+       [(p? x) (stx->datum f x)]
+       [else
+        (define uw (syntax-e x))
+        (cond
+         [(pair? uw)
+          (f uw)]
+         [(symbol? uw)
+          (f uw)]
+         [else
+          ;; Composite types other than pairs (vectors, boxes, etc.) not
+          ;; supported at this time.
+          (syntax->datum x)])]))
+     (else
+      (error 'syntax->datum/loc "unsupported: ~s" x))))
+  (f stx))
+
 (define* (print-with-select-syntax-properties props stx)
   (define (props-for stx)
     (define lst

@@ -101,7 +101,8 @@ same variables at the same phase level).
        (define ast (local-expand
                     #`(#%module-begin . bodies)
                     'module-begin null))
-       ;;(pretty-print (syntax->datum ast))
+       ;;(pretty-print (syntax->datum/loc ast))
+       ;;(pretty-print (syntax->datum/loc ast #:stx->datum stx->datum/source))
        (define sm-stx (make-definfo-submodule #'orig-mb ast))
        (with-syntax ([(mb . bodies) ast]
                      [sm sm-stx])
