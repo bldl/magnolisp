@@ -160,7 +160,31 @@ Assumptions for AST node types:
        #'(define/generic super syntactifiable-mkstx)
        #'(define (syntactifiable-mkstx obj)
            (qs (ctor e ...)))))))
-            
+
+;;; 
+;;; additional functional struct accessors
+;;; 
+
+;; Returns (listof syntax?).
+(define-for-syntax (make-extra-accessors conc-id fld-id-lst)
+  (define conc-name (syntax-e conc-id))
+  (with-syntax ([conc conc-id])
+    (define copy-impl
+      (with-syntax ([(fld ...) fld-id-lst]
+                    [c-copy (format-id conc-id "~a-copy" conc-name)])
+         #'(define* (c-copy obj fld ...)
+             (struct-copy conc obj [fld fld] ...))))
+    
+    (define (make-setter-impl fld-id)
+      (define fld-name (syntax-e fld-id))
+      (with-syntax ([c-setter-id
+                     (format-id conc-id "set-~a-~a" conc-name fld-name)]
+                    [fld fld-id])
+        #'(define* (c-setter-id obj fld)
+            (struct-copy conc obj [fld fld]))))
+    
+    (cons copy-impl (map make-setter-impl fld-id-lst))))
+
 ;;; 
 ;;; concrete AST node definition
 ;;; 
@@ -178,32 +202,39 @@ Assumptions for AST node types:
      (define singleton? (attribute arg))
      (define singleton-id
        (and singleton? (format-id stx "the-~a" (syntax-e #'name))))
-     (quasisyntax/loc stx
-       (#,(if singleton? #'singleton-struct* #'concrete-struct*)
-        name
-        #,@(if singleton?
-               (with-syntax ((the-name singleton-id))
-                 (list #'(the-name arg ...)))
-               null)
-        (fld ...)
-        #:property prop:custom-write #,(if (attribute writer)
-                                           #'writer
-                                           #'ast-write)
-        #:methods gen:syntactifiable
-        (#,@(if singleton?
-                (make-syntactifiable/singleton singleton-id)
-                (make-syntactifiable
-                 #'name (syntax->list #'(fld ...)))))
-        #:methods gen:strategic (#,@(make-strategic
-                                     #'name
-                                     (syntax->list #'((t fld) ...))))
-        #,@(apply append
-                  (for/list ([view-id (syntax->list #'(view ...))])
-                    (generate-view-methods #'name view-id singleton?)))
-        #:transparent
-        #,@(if (attribute opt)
-               (syntax->list #'(opt ...))
-               null)))]))
+     (define struct-def
+       (quasisyntax
+        (#,(if singleton? #'singleton-struct* #'concrete-struct*)
+         name
+         #,@(if singleton?
+                (with-syntax ((the-name singleton-id))
+                  (list #'(the-name arg ...)))
+                null)
+         (fld ...)
+         #:property prop:custom-write #,(if (attribute writer)
+                                            #'writer
+                                            #'ast-write)
+         #:methods gen:syntactifiable
+         (#,@(if singleton?
+                 (make-syntactifiable/singleton singleton-id)
+                 (make-syntactifiable
+                  #'name (syntax->list #'(fld ...)))))
+         #:methods gen:strategic (#,@(make-strategic
+                                      #'name
+                                      (syntax->list #'((t fld) ...))))
+         #,@(apply append
+                   (for/list ([view-id (syntax->list #'(view ...))])
+                     (generate-view-methods #'name view-id singleton?)))
+         #:transparent
+         #,@(if (attribute opt)
+                (syntax->list #'(opt ...))
+                null))))
+     (if singleton?
+         struct-def
+         #`(begin
+             #,struct-def
+             #,@(make-extra-accessors
+                 #'name (syntax->list #'(fld ...)))))]))
 
 ;;; 
 ;;; testing
