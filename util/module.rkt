@@ -57,6 +57,10 @@
     (provide n ...)))
 
 (define-syntax-rule*
+  (concrete-struct nm rest ...)
+  (struct nm rest ...))
+
+(define-syntax-rule*
   (concrete-struct* nm rest ...)
   (begin
     (struct nm rest ...)
@@ -67,6 +71,12 @@
   (begin
     (struct nm rest ... #:constructor-name ctor)
     (provide (except-out (struct-out nm) ctor))))
+
+(define-syntax-rule*
+  (singleton-struct nm (the-nm e ...) rest ...)
+  (begin
+    (struct nm rest ... #:constructor-name ctor)
+    (define the-nm (ctor e ...))))
 
 (define-syntax-rule*
   (singleton-struct* nm (the-nm e ...) rest ...)

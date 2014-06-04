@@ -18,7 +18,8 @@ Assumptions for AST node types:
          "util.rkt" "util/struct.rkt"
          racket/generic unstable/struct
          (for-syntax racket/base racket/function racket/list
-                     racket/pretty racket/syntax syntax/parse)
+                     ;;racket/pretty 
+                     racket/syntax syntax/parse)
          (for-template racket/base "ast-serialize.rkt"))
 
 ;;; 
@@ -166,13 +167,14 @@ Assumptions for AST node types:
 ;;; 
 
 ;; Returns (listof syntax?).
-(define-for-syntax (make-extra-accessors conc-id fld-id-lst)
+(define-for-syntax (make-extra-accessors conc-id fld-id-lst provide?)
   (define conc-name (syntax-e conc-id))
-  (with-syntax ([conc conc-id])
+  (with-syntax ([conc conc-id]
+                [def (if provide? #'define* #'define)])
     (define copy-impl
       (with-syntax ([(fld ...) fld-id-lst]
                     [c-copy (format-id conc-id "~a-copy" conc-name)])
-         #'(define* (c-copy obj fld ...)
+         #'(def (c-copy obj fld ...)
              (struct-copy conc obj [fld fld] ...))))
     
     (define (make-setter-impl fld-id)
@@ -180,7 +182,7 @@ Assumptions for AST node types:
       (with-syntax ([c-setter-id
                      (format-id conc-id "set-~a-~a" conc-name fld-name)]
                     [fld fld-id])
-        #'(define* (c-setter-id obj fld)
+        #'(def (c-setter-id obj fld)
             (struct-copy conc obj [fld fld]))))
     
     (cons copy-impl (map make-setter-impl fld-id-lst))))
@@ -220,7 +222,7 @@ Assumptions for AST node types:
 ;;; concrete AST node definition
 ;;; 
 
-(define-syntax* (define-ast* stx)
+(define-for-syntax (make-define-ast stx provide?)
   (define-syntax-class ft
     (pattern (~or (~datum no-term)
                   (~datum just-term)
@@ -237,7 +239,9 @@ Assumptions for AST node types:
      (define fld-id-lst (syntax->list #'(fld ...)))
      (define struct-def
        (quasisyntax
-        (#,(if singleton? #'singleton-struct* #'concrete-struct*)
+        (#,(if provide?
+               (if singleton? #'singleton-struct* #'concrete-struct*)
+               (if singleton? #'singleton-struct #'struct))
          name
          #,@(if singleton?
                 (with-syntax ((the-name singleton-id))
@@ -273,7 +277,13 @@ Assumptions for AST node types:
          struct-def
          #`(begin
              #,struct-def
-             #,@(make-extra-accessors conc-id fld-id-lst)))]))
+             #,@(make-extra-accessors conc-id fld-id-lst provide?)))]))
+
+(define-syntax* (define-ast stx)
+  (make-define-ast stx #f))
+
+(define-syntax* (define-ast* stx)
+  (make-define-ast stx #t))
 
 ;;; 
 ;;; testing
@@ -284,10 +294,10 @@ Assumptions for AST node types:
 
   (define-view Ast #:fields (annos))
 
-  (define-ast* Singleton (Ast) ((no-term annos)) #:singleton (#hasheq()))
-  (define-ast* Empty (Ast) ((no-term annos)))
-  (define-ast* Some (Ast) ((no-term annos) (just-term thing)))
-  (define-ast* Object (Ast) ((no-term annos) (just-term one) (list-of-term many)))
+  (define-ast Singleton (Ast) ((no-term annos)) #:singleton (#hasheq()))
+  (define-ast Empty (Ast) ((no-term annos)))
+  (define-ast Some (Ast) ((no-term annos) (just-term thing)))
+  (define-ast Object (Ast) ((no-term annos) (just-term one) (list-of-term many)))
 
   (define empty (Empty #hasheq()))
   (define object (Object #hasheq() the-Singleton (list the-Singleton empty)))
