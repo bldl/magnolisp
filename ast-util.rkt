@@ -18,7 +18,7 @@ Assumptions for AST node types:
          "util.rkt" "util/struct.rkt"
          racket/generic unstable/struct
          (for-syntax racket/base racket/function racket/list
-                     racket/syntax syntax/parse)
+                     racket/pretty racket/syntax syntax/parse)
          (for-template racket/base "ast-serialize.rkt"))
 
 ;;; 
@@ -61,7 +61,7 @@ Assumptions for AST node types:
           (lambda (f-stx)
             (syntax-case f-stx (no-term just-term list-of-term)
               ((no-term fn-pat)
-               (void))
+               #'(begin))
               ((just-term fn-pat)
                (let* ((fn-sym (syntax-e #'fn-pat))
                       (get-stx (format-id nn-stx "~a-~a"
@@ -186,6 +186,37 @@ Assumptions for AST node types:
     (cons copy-impl (map make-setter-impl fld-id-lst))))
 
 ;;; 
+;;; equal? implementation
+;;; 
+
+;; For singletons, these are unnecessary, as mere eq? comparison will
+;; do, and the default implementation provides that.
+(define-for-syntax (make-equal+hash n-stx fld-id-lst)
+  (define getter-lst
+    (for/list ([fld fld-id-lst]
+               #:unless (eq? (syntax-e fld) 'annos))
+      (format-id n-stx "~a-~a" n-stx fld)))
+  
+  (define equal-stx
+    (with-syntax ([(get ...) getter-lst])
+      #'(define (equal-proc x y e?)
+          (and (e? (get x) (get y)) ... #t))))
+  
+  (define hash-stx
+    (with-syntax ([(get ...) getter-lst])
+      #'(define (hash-proc x h)
+          (+ (h (get x)) ...))))
+  
+  (define hash2-stx
+    (with-syntax ([(get ...) getter-lst])
+      #'(define (hash2-proc x h)
+          (* (h (get x)) ...))))
+    
+  ;;(write (map syntax->datum (list equal-stx hash-stx hash2-stx))) (newline)
+  
+  (list equal-stx hash-stx hash2-stx))
+
+;;; 
 ;;; concrete AST node definition
 ;;; 
 
@@ -202,6 +233,8 @@ Assumptions for AST node types:
      (define singleton? (attribute arg))
      (define singleton-id
        (and singleton? (format-id stx "the-~a" (syntax-e #'name))))
+     (define conc-id #'name)
+     (define fld-id-lst (syntax->list #'(fld ...)))
      (define struct-def
        (quasisyntax
         (#,(if singleton? #'singleton-struct* #'concrete-struct*)
@@ -214,27 +247,33 @@ Assumptions for AST node types:
          #:property prop:custom-write #,(if (attribute writer)
                                             #'writer
                                             #'ast-write)
+         #,@(if singleton?
+                null
+                (list 
+                 #'#:methods #'gen:equal+hash
+                 (with-syntax ([(m ...) 
+                                (make-equal+hash conc-id fld-id-lst)])
+                   #'[m ...])))
          #:methods gen:syntactifiable
          (#,@(if singleton?
                  (make-syntactifiable/singleton singleton-id)
-                 (make-syntactifiable
-                  #'name (syntax->list #'(fld ...)))))
+                 (make-syntactifiable conc-id fld-id-lst)))
          #:methods gen:strategic (#,@(make-strategic
-                                      #'name
+                                      conc-id
                                       (syntax->list #'((t fld) ...))))
          #,@(apply append
                    (for/list ([view-id (syntax->list #'(view ...))])
-                     (generate-view-methods #'name view-id singleton?)))
+                     (generate-view-methods conc-id view-id singleton?)))
          #:transparent
          #,@(if (attribute opt)
                 (syntax->list #'(opt ...))
                 null))))
+     ;;(pretty-print (syntax->datum struct-def))
      (if singleton?
          struct-def
          #`(begin
              #,struct-def
-             #,@(make-extra-accessors
-                 #'name (syntax->list #'(fld ...)))))]))
+             #,@(make-extra-accessors conc-id fld-id-lst)))]))
 
 ;;; 
 ;;; testing
@@ -247,10 +286,16 @@ Assumptions for AST node types:
 
   (define-ast* Singleton (Ast) ((no-term annos)) #:singleton (#hasheq()))
   (define-ast* Empty (Ast) ((no-term annos)))
+  (define-ast* Some (Ast) ((no-term annos) (just-term thing)))
   (define-ast* Object (Ast) ((no-term annos) (just-term one) (list-of-term many)))
 
   (define empty (Empty #hasheq()))
   (define object (Object #hasheq() the-Singleton (list the-Singleton empty)))
+  
+  (check-equal? the-Singleton the-Singleton)
+  (check-equal? empty empty)
+  (check-equal? empty (Empty (hasheq 'x 5)))
+  (check-not-equal? (Some #hasheq() empty) (Some #hasheq() the-Singleton))
   
   (for ([dat (list the-Singleton
                    `(,the-Singleton)
@@ -262,15 +307,16 @@ Assumptions for AST node types:
                    (Empty (hasheq 'stx #'(Empty #hasheq())))
                    (Empty (hasheq 'origin (list #'foo #'bar)))
                    )])
-    (writeln `(ORIGINAL VALUE ,dat))
+    ;;(writeln `(ORIGINAL VALUE ,dat))
     (define stx (syntactifiable-mkstx dat))
     ;;(writeln stx)
-    (writeln `(MARSHALLED SYNTAX ,(syntax->datum stx)))
+    ;;(writeln `(MARSHALLED SYNTAX ,(syntax->datum stx)))
     (define val (eval-syntax stx))
-    (writeln `(UNMARSHALED VALUE ,val))
+    ;;(writeln `(UNMARSHALED VALUE ,val))
     (when (Ast? val)
       (define annos (Ast-annos val))
       (unless (hash-empty? annos)
-        (writeln `(UNMARSHALED ANNOS ,annos)))))
+        ;;(writeln `(UNMARSHALED ANNOS ,annos))
+        (void))))
 
   (void))
