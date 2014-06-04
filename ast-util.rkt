@@ -248,9 +248,10 @@ Assumptions for AST node types:
                   (list #'(the-name arg ...)))
                 null)
          (fld ...)
-         #:property prop:custom-write #,(if (attribute writer)
-                                            #'writer
-                                            #'ast-write)
+         #:methods gen:custom-write
+         [(define write-proc #,(if (attribute writer)
+                                   #'writer
+                                   #'ast-write))]
          #,@(if singleton?
                 null
                 (list 
@@ -301,7 +302,7 @@ Assumptions for AST node types:
 
   (define empty (Empty #hasheq()))
   (define object (Object #hasheq() the-Singleton (list the-Singleton empty)))
-  
+
   (check-equal? the-Singleton the-Singleton)
   (check-equal? empty empty)
   (check-equal? empty (Empty (hasheq 'x 5)))
