@@ -34,7 +34,29 @@ E.g.,
 (require "util.rkt" racket/generic
          (for-syntax racket/base racket/pretty racket/syntax syntax/parse))
 
-(define-for-syntax (make-define-view def-gen-id stx)
+;; Generates syntax for defining a view-based comparison function.
+;; I.e., only the bits of the objects that are "in view" are compared.
+;; For comparing concrete objects one can simply use `equal?`.
+(define-for-syntax (make-view-equal view-id fld-id-lst def-fun-id)
+  (define view-name (syntax-e view-id))
+  (with-syntax ([view=? (format-id view-id "~a=?" view-name)]
+                [view? (format-id view-id "~a?" view-name)]
+                [def-fun def-fun-id]
+                [expected (format "~a?" view-name)]
+                [(get ...) (for/list ([id fld-id-lst])
+                             (format-id view-id "~a-~a" view-name (syntax-e id)))])
+    #'(def-fun (view=? x y)
+        (cond
+         [(not (view? x))
+          (raise-argument-error (quote view=?) expected 0 x y)]
+         [(eq? x y)
+          #t]
+         [(not (view? y))
+          (raise-argument-error (quote view=?) expected 1 x y)]
+         [else
+          (and (equal? (get x) (get y)) ... #t)]))))
+
+(define-for-syntax (make-define-view def-gen-id def-stx-id def-fun-id stx)
   (syntax-parse stx
     [(_ view:id #:fields (fld:id ...))
      (let ()
@@ -54,18 +76,21 @@ E.g.,
           (apply append (map make-accessor-sigs fld-ids))))
        (with-syntax ([(method ...) method-sig-lst]
                      [def-gen def-gen-id]
+                     [def-stx def-stx-id]
+                     [def-equ (make-view-equal view-id fld-ids def-fun-id)]
                      [view-info (format-id stx "view:~a" view-name)])
          #'(begin
-             (define-syntax view-info
+             (def-stx view-info
                (list #'fld ...))
              (def-gen view
-               method ...))))]))
+               method ...)
+             def-equ)))]))
 
 (define-syntax* (define-view stx)
-  (make-define-view #'define-generics stx))
+  (make-define-view #'define-generics #'define-syntax #'define stx))
 
 (define-syntax* (define-view* stx)
-  (make-define-view #'define-generics* stx))
+  (make-define-view #'define-generics* #'define-syntax* #'define* stx))
 
 ;; Generates syntax for specifying the implementation of the methods
 ;; of the specified view for the specified concrete struct type. The

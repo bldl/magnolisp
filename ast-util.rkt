@@ -306,6 +306,8 @@ Assumptions for AST node types:
   (check-equal? empty empty)
   (check-equal? empty (Empty (hasheq 'x 5)))
   (check-not-equal? (Some #hasheq() empty) (Some #hasheq() the-Singleton))
+  (check-true (Ast=? (Empty (hasheq 'x 5)) (Some (hasheq 'x 5) empty)))
+  (check-false (Ast=? (Empty (hasheq 'x 5)) (Some (hasheq 'x 7) empty)))
   
   (for ([dat (list the-Singleton
                    `(,the-Singleton)
