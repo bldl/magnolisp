@@ -196,21 +196,21 @@ Assumptions for AST node types:
     (for/list ([fld fld-id-lst]
                #:unless (eq? (syntax-e fld) 'annos))
       (format-id n-stx "~a-~a" n-stx fld)))
-  
+
   (define equal-stx
     (with-syntax ([(get ...) getter-lst])
       #'(define (equal-proc x y e?)
           (and (e? (get x) (get y)) ... #t))))
   
   (define hash-stx
-    (with-syntax ([(get ...) getter-lst])
-      #'(define (hash-proc x h)
-          (+ (h (get x)) ...))))
+    #`(define (hash-proc x h)
+        (+ #,@(for/list ([c (in-naturals 1)] [get getter-lst])
+                #`(* #,c (h (#,get x)))))))
   
   (define hash2-stx
-    (with-syntax ([(get ...) getter-lst])
-      #'(define (hash2-proc x h)
-          (* (h (get x)) ...))))
+    #`(define (hash2-proc x h)
+        (+ #,@(for/list ([c (in-naturals 17)] [get getter-lst])
+                #`(* #,c (h (#,get x)))))))
     
   ;;(write (map syntax->datum (list equal-stx hash-stx hash2-stx))) (newline)
   
