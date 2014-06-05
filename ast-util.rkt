@@ -167,10 +167,33 @@ Assumptions for AST node types:
         (let (bind ...)
           (and any? copy)))))
 
+(define-for-syntax (make-one-rw-term nn-stx f-stx-lst)
+  (define nn-sym (syntax-e nn-stx))
+  (define r-f-lst (get-relevant-fields f-stx-lst))
+
+  (define choice-lst
+    (for/list ([fld r-f-lst])
+      (define kind (first fld))
+      (define fn-stx (second fld))
+      (define fn-sym (syntax-e fn-stx))
+      (with-syntax ([get (format-id nn-stx "~a-~a" nn-sym fn-sym)]
+                    [compute-r (case kind
+                                 [(just) #'(s v)]
+                                 [(list) #'(one-rw-list s v)])]
+                    [copy #`(struct-copy #,nn-stx ast [#,fn-stx r])])
+        #'(let* ([v (get ast)]
+                 [r compute-r])
+            (and r copy)))))
+  
+  (with-syntax ([(choice ...) choice-lst])
+    #'(define (one-rw-term s ast)
+        (or choice ...))))
+
 (define-for-syntax (make-strategic nn-stx f-stx-lst)
   (list (make-all-visit-term nn-stx f-stx-lst)
         (make-all-rw-term nn-stx f-stx-lst)
-        (make-some-rw-term nn-stx f-stx-lst)))
+        (make-some-rw-term nn-stx f-stx-lst)
+        (make-one-rw-term nn-stx f-stx-lst)))
 
 ;;; 
 ;;; gen:syntactifiable
@@ -354,15 +377,36 @@ Assumptions for AST node types:
   (check-true (match empty [(Ast (? hash?)) #t] [_ #f]))
   (check-true (match empty [(Ast (? hash? h)) (hash-empty? h)] [_ #f]))
 
-  (define some-Singleton->Empty
-    (some
+  (define rw-Singleton->Empty
      (lambda (ast)
        (match ast
          [(? Singleton?) empty]
-         [else ast]))))
+         [else #f])))
+  
+  (define some-Singleton->Empty
+    (some rw-Singleton->Empty))
+  
+  (define one-Singleton->Empty
+    (one rw-Singleton->Empty))
+
+  (define (count-Singleton ast)
+    (define c 0)
+    ((topdown-visit (lambda (ast)
+                      (when (Singleton? ast)
+                        (set! c (add1 c))))) 
+     ast)
+    c)
   
   (check-false (some-Singleton->Empty empty))
   (check-not-false (some-Singleton->Empty object))
+  (check-false (one-Singleton->Empty empty))
+  (check-not-false (one-Singleton->Empty object))
+
+  (let ((ast (one-Singleton->Empty 
+              (Object #hasheq() 
+                      empty 
+                      (list empty the-Singleton the-Singleton)))))
+    (check-eqv? 1 (count-Singleton ast)))
   
   (for ([dat (list the-Singleton
                    `(,the-Singleton)
