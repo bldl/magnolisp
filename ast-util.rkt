@@ -103,6 +103,15 @@ Assumptions for AST node types:
          (list 'list #'fn-pat (generate-temporary (syntax-e #'fn-pat))))))
     f-stx-lst)))
 
+(define-for-syntax (make-r-f-struct-copy type-id obj-id r-f-lst)
+  (with-syntax ([type type-id]
+                [obj obj-id]
+                [(set-fld ...) (for/list ([fld r-f-lst])
+                                 (with-syntax ([fld (second fld)]
+                                               [tmp (third fld)])
+                                   #'[fld tmp]))])
+    #'(struct-copy type obj set-fld ...)))
+
 ;; E.g. output
 ;; (define (all-rw-term s ast)
 ;;   (let-and var (s (Define-var ast))
@@ -131,14 +140,7 @@ Assumptions for AST node types:
                   ((eq? kind 'list)
                    #`(all-rw-list s (#,get-stx ast)))))))
             r-f-lst))
-       (struct-copy
-        #,nn-stx ast
-        #,@(map
-            (lambda (fld)
-              (let ((fn-stx (second fld))
-                    (tmp-stx (third fld)))
-                #`[#,fn-stx #,tmp-stx]))
-            r-f-lst)))))
+       #,(make-r-f-struct-copy nn-stx #'ast r-f-lst))))
 
 (define-for-syntax (make-some-rw-term nn-stx f-stx-lst)
   (define nn-sym (syntax-e nn-stx))
@@ -156,19 +158,13 @@ Assumptions for AST node types:
                              [(just) #'(s v)]
                              [(list) #'(some-rw-list s v)])])
               (if r (begin (set! any? #t) r) v))])))
-  
-  #`(define (some-rw-term s ast)
+
+  (with-syntax ([(bind ...) bind-lst]
+                [copy (make-r-f-struct-copy nn-stx #'ast r-f-lst)])
+  #'(define (some-rw-term s ast)
       (define any? #f)
-      (let (#,@bind-lst)
-        (and any?
-             (struct-copy 
-              #,nn-stx ast
-              #,@(map
-                  (lambda (fld)
-                    (let ((fn-stx (second fld))
-                          (tmp-stx (third fld)))
-                      #`[#,fn-stx #,tmp-stx]))
-                  r-f-lst))))))
+      (let (bind ...)
+        (and any? copy)))))
 
 (define-for-syntax (make-strategic nn-stx f-stx-lst)
   (list (make-all-visit-term nn-stx f-stx-lst)
