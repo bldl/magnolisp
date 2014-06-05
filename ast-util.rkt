@@ -152,19 +152,20 @@ Assumptions for AST node types:
       (define fn-stx (second fld))
       (define fn-sym (syntax-e fn-stx))
       (with-syntax ([tmp (third fld)]
-                    [get (format-id nn-stx "~a-~a" nn-sym fn-sym)])
-        #`[tmp (let* ([v (get ast)]
-                      [r #,(case kind
-                             [(just) #'(s v)]
-                             [(list) #'(some-rw-list s v)])])
+                    [get (format-id nn-stx "~a-~a" nn-sym fn-sym)]
+                    [compute-r (case kind
+                                 [(just) #'(s v)]
+                                 [(list) #'(some-rw-list s v)])])
+        #'[tmp (let* ([v (get ast)]
+                      [r compute-r])
               (if r (begin (set! any? #t) r) v))])))
 
   (with-syntax ([(bind ...) bind-lst]
                 [copy (make-r-f-struct-copy nn-stx #'ast r-f-lst)])
-  #'(define (some-rw-term s ast)
-      (define any? #f)
-      (let (bind ...)
-        (and any? copy)))))
+    #'(define (some-rw-term s ast)
+        (define any? #f)
+        (let (bind ...)
+          (and any? copy)))))
 
 (define-for-syntax (make-strategic nn-stx f-stx-lst)
   (list (make-all-visit-term nn-stx f-stx-lst)
