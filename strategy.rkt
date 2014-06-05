@@ -53,12 +53,10 @@ Meta-Compilation of Language Abstractions (2006).
 (define-generics* strategic
   (all-visit-term s strategic)
   (all-rw-term s strategic)
-  ;;(some-rw-term s strategic)
+  (some-rw-term s strategic)
   ;;(one-rw-term s strategic)
   )
 
-(define (some-rw-term s strategic) ;; xxx
-  (error 'unimplemented))
 (define (one-rw-term s strategic) ;; xxx
   (error 'unimplemented))
 

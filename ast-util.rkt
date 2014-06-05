@@ -98,9 +98,9 @@ Assumptions for AST node types:
         ((no-term fn-pat)
          #f)
         ((just-term fn-pat)
-         (list 'just #'fn-pat (generate-temporary)))
+         (list 'just #'fn-pat (generate-temporary (syntax-e #'fn-pat))))
         ((list-of-term fn-pat)
-         (list 'list #'fn-pat (generate-temporary)))))
+         (list 'list #'fn-pat (generate-temporary (syntax-e #'fn-pat))))))
     f-stx-lst)))
 
 ;; E.g. output
@@ -135,14 +135,45 @@ Assumptions for AST node types:
         #,nn-stx ast
         #,@(map
             (lambda (fld)
-              (let* ((fn-stx (second fld))
-                     (tmp-stx (third fld)))
-                #`(#,fn-stx #,tmp-stx)))
+              (let ((fn-stx (second fld))
+                    (tmp-stx (third fld)))
+                #`[#,fn-stx #,tmp-stx]))
             r-f-lst)))))
+
+(define-for-syntax (make-some-rw-term nn-stx f-stx-lst)
+  (define nn-sym (syntax-e nn-stx))
+  (define r-f-lst (get-relevant-fields f-stx-lst))
+
+  (define bind-lst
+    (for/list ([fld r-f-lst])
+      (define kind (first fld))
+      (define fn-stx (second fld))
+      (define fn-sym (syntax-e fn-stx))
+      (with-syntax ([tmp (third fld)]
+                    [get (format-id nn-stx "~a-~a" nn-sym fn-sym)])
+        #`[tmp (let* ([v (get ast)]
+                      [r #,(case kind
+                             [(just) #'(s v)]
+                             [(list) #'(some-rw-list s v)])])
+              (if r (begin (set! any? #t) r) v))])))
+  
+  #`(define (some-rw-term s ast)
+      (define any? #f)
+      (let (#,@bind-lst)
+        (and any?
+             (struct-copy 
+              #,nn-stx ast
+              #,@(map
+                  (lambda (fld)
+                    (let ((fn-stx (second fld))
+                          (tmp-stx (third fld)))
+                      #`[#,fn-stx #,tmp-stx]))
+                  r-f-lst))))))
 
 (define-for-syntax (make-strategic nn-stx f-stx-lst)
   (list (make-all-visit-term nn-stx f-stx-lst)
-        (make-all-rw-term nn-stx f-stx-lst)))
+        (make-all-rw-term nn-stx f-stx-lst)
+        (make-some-rw-term nn-stx f-stx-lst)))
 
 ;;; 
 ;;; gen:syntactifiable
@@ -311,7 +342,8 @@ Assumptions for AST node types:
   (define-ast Singleton (Ast) ((no-term annos)) #:singleton (#hasheq()))
   (define-ast Empty (Ast) ((no-term annos)))
   (define-ast Some (Ast) ((no-term annos) (just-term thing)))
-  (define-ast Object (Ast) ((no-term annos) (just-term one) (list-of-term many)))
+  (define-ast Object (Ast) ((no-term annos) (just-term one) 
+                            (list-of-term many)))
 
   (define empty (Empty #hasheq()))
   (define object (Object #hasheq() the-Singleton (list the-Singleton empty)))
@@ -324,6 +356,16 @@ Assumptions for AST node types:
   (check-false (Ast=? (Empty (hasheq 'x 5)) (Some (hasheq 'x 7) empty)))
   (check-true (match empty [(Ast (? hash?)) #t] [_ #f]))
   (check-true (match empty [(Ast (? hash? h)) (hash-empty? h)] [_ #f]))
+
+  (define some-Singleton->Empty
+    (some
+     (lambda (ast)
+       (match ast
+         [(? Singleton?) empty]
+         [else ast]))))
+  
+  (check-false (some-Singleton->Empty empty))
+  (check-not-false (some-Singleton->Empty object))
   
   (for ([dat (list the-Singleton
                    `(,the-Singleton)
