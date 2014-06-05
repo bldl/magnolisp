@@ -31,8 +31,12 @@ E.g.,
 
 |#
 
-(require "util.rkt" racket/generic
+(require "util.rkt" racket/generic racket/match
          (for-syntax racket/base racket/pretty racket/syntax syntax/parse))
+
+;;; 
+;;; view-based comparison
+;;; 
 
 ;; Generates syntax for defining a view-based comparison function.
 ;; I.e., only the bits of the objects that are "in view" are compared.
@@ -44,7 +48,8 @@ E.g.,
                 [def-fun def-fun-id]
                 [expected (format "~a?" view-name)]
                 [(get ...) (for/list ([id fld-id-lst])
-                             (format-id view-id "~a-~a" view-name (syntax-e id)))])
+                             (format-id view-id "~a-~a" 
+                                        view-name (syntax-e id)))])
     #'(def-fun (view=? x y)
         (cond
          [(not (view? x))
@@ -56,7 +61,44 @@ E.g.,
          [else
           (and (equal? (get x) (get y)) ... #t)]))))
 
-(define-for-syntax (make-define-view def-gen-id def-stx-id def-fun-id stx)
+;;; 
+;;; view-based pattern matching
+;;; 
+
+;; Returns syntax for a match expander definition, for the specified
+;; view, and its specified fields. Pattern matching is positional, so
+;; the order of the fields in `fld-id-lst` matters.
+(define-for-syntax (make-view-pattern view-id fld-id-lst def-pat-id)
+  (define view-name (syntax-e view-id))
+  
+  (define var-lst
+    (for/list ([id fld-id-lst])
+      (generate-temporary (syntax-e id))))
+  
+  (define getter-lst
+    (for/list ([id fld-id-lst])
+      (format-id view-id "~a-~a" view-name (syntax-e id))))
+  
+  (with-syntax ([def-pat def-pat-id]
+                [pat-name view-id]
+                [view? (format-id view-id "~a?" view-name)]
+                [(var ...) var-lst]
+                [(fld-pat ...) (map
+                                (lambda (x get)
+                                  #`(app #,get #,x))
+                                var-lst getter-lst)])
+    #'(def-pat pat-name
+        (lambda (stx)
+          (syntax-case stx ()
+            [(_ var ...)
+             #'(? view? (and fld-pat ...))])))))
+
+;;; 
+;;; view definition
+;;; 
+
+(define-for-syntax (make-define-view def-gen-id def-stx-id 
+                                     def-pat-id def-fun-id stx)
   (syntax-parse stx
     [(_ view:id #:fields (fld:id ...))
      (let ()
@@ -77,6 +119,7 @@ E.g.,
        (with-syntax ([(method ...) method-sig-lst]
                      [def-gen def-gen-id]
                      [def-stx def-stx-id]
+                     [def-pat (make-view-pattern view-id fld-ids def-pat-id)]
                      [def-equ (make-view-equal view-id fld-ids def-fun-id)]
                      [view-info (format-id stx "view:~a" view-name)])
          #'(begin
@@ -84,13 +127,20 @@ E.g.,
                (list #'fld ...))
              (def-gen view
                method ...)
+             def-pat
              def-equ)))]))
 
 (define-syntax* (define-view stx)
-  (make-define-view #'define-generics #'define-syntax #'define stx))
+  (make-define-view #'define-generics #'define-syntax 
+                    #'define-match-expander #'define stx))
 
 (define-syntax* (define-view* stx)
-  (make-define-view #'define-generics* #'define-syntax* #'define* stx))
+  (make-define-view #'define-generics* #'define-syntax* 
+                    #'define-match-expander* #'define* stx))
+
+;;; 
+;;; view implementation
+;;; 
 
 ;; Generates syntax for specifying the implementation of the methods
 ;; of the specified view for the specified concrete struct type. The
