@@ -46,6 +46,19 @@ Assumptions for AST node types:
     (error 'ast-write "non-opaque struct ~a" n))
   (write (cons n (cdr fvs)) out))
 
+;; Produces syntax for a node-type specific implementation of a
+;; gen:custom-write style function.
+(define-for-syntax (make-ast-write n-stx fld-id-lst)
+  (define getter-lst
+    (for/list ([fld fld-id-lst]
+               #:unless (eq? (syntax-e fld) 'annos))
+      (format-id n-stx "~a-~a" n-stx fld)))
+  
+  (with-syntax ([name n-stx]
+                [(get ...) getter-lst])
+    #'(lambda (v out mode)
+        (write (list (quote name) (get v) ...) out))))
+
 ;;; 
 ;;; gen:strategic
 ;;; 
@@ -251,7 +264,7 @@ Assumptions for AST node types:
          #:methods gen:custom-write
          [(define write-proc #,(if (attribute writer)
                                    #'writer
-                                   #'ast-write))]
+                                   (make-ast-write conc-id fld-id-lst)))]
          #,@(if singleton?
                 null
                 (list 
