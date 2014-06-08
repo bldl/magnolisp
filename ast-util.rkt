@@ -239,7 +239,7 @@ Assumptions for AST node types:
       (with-syntax ([(fld ...) fld-id-lst]
                     [c-copy (format-id conc-id "~a-copy" conc-name)])
          #'(def (c-copy obj fld ...)
-             (struct-copy conc obj [fld fld] ...))))
+             (conc fld ...))))
     
     (define (make-setter-impl fld-id)
       (define fld-name (syntax-e fld-id))
