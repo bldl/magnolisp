@@ -109,7 +109,7 @@ Meta-Compilation of Language Abstractions (2006).
 ;;; 
 
 (define-syntax-rule
-  (define-strategy* n f)
+  (define-strategy-combinator* n f)
   (define* (n s)
     (lambda (ast)
       (f s ast))))
@@ -122,7 +122,7 @@ Meta-Compilation of Language Abstractions (2006).
 (module+ test
   (require rackunit))
 
-(define-strategy* one/list one-rw-list)
+(define-strategy-combinator* one/list one-rw-list)
 
 (module+ test
   (check-equal?
@@ -132,7 +132,7 @@ Meta-Compilation of Language Abstractions (2006).
     ((one/list number?) '(x 2 y 4)))
    '(#f #f (x #t y 4))))
 
-(define-strategy* some/list some-rw-list)
+(define-strategy-combinator* some/list some-rw-list)
 
 (module+ test
   (check-equal?
@@ -143,7 +143,7 @@ Meta-Compilation of Language Abstractions (2006).
    '(#f #f (x #t y #t))))
 
 ;; This is an 'all' for lists, where elements are "subterms".
-(define-strategy* all/list all-rw-list)
+(define-strategy-combinator* all/list all-rw-list)
 
 (module+ test
   (check-equal?
@@ -153,7 +153,7 @@ Meta-Compilation of Language Abstractions (2006).
     ((all/list number?) '(x 2 y 4)))
    '(() (#t #t #t) #f)))
 
-(define-strategy* all-visit/list all-visit-list)
+(define-strategy-combinator* all-visit/list all-visit-list)
 
 (module+ test
   (check-equal?
@@ -173,10 +173,10 @@ Meta-Compilation of Language Abstractions (2006).
 (define* (fail-rw ast) #f)
 (define* (id-rw ast) ast)
 
-(define-strategy* all-visit all-visit-term)
-(define-strategy* all all-rw-term)
-(define-strategy* some some-rw-term)
-(define-strategy* one one-rw-term)
+(define-strategy-combinator* all-visit all-visit-term)
+(define-strategy-combinator* all all-rw-term)
+(define-strategy-combinator* some some-rw-term)
+(define-strategy-combinator* one one-rw-term)
 
 ;;; 
 ;;; Strategy combinators.
