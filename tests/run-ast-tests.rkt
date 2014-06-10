@@ -52,3 +52,16 @@
 (check-equal? (Weird 1 2) (set-D-a (Weird 6 2) 1))
 (check-equal? (Weird 1 2) (set-D-d (Weird 1 6) 4))
 (check-equal? '(1 4) (match (Weird 1 2) [(D a d) (list a d)] [_ #f]))
+
+(define-view Ast ([#:field annos]))
+(define (get-type ast)
+  (hash-ref (Ast-annos ast) 'type))
+(define (set-type ast t)
+  (set-Ast-annos ast (hash-set (Ast-annos ast) 'type t)))
+(define-view Expr ([#:access type get-type set-type]))
+(define-ast Lit (Ast Expr) ([no-term annos] [no-term dat]))
+
+(check-eq? 'int (Expr-type (Lit #hasheq((type . int)) 5)))
+
+(let ((e (Lit #hasheq() 6)))
+  (check-eq? 'int (Expr-type (set-Expr-type e 'int))))
