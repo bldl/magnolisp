@@ -1,0 +1,54 @@
+#lang racket
+
+#|
+|#
+
+(require magnolisp/ast-util magnolisp/ast-view
+         racket/generic rackunit)
+
+(define-view A ([#:field a]))
+(define-view AB ([#:field a] [#:field b]))
+
+(define (get-c obj) (HasA-a obj))
+(define (set-c obj v) (set-HasA-a obj v))
+
+(define-view C ([#:access c get-c set-c]))
+
+(define-ast HasA (A C) ([no-term a]))
+(define-ast HasAB (A AB) ([no-term a] [no-term b]))
+(define-ast HasBA (A AB) ([no-term b] [no-term a]))
+
+(check-eqv? 7 (C-c (HasA 7)))
+
+(check-true (A=? (HasA 4) (HasAB 4 5)))
+(check-true (A=? (HasA 4) (HasBA 6 4)))
+(check-true (A=? (HasAB 4 7) (HasBA 6 4)))
+
+(check-equal? '(4 7) (match (HasAB 4 7) [(AB a b) (list a b)] [_ #f]))
+(check-equal? '(4 7) (match (HasBA 7 4) [(AB a b) (list a b)] [_ #f]))
+
+(define-generics D-impl
+  (get-d D-impl)
+  (set-d D-impl v))
+
+(struct DoesD (d)
+        #:methods gen:D-impl
+        [(define (get-d x) 1)
+         (define (set-d x v) (void))])
+
+(define-view D ([#:field a] [#:access d get-d set-d]))
+
+(define-ast Weird (A AB D) ([no-term a] [no-term b])
+  #:struct-options
+  (#:methods gen:D-impl 
+             [(define (get-d D-impl)
+                (* 2 (Weird-b D-impl)))
+              (define (set-d D-impl v)
+                (set-Weird-b D-impl (/ v 2)))]))
+
+(check-eqv? 4 (D-d (Weird 1 2)))
+(check-eqv? 3/2 (Weird-b (D-copy (Weird 1 2) 7 3)))
+(check-equal? (Weird 1 2) (D-copy (Weird 10 10) 1 4))
+(check-equal? (Weird 1 2) (set-D-a (Weird 6 2) 1))
+(check-equal? (Weird 1 2) (set-D-d (Weird 1 6) 4))
+(check-equal? '(1 4) (match (Weird 1 2) [(D a d) (list a d)] [_ #f]))
