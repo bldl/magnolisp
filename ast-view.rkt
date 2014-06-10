@@ -123,10 +123,17 @@ E.g.,
                     [def-stx def-stx-id]
                     [def-pat (make-view-pattern view-id fld-ids def-pat-id)]
                     [def-equ (make-view-equal view-id fld-ids def-fun-id)]
-                    [view-info (format-id stx "view:~a" view-name)])
+                    [view-info (format-id stx "view:~a" view-name)]
+                    [(entry ...) 
+                     (for/list ([fld fld-spec-lst])
+                       (define-values (id-stx get-stx set-stx)
+                         (apply values fld))
+                       (if (not get-stx)
+                           #`#'#,id-stx
+                           #`(list #'#,id-stx #'#,get-stx #'#,set-stx)))])
         #'(begin
             (def-stx view-info
-              (list #'fld ...)) ;; xxx to support #:access, stored info must become richer, and concrete getter, setter, and copy implementation generators must change
+              (list entry ...))
             (def-gen view
               method ...)
             def-pat
