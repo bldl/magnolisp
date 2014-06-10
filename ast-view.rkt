@@ -99,36 +99,53 @@ E.g.,
 
 (define-for-syntax (make-define-view def-gen-id def-stx-id 
                                      def-pat-id def-fun-id stx)
+  (define (generate view-id fld-spec-lst)
+    (define view-name (syntax-e view-id))
+    (define fld-ids (map car fld-spec-lst))
+
+    (with-syntax ([view view-id]
+                  [(fld ...) fld-ids])
+      (define (make-accessor-sigs fld-id)
+        (define fld-name (syntax-e fld-id))
+        (define getter-sig
+          #`(#,(format-id stx "~a-~a" view-name fld-name) view))
+        (define setter-sig
+          #`(#,(format-id stx "set-~a-~a" view-name fld-name) view #,fld-id))
+        (list getter-sig setter-sig))
+    
+      (define method-sig-lst
+        (cons
+         #`(#,(format-id stx "~a-copy" view-name) view fld ...)
+         (apply append (map make-accessor-sigs fld-ids))))
+    
+      (with-syntax ([(method ...) method-sig-lst]
+                    [def-gen def-gen-id]
+                    [def-stx def-stx-id]
+                    [def-pat (make-view-pattern view-id fld-ids def-pat-id)]
+                    [def-equ (make-view-equal view-id fld-ids def-fun-id)]
+                    [view-info (format-id stx "view:~a" view-name)])
+        #'(begin
+            (def-stx view-info
+              (list #'fld ...)) ;; xxx to support #:access, stored info must become richer, and concrete getter, setter, and copy implementation generators must change
+            (def-gen view
+              method ...)
+            def-pat
+            def-equ))))
+  
+  (define-syntax-class vfld
+    #:description "view field specification"
+    [pattern (#:field fld:id) 
+             #:attr spec (list #'fld #f #f)]
+    [pattern (#:access fld:id get:expr set:expr)
+             #:attr spec (list #'fld #'get #'set)])
+  
   (syntax-parse stx
     [(_ view:id #:fields (fld:id ...))
-     (let ()
-       (define view-id #'view)
-       (define view-name (syntax-e view-id))
-       (define fld-ids (syntax->list #'(fld ...)))
-       (define (make-accessor-sigs fld-id)
-         (define fld-name (syntax-e fld-id))
-         (define getter-sig
-           #`(#,(format-id stx "~a-~a" view-name fld-name) view))
-         (define setter-sig
-           #`(#,(format-id stx "set-~a-~a" view-name fld-name) view #,fld-id))
-         (list getter-sig setter-sig))
-       (define method-sig-lst
-         (cons
-          #`(#,(format-id stx "~a-copy" view-name) view fld ...)
-          (apply append (map make-accessor-sigs fld-ids))))
-       (with-syntax ([(method ...) method-sig-lst]
-                     [def-gen def-gen-id]
-                     [def-stx def-stx-id]
-                     [def-pat (make-view-pattern view-id fld-ids def-pat-id)]
-                     [def-equ (make-view-equal view-id fld-ids def-fun-id)]
-                     [view-info (format-id stx "view:~a" view-name)])
-         #'(begin
-             (def-stx view-info
-               (list #'fld ...))
-             (def-gen view
-               method ...)
-             def-pat
-             def-equ)))]))
+     (generate #'view (map
+                       (lambda (id) (list id #f #f))
+                       (syntax->list #'(fld ...))))]
+    [(_ view:id (fld:vfld ...))
+     (generate #'view (attribute fld.spec))]))
 
 (define-syntax* (define-view stx)
   (make-define-view #'define-generics #'define-syntax 
