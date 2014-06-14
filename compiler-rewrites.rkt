@@ -156,28 +156,28 @@
 
 (define* (StatCont-ss ast)
   (match ast
-    ((BlockStat _ ss) ss)
-    ((BlockExpr _ ss) ss)
-    ((LetStat _ _ ss) ss)
-    (_ #f)))
+    [(BlockStat _ ss) ss]
+    [(BlockExpr _ ss) ss]
+    [(LetStat _ _ ss) ss]
+    [_ #f]))
 
 (define* (set-StatCont-ss ast n-ss)
   (match ast
-    ((BlockExpr a ss)
-     (BlockExpr a n-ss))
-    ((BlockStat a ss)
-     (BlockStat a n-ss))
-    ((LetStat a bs ss)
-     (LetStat a bs n-ss))))
+    [(BlockExpr a ss)
+     (BlockExpr a n-ss)]
+    [(BlockStat a ss)
+     (BlockStat a n-ss)]
+    [(LetStat a bs ss)
+     (LetStat a bs n-ss)]))
 
 (define* (StatCont-copy ast n-a n-ss)
   (match ast
-    ((BlockExpr a ss)
-     (BlockExpr n-a n-ss))
-    ((BlockStat a ss)
-     (BlockStat n-a n-ss))
-    ((LetStat a bs ss)
-     (LetStat n-a bs n-ss))))
+    [(BlockExpr a ss)
+     (BlockExpr n-a n-ss)]
+    [(BlockStat a ss)
+     (BlockStat n-a n-ss)]
+    [(LetStat a bs ss)
+     (LetStat n-a bs n-ss)]))
 
 ;;; 
 ;;; types

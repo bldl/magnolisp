@@ -142,6 +142,7 @@ E.g.,
   
   (define-syntax-class vfld
     #:description "view field specification"
+    #:attributes (spec)
     [pattern (#:field fld:id) 
              #:attr spec (list #'fld #f #f)]
     [pattern (#:access fld:id get:expr set:expr)
