@@ -147,14 +147,20 @@ E.g.,
              #:attr spec (list #'fld #f #f)]
     [pattern (#:access fld:id get:expr set:expr)
              #:attr spec (list #'fld #'get #'set)])
+
+  (define-splicing-syntax-class vflds
+    #:description "view fields specification"
+    #:attributes (spec-lst)
+    [pattern (~seq #:fields (fld:id ...))
+             #:attr spec-lst (map
+                              (lambda (id) (list id #f #f))
+                              (syntax->list #'(fld ...)))]
+    [pattern (fld:vfld ...)
+             #:attr spec-lst (attribute fld.spec)])
   
   (syntax-parse stx
-    [(_ view:id #:fields (fld:id ...))
-     (generate #'view (map
-                       (lambda (id) (list id #f #f))
-                       (syntax->list #'(fld ...))))]
-    [(_ view:id (fld:vfld ...))
-     (generate #'view (attribute fld.spec))]))
+    [(_ view:id flds:vflds)
+     (generate #'view (attribute flds.spec-lst))]))
 
 (define-syntax* (define-view stx)
   (make-define-view #'define-generics #'define-syntax 
