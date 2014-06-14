@@ -295,7 +295,7 @@ Assumptions for AST node types:
     [(_ name:id (view:id ...) ((t:ft fld:id) ...)
         (~optional (~seq #:singleton (arg:expr ...)))
         (~optional (~seq #:custom-write writer:expr))
-        (~optional (~seq #:struct-options (opt ...+))))
+        (~optional (~seq #:struct-options (opt ...))))
      (define singleton? (attribute arg))
      (define singleton-id
        (and singleton? (format-id stx "the-~a" (syntax-e #'name))))
