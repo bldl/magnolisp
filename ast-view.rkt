@@ -100,7 +100,7 @@ E.g.,
 
 (define-for-syntax (make-define-view def-gen-id def-stx-id 
                                      def-pat-id def-fun-id stx)
-  (define (generate view-id fld-spec-lst)
+  (define (generate view-id fld-spec-lst opt-stx-lst)
     (define view-name (syntax-e view-id))
     (define fld-ids (map car fld-spec-lst))
 
@@ -125,6 +125,7 @@ E.g.,
                     [def-pat (make-view-pattern view-id fld-ids def-pat-id)]
                     [def-equ (make-view-equal view-id fld-ids def-fun-id)]
                     [view-info (format-id stx "view:~a" view-name)]
+                    [(gen-opt ...) opt-stx-lst]
                     [(entry ...) 
                      (for/list ([fld fld-spec-lst])
                        (define-values (id-stx get-stx set-stx)
@@ -136,6 +137,7 @@ E.g.,
             (def-stx view-info
               (list entry ...))
             (def-gen view
+              gen-opt ...
               method ...)
             def-pat
             def-equ))))
@@ -159,8 +161,13 @@ E.g.,
              #:attr spec-lst (attribute fld.spec)])
   
   (syntax-parse stx
-    [(_ view:id flds:vflds)
-     (generate #'view (attribute flds.spec-lst))]))
+    [(_ view:id flds:vflds
+        (~optional (~seq #:generics-options (opt ...))))
+     (generate #'view 
+               (attribute flds.spec-lst)
+               (if (attribute opt)
+                   (syntax->list #'(opt ...))
+                   null))]))
 
 (define-syntax* (define-view stx)
   (make-define-view #'define-generics #'define-syntax 
