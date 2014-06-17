@@ -55,7 +55,7 @@
 
 (define-view Ast ([#:field annos]))
 (define (get-type ast)
-  (hash-ref (Ast-annos ast) 'type))
+  (hash-ref (Ast-annos ast) 'type #f))
 (define (set-type ast t)
   (set-Ast-annos ast (hash-set (Ast-annos ast) 'type t)))
 (define-view Expr ([#:access type get-type set-type]))

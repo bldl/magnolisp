@@ -92,7 +92,7 @@ E.g.,
         (lambda (stx)
           (syntax-case stx ()
             [(_ var ...)
-             #'(? view? (and fld-pat ...))])))))
+             #'(? view? fld-pat ...)])))))
 
 ;;; 
 ;;; view definition
