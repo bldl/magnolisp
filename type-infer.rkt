@@ -363,12 +363,12 @@
        (void))
       (else
        (raise-argument-error
-        'ti-def "supported Ast?" ast))))
+        'ti-def "supported Def?" ast))))
 
   ;; Initialized to #f for each BlockExpr scope.
   (define return-type (make-parameter #f))
   
-  (define (ti-stat ast) ;; Ast? -> void?
+  (define (ti-stat ast) ;; Stat? -> void?
     (match ast
       ((Return _ e)
        (define t (ti-expr e))
@@ -409,7 +409,7 @@
        (void))
       (else
        (raise-argument-error
-        'ti-stat "supported Ast?" ast))))
+        'ti-stat "supported Stat?" ast))))
       
   (define (ti-expr ast) ;; Ast? -> Type?
     (match ast

@@ -23,6 +23,7 @@ It is rather important for all Ast derived node types to be
 (define-view* Anno #:fields ())
 (define-view* Type #:fields ())
 (define-view* Def #:fields (id))
+(define-view* Stat #:fields ())
 
 ;;; 
 ;;; annotations
@@ -274,8 +275,6 @@ It is rather important for all Ast derived node types to be
 ;;; other Magnolisp
 ;;; 
 
-(define-ast* CompilationUnit (Ast) ((no-term annos) (list-of-term lst))) 
-
 ;; For functions with no Magnolisp body.
 (define-ast* NoBody (Ast) ((no-term annos)))
 
@@ -284,14 +283,15 @@ It is rather important for all Ast derived node types to be
 ;; 'def' contains a DefVar term. 'let-kind annotation has either
 ;; 'let-values or 'letrec-values or 'letrec-syntaxes+values; we mostly
 ;; do not care, since Racket has done name resolution.
-(define-ast* LetStat (Ast) ((no-term annos) (just-term def) (list-of-term ss)))
+(define-ast* LetStat (Ast Stat) ((no-term annos) 
+                                 (just-term def) (list-of-term ss)))
 
 ;; We only allow a limited form of 'let' expressions. There is a
 ;; 'let-kind annotation.
 (define-ast* LetExpr (Ast) ((no-term annos) (just-term def) (just-term e)))
 
 ;; Sequence of statements.
-(define-ast* BlockStat (Ast) ((no-term annos) (list-of-term ss)))
+(define-ast* BlockStat (Ast Stat) ((no-term annos) (list-of-term ss)))
 
 ;; Variable reference.
 (define-ast* Var (Ast) ((no-term annos) (no-term id)))
@@ -300,13 +300,15 @@ It is rather important for all Ast derived node types to be
 (define-ast* Lambda (Ast) ((no-term annos) (list-of-term params) (just-term body)))
 
 ;; Assignment.
-(define-ast* Assign (Ast) ((no-term annos) (just-term lv) (just-term rv)))
+(define-ast* Assign (Ast Stat) ((no-term annos) 
+                                (just-term lv) (just-term rv)))
 
 ;; If expression.
 (define-ast* IfExpr (Ast) ((no-term annos) (just-term c) (just-term t) (just-term e)))
 
 ;; If statement.
-(define-ast* IfStat (Ast) ((no-term annos) (just-term c) (just-term t) (just-term e)))
+(define-ast* IfStat (Ast Stat) ((no-term annos) (just-term c) 
+                                (just-term t) (just-term e)))
 
 ;; A literal datum.
 (define-ast* Literal (Ast) ((no-term annos) (no-term datum)))
@@ -314,9 +316,6 @@ It is rather important for all Ast derived node types to be
 ;; Function (or predicate) application, with function expression, and
 ;; argument expressions.
 (define-ast* Apply (Ast) ((no-term annos) (just-term f) (list-of-term args)))
-
-;; Procedure call. A statement.
-(define-ast* Call (Ast) ((no-term annos) (just-term f) (list-of-term args)))
 
 ;; Transient. Corresponds to a let/ec that only escapes to a local,
 ;; immediately surrounding call/cc continuation. 'k' is a label (an
@@ -328,14 +327,14 @@ It is rather important for all Ast derived node types to be
 (define-ast* AppLocalEc (Ast) ((no-term annos) (just-term k) (just-term e)))
 
 ;; Label, either a binding or use context.
-(define-ast* Label (Ast) ((no-term annos) (no-term id)))
+(define-ast* Label (Ast Stat) ((no-term annos) (no-term id)))
 
 ;; Block expression. Contains statements.
 (define-ast* BlockExpr (Ast) ((no-term annos) (list-of-term ss)))
 
 ;; Return statement. For now we only support single value returns. The
 ;; semantics are to escape from a surrounding BlockExpr.
-(define-ast* Return (Ast) ((no-term annos) (just-term e)))
+(define-ast* Return (Ast Stat) ((no-term annos) (just-term e)))
 
 (define-ast* RacketExpr (Ast) ((no-term annos)))
 
@@ -357,11 +356,12 @@ It is rather important for all Ast derived node types to be
                               (no-term modifs) (just-term rtype)
                               (list-of-term params)))
 
-(define-ast* CxxReturnNone (Ast) ((no-term annos)))
+(define-ast* CxxReturnNone (Ast Stat) ((no-term annos)))
 
-(define-ast* CxxReturnOne (Ast) ((no-term annos) (just-term e)))
+(define-ast* CxxReturnOne (Ast Stat) ((no-term annos) (just-term e)))
 
-(define-ast* CxxIfSugar (Ast) ((no-term annos) (just-term c) (just-term t)))
+(define-ast* CxxIfSugar (Ast Stat) ((no-term annos) (just-term c) 
+                                    (just-term t)))
 
 (define-ast* CxxParam (Ast Def) ((no-term annos) (no-term id)
                                  (just-term t)))
@@ -373,13 +373,13 @@ It is rather important for all Ast derived node types to be
 (define-ast* GccStatExpr (Ast) ((no-term annos) (list-of-term ss) (just-term e)))
 
 ;; Local label declaration (GCC extension). A statement.
-(define-ast* GccLabelDecl (Ast) ((no-term annos) (no-term n)))
+(define-ast* GccLabelDecl (Ast Stat) ((no-term annos) (no-term n)))
 
 ;; Label for the following statements. Itself a statement.
-(define-ast* CxxLabel (Ast) ((no-term annos) (no-term n)))
+(define-ast* CxxLabel (Ast Stat) ((no-term annos) (no-term n)))
 
 ;; Where 'n' is a label. A statement.
-(define-ast* Goto (Ast) ((no-term annos) (no-term n)))
+(define-ast* Goto (Ast Stat) ((no-term annos) (no-term n)))
 
 ;; Parenthesized expression.
 (define-ast* Parens (Ast) ((no-term annos) (just-term e)))
