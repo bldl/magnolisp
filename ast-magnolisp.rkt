@@ -25,6 +25,7 @@ It is rather important for all Ast derived node types to be
 (define-view* Def #:fields (id))
 (define-view* Stat #:fields ())
 (define-view* StatCont #:fields (ss))
+(define-view* If ([#:field c] [#:field t] [#:field e]))
 
 (define (get-type ast)
   (hash-ref (Ast-annos ast) 'type #f))
@@ -315,12 +316,12 @@ It is rather important for all Ast derived node types to be
                                 (just-term lv) (just-term rv)))
 
 ;; If expression.
-(define-ast* IfExpr (Ast Expr) ((no-term annos) (just-term c) 
-                                (just-term t) (just-term e)))
+(define-ast* IfExpr (Ast Expr If) ([no-term annos] [just-term c] 
+                                   [just-term t] [just-term e]))
 
 ;; If statement.
-(define-ast* IfStat (Ast Stat) ((no-term annos) (just-term c) 
-                                (just-term t) (just-term e)))
+(define-ast* IfStat (Ast Stat If) ([no-term annos] [just-term c] 
+                                   [just-term t] [just-term e]))
 
 ;; A literal datum.
 (define-ast* Literal (Ast Expr) ((no-term annos) (no-term datum)))

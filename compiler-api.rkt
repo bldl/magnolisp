@@ -183,22 +183,16 @@ optimization.
   (define TRUE? (make-f-pred TRUE-id))
   (define FALSE? (make-f-pred FALSE-id))
   
-  (define-match-expander SomeIf
-    (syntax-rules ()
-      [(_ a c t e)
-       (or (IfExpr a c t e)
-           (IfStat a c t e))]))
-
   (define rw
     (bottomup
      (lambda (ast)
        (match ast
-         ((SomeIf _ c t e)
+         [(If c t e)
           (cond
-           ((TRUE? c) t)
-           ((FALSE? c) e)
-           (else ast)))
-         (_ ast)))))
+           [(TRUE? c) t]
+           [(FALSE? c) e]
+           [else ast])]
+         [_ ast]))))
 
   (map rw defs))
 
