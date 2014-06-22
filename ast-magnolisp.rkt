@@ -24,6 +24,7 @@ It is rather important for all Ast derived node types to be
 (define-view* Type #:fields ())
 (define-view* Def #:fields (id))
 (define-view* Stat #:fields ())
+(define-view* StatCont #:fields (ss))
 
 (define (get-type ast)
   (hash-ref (Ast-annos ast) 'type #f))

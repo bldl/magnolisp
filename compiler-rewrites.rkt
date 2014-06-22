@@ -127,45 +127,6 @@
    (else #f)))
 
 ;;; 
-;;; statement containers
-;;;
-
-(define* (StatCont? ast)
-  (any-pred-holds BlockExpr? BlockStat? LetStat? ast))
-
-(define-match-expander* StatCont
-  (syntax-rules ()
-    [(_ a ss)
-     (or (BlockStat a ss)
-         (BlockExpr a ss)
-         (LetStat a _ ss))]))
-
-(define* (StatCont-ss ast)
-  (match ast
-    [(BlockStat _ ss) ss]
-    [(BlockExpr _ ss) ss]
-    [(LetStat _ _ ss) ss]
-    [_ #f]))
-
-(define* (set-StatCont-ss ast n-ss)
-  (match ast
-    [(BlockExpr a ss)
-     (BlockExpr a n-ss)]
-    [(BlockStat a ss)
-     (BlockStat a n-ss)]
-    [(LetStat a bs ss)
-     (LetStat a bs n-ss)]))
-
-(define* (StatCont-copy ast n-a n-ss)
-  (match ast
-    [(BlockExpr a ss)
-     (BlockExpr n-a n-ss)]
-    [(BlockStat a ss)
-     (BlockStat n-a n-ss)]
-    [(LetStat a bs ss)
-     (LetStat n-a bs n-ss)]))
-
-;;; 
 ;;; types
 ;;; 
 
@@ -218,18 +179,18 @@
   (topdown
    (repeat
     (lambda (ast)
-      (define ss (StatCont-ss ast))
+      (define ss (and (StatCont? ast) (StatCont-ss ast)))
       (cond
-       ((and ss (ormap BlockStat? ss))
+       [(and ss (ormap BlockStat? ss))
         (define n-ss
           (apply append (for/list ((s ss))
                           (if (BlockStat? s)
                               (BlockStat-ss s)
                               (list s)))))
-        (set-StatCont-ss ast n-ss))
-       (else
+        (set-StatCont-ss ast n-ss)]
+       [else
         ;; Signifies failed strategy.
-        #f))))))
+        #f])))))
        
 (define (take-until/inclusive p? lst)
   (define n-lst null)
@@ -248,13 +209,13 @@
 (define ast-rm-dead-code
   (topdown
    (lambda (ast)
-     (define ss (StatCont-ss ast))
+     (define ss (and (StatCont? ast) (StatCont-ss ast)))
      (cond
-      ((and ss (ormap Return? ss))
+      [(and ss (ormap Return? ss))
        (define n-ss (take-until/inclusive Return? ss))
-       (set-StatCont-ss ast n-ss))
-      (else
-       ast)))))
+       (set-StatCont-ss ast n-ss)]
+      [else
+       ast]))))
 
 (define ast-simplify-multi-innermost
   (innermost
