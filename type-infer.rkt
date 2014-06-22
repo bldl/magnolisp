@@ -46,14 +46,18 @@
 
 ;; Returns #f for nodes that have no type.
 (define (ast-get-type ast)
-  (if (Def? ast)
-      (def-get-type ast)
-      (expr-get-type ast)))
+  (cond 
+   [(Def? ast)
+    (def-get-type ast)]
+   [(Expr? ast)
+    (Expr-type ast)]
+   [else
+    #f]))
 
 (define (ast-set-type ast t)
   (if (Def? ast)
       (def-set-type ast t)
-      (expr-set-type ast t)))
+      (set-Expr-type ast t)))
 
 (define (type=? x y)
   (cond
@@ -110,8 +114,8 @@
      (lambda (ast)
        (match ast
          ((? ast-expr?)
-          (define t (type-add-VarT (expr-get-type ast)))
-          (expr-set-type ast t))
+          (define t (type-add-VarT (Expr-type ast)))
+          (set-Expr-type ast t))
          (_ ast)))))
   
   (rw def))
@@ -321,7 +325,7 @@
     (unify var-h x y))
 
   (define (expr-unify! e t)
-    (define e-t (expr-get-type e))
+    (define e-t (Expr-type e))
     (assert e-t)
     (unify! e-t t)
     t)
@@ -480,7 +484,7 @@
        ;; May have an explicit type annotation, instead of an
        ;; auto-assigned type variable. In any case, we cannot learn
        ;; anything new here.
-       (define l-t (expr-get-type ast))
+       (define l-t (Expr-type ast))
        (assert l-t)
        l-t)
 
@@ -505,7 +509,7 @@
        (expr-unify! ast t-t))
 
       ((? RacketExpr?)
-       (expr-get-type ast))
+       (Expr-type ast))
 
       (else
        (raise-argument-error

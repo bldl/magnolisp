@@ -316,7 +316,7 @@ C++ back end.
       ((IfExpr a c t e)
        (IfExpr a (expr->cxx c) (expr->cxx t) (expr->cxx e)))
       ((BlockExpr a ss)
-       (define t (expr-get-type ast))
+       (define t (Expr-type ast))
        (define cxx-t (type->cxx t))
        (define lbl (fresh-ast-identifier 'b))
        (define rval (fresh-ast-identifier 'r))

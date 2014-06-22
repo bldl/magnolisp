@@ -183,11 +183,8 @@
 ;;; types
 ;;; 
 
-(define* (expr-get-type ast)
-  (ast-anno-maybe ast 'type))
-
-(define* (expr-set-type ast t)
-  (ast-anno-set ast 'type t))
+(define* (maybe-Expr-type ast)
+  (and (Expr? ast) (Expr-type ast)))
 
 ;;; 
 ;;; exports

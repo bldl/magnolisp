@@ -341,7 +341,7 @@ optimization.
        (when id
          (set-add! binds (Id-bind id)))
        (when (ast-expr? ast)
-         (when-let t (expr-get-type ast)
+         (when-let t (Expr-type ast)
            (rw t))))))
   
   (rw def)

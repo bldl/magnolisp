@@ -25,6 +25,14 @@ It is rather important for all Ast derived node types to be
 (define-view* Def #:fields (id))
 (define-view* Stat #:fields ())
 
+(define (get-type ast)
+  (hash-ref (Ast-annos ast) 'type #f))
+
+(define (set-type ast t)
+  (set-Ast-annos ast (hash-set (Ast-annos ast) 'type t)))
+
+(define-view* Expr ([#:access type get-type set-type]))
+
 ;;; 
 ;;; annotations
 ;;; 
@@ -288,55 +296,61 @@ It is rather important for all Ast derived node types to be
 
 ;; We only allow a limited form of 'let' expressions. There is a
 ;; 'let-kind annotation.
-(define-ast* LetExpr (Ast) ((no-term annos) (just-term def) (just-term e)))
+(define-ast* LetExpr (Ast Expr) ((no-term annos) (just-term def) 
+                                 (just-term e)))
 
 ;; Sequence of statements.
 (define-ast* BlockStat (Ast Stat) ((no-term annos) (list-of-term ss)))
 
 ;; Variable reference.
-(define-ast* Var (Ast) ((no-term annos) (no-term id)))
+(define-ast* Var (Ast Expr) ((no-term annos) (no-term id)))
 
 ;; Function value.
-(define-ast* Lambda (Ast) ((no-term annos) (list-of-term params) (just-term body)))
+(define-ast* Lambda (Ast Expr) ((no-term annos) (list-of-term params) 
+                                (just-term body)))
 
 ;; Assignment.
 (define-ast* Assign (Ast Stat) ((no-term annos) 
                                 (just-term lv) (just-term rv)))
 
 ;; If expression.
-(define-ast* IfExpr (Ast) ((no-term annos) (just-term c) (just-term t) (just-term e)))
+(define-ast* IfExpr (Ast Expr) ((no-term annos) (just-term c) 
+                                (just-term t) (just-term e)))
 
 ;; If statement.
 (define-ast* IfStat (Ast Stat) ((no-term annos) (just-term c) 
                                 (just-term t) (just-term e)))
 
 ;; A literal datum.
-(define-ast* Literal (Ast) ((no-term annos) (no-term datum)))
+(define-ast* Literal (Ast Expr) ((no-term annos) (no-term datum)))
 
 ;; Function (or predicate) application, with function expression, and
 ;; argument expressions.
-(define-ast* Apply (Ast) ((no-term annos) (just-term f) (list-of-term args)))
+(define-ast* Apply (Ast Expr) ((no-term annos) (just-term f) 
+                               (list-of-term args)))
 
 ;; Transient. Corresponds to a let/ec that only escapes to a local,
 ;; immediately surrounding call/cc continuation. 'k' is a label (an
 ;; ID) naming the continuation.
-(define-ast* LetLocalEc (Ast) ((no-term annos) (just-term k) (list-of-term ss)))
+(define-ast* LetLocalEc (Ast Expr) ((no-term annos) (just-term k) 
+                                    (list-of-term ss)))
 
 ;; Escapes to the named LetLocalEc continuation 'k' (an ID) with the
 ;; value given by expression 'e'.
-(define-ast* AppLocalEc (Ast) ((no-term annos) (just-term k) (just-term e)))
+(define-ast* AppLocalEc (Ast Stat) ((no-term annos) (just-term k) 
+                                    (just-term e)))
 
 ;; Label, either a binding or use context.
 (define-ast* Label (Ast Stat) ((no-term annos) (no-term id)))
 
 ;; Block expression. Contains statements.
-(define-ast* BlockExpr (Ast) ((no-term annos) (list-of-term ss)))
+(define-ast* BlockExpr (Ast Expr) ((no-term annos) (list-of-term ss)))
 
 ;; Return statement. For now we only support single value returns. The
 ;; semantics are to escape from a surrounding BlockExpr.
 (define-ast* Return (Ast Stat) ((no-term annos) (just-term e)))
 
-(define-ast* RacketExpr (Ast) ((no-term annos)))
+(define-ast* RacketExpr (Ast Expr) ((no-term annos)))
 
 ;;; 
 ;;; C++
@@ -370,7 +384,8 @@ It is rather important for all Ast derived node types to be
                                    (just-term t)))
 
 ;; Statement expression (GCC extension).
-(define-ast* GccStatExpr (Ast) ((no-term annos) (list-of-term ss) (just-term e)))
+(define-ast* GccStatExpr (Ast Expr) ((no-term annos) (list-of-term ss) 
+                                     (just-term e)))
 
 ;; Local label declaration (GCC extension). A statement.
 (define-ast* GccLabelDecl (Ast Stat) ((no-term annos) (no-term n)))
@@ -380,14 +395,6 @@ It is rather important for all Ast derived node types to be
 
 ;; Where 'n' is a label. A statement.
 (define-ast* Goto (Ast Stat) ((no-term annos) (no-term n)))
-
-;; Parenthesized expression.
-(define-ast* Parens (Ast) ((no-term annos) (just-term e)))
-
-(define-ast* UnaryOp (Ast) ((no-term annos) (no-term op) (just-term e)))
-(define-ast* BinaryOp (Ast) ((no-term annos) (no-term op) (just-term e1) (just-term e2)))
-(define-ast* TrinaryOp (Ast) ((no-term annos) (no-term op) (just-term e1)
-                              (just-term e2) (just-term e3)))
 
 ;; Top-level verbatim string.
 (define-ast* TlVerbatim (Ast) ((no-term annos) (no-term s)))
@@ -468,6 +475,7 @@ It is rather important for all Ast derived node types to be
     (check-true (Id? (Var-id ast)))
     (check-true (hash? (Ast-annos ast)))
     (check-true (Ast? (set-Ast-annos ast #hasheq())))
+    (check-false (Expr-type ast))
     (let ((a (Ast-annos ast)))
       (check-eq? a (Ast-annos (set-Ast-annos ast a))))
     (let ((a #hasheq((foo . bar))))
