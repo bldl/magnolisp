@@ -62,49 +62,6 @@
     (values (Id-bind (Def-id def)) def)))
 
 ;;; 
-;;; definition IDs
-;;; 
-
-(define-with-contract*
-  (-> any/c (or/c syntax? #f))
-  (get-def-id x)
-  (cond
-   ((identifier? x)
-    (syntax-property x 'def-id))
-   ((Def? x)
-    (get-def-id (Def-id x)))
-   ((Var? x)
-    (get-def-id (Var-id x)))
-   ((NameT? x)
-    (get-def-id (NameT-id x)))
-   (else
-    (raise-argument-error
-     'get-def-id
-     "(or/c identifier? Def? Var? NameT?)"
-     x))))
-
-(define-with-contract*
-  (-> any/c syntax? any/c)
-  (set-def-id x def-id)
-  (cond
-   ((identifier? x)
-    (syntax-property x 'def-id def-id))
-   ((Def? x)
-    (define id (set-def-id (Def-id x) def-id))
-    (Def-copy x id))
-   ((Var? x)
-    (define id (set-def-id (Var-id x) def-id))
-    (struct-copy Var x (id id)))
-   ((NameT? x)
-    (define id (set-def-id (NameT-id x) def-id))
-    (struct-copy NameT x (id id)))
-   (else
-    (raise-argument-error
-     'set-def-id
-     "(or/c identifier? Def? Var? NameT?)"
-     0 x def-id))))
-
-;;; 
 ;;; names
 ;;; 
 

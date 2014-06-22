@@ -266,30 +266,30 @@ C++ back end.
   
   (define (def->cxx ast)
     (match ast
-      ((Defun a id t ps b)
+      [(Defun a id t ps b)
        (define foreign? (and (get-foreign-name a) #t))
        (CxxDefun a id null (type->cxx (FunT-rt t))
                  (map def->cxx ps)
                  (if foreign?
                      null
-                     (list (annoless CxxReturnOne (expr->cxx b))))))
-      ((Param a id t)
-       (CxxParam a id (annoless RefT (annoless ConstT (type->cxx t)))))
-      ((DefVar a id t v)
-       (DefVar a id (type->cxx t) (expr->cxx v)))
-      (_
+                     (list (annoless CxxReturnOne (expr->cxx b)))))]
+      [(Param a id t)
+       (CxxParam a id (annoless RefT (annoless ConstT (type->cxx t))))]
+      [(DefVar a id t v)
+       (DefVar a id (type->cxx t) (expr->cxx v))]
+      [_
        (raise-argument-error
-        'def->cxx "supported definition Ast?" ast))))
+        'def->cxx "supported Def?" ast)]))
   
   (define (stat->cxx ast)
     (match ast
-      ((IfStat a c t e)
+      [(IfStat a c t e)
        (if (and (BlockStat? e) (null? (BlockStat-ss e)))
            (CxxIfSugar a (expr->cxx c) (stat->cxx t))
-           (IfStat a (expr->cxx c) (stat->cxx t) (stat->cxx e))))
-      ((BlockStat a ss)
-       (BlockStat a (map stat->cxx ss)))
-      ((Return a e)
+           (IfStat a (expr->cxx c) (stat->cxx t) (stat->cxx e)))]
+      [(BlockStat a ss)
+       (BlockStat a (map stat->cxx ss))]
+      [(Return a e)
        (define tgt (b-tgt))
        (unless tgt
          (raise-language-error/ast
@@ -298,24 +298,24 @@ C++ back end.
        (BlockStat a (list (annoless Assign
                                     (annoless Var (cdr tgt))
                                     (expr->cxx e))
-                          (annoless Goto (car tgt)))))
-      ((LetStat a dv ss)
-       (BlockStat a (cons (def->cxx dv) (map stat->cxx ss))))
-      ((Assign a lhs rhs)
-       (Assign a (expr->cxx lhs) (expr->cxx rhs)))
-      (_
+                          (annoless Goto (car tgt))))]
+      [(LetStat a dv ss)
+       (BlockStat a (cons (def->cxx dv) (map stat->cxx ss)))]
+      [(Assign a lhs rhs)
+       (Assign a (expr->cxx lhs) (expr->cxx rhs))]
+      [_
        (raise-argument-error
-        'stat->cxx "supported statement Ast?" ast))))
+        'stat->cxx "supported Stat?" ast)]))
   
   (define (expr->cxx ast)
     (match ast
-      ((? Var?)
-       ast)
-      ((Apply a f es)
-       (Apply a f (map expr->cxx es)))
-      ((IfExpr a c t e)
-       (IfExpr a (expr->cxx c) (expr->cxx t) (expr->cxx e)))
-      ((BlockExpr a ss)
+      [(? Var?)
+       ast]
+      [(Apply a f es)
+       (Apply a f (map expr->cxx es))]
+      [(IfExpr a c t e)
+       (IfExpr a (expr->cxx c) (expr->cxx t) (expr->cxx e))]
+      [(BlockExpr a ss)
        (define t (Expr-type ast))
        (define cxx-t (type->cxx t))
        (define lbl (fresh-ast-identifier 'b))
@@ -330,16 +330,16 @@ C++ back end.
                  (annoless CxxDeclVar rval cxx-t))
                 n-ss
                 (list (annoless CxxLabel lbl)))
-        (annoless Var rval)))
-      ((Literal a d)
-       (Literal a (syntax->datum d)))
-      (_
+        (annoless Var rval))]
+      [(Literal a d)
+       (Literal a (syntax->datum d))]
+      [_
        (raise-argument-error
-        'expr->cxx "supported expression Ast?" ast))))
+        'expr->cxx "supported Expr?" ast)]))
   
   (define (type->cxx ast)
     (match ast
-      ((NameT _ id)
+      [(NameT _ id)
        (define def (ast-identifier-lookup defs-t id))
        (unless def
          (raise-language-error/ast
@@ -347,10 +347,10 @@ C++ back end.
           ast id))
        (match def
          ((ForeignTypeDecl _ _ cxx-t)
-          cxx-t)))
-      (_
+          cxx-t))]
+      [_
        (raise-argument-error
-        'type->cxx "supported type expression Ast?" ast))))
+        'type->cxx "supported Type?" ast)]))
   
   (filter
    values
@@ -368,12 +368,12 @@ C++ back end.
     (topdown
      (lambda (ast)
        (cond
-        ((and (LetStat? ast) (Defun? (LetStat-def ast)))
+        [(and (LetStat? ast) (Defun? (LetStat-def ast)))
          (match-define (LetStat a b ss) ast)
          (do-Defun b)
-         (BlockStat a ss))
-        (else
-         ast)))))
+         (BlockStat a ss)]
+        [else
+         ast]))))
   
   (define (do-Defun ast)
     (match-define (Defun a id t ps b) ast)
