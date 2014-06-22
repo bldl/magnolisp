@@ -113,10 +113,10 @@
     (topdown
      (lambda (ast)
        (match ast
-         ((? ast-expr?)
+         [(? Expr?)
           (define t (type-add-VarT (Expr-type ast)))
-          (set-Expr-type ast t))
-         (_ ast)))))
+          (set-Expr-type ast t)]
+         [_ ast]))))
   
   (rw def))
 

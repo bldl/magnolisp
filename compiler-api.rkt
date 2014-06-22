@@ -340,7 +340,7 @@ optimization.
        (define id (name-ref-id/maybe ast))
        (when id
          (set-add! binds (Id-bind id)))
-       (when (ast-expr? ast)
+       (when (Expr? ast)
          (when-let t (Expr-type ast)
            (rw t))))))
   

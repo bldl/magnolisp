@@ -127,20 +127,6 @@
    (else #f)))
 
 ;;; 
-;;; expressions
-;;; 
-
-(define* (ast-expr? ast)
-  (any-pred-holds
-   Apply?
-   BlockExpr?
-   IfExpr?
-   Literal?
-   RacketExpr?
-   Var?
-   ast))
-
-;;; 
 ;;; statement containers
 ;;;
 
