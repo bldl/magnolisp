@@ -357,7 +357,7 @@ Assumptions for AST node types:
 (module* test #f
   (require racket rackunit)
 
-  (define-view Ast #:fields (annos))
+  (define-view Ast (#:fields annos))
 
   (define-ast Singleton (Ast) ((no-term annos)) #:singleton (#hasheq()))
   (define-ast Empty (Ast) ((no-term annos)))

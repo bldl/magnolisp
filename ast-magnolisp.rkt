@@ -19,12 +19,12 @@ It is rather important for all Ast derived node types to be
 ;;; abstract nodes
 ;;; 
 
-(define-view* Ast #:fields (annos))
-(define-view* Anno #:fields ())
-(define-view* Type #:fields ())
-(define-view* Def #:fields (id))
-(define-view* Stat #:fields ())
-(define-view* StatCont #:fields (ss))
+(define-view* Ast (#:fields annos))
+(define-view* Anno ())
+(define-view* Type ())
+(define-view* Def (#:fields id))
+(define-view* Stat ())
+(define-view* StatCont (#:fields ss))
 (define-view* If ([#:field c] [#:field t] [#:field e]))
 
 (define (get-type ast)

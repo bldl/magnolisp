@@ -66,7 +66,7 @@
 (let ((e (Lit #hasheq() 6)))
   (check-eq? 'int (Expr-type (set-Expr-type e 'int))))
 
-(define-view Num #:fields (num)
+(define-view Num (#:fields num)
   #:generics-options
   (#:defaults ([number? 
                 (define (Num-num x) x)

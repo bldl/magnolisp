@@ -6,7 +6,7 @@ Definition and implementation of "views".
 
 E.g.,
 
-  (define-view* Def #:fields (annos id))
+  (define-view* Def (#:fields annos id))
 
 and then, within a macro, generate-view-methods may be used to
 generate syntax for an implementation of the relevant generic methods
@@ -150,10 +150,10 @@ E.g.,
     [pattern (#:access fld:id get:expr set:expr)
              #:attr spec (list #'fld #'get #'set)])
 
-  (define-splicing-syntax-class vflds
+  (define-syntax-class vflds
     #:description "view fields specification"
     #:attributes (spec-lst)
-    [pattern (~seq #:fields (fld:id ...))
+    [pattern (#:fields fld:id ...)
              #:attr spec-lst (map
                               (lambda (id) (list id #f #f))
                               (syntax->list #'(fld ...)))]
