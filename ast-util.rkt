@@ -343,7 +343,7 @@ Assumptions for AST node types:
          #,@(apply append
                    (for/list ([view-spec (attribute view.spec)])
                      (generate-view-methods conc-id
-                                            (car view-spec)
+                                            view-spec
                                             singleton?)))
          #:transparent
          #,@(if (attribute opt)
@@ -441,5 +441,11 @@ Assumptions for AST node types:
       (unless (hash-empty? annos)
         ;;(writeln `(UNMARSHALED ANNOS ,annos))
         (void))))
+  
+  (define-view HasX (#:fields x))
+  (define-ast FunnyCopy ([HasX (#:copy (lambda (fc x)
+                                         (FunnyCopy 5)))])
+    ([no-term x]))
+  (check-eqv? 5 (HasX-x (HasX-copy (FunnyCopy 1) 7)))
 
   (void))
