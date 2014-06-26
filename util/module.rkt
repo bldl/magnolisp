@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require racket/contract racket/generic racket/match racket/stxparam
+         syntax/parse
          (for-syntax racket/base racket/syntax
                      syntax/define syntax/parse))                     
 
@@ -143,6 +144,28 @@
              (meth . formals) ...
              #,@(syntax->list #'post))
            (provide gen pred c meth ...)))]))
+
+(define-syntax* define-syntax-class*
+  (syntax-rules ()
+    [(_ (name-id . kw-formals) . rest)
+     (begin
+       (define-syntax-class (name-id . kw-formals) . rest)
+       (provide name-id))]
+    [(_ name-id . rest)
+     (begin
+       (define-syntax-class name-id . rest)
+       (provide name-id))]))
+
+(define-syntax* define-splicing-syntax-class*
+  (syntax-rules ()
+    [(_ (name-id . kw-formals) . rest)
+     (begin
+       (define-splicing-syntax-class (name-id . kw-formals) . rest)
+       (provide name-id))]
+    [(_ name-id . rest)
+     (begin
+       (define-splicing-syntax-class name-id . rest)
+       (provide name-id))]))
 
 #|
 

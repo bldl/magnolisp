@@ -98,6 +98,37 @@ E.g.,
 ;;; view definition
 ;;; 
 
+(begin-for-syntax
+  (define-syntax-class vfld
+    #:description "view field specification"
+    #:attributes (spec)
+    [pattern (#:field fld:id) 
+             #:attr spec (list #'fld #f #f)]
+    [pattern (#:access fld:id get:expr set:expr)
+             #:attr spec (list #'fld #'get #'set)])
+
+  (define-splicing-syntax-class vflds
+    #:description "view fields specification"
+    #:attributes (spec-lst)
+    [pattern (~seq #:fields fld:id ...)
+             #:attr spec-lst (map
+                              (lambda (id) (list id #f #f))
+                              (syntax->list #'(fld ...)))]
+    [pattern (~seq fld:vfld ...)
+             #:attr spec-lst (attribute fld.spec)])
+  
+  (define-syntax-class vspec
+    #:description "view implementation specification"
+    #:attributes (fspec-lst)
+    [pattern (flds:vflds)
+             #:attr fspec-lst (attribute flds.spec-lst)])
+  
+  (define-syntax-class vspec-with-copy
+    #:description "view implementation specification"
+    #:attributes (fspec-lst copy)
+    [pattern (flds:vflds (~optional (~seq #:copy copy:expr)))
+             #:attr fspec-lst (attribute flds.spec-lst)]))
+
 (define-for-syntax (make-define-view def-gen-id def-stx-id 
                                      def-pat-id def-fun-id stx)
   (define (generate view-id fld-spec-lst opt-stx-lst)
@@ -142,29 +173,11 @@ E.g.,
             def-pat
             def-equ))))
   
-  (define-syntax-class vfld
-    #:description "view field specification"
-    #:attributes (spec)
-    [pattern (#:field fld:id) 
-             #:attr spec (list #'fld #f #f)]
-    [pattern (#:access fld:id get:expr set:expr)
-             #:attr spec (list #'fld #'get #'set)])
-
-  (define-syntax-class vflds
-    #:description "view fields specification"
-    #:attributes (spec-lst)
-    [pattern (#:fields fld:id ...)
-             #:attr spec-lst (map
-                              (lambda (id) (list id #f #f))
-                              (syntax->list #'(fld ...)))]
-    [pattern (fld:vfld ...)
-             #:attr spec-lst (attribute fld.spec)])
-  
   (syntax-parse stx
-    [(_ view:id flds:vflds
+    [(_ view:id flds:vspec
         (~optional (~seq #:generics-options (opt ...))))
      (generate #'view 
-               (attribute flds.spec-lst)
+               (attribute flds.fspec-lst)
                (if (attribute opt)
                    (syntax->list #'(opt ...))
                    null))]))
