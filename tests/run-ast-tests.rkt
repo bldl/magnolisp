@@ -87,3 +87,24 @@
 (check-eqv? 15 (match (cons 7 (HasNum 8))
                  [(cons (Num x) (Num y)) (+ x y)]
                  [_ #f]))
+
+(define-view HasX (#:fields x))
+(define-ast FunnyCopy ([HasX (#:copy (lambda (fc x)
+                                       (FunnyCopy 5)))])
+  ([no-term x]))
+(check-eqv? 5 (HasX-x (HasX-copy (FunnyCopy 1) 7)))
+
+(define-ast FunnyOverride ([HasX ([#:field x])]) ([no-term x]))
+(check-eqv? 6 (HasX-x (FunnyOverride 6)))
+
+(define-ast SevenX ([HasX ([#:access x (lambda (obj) 7) (lambda (obj x) obj)])])
+  ([no-term x]))
+(check-eqv? 7 (HasX-x (set-HasX-x (SevenX 9) 8)))
+
+(define (AC-getter obj)
+  (AC-c obj))
+(define (AC-setter obj b)
+  (struct-copy AC obj [c b]))
+(define-ast AC (A [AB ([#:access b AC-getter AC-setter])])
+  ([no-term a] [no-term c]))
+(check-match (A-copy (AB-copy (AC 1 2) 4 5) 6) (AC 6 5))

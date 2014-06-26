@@ -372,7 +372,7 @@ Assumptions for AST node types:
   (define-view Ast (#:fields annos))
 
   (define-ast Singleton (Ast) ((no-term annos)) #:singleton (#hasheq()))
-  (define-ast Empty ([Ast (#:fields annos)]) ((no-term annos)))
+  (define-ast Empty (Ast) ([no-term annos]))
   (define-ast Some (Ast) ((no-term annos) (just-term thing)))
   (define-ast Object (Ast) ((no-term annos) (just-term one) 
                             (list-of-term many)))
@@ -442,10 +442,4 @@ Assumptions for AST node types:
         ;;(writeln `(UNMARSHALED ANNOS ,annos))
         (void))))
   
-  (define-view HasX (#:fields x))
-  (define-ast FunnyCopy ([HasX (#:copy (lambda (fc x)
-                                         (FunnyCopy 5)))])
-    ([no-term x]))
-  (check-eqv? 5 (HasX-x (HasX-copy (FunnyCopy 1) 7)))
-
   (void))

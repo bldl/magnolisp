@@ -203,14 +203,36 @@ E.g.,
 ;; #'V '() #f)) -> (list #'#:methods #'gen:V (...)).
 (define-for-syntax* (generate-view-methods conc-id view-spec [singleton? #f])
   (define view-id (car view-spec))
+  (define fld-override-lst (cadr view-spec))
   (define copy-lambda-stx (caddr view-spec))
   (define view-name (syntax-e view-id))
   (define conc-name (syntax-e conc-id))
   (define fld-info-lst
     ;; Note that this call requires transformer context.
     (syntax-local-value (format-id view-id "view:~a" view-name)))
+  
+  (unless (null? fld-override-lst)
+    ;;(write `(before override ,fld-info-lst)) (newline)
+    (define h (make-hasheq))
+    (for ([fld fld-override-lst])
+      (hash-set! h (syntax-e (car fld)) fld))
+    (set! fld-info-lst 
+          (for/list ([fld fld-info-lst])
+            (define n (syntax-e (car fld)))
+            (define e (hash-ref h n #f))
+            (if e 
+                (begin0 e
+                  (hash-remove! h n))
+                fld)))
+    (unless (hash-empty? h)
+      (error 'generate-view-methods
+             "overrides for non-existent fields of view ~a of ~a: ~a"
+             view-name conc-name (hash-keys h)))
+    ;;(write `(after override ,fld-info-lst)) (newline)
+    (void))
+  
   (define fld-id-lst (map car fld-info-lst))
-
+  
   (define (mk-setter-id fld-name)
     (format-id view-id "set-~a-~a" view-name fld-name))
   
