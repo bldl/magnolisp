@@ -127,7 +127,9 @@ E.g.,
     #:description "view implementation specification"
     #:attributes (fspec-lst copy)
     [pattern (flds:vflds (~optional (~seq #:copy copy:expr)))
-             #:attr fspec-lst (attribute flds.spec-lst)]))
+             #:attr fspec-lst (attribute flds.spec-lst)])
+  
+  (provide vspec-with-copy))
 
 (define-for-syntax (make-define-view def-gen-id def-stx-id 
                                      def-pat-id def-fun-id stx)

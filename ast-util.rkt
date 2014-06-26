@@ -291,8 +291,18 @@ Assumptions for AST node types:
     (pattern (~or (~datum no-term)
                   (~datum just-term)
                   (~datum list-of-term))))
+  
+  (define-syntax-class vw
+    #:attributes (spec)
+    (pattern v-id:id
+             #:attr spec (list #'v-id null #f))
+    (pattern (v-id:id v-spec:vspec-with-copy)
+             #:attr spec (list #'v-id 
+                               (attribute v-spec.fspec-lst)
+                               (attribute v-spec.copy))))
+  
   (syntax-parse stx
-    [(_ name:id (view:id ...) ((t:ft fld:id) ...)
+    [(_ name:id (view:vw ...) ((t:ft fld:id) ...)
         (~optional (~seq #:singleton (arg:expr ...)))
         (~optional (~seq #:custom-write writer:expr))
         (~optional (~seq #:struct-options (opt ...))))
@@ -331,8 +341,10 @@ Assumptions for AST node types:
                                       conc-id
                                       (syntax->list #'((t fld) ...))))
          #,@(apply append
-                   (for/list ([view-id (syntax->list #'(view ...))])
-                     (generate-view-methods conc-id view-id singleton?)))
+                   (for/list ([view-spec (attribute view.spec)])
+                     (generate-view-methods conc-id
+                                            (car view-spec)
+                                            singleton?)))
          #:transparent
          #,@(if (attribute opt)
                 (syntax->list #'(opt ...))
@@ -360,7 +372,7 @@ Assumptions for AST node types:
   (define-view Ast (#:fields annos))
 
   (define-ast Singleton (Ast) ((no-term annos)) #:singleton (#hasheq()))
-  (define-ast Empty (Ast) ((no-term annos)))
+  (define-ast Empty ([Ast (#:fields annos)]) ((no-term annos)))
   (define-ast Some (Ast) ((no-term annos) (just-term thing)))
   (define-ast Object (Ast) ((no-term annos) (just-term one) 
                             (list-of-term many)))
