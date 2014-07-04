@@ -1,4 +1,4 @@
-#lang setup/infotab
+#lang info
 (define collection "magnolisp")
 (define name "Magnolisp")
 (define blurb
@@ -8,3 +8,4 @@
 (define racket-launcher-libraries '("compiler-cli.rkt"))
 (define racket-launcher-names '("mglc"))
 (define compile-omit-paths '("failing" "retired"))
+(define deps '(("base" #:version "6.0")))
