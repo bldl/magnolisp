@@ -66,4 +66,4 @@ setup :
 	raco setup magnolisp
 
 test :
-	raco test tests/run-*.rkt
+	raco test --direct --run-if-absent tests/run-*.rkt
