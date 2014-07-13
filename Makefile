@@ -4,10 +4,10 @@ default : setup
 
 -include local.mk
 
-install :
+uncrustify-install :
 	-ln -s $(PWD)/etc/uncrustify.cfg $(HOME)/.uncrustify.cfg
 
-sys-install :
+uncrustify-sys-install :
 	sudo aptitude install uncrustify
 
 # 'raco setup' can also do this
