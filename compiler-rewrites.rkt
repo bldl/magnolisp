@@ -137,8 +137,10 @@
    (repeat
     (lambda (ast)
       (define ss (and (StatCont? ast) (StatCont-ss ast)))
+      ;;(when ss (pretty-print `(considering ,ast)))
       (cond
        [(and ss (ormap BlockStat? ss))
+        ;;(pretty-print `(simplifying ,ast))
         (define n-ss
           (apply append (for/list ((s ss))
                           (if (BlockStat? s)

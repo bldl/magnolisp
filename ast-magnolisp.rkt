@@ -293,8 +293,8 @@ It is rather important for all Ast derived node types to be
 ;; 'def' contains a DefVar term. 'let-kind annotation has either
 ;; 'let-values or 'letrec-values or 'letrec-syntaxes+values; we mostly
 ;; do not care, since Racket has done name resolution.
-(define-ast* LetStat (Ast Stat) ((no-term annos) 
-                                 (just-term def) (list-of-term ss)))
+(define-ast* LetStat (Ast Stat StatCont) 
+  ((no-term annos) (just-term def) (list-of-term ss)))
 
 ;; We only allow a limited form of 'let' expressions. There is a
 ;; 'let-kind annotation.
@@ -302,7 +302,8 @@ It is rather important for all Ast derived node types to be
                                  (just-term e)))
 
 ;; Sequence of statements.
-(define-ast* BlockStat (Ast Stat) ((no-term annos) (list-of-term ss)))
+(define-ast* BlockStat (Ast Stat StatCont) 
+  ((no-term annos) (list-of-term ss)))
 
 ;; Variable reference.
 (define-ast* Var (Ast Expr) ((no-term annos) (no-term id)))
@@ -334,8 +335,8 @@ It is rather important for all Ast derived node types to be
 ;; Transient. Corresponds to a let/ec that only escapes to a local,
 ;; immediately surrounding call/cc continuation. 'k' is a label (an
 ;; ID) naming the continuation.
-(define-ast* LetLocalEc (Ast Expr) ((no-term annos) (just-term k) 
-                                    (list-of-term ss)))
+(define-ast* LetLocalEc (Ast Expr) 
+  ((no-term annos) (just-term k) (list-of-term ss)))
 
 ;; Escapes to the named LetLocalEc continuation 'k' (an ID) with the
 ;; value given by expression 'e'.
@@ -346,7 +347,8 @@ It is rather important for all Ast derived node types to be
 (define-ast* Label (Ast Stat) ((no-term annos) (no-term id)))
 
 ;; Block expression. Contains statements.
-(define-ast* BlockExpr (Ast Expr) ((no-term annos) (list-of-term ss)))
+(define-ast* BlockExpr (Ast Expr StatCont) 
+  ((no-term annos) (list-of-term ss)))
 
 ;; Return statement. For now we only support single value returns. The
 ;; semantics are to escape from a surrounding BlockExpr.
