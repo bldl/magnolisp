@@ -1,4 +1,5 @@
-PROJ_NAME := magnolisp
+VERSION := 
+PROJ_NAME := magnolisp$(and $(VERSION),-$(VERSION))
 
 default : setup
 
