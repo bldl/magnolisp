@@ -212,6 +212,31 @@ Meta-Compilation of Language Abstractions (2006).
     (s ast) ...
     (void)))
 
+(struct Break () #:transparent)
+(struct BreakWith (v) #:transparent)
+
+(define-syntax* break
+  (syntax-rules ()
+    ((_ v)
+     (BreakWith v))
+    ((_)
+     (Break))))
+
+;; A sequence that may be interrupted without failing by invoking `break`.
+(define-syntax-rule* (seq-break s ...)
+  (lambda (ast)
+    (let/ec k 
+      (and (begin (set! ast (s ast))
+                  (when (BreakWith? ast)
+                    (k (BreakWith-v ast)))
+                  ast) ...
+           ast))))
+
+(define-syntax-rule* (seq-visit-break s ...)
+  (lambda (ast)
+    (and (not (Break? (s ast))) ...)
+    (void)))
+
 (define* (try s)
   (alt s id-rw))
 
@@ -247,6 +272,14 @@ Meta-Compilation of Language Abstractions (2006).
   (rec again s
        (seq-visit s (all-visit again))))
 
+(define* topdown-break
+  (rec again s
+       (seq-break s (all again))))
+
+(define* topdown-visit-break
+  (rec again s
+       (seq-visit-break s (all-visit again))))
+
 (define* bottomup
   (rec again s
        (seq (all again) s)))
@@ -262,6 +295,32 @@ Meta-Compilation of Language Abstractions (2006).
 (define* innermost
   (rec again s
        (bottomup (try (seq s again)))))
+
+(module+ test
+  (struct List (lst)
+          #:methods gen:strategic
+          [(define (all-visit-term s strategic)
+             (all-visit-list s (List-lst strategic)))
+           (define (all-rw-term s strategic)
+             (define r (all-rw-list s (List-lst strategic)))
+             (and r (List r)))
+           (define (some-rw-term s strategic)
+             (define r (some-rw-list s (List-lst strategic)))
+             (and r (List r)))
+           (define (one-rw-term s strategic)
+             (define r (one-rw-list s (List-lst strategic)))
+             (and r (List r)))])
+  
+  (define lst (List '(1 2 3)))
+  (let ((x 0))
+    (define (s ast) (set! x (add1 x)))
+    (define (br ast) (break))
+    ((all-visit s) lst)
+    (check-eqv? x 3)
+    ((seq-visit-break (all-visit s) (all-visit s)) lst)
+    (check-eqv? x 9)
+    ((seq-visit-break (all-visit s) br (all-visit s)) lst)
+    (check-eqv? x 12)))
 
 ;;; 
 ;;; Dynamic rule scope.
