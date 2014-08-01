@@ -68,6 +68,10 @@
     (provide (struct-out nm))))
 
 (define-syntax-rule*
+  (abstract-struct nm rest ...)
+  (struct nm rest ... #:constructor-name ctor))
+
+(define-syntax-rule*
   (abstract-struct* nm rest ...)
   (begin
     (struct nm rest ... #:constructor-name ctor)
