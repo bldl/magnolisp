@@ -3,10 +3,15 @@
 #|
 |#
 
-(require "ast-magnolisp.rkt" "backend-util.rkt" "util.rkt")
+(require "ast-magnolisp.rkt" "backend-util.rkt" 
+         (rename-in "pp-yield.rkt" [pp pp-y]) "util.rkt")
 
-(define (join sep lst)
-  (string-join lst sep))
+(define (pp . ds)
+  (call-with-output-string
+   (lambda (out)
+     (define (yield s)
+       (display s out))
+     (pp-y #:yield yield ds))))
 
 (define (ew-error sym msg v)
   (error sym (string-append msg ": ~s") v))
@@ -16,33 +21,19 @@
     ((_ f pat)
      (app f (and (? values) pat)))))
 
-(define ew-indent (make-parameter 0))
-
-(define (push-indent) (ew-indent (+ (ew-indent) 1)))
-(define (pop-indent) (ew-indent (- (ew-indent) 1)))
-
-(define-syntax indent-more
-  (syntax-rules ()
-    ((_ expr)
-     (parameterize ((ew-indent (+ 1 (ew-indent)))) expr))))
-
-(define (indent-before str)
-  (let loop ((i (ew-indent)))
-    (if (zero? i) str (string-append "  " (loop (- i 1))))))
-
 (define* (format-c decl*)
   (let ((decl* (map format-decl decl*)))
-    (string-append (join "\n\n" decl*) "\n")))
+    (string-join decl* "\n\n")))
 
 (define (format-defun name modifs type args [stmt* null])
-  (string-append (space-join (append modifs (list type)))
-                 " " (symbol->string name) "(" args ")"
-                 (if (null? stmt*)
-                     ";\n"
-                     (string-append
-                      " {\n"
-                      (join "\n" (indent-more (map format-stat stmt*)))
-                      "\n}\n"))))
+  (pp (add-between (append modifs (list type)) " ")
+      " " (symbol->string name) "(" args ")"
+      (if (null? stmt*)
+          ";"
+          `((in " {"
+                ,(for/list ((x stmt*))
+                   `(br ,(format-stat x)))
+                ) br "}"))))
 
 (define (format-decl decl)
   (match decl
@@ -51,9 +42,9 @@
        (if (eq? kind 'user)
            (values "\"" "\"")
            (values "<" ">")))
-     (string-append "#include " lq header rq "\n\n"))
+     (string-append "#include " lq header rq))
     ((TlVerbatim _ s)
-     (string-append s "\n"))
+     s)
     ((CxxDefun _ name modifs
                [format-type . produces . type]
                [format-params . produces . args] stmt*)
@@ -62,140 +53,68 @@
             [format-type . produces . type]
             [format-params . produces . args])
      (format-defun name modifs type args))
-    ;; ((extern ,[format-type . produces . type] ,[format-ident . produces . name]
-    ;;          (,[format-type . produces . args] ...))
-    ;;  (string-append type " " name "(" (join ", " args) ");\n"))
-    ;; ((typedef ,[format-ident . produces . name] ,[format-type . produces . type])
-    ;;  (string-append "typedef " type " " name " ;\n"))
     (else (ew-error 'format-decl "could not format" else))))
+
+(define (format-sub-stats ss)
+  (if (null? ss)
+      '(in br "{}")
+      `(" {" (in ,(for/list ((s ss))
+                   `(br ,(format-stat s)))) br "}")))
 
 (define (format-stat stmt)
   (match stmt
     ((BlockStat _ stmt*)
-     (string-append
-      (indent-before "{\n")
-      (join "\n" (indent-more (map format-stat stmt*)))
-      "\n"
-      (indent-before "}")))
+     (if (null? stmt*)
+         "{}"
+         `("{"
+           (in ,(for/list ((s stmt*))
+                  `(br ,(format-stat s))))
+           br "}")))
     ((DefVar _ [format-ident . produces . ident]
        [format-type . produces . type]
        [format-expr . produces . expr])
-     (indent-before
-      (string-append type " " ident " = " expr ";")))
+     (list type " " ident " = " expr ";"))
     ((CxxDeclVar _ [format-ident . produces . ident]
        [format-type . produces . type])
-     (indent-before
-      (string-append type " " ident ";")))
-    ;; ((let ,[format-ident . produces . ident] (fixed-array ,[format-type . produces . type] ,i)
-    ;;       ,[format-expr . produces . expr])
-    ;;  (indent-before
-    ;;   (string-append type " " ident "[" (number->string i) "] = " expr ";")))
-    ;; ((let ,[format-ident . produces . ident] ,[format-type . produces . type]
-    ;;       ,[format-expr . produces . expr])
-    ;;  (indent-before
-    ;;   (string-append type " " ident " = " expr ";")))
-    ;; ((let ,[format-ident . produces . ident] ,[format-type . produces . type])
-    ;;  (indent-before
-    ;;   (string-append type " " ident ";")))
-    ((CxxIfSugar _ [format-expr . produces . test] conseq)
-     (string-append
-      (indent-before (string-append "if (" test ")\n"))
-      (indent-more (format-stat conseq))))
-    ((IfStat _ [format-expr . produces . test] conseq alt)
-     (string-append
-      (indent-before (string-append "if (" test ")\n"))
-      (indent-more (format-stat conseq))
-      "\n"
-      (indent-before "else\n")
-      (indent-more (format-stat alt))))
+     (list type " " ident ";"))
+    ((PpCxxIfStat _ [format-expr . produces . test] ts es)
+     `("if (" ,test ")"
+       ,(format-sub-stats ts)
+       ,(and (not (null? es))
+             `(,(if (null? ts) 'br " ")
+               "else "
+               ,(format-sub-stats es)))))
     ((CxxReturnOne _ [format-expr . produces . expr])
-     (indent-before (string-append "return " expr ";")))
+     (list "return " expr ";"))
     ((Assign _ [format-expr . produces . x] [format-expr . produces . v])
-     (indent-before (string-append x " = " v ";")))
-    ;; ((vector-set! ,[format-expr . produces . vec-expr]
-    ;;               ,[format-expr . produces . i-expr] ,[format-expr . produces . val-expr])
-    ;;  (indent-before
-    ;;   (string-append vec-expr "[" i-expr "] = " val-expr ";")))
+     (list x " = " v ";"))
     ((Goto _ name)
-     (indent-before (string-append "goto " (format-ident name) ";")))
+     (string-append "goto " (format-ident name) ";"))
     ((GccLabelDecl _ name)
      (string-append "__label__ " (format-ident name) ";"))
     ((CxxLabel _ name)
      (string-append (format-ident name) ":"))
-    ;; ((while ,[format-expr . produces . expr] ,stmt)
-    ;;  (string-append
-    ;;   (indent-before (string-append "while(" expr ")\n"))
-    ;;   (indent-more (format-stat stmt))))
-    ;; ((for (,[format-ident . produces . i]
-    ;;        ,[format-expr . produces . start]
-    ;;        ,[format-expr . produces . end])
-    ;;    ,stmt)
-    ;;  (string-append
-    ;;   (indent-before
-    ;;    (string-append
-    ;;     "for(int " i " = " start "; " i " < " end "; ++" i ")\n"))
-    ;;   (indent-more (format-stat stmt))))
-    ;; ((for (,[format-ident . produces . i]
-    ;;        ,[format-expr . produces . start]
-    ;;        ,[format-expr . produces . end]
-    ;;        ,[format-expr . produces . step])
-    ;;    ,stmt)
-    ;;  (string-append
-    ;;   (indent-before
-    ;;    (string-append
-    ;;     "for(int " i " = " start "; " i " < " end "; " i "= (" i " + " step "))\n"))
-    ;;   (indent-more (format-stat stmt))))
-    ;; ((do ,[format-expr . produces . e])
-    ;;  (indent-before (string-append e ";")))
     (else (ew-error 'format-stat "could not format" else))))
 
 (define (format-expr expr)
   (match expr
     ((GccStatExpr _ ss e)
-     (string-append
-      "({ "
-      (join "\n" (append (map format-stat ss)
-                         (list (string-append (format-expr e) ";"))))
-      " })"))
-    ;; ((empty-struct) "{0}")
-    ;; ((field ,[obj] ,x)
-    ;;  (string-append obj "." (format-ident x)))
-    ;; ((field ,[obj] ,x ,[format-type . produces . t])
-    ;;  (string-append obj "." (format-ident x) "<" t ">"))
+     `("({ " (in ,(for/list ((s ss))
+                    `(br ,(format-stat s)))
+                 br ,(format-expr e) ";") " })"))
     ((IfExpr _ [format-expr . produces . test]
              [format-expr . produces . conseq]
              [format-expr . produces . alt])
-     (string-append "(" test ") ? (" conseq ") : (" alt ")"))
-    ;; ((vector-ref ,[format-expr . produces . v]
-    ;;              ,[format-expr . produces . i])
-    ;;  (string-append v "[" i "]"))
-    ;; ((sizeof ,[format-type . produces . t])
-    ;;  (string-append "sizeof(" t ")"))
-    ;; ((deref ,[format-expr . produces . p])
-    ;;  (string-append "*" p))
-    ;; ((cast ,[format-type . produces . t] ,[e])
-    ;;  (string-append "((" t ")(" e "))"))
-    ;; ((addressof ,[format-expr . produces . e])
-    ;;  (string-append "(&(" e "))"))
-    ;; ((,op ,[format-expr . produces . lhs] ,[format-expr . produces . rhs])
-    ;;  (guard (binop? op))
-    ;;  (string-append "(" lhs ") " (format-binop op) " (" rhs ")"))
-    ;; ((,op ,[format-expr . produces . lhs] ,[format-expr . produces . rhs])
-    ;;  (guard (relop? op))
-    ;;  (string-append "(" lhs ") " (format-relop op) " (" rhs ")"))
-    ;; ((not ,[format-expr . produces . lhs])
-    ;;  (string-append "!(" lhs ")"))
+     (list "(" test ") ? (" conseq ") : (" alt ")"))
     ((Var _ var) (symbol->string var))
-    ;; ((char ,c) (format-char-literal c))
     ((Literal _ (? number? n))
      (number->string n))
     ((Literal _ (? boolean? b))
      (if (not b) "false" "true"))
     ((Literal _ (? string? s))
      (string-append "\"" (escape-string-literal s) "\""))
-    ;; ((c-expr ,x) (symbol->string x))
     ((Apply _ f [format-args . produces . args])
-     (string-append (format-expr f) "(" args ")"))
+     (list (format-expr f) "(" args ")"))
     (else (ew-error 'format-expr "could not format" else))))
 
 (require (only-in rnrs/base-6 string-for-each))
@@ -226,75 +145,26 @@
         (mangle-ident (symbol->string ident)))))
 
 (define (format-type t)
-  ;;(writeln t)
   (match t
     ((CxxNameT _ (? symbol? s))
      (symbol->string s))
     ((ConstT _ t)
-     (string-append (format-type t) " const"))
+     (list (format-type t) " const"))
     ((RefT _ t)
-     (string-append (format-type t) "&"))
-    ;; (u64 "uint64_t")
-    ;; ((ptr ,[t])
-    ;;  (string-append t " __global *"))
-    ;; ((fixed-array ,t ,i)
-    ;;  (ew-error 'format-type
-    ;;         "Directly formatting fixed-size arrays is a bad idea."
-    ;;         `(fixed-array ,t ,i)))
-    ;; ((struct (,[format-ident . produces . x] ,[t]) ...)
-    ;;  (string-append "struct {\n"
-    ;;                 (indent-more
-    ;;                  (join "" (map (lambda (x t)
-    ;;                                  (indent-before
-    ;;                                   (string-append t " " x ";\n")))
-    ;;                                x t)))
-    ;;                 "}"))
-    ;; ((union (,[format-ident . produces . x] ,[t]) ...)
-    ;;  (string-append "union {\n"
-    ;;                 (indent-more
-    ;;                  (join "" (map (lambda (x t)
-    ;;                                  (indent-before
-    ;;                                   (string-append t " " x ";\n")))
-    ;;                                x t)))
-    ;;                 "}"))
-    ;; ((,[t] ,[t*] ...)
-    ;;  (if (null? t*)
-    ;;      t
-    ;;      (string-append t "< " (join ", " t*) " >")))
-    ;; (,x (guard (symbol? x))
-    ;;     (format-ident x))
+     (list (format-type t) "&"))
     (else (ew-error 'format-type "could not format" else))))
 
 (define (format-params args)
-  (join ", " (map format-param args)))
+  (add-between (map format-param args) '("," sp)))
 
 (define (format-args args)
-  (join ", " (map format-expr args)))
+  (add-between (map format-expr args) '("," sp)))
 
 (define (format-param arg)
   (match arg
     ((CxxParam _ n [format-type . produces . t])
-     (string-append t " " (symbol->string n)))
+     (list t " " (symbol->string n)))
     (arg (ew-error 'format-param "could not format" arg))))
-
-(define (format-binop op)
-  (case op
-    ((bitwise-or) "|")
-    ((+) "+")
-    ((*) "*")
-    ((-) "-")
-    ((/) "/")
-    ((mod) "%")
-    (else (ew-error 'format-binop "could not format" op))))
-
-(define (format-relop op)
-  (case op
-    ((== =) "==")
-    ((<) "<")
-    ((>) ">")
-    ((<=) "<=")
-    ((>=) ">=")
-    (else (ew-error 'format-relop "could not format" op))))
 
 (define (escape-string-literal s)
   (if (zero? (string-length s))
@@ -307,13 +177,6 @@
        (escape-string-literal
         (substring s 1 (string-length s))))))
 
-(define (format-char-literal c)
-  (string-append "'"
-                 (case c
-                   ((#\nul) "\\0")
-                   (else (string c)))
-                 "'"))
-
 #|
 
 The contents of this file are derived from the print-c.scm file of
@@ -321,7 +184,7 @@ Elegant Weapons. Any changes to this file are copyright University of
 Bergen and the authors, and the following license applies to this
 file.
 
-Copyright (c) 2013      University of Bergen
+Copyright (c) 2013-2014 Tero Hasu and University of Bergen
 
 Copyright (c) 2011-2013 The Trustees of Indiana University and Indiana
                         University Research and Technology

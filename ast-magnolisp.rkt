@@ -378,8 +378,8 @@ It is rather important for all Ast derived node types to be
 
 (define-ast* CxxReturnOne (Ast Stat) ((no-term annos) (just-term e)))
 
-(define-ast* CxxIfSugar (Ast Stat) ((no-term annos) (just-term c) 
-                                    (just-term t)))
+(define-ast* PpCxxIfStat (Ast) ((no-term annos) (just-term c)
+                                (list-of-term ts) (list-of-term es)))
 
 (define-ast* CxxParam (Ast Def) ((no-term annos) (no-term id)
                                  (just-term t)))

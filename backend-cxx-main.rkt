@@ -284,9 +284,7 @@ C++ back end.
   (define (stat->cxx ast)
     (match ast
       [(IfStat a c t e)
-       (if (and (BlockStat? e) (null? (BlockStat-ss e)))
-           (CxxIfSugar a (expr->cxx c) (stat->cxx t))
-           (IfStat a (expr->cxx c) (stat->cxx t) (stat->cxx e)))]
+       (IfStat a (expr->cxx c) (stat->cxx t) (stat->cxx e))]
       [(BlockStat a ss)
        (BlockStat a (map stat->cxx ss))]
       [(Return a e)
@@ -397,6 +395,22 @@ C++ back end.
 (define (cxx-decl-sort lst)
   (sort lst symbol<? #:key Def-id))
 
+(define (cxx->pp lst)
+  (define (s->ss ast)
+    (cond
+     ((BlockStat? ast) (BlockStat-ss ast))
+     (else ast)))
+  (define f
+    (topdown
+     (lambda (ast)
+       (match ast
+         [(IfStat a c t e)
+          (PpCxxIfStat a c (s->ss t) (s->ss e))]
+         [_
+          ast]))))
+  (for/list ((ast lst))
+    (f ast)))
+  
 ;;; 
 ;;; driver routines
 ;;; 
@@ -423,7 +437,8 @@ C++ back end.
      defs-lift-locals
      defs->cxx
      cxx-rename
-     cxx-decl-sort))
+     cxx-decl-sort
+     cxx->pp))
   (for ((kind kinds))
     (cond
      ((eq? kind 'cc)
@@ -445,7 +460,8 @@ C++ back end.
         (when banner?
           (display-banner "//" filename))
         (display-generated-notice "//")
-        (display s))))
+        (display s)
+        (newline))))
      ((eq? kind 'hh)
       (define sfx (get-suffix kind))
       (define path (path-add-suffix path-stem sfx))
@@ -467,7 +483,8 @@ C++ back end.
         (when banner?
           (display-banner "//" filename))
         (display-generated-notice "//")
-        (display s))))
+        (display s)
+        (newline))))
      (else
       (raise-argument-error
        'generate-cxx-file
