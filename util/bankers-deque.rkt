@@ -68,17 +68,17 @@ concatenation and iteration.
   (check (length es) es 0 '()))
 
 ;; Push element to front.
-(define* (dq-cons-f q e)
+(define* (dq-conj-f q e)
   (check (+ (Deque-lenf q) 1) (cons e (Deque-f q))
 	 (Deque-lenr q) (Deque-r q)))
 
 ;; Push element to rear.
-(define* (dq-cons-r q e)
+(define* (dq-conj-r q e)
   (check (Deque-lenf q) (Deque-f q) 
 	 (+ (Deque-lenr q) 1) (cons e (Deque-r q))))
 
 ;; Push two elements, first to front, second to rear.
-(define* (dq-cons-f-r q e-f e-r)
+(define* (dq-conj-f-r q e-f e-r)
   (check (+ (Deque-lenf q) 1) (cons e-f (Deque-f q))
 	 (+ (Deque-lenr q) 1) (cons e-r (Deque-r q))))
 
@@ -93,6 +93,21 @@ concatenation and iteration.
           (default)
           default))
     b ...))
+
+;; Modifies the first element from the rear with `f`.
+(define-with-default* (dq-modify-r q f) was-empty
+  (let ((lenf (Deque-lenf q))
+        (lenr (Deque-lenr q)))
+    (cond
+     [(and (= lenf 0) (= lenr 0))
+      (was-empty)]
+
+     [(= lenr 0) 
+      (Deque 1 (list (f (car (Deque-f q)))) 0 '())]
+
+     [else 
+      (struct-copy Deque q (r (let ((r (Deque-r q)))
+                                (cons (f (car r)) (cdr r)))))])))
 
 ;; Returns the first element from the front, or failure-result if
 ;; none.
