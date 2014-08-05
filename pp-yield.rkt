@@ -89,36 +89,6 @@ properties.
 (define-token Reset) ;; unconditional newline
 
 ;;; 
-;;; DSL
-;;; 
-
-(abstract-struct Doc () #:transparent)
-
-(define-syntax-rule (define-doc* n fld-spec ...)
-  (concrete-struct* n Doc (fld-spec ...) #:transparent))
-
-(define-doc* Space)
-(define-doc* Group d)
-(define-doc* Nest lv d)
-
-;; Normalizes a `d` that is immediately within an outer group. Removes
-;; any redundant immediate `Group` elements, or anything that has no
-;; width. Returns #f if nothing of interest is left.
-(define (normalize d)
-  (match d
-    [(Group d0) (normalize d0)]
-    [(? list? lst)
-     (match lst
-       [(? null?) #f]
-       [(list d0) (normalize d0)]
-       [(list-rest (not (? normalize)) ds)
-        (normalize ds)]
-       [_ d])]
-    [(Nest _ (not (? normalize))) #f]
-    ["" #f]
-    [_ d]))
-
-;;; 
 ;;; algorithm
 ;;; 
 
@@ -177,8 +147,8 @@ properties.
 
 ;; Determines group widths, essentially, and annotates `GBeg` end
 ;; positions accordingly, using 'too-far where they definitely will
-;; not fit. (This code is so intricate that we adapt the original
-;; fairly faithfully for easier comparison.)
+;; not fit. (This code is so intricate that we retain some of the
+;; original structure for easier comparison.)
 (define (make-annotate-width w yield)
   (let ((buffer BufferP-empty))
     (define (go buffer t)
@@ -251,6 +221,36 @@ properties.
     (lambda (t)
       (set! buffer (go buffer t)))))
 
+;;; 
+;;; DSL
+;;; 
+
+(abstract-struct Doc () #:transparent)
+
+(define-syntax-rule (define-doc* n fld-spec ...)
+  (concrete-struct* n Doc (fld-spec ...) #:transparent))
+
+(define-doc* Space)
+(define-doc* Group d)
+(define-doc* Nest lv d)
+
+;; Normalizes a `d` that is immediately within an outer group. Removes
+;; any redundant immediate `Group` elements, or anything that has no
+;; width. Returns #f if nothing of interest is left.
+(define (normalize d)
+  (match d
+    [(Group d0) (normalize d0)]
+    [(? list? lst)
+     (match lst
+       [(? null?) #f]
+       [(list d0) (normalize d0)]
+       [(list-rest (not (? normalize)) ds)
+        (normalize ds)]
+       [_ d])]
+    [(Nest _ (not (? normalize))) #f]
+    ["" #f]
+    [_ d]))
+
 (define* (doc? x)
   (or (string? x) (list? x) (Doc? x) (not x)
       (memq x '(sp br))
@@ -316,7 +316,7 @@ properties.
            (set! fits 0)
            (yield "\n")]))))
   
-  ;; The position `pos` is a theoretical starting position for an
+  ;; The position `st-col` is a theoretical starting position for an
   ;; entire document that fits on a single line. Hence there is no
   ;; indentation, but the start position might be non-zero. It is
   ;; enough if the position numbers are unique within a document (or
