@@ -85,6 +85,9 @@ properties.
 (define-token GBeg beg end) ;; group begin
 (define-token GEnd a) ;; group end
 
+;; extensions
+(define-token Reset) ;; unconditional newline
+
 ;;; 
 ;;; DSL
 ;;; 
@@ -120,7 +123,9 @@ properties.
 ;;; 
 
 ;; Note that since this generator has state, it is necessary to create
-;; a new instance for every pipeline instance.
+;; a new instance for every pipeline instance. If there are any
+;; characters on the line to begin with, `init-pos` should be
+;; specified accordingly.
 (define (make-annotate-position init-pos yield)
   (let ([pos init-pos])
     (lambda (t)
@@ -131,9 +136,15 @@ properties.
 	[(LE _ ind) 
          (set! pos (+ pos 1))
          (yield (LE pos ind))]
-	[(GBeg _ _) (yield (GBeg pos #f))]
-	[(GEnd _) (yield (GEnd pos))]
-        [_ (yield t)]))))
+	[(GBeg _ _) 
+         (yield (GBeg pos #f))]
+	[(GEnd _) 
+         (yield (GEnd pos))]
+        [(Reset) 
+         (set! pos 0)
+         (yield t)]
+        [_ 
+         (yield t)]))))
 
 ;; We require very stringent algorithmic properties for state updates
 ;; and queries for the overall algorithm to get the original
@@ -177,8 +188,8 @@ properties.
 	     (let ((p+w (+ p w)))
                (BufferP p+w (dq (Grp p+w dq-null p))))]
             ;; `GEnd` may appear here, presumably if we have pruned a
-            ;; `GBeg`, and emptied our buffers.
-            [(or (? TE?) (? LE?) (? GEnd?))
+            ;; `GBeg` and emptied our buffers before the `GEnd` comes in.
+            [(or (? TE?) (? LE?) (? GEnd?) (? Reset?))
              (begin (yield t) buffer)])
 	  (match t
 	    [(GBeg p _)
@@ -193,7 +204,10 @@ properties.
                   (pop p0 q^ (dq-conj-f-r b (GBeg beg p) (GEnd p)))]))]
 	    [(or (TE p _) (LE p _))
              (define-values (p0 q) (BufferP-p-q buffer))
-             (check (BufferP p0 (push t q)) p)])))
+             (check (BufferP p0 (push t q)) p)]
+            [(Reset)
+             (error 'make-annotate-width 
+                    "received Reset while within a Group")])))
 
     ;; Append token `t` to the buffer of the rightmost group in `q`.
     (define (push t q)
@@ -238,9 +252,9 @@ properties.
       (set! buffer (go buffer t)))))
 
 (define* (doc? x)
-  (or (Doc? x) (string? x) (list? x) 
+  (or (string? x) (list? x) (Doc? x) (not x)
       (memq x '(sp br))
-      (memv x '(#\newline #\space)) (not x)))
+      (memv x '(#\newline #\space))))
 
 (define-with-contract*
   (->* ()
@@ -261,8 +275,10 @@ properties.
   ;; Like `yield-out`, but also updates `st-col`.
   (define (track-pos s) ;; (-> string? any/c)
     (match s
-      ["\n" (set! st-col 0)]
-      [(? string?) (set! st-col (+ st-col (string-length s)))])
+      ["\n" 
+       (set! st-col 0)]
+      [(? string?) 
+       (set! st-col (+ st-col (string-length s)))])
     (yield-out s))
 
   ;; Based on collected information and state, decides where to break
@@ -273,29 +289,32 @@ properties.
   (define (make-emit)
     (let ([yield track-pos]
           [fits 0]) ;; number of fitting groups around position
-    (lambda (t)
-      (match t
-        [(TE _ s) 
-         (yield s)]
-        [(LE p ind) 
-         (cond
-          [(= fits 0)
-           (yield "\n")
-           (yield ind)]
-          [else
-           (yield " ")])]
-        [(GBeg beg end)
-         (cond
-          [(= fits 0)
-           (when (and (not (eq? end 'too-far))
-                      (<= (+ st-col (- end beg)) w))
-             (set! fits 1))]
-          [else
-           ;; If an outer group fits, so will an inner one.
-           (set! fits (add1 fits))])]
-        [(GEnd _) 
-         (unless (= fits 0)
-           (set! fits (sub1 fits)))]))))
+      (lambda (t)
+        (match t
+          [(TE _ s) 
+           (yield s)]
+          [(LE p ind) 
+           (cond
+            [(= fits 0)
+             (yield "\n")
+             (yield ind)]
+            [else
+             (yield " ")])]
+          [(GBeg beg end)
+           (cond
+            [(= fits 0)
+             (when (and (not (eq? end 'too-far))
+                        (<= (+ st-col (- end beg)) w))
+               (set! fits 1))]
+            [else
+             ;; If an outer group fits, so will an inner one.
+             (set! fits (add1 fits))])]
+          [(GEnd _) 
+           (unless (= fits 0)
+             (set! fits (sub1 fits)))]
+          [(Reset)
+           (set! fits 0)
+           (yield "\n")]))))
   
   ;; The position `pos` is a theoretical starting position for an
   ;; entire document that fits on a single line. Hence there is no
@@ -304,15 +323,15 @@ properties.
   ;; any groups, really), as we are ultimately interested in
   ;; differences, i.e. whether something will fit within two
   ;; positions.
-  (define (mk-yield pos)
-    (define annotate-width
-      (make-annotate-width w (make-emit)))
-    (make-annotate-position pos annotate-width))
+  (define pgf-yield
+    (let ((annotate-width
+           (make-annotate-width w (make-emit))))
+      (make-annotate-position st-col annotate-width)))
     
   (let ([in-group 0]
         [ind-col st-col] ;; (or/c integer? #f), tracked for LvRel
-        [ind init-ind])
-    (define yield (mk-yield st-col))
+        [ind init-ind]
+        [yield pgf-yield])
     (for ([spec spec-lst])
       (let parse ([d spec])
         [match d
@@ -323,10 +342,9 @@ properties.
              (error 'pp "linebreak within a Group: ~s" spec))
            (define s (car ind))
            (define s-len (string-length s))
-           (track-pos "\n")
-           (track-pos s)
            (set! ind-col s-len)
-           (set! yield (mk-yield 0))]
+           (yield (Reset))
+           (yield (TE #f s))]
           [(? string? s) 
            (yield (TE #f s))
            (when ind-col
