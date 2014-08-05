@@ -27,7 +27,7 @@
 
 (define (format-defun name modifs type args [stmt* null])
   (pp (add-between (append modifs (list type)) " ")
-      " " (symbol->string name) "(" args ")"
+      " " (symbol->string name) "(" `(in (gr sp ,args)) " )"
       (if (null? stmt*)
           ";"
           `((in " {"
@@ -114,7 +114,7 @@
     ((Literal _ (? string? s))
      (string-append "\"" (escape-string-literal s) "\""))
     ((Apply _ f [format-args . produces . args])
-     (list (format-expr f) "(" args ")"))
+     (list (format-expr f) "(" `(in (gr ,args)) ")"))
     (else (ew-error 'format-expr "could not format" else))))
 
 (require (only-in rnrs/base-6 string-for-each))

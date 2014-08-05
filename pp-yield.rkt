@@ -115,10 +115,6 @@ properties.
     ["" #f]
     [_ d]))
 
-(module+ test
-  (require rackunit)
-  (define doc1 (Group `("A" ,(Space) ,(Group `("B" ,(Space) "C"))))))
-
 ;;; 
 ;;; algorithm
 ;;; 
@@ -218,8 +214,8 @@ properties.
     ;; Prunes look-ahead `st` in case that the current horizontal
     ;; position `p` is too far for the outermost group to fit. Or,
     ;; assuming normalized input, in the case that we have more than
-    ;; `w` groups, in which case they will be wider than `w` (1 char
-    ;; per group).
+    ;; `w` groups, in which case they will be wider than `w` (at least
+    ;; 1 char per group).
     (define (check st p) ;; BufferP, pos -> BufferP
       (define-values (p0 q) (BufferP-p-q st))
       (if (and (<= p p0) (<= (dq-length q) w))
@@ -244,7 +240,7 @@ properties.
 (define* (doc? x)
   (or (Doc? x) (string? x) (list? x) 
       (memq x '(sp br))
-      (eqv? #\newline x) (not x)))
+      (memv x '(#\newline #\space)) (not x)))
 
 (define-with-contract*
   (->* ()
@@ -335,7 +331,7 @@ properties.
            (yield (TE #f s))
            (when ind-col
              (set! ind-col (+ ind-col (string-length s))))]
-          [(or (Space) 'sp)
+          [(or (Space) #\space 'sp)
            (cond
             [(= in-group 0)
              (parse " ")]
@@ -370,6 +366,8 @@ properties.
   st-col)
 
 (module+ test
+  (require rackunit)
+  (define doc1 (Group `("A" #\space ,(Group `("B" #\space "C")))))
   (for ([w '(2 4 6)])
     (displayln `(w = ,w))
     (pp doc1 #:page-width w)
