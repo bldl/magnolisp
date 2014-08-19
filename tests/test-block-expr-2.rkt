@@ -6,7 +6,7 @@
   (#:annos (type (fn int int predicate)) foreign)
   (begin-racket (equal? x y)))
 
-(function (default e f d) #an(export)
+(function (default e f d) #an([export dflt])
   (do
     (if (equal e f)
         (return d)

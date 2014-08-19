@@ -388,17 +388,16 @@ It is rather important for all Ast derived node types to be
                                    (just-term t)))
 
 ;; Statement expression (GCC extension).
-(define-ast* GccStatExpr (Ast Expr) ((no-term annos) (list-of-term ss) 
-                                     (just-term e)))
-
-;; Local label declaration (GCC extension). A statement.
-(define-ast* GccLabelDecl (Ast Stat) ((no-term annos) (no-term n)))
+;; `id` is the label Id; a node of this type effectively binds it.
+;; `e` is a `Var` expression of the result variable.
+(define-ast* GccStatExpr (Ast Expr) ((no-term annos) (no-term id)
+                                     (list-of-term ss) (just-term e)))
 
 ;; Label for the following statements. Itself a statement.
-(define-ast* CxxLabel (Ast Stat) ((no-term annos) (no-term n)))
+(define-ast* CxxLabel (Ast Stat) ((no-term annos) (no-term id)))
 
-;; Where 'n' is a label. A statement.
-(define-ast* Goto (Ast Stat) ((no-term annos) (no-term n)))
+;; Where 'id' is a label Id. A statement.
+(define-ast* Goto (Ast Stat) ((no-term annos) (no-term id)))
 
 ;; Top-level verbatim string.
 (define-ast* TlVerbatim (Ast) ((no-term annos) (no-term s)))

@@ -90,15 +90,13 @@
      (list x " = " v ";"))
     ((Goto _ name)
      (string-append "goto " (format-ident name) ";"))
-    ((GccLabelDecl _ name)
-     (string-append "__label__ " (format-ident name) ";"))
     ((CxxLabel _ name)
      (string-append (format-ident name) ":"))
     (else (ew-error 'format-stat "could not format" else))))
 
 (define (format-expr expr)
   (match expr
-    ((GccStatExpr _ ss e)
+    ((GccStatExpr _ _ ss e)
      `("({ " (in ,(for/list ((s ss))
                     `(br ,(format-stat s)))
                  br ,(format-expr e) ";") " })"))

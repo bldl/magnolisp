@@ -68,21 +68,20 @@ C++ back end.
      "illegal name for a C++ export: ~s" o-s))
   s)
 
-(define (string->internal-cxx-id s #:default [default #f])
+(define (string->internal-cxx-id s #:default [default "_"])
   (set! s (string-underscorify s))
   (set! s (regexp-replace #rx"^[^a-zA-Z_]+" s ""))
   (set! s (translate-id-string s))
   (set! s (regexp-replace* #rx"[^a-zA-Z0-9_]+" s ""))
-  (if (and default (= (string-length s) 0))
-      default s))
+  (if (string=? "" s) default s))
 
 ;;; 
 ;;; C++ renaming
 ;;; 
 
-;; Renames Racket IDs to legal C++ symbols. Tracks renamings using a
-;; map. Does fairly "stable" renaming by limiting the context of
-;; locals to the function body.
+;; Renames Ids to legal C++ symbols. Tracks renamings using a map.
+;; Does fairly "stable" renaming by limiting the context of locals to
+;; the function body.
 (define (cxx-rename ast-lst)
   ;;(pretty-print ast-lst) (exit)
   
@@ -95,7 +94,8 @@ C++ back end.
   (define id->sym (make-hasheq))
 
   ;; More than one binding may get the same name, but each binding is
-  ;; unique.
+  ;; unique. As a form of consistency checking, we do not allow two
+  ;; registrations for the same `id`.
   (define (record-cxx-name! id n-sym)
     (define bind (Id-bind id))
     (when (hash-has-key? id->sym bind)
@@ -105,15 +105,35 @@ C++ back end.
        id (hash->list id->sym)))
     (hash-set! id->sym bind n-sym))
 
+  ;; Returns #f if `id` has no chosen name registration.
   (define (lookup-cxx-name id)
     (hash-ref id->sym (Id-bind id) #f))
+  
+  ;; Decides name for an ID binding. For a name that has no allowed
+  ;; characters, `stem` is used instead as the base name. Returns
+  ;; (values r sym).
+  (define (decide-name-for-id r id stem)
+    (define orig-s (ast-identifier->string id))
+    (define cand-s (string->internal-cxx-id orig-s #:default stem))
+    (define-values (n-r n-sym) (next-gensym r (string->symbol cand-s)))
+    (record-cxx-name! id n-sym)
+    (values n-r n-sym))
+
+  ;; Gets decided name for an ID reference.
+  (define (get-decision-for id)
+    (define sym (lookup-cxx-name id))
+    (unless sym
+      (raise-assertion-error
+       'cxx-rename
+       "expected C++ name to have been decided for ~s" id))
+    sym)
   
   ;; We must collect all top-level IDs (and decide on their C++ name)
   ;; before renaming any locals.
   (for-each
    (lambda (ast)
      (match ast
-       ((? CxxDefun?)
+       [(? CxxDefun?)
         (define a (Ast-annos ast))
         (define id (Def-id ast))
         (define export-name (get-export-name a))
@@ -133,28 +153,10 @@ C++ back end.
               (string->internal-cxx-id orig-s #:default "f")))
         (define n-sym (string->symbol cand-s))
         (set!-values (r n-sym) (next-gensym r n-sym))
-        (record-cxx-name! id n-sym))
-       (_ (void))))
+        (record-cxx-name! id n-sym)]
+       [_ (void)]))
    ast-lst)
 
-  ;; Decides name for an ID binding. Returns (values r sym).
-  (define (decide-name-for-id r id stem)
-    (define orig-s (ast-identifier->string id))
-    (define cand-s
-      (string->internal-cxx-id orig-s #:default stem))
-    (define-values (n-r n-sym) (next-gensym r (string->symbol cand-s)))
-    (record-cxx-name! id n-sym)
-    (values n-r n-sym))
-
-  ;; Gets decided name for an ID reference.
-  (define (get-decision-for id)
-    (define sym (lookup-cxx-name id))
-    (unless sym
-      (raise-assertion-error
-       'cxx-rename
-       "expected C++ name to have been decided for ~s" id))
-    sym)
-  
   ;; Returns (values r ast).
   (define (rw r ast)
     (match ast
@@ -176,9 +178,9 @@ C++ back end.
       ((CxxDeclVar a id t)
        (define-values (r-2 n-sym) (decide-name-for-id r id "v"))
        (values r-2 (CxxDeclVar a n-sym t)))
-      ((GccLabelDecl a id)
-       (define-values (n-r n-sym) (decide-name-for-id r id "l"))
-       (values n-r (GccLabelDecl a n-sym)))
+      ((GccStatExpr a id ss e)
+       (define-values (r-1 n-sym) (decide-name-for-id r id "l"))
+       (rw-all r-1 (GccStatExpr a n-sym ss e)))
       ((CxxLabel a id)
        (define sym (get-decision-for id))
        (values r (CxxLabel a sym)))
@@ -293,9 +295,10 @@ C++ back end.
          (raise-language-error/ast
           "return without surrounding block expression"
           ast))
-       (BlockStat a (list (annoless Assign
-                                    (annoless Var (cdr tgt))
-                                    (expr->cxx e))
+       (define n-e
+         (parameterize ((b-tgt #f))
+           (expr->cxx e)))
+       (BlockStat a (list (annoless Assign (annoless Var (cdr tgt)) n-e)
                           (annoless Goto (car tgt))))]
       [(LetStat a dv ss)
        (BlockStat a (cons (def->cxx dv) (map stat->cxx ss)))]
@@ -322,12 +325,10 @@ C++ back end.
          (parameterize ((b-tgt (cons lbl rval)))
            (map stat->cxx ss)))
        (GccStatExpr
-        a
-        (append (list
-                 (annoless GccLabelDecl lbl)
-                 (annoless CxxDeclVar rval cxx-t))
-                n-ss
-                (list (annoless CxxLabel lbl)))
+        a lbl 
+        `(,(annoless CxxDeclVar rval cxx-t)
+          ,@n-ss
+          ,(annoless CxxLabel lbl))
         (annoless Var rval))]
       [(Literal a d)
        (Literal a (syntax->datum d))]

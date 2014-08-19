@@ -477,5 +477,16 @@ Assumptions for AST node types:
         (_ ast)))
     (set! t ((topdown-break inc) t))
     (check-eqv? (sum t) 9))
+  (let ()
+    (define (collect-nums t)
+      (define lst '())
+      ((bottomup-visit
+        (lambda (ast)
+          (when (Atom? ast)
+            (set! lst (cons (Atom-v ast) lst))))) t)
+      (reverse lst))
+    (define t (Tree (list (Tree (list (Atom 1) (Atom 2))) (Atom 3))))
+    ;; note: not in reverse order as probably are in Stratego
+    (check-equal? '(1 2 3) (collect-nums t)))
   
   (void))
