@@ -96,7 +96,7 @@
 
 (define (format-expr expr)
   (match expr
-    ((GccStatExpr _ _ ss e)
+    ((GccStatExpr _ ss e)
      `("({ " (in ,(for/list ((s ss))
                     `(br ,(format-stat s)))
                  br ,(format-expr e) ";") " })"))

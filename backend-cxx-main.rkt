@@ -178,9 +178,9 @@ C++ back end.
       ((CxxDeclVar a id t)
        (define-values (r-2 n-sym) (decide-name-for-id r id "v"))
        (values r-2 (CxxDeclVar a n-sym t)))
-      ((GccStatExpr a id ss e)
+      ((CxxLabelDecl a id)
        (define-values (r-1 n-sym) (decide-name-for-id r id "l"))
-       (rw-all r-1 (GccStatExpr a n-sym ss e)))
+       (values r-1 (CxxLabelDecl a n-sym)))
       ((CxxLabel a id)
        (define sym (get-decision-for id))
        (values r (CxxLabel a sym)))
@@ -217,6 +217,18 @@ C++ back end.
   (set! ast-lst (map rw-type-refs ast-lst))
   ;;(writeln ast-lst)
   ast-lst)
+
+(define (cxx-rm-CxxLabelDecl ast-lst)
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         [(StatCont ss)
+          #:when (ormap CxxLabelDecl? ss)
+          (StatCont-copy ast (filter (negate CxxLabelDecl?) ss))]
+         [_ ast]))))
+  
+  (map rw ast-lst))
 
 ;;; 
 ;;; C++ translation
@@ -325,8 +337,9 @@ C++ back end.
          (parameterize ((b-tgt (cons lbl rval)))
            (map stat->cxx ss)))
        (GccStatExpr
-        a lbl 
-        `(,(annoless CxxDeclVar rval cxx-t)
+        a 
+        `(,(annoless CxxLabelDecl lbl)
+          ,(annoless CxxDeclVar rval cxx-t)
           ,@n-ss
           ,(annoless CxxLabel lbl))
         (annoless Var rval))]
@@ -438,6 +451,7 @@ C++ back end.
      defs-lift-locals
      defs->cxx
      cxx-rename
+     cxx-rm-CxxLabelDecl
      cxx-decl-sort
      cxx->pp))
   (for ((kind kinds))

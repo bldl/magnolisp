@@ -387,11 +387,15 @@ It is rather important for all Ast derived node types to be
 (define-ast* CxxDeclVar (Ast Def) ((no-term annos) (no-term id)
                                    (just-term t)))
 
-;; Statement expression (GCC extension).
-;; `id` is the label Id; a node of this type effectively binds it.
-;; `e` is a `Var` expression of the result variable.
-(define-ast* GccStatExpr (Ast Expr) ((no-term annos) (no-term id)
-                                     (list-of-term ss) (just-term e)))
+;; Statement expression (GCC extension). `e` is a `Var` expression of the
+;; result variable, which is declared within the block.
+(define-ast* GccStatExpr (Ast Expr StatCont) ((no-term annos)
+                                              (list-of-term ss) 
+                                              (just-term e)))
+
+;; Declares a label. `id` is the label Id; a node of this type
+;; effectively binds it.
+(define-ast* CxxLabelDecl (Ast Stat) ((no-term annos) (no-term id)))
 
 ;; Label for the following statements. Itself a statement.
 (define-ast* CxxLabel (Ast Stat) ((no-term annos) (no-term id)))
