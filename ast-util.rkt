@@ -7,9 +7,6 @@ Assumptions for AST node types:
 - each type must be defined as #:transparent
   (this is done by the macros here)
 
-- the first field of each node is for annotations,
-  and named 'annos', and declared as 'no-term'
-
 - no inheritance is used in defining the types
 
 |#

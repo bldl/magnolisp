@@ -4,8 +4,10 @@
 
 Data types used for internal representation of abstract syntax.
 
-It is rather important for all Ast derived node types to be
-#:transparent, as such is assumed by some of the compiler machinery.
+Assumptions for AST node types:
+
+- the first field of each node is for annotations,
+  and named 'annos', and declared as 'no-term'
 
 |#
 
