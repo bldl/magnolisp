@@ -90,18 +90,16 @@ Assumptions for AST node types:
       (void)))
 
 (define-for-syntax (get-relevant-fields f-stx-lst)
-  (filter
-   identity
-   (map
-    (lambda (f-stx)
-      (syntax-case f-stx (no-term just-term list-of-term)
-        ((no-term fn-pat)
-         #f)
-        ((just-term fn-pat)
-         (list 'just #'fn-pat (generate-temporary (syntax-e #'fn-pat))))
-        ((list-of-term fn-pat)
-         (list 'list #'fn-pat (generate-temporary (syntax-e #'fn-pat))))))
-    f-stx-lst)))
+  (filter-map
+   (lambda (f-stx)
+     (syntax-case f-stx (no-term just-term list-of-term)
+       [(no-term fn-pat)
+        #f]
+       [(just-term fn-pat)
+        (list 'just #'fn-pat (generate-temporary (syntax-e #'fn-pat)))]
+       [(list-of-term fn-pat)
+        (list 'list #'fn-pat (generate-temporary (syntax-e #'fn-pat)))]))
+   f-stx-lst))
 
 (define-for-syntax (make-r-f-struct-copy type-id obj-id r-f-lst)
   (with-syntax ([type type-id]
@@ -205,20 +203,32 @@ Assumptions for AST node types:
           #'fn-pat]))
      (cons n i))))
 
-(define-for-syntax (make-term-field-accessors nn-stx f-stx-lst)
+(define-for-syntax (make-get-term-fields f-stx-lst)
   (define lst (to-term-fields-with-ix f-stx-lst))
-  
   (with-syntax ([(ix ...) (map cdr lst)])
-    (list
-     #'(define (get-term-fields ast)
-         (list (unsafe-struct*-ref ast ix) ...)))))
+    #'(define (get-term-fields ast)
+        (list (unsafe-struct*-ref ast ix) ...))))
+     
+(define-for-syntax (make-set-term-fields type-id f-stx-lst)
+  (define r-f-lst (get-relevant-fields f-stx-lst))
+  (with-syntax ([type type-id]
+                [(tmp ...) (for/list ([fld r-f-lst])
+                             (third fld))]
+                [(set-fld ...) (for/list ([fld r-f-lst])
+                                 (with-syntax ([fld (second fld)]
+                                               [tmp (third fld)])
+                                   #'[fld tmp]))])
+    #'(define (set-term-fields ast lst)
+        (let-values ([(tmp ...) (apply values lst)])
+          (struct-copy type ast set-fld ...)))))
 
 (define-for-syntax (make-strategic nn-stx f-stx-lst)
   `(,(make-all-visit-term nn-stx f-stx-lst)
     ,(make-all-rw-term nn-stx f-stx-lst)
     ,(make-some-rw-term nn-stx f-stx-lst)
     ,(make-one-rw-term nn-stx f-stx-lst)
-    ,@(make-term-field-accessors nn-stx f-stx-lst)))
+    ,(make-get-term-fields f-stx-lst)
+    ,(make-set-term-fields nn-stx f-stx-lst)))
 
 ;;; 
 ;;; gen:syntactifiable
@@ -518,5 +528,20 @@ Assumptions for AST node types:
     (define t (Tree (list (Tree (list (Atom 1) (Atom 2))) (Atom 3))))
     ;; note: not in reverse order as probably are in Stratego
     (check-equal? '(1 2 3) (collect-nums t)))
-  
+
+  (let ((t (Tree (list (Tree (list (Atom 1) (Atom 2))) (Atom 3)))))
+    (let ((lst (get-term-fields t)))
+      (check-equal? t (set-term-fields t lst))
+      (check-equal? t (set-term-fields (Tree null) lst))))
+  (let ((t (Tree (list (Atom 1) (Atom 2)))))
+    (define (inc ast)
+      (match ast
+        ((Atom x) (Atom (add1 x)))
+        (_ ast)))
+    (define lst (get-term-fields t))
+    (define inc-lst (for/list ((f lst))
+                      (map inc f)))
+    (check-equal? (set-term-fields t inc-lst)
+                  (Tree (list (Atom 2) (Atom 3)))))
+
   (void))
