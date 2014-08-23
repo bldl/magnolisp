@@ -58,26 +58,6 @@ Meta-Compilation of Language Abstractions (2006).
   (set-term-fields strategic lst))
 
 ;;; 
-;;; Abstract term access operations.
-;;;
-
-(define* (for-each-term-field f strategic)
-  (for-each f (get-term-fields strategic)))
-
-(define* (map-term-field f strategic)
-  (set-term-fields strategic (map f (get-term-fields strategic))))
-
-(define* (some-rw-term s strategic)
-  (define o-lst (get-term-fields strategic))
-  (define any? #f)
-  (define (f v)
-    (define r (s v))
-    (if r (begin (set! any? #t) r) v))
-  (define n-lst (for/list ((fv o-lst))
-                  (if (list? fv) (map f fv) (f fv))))
-  (and any? (set-term-fields strategic n-lst)))
-
-;;; 
 ;;; List access operations.
 ;;;
 
@@ -124,6 +104,31 @@ Meta-Compilation of Language Abstractions (2006).
           (if res
               (append (reverse res-lst) (cons res xs))
               (next (cons x res-lst) xs))))))
+
+;;; 
+;;; Abstract term access operations.
+;;;
+
+(define* (for-each-term-field f strategic)
+  (for-each f (get-term-fields strategic)))
+
+(define* (map-term-field f strategic)
+  (set-term-fields strategic (map f (get-term-fields strategic))))
+
+(define* (some-rw-term s strategic)
+  (define o-lst (get-term-fields strategic))
+  (define some? #f)
+  (define n-lst 
+    (for/list ((fv o-lst))
+      (define nv (if (list? fv)
+                     (some-rw-list s fv)
+                     (s fv)))
+      (if nv
+          (begin
+            (set! some? #t)
+            nv)
+          fv)))
+  (and some? (set-term-fields strategic n-lst)))
 
 ;;; 
 ;;; Primitive traversal operators for lists.
