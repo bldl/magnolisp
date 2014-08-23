@@ -140,28 +140,6 @@ Assumptions for AST node types:
             r-f-lst))
        #,(make-r-f-struct-copy nn-stx #'ast r-f-lst))))
 
-(define-for-syntax (make-one-rw-term nn-stx f-stx-lst)
-  (define nn-sym (syntax-e nn-stx))
-  (define r-f-lst (get-relevant-fields f-stx-lst))
-
-  (define choice-lst
-    (for/list ([fld r-f-lst])
-      (define kind (first fld))
-      (define fn-stx (second fld))
-      (define fn-sym (syntax-e fn-stx))
-      (with-syntax ([get (format-id nn-stx "~a-~a" nn-sym fn-sym)]
-                    [compute-r (case kind
-                                 [(just) #'(s v)]
-                                 [(list) #'(one-rw-list s v)])]
-                    [copy #`(struct-copy #,nn-stx ast [#,fn-stx r])])
-        #'(let* ([v (get ast)]
-                 [r compute-r])
-            (and r copy)))))
-  
-  (with-syntax ([(choice ...) choice-lst])
-    #'(define (one-rw-term s ast)
-        (or choice ...))))
-
 ;; E.g., '((#'lv . 1) (#'rv . 2))
 (define-for-syntax (to-term-fields-with-ix f-stx-lst)
   (filter
@@ -200,7 +178,6 @@ Assumptions for AST node types:
 (define-for-syntax (make-strategic nn-stx f-stx-lst)
   `(,(make-all-visit-term nn-stx f-stx-lst)
     ,(make-all-rw-term nn-stx f-stx-lst)
-    ,(make-one-rw-term nn-stx f-stx-lst)
     ,(make-get-term-fields f-stx-lst)
     ,(make-set-term-fields nn-stx f-stx-lst)))
 

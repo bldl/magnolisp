@@ -53,7 +53,6 @@ Meta-Compilation of Language Abstractions (2006).
 (define-generics* strategic
   (all-visit-term s strategic)
   (all-rw-term s strategic)
-  (one-rw-term s strategic)
   (get-term-fields strategic)
   (set-term-fields strategic lst))
 
@@ -129,6 +128,24 @@ Meta-Compilation of Language Abstractions (2006).
             nv)
           fv)))
   (and some? (set-term-fields strategic n-lst)))
+
+(define* (one-rw-term s strategic)
+  (define o-lst (get-term-fields strategic))
+  (define one? #f)
+  (define n-lst 
+    (for/list ((fv o-lst))
+      (if one? 
+          fv
+          (let ()
+            (define nv (if (list? fv)
+                           (one-rw-list s fv)
+                           (s fv)))
+            (if nv
+                (begin
+                  (set! one? #t)
+                  nv)
+                fv)))))
+  (and one? (set-term-fields strategic n-lst)))
 
 ;;; 
 ;;; Primitive traversal operators for lists.
@@ -329,9 +346,6 @@ Meta-Compilation of Language Abstractions (2006).
              (all-visit-list s (List-lst strategic)))
            (define (all-rw-term s strategic)
              (define r (all-rw-list s (List-lst strategic)))
-             (and r (List r)))
-           (define (one-rw-term s strategic)
-             (define r (one-rw-list s (List-lst strategic)))
              (and r (List r)))
            (define (get-term-fields strategic)
              (list (List-lst strategic)))
