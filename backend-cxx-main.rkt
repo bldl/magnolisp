@@ -163,14 +163,14 @@ C++ back end.
       ((Var a id)
        (define sym (get-decision-for id))
        (values r (Var a sym)))
-      ((CxxDefun a id m t ps bs)
+      ((CxxDefun a id m t ps b)
        (define n-sym (get-decision-for id))
        (define-values (r-dummy n-ast)
-         (rw-all r (CxxDefun a n-sym m t ps bs)))
+         (rw-all r (CxxDefun a n-sym m t ps b)))
        (values r n-ast))
-      ((CxxParam a id t)
+      ((Param a id t)
        (define-values (n-r n-sym) (decide-name-for-id r id "a"))
-       (values n-r (CxxParam a n-sym t)))
+       (values n-r (Param a n-sym t)))
       ((DefVar a id t v)
        (define-values (r-1 n-v) (rw r v))
        (define-values (r-2 n-sym) (decide-name-for-id r-1 id "v"))
@@ -244,7 +244,7 @@ C++ back end.
 (define (cxx->partition ast)
   ;;(writeln ast)
   (match ast
-    ((CxxDefun a id m t ps bs)
+    ((CxxDefun a id m t ps b)
      (define foreign? (and (get-foreign-name a) #t))
      (define export? (and (get-export-name a) #t))
      (define proto? (memq (cxx-kind) '(public-prototypes private-prototypes)))
@@ -259,7 +259,7 @@ C++ back end.
      (cond
       (foreign? #f)
       ((eq? (cxx-kind) 'private-implementations)
-       (CxxDefun a id m t ps bs))
+       (CxxDefun a id m t ps b))
       ((and proto?
             (or (and export? (eq? (cxx-kind) 'public-prototypes))
                 (and (not export?) (eq? (cxx-kind) 'private-prototypes))))
@@ -282,15 +282,15 @@ C++ back end.
     (match ast
       [(Defun a id t ps b)
        (define foreign? (and (get-foreign-name a) #t))
-       (CxxDefun a id null (type->cxx (FunT-rt t))
+       (CxxDefun a id null t
                  (map def->cxx ps)
                  (if foreign?
-                     null
-                     (list (annoless CxxReturnOne (expr->cxx b)))))]
-      [(Param a id t)
-       (CxxParam a id (annoless RefT (annoless ConstT (type->cxx t))))]
+                     the-NoBody
+                     (annoless CxxReturnOne (expr->cxx b))))]
+      [(? Param?)
+       ast]
       [(DefVar a id t v)
-       (DefVar a id (type->cxx t) (expr->cxx v))]
+       (DefVar a id t (expr->cxx v))]
       [_
        (raise-argument-error
         'def->cxx "supported Def?" ast)]))
@@ -330,25 +330,31 @@ C++ back end.
        (IfExpr a (expr->cxx c) (expr->cxx t) (expr->cxx e))]
       [(BlockExpr a ss)
        (define t (Expr-type ast))
-       (define cxx-t (type->cxx t))
        (define lbl (fresh-ast-identifier 'b))
        (define rval (fresh-ast-identifier 'r))
        (define n-ss
          (parameterize ((b-tgt (cons lbl rval)))
            (map stat->cxx ss)))
-       (GccStatExpr
-        a 
+       (LiftStatExpr
+        a rval
         `(,(annoless CxxLabelDecl lbl)
-          ,(annoless CxxDeclVar rval cxx-t)
           ,@n-ss
-          ,(annoless CxxLabel lbl))
-        (annoless Var rval))]
+          ,(annoless CxxLabel lbl)))]
       [(Literal a d)
        (Literal a (syntax->datum d))]
       [_
        (raise-argument-error
         'expr->cxx "supported Expr?" ast)]))
   
+  (filter
+   values
+   (map
+    def->cxx
+    (filter
+     Defun?
+     (hash-values defs-t)))))
+
+(define (types-to-cxx defs-t def-lst)
   (define (type->cxx ast)
     (match ast
       [(NameT _ id)
@@ -364,13 +370,203 @@ C++ back end.
        (raise-argument-error
         'type->cxx "supported Type?" ast)]))
   
-  (filter
-   values
-   (map
-    def->cxx
-    (filter
-     Defun?
-     (hash-values defs-t)))))
+  (define rw-def
+    (topdown
+     (lambda (ast)
+       (match ast
+         [(? CxxDefun?)
+          (define t (CxxDefun-rtype ast))
+          (define rt (type->cxx (FunT-rt t)))
+          (struct-copy CxxDefun ast [rtype rt])]
+         [(Param a id t)
+          (Param a id (annoless RefT (annoless ConstT (type->cxx t))))]
+         [(DefVar a id t v)
+          (DefVar a id (type->cxx t) v)]
+         [(CxxDeclVar a id t)
+          (CxxDeclVar a id (type->cxx t))]
+         [_ ast]))))
+  
+  (map rw-def def-lst))
+
+;;; 
+;;; statement unsplicing
+;;; 
+
+(define (ast-rm-SpliceStat ast)
+  (define un-nest
+    (bottomup
+     (lambda (ast)
+       (match ast
+         [(StatCont (? (curry ormap SpliceStat?) ss))
+          (define n-ss
+            (apply append (for/list ((s ss))
+                            (if (SpliceStat? s)
+                                (SpliceStat-ss s)
+                                (list s)))))
+          (StatCont-copy ast n-ss)]
+         [else ast]))))
+  
+  (define convert
+    (bottomup
+     (lambda (ast)
+       (match ast
+         [(SpliceStat a ss)
+          (match ss
+            [(list s) s]
+            [_ (BlockStat a ss)])]
+         [_ ast]))))
+  
+  (convert (un-nest ast)))
+
+;;; 
+;;; lifting of statements
+;;; 
+
+(define (ast-contains? p? ast)
+  (let/ec k
+    ((topdown-visit
+      (lambda (ast)
+        (when (p? ast)
+          (k #t)))) ast)
+    (k #f)))
+
+(define has-lifts?
+  (fix ast-contains? LiftStatExpr?))
+
+(define (prepend-stats s ss)
+  (annoless SpliceStat (append ss (list s))))
+
+(define (def-rm-LiftStatExpr ast)
+  ;; Wraps statement `ast` with the specified lifts, returning a new
+  ;; statement. The statements `ss` are assumed to be in evaluation
+  ;; order. The declarations `ds` should be of type CxxDeclVar.
+  (define (wrap ds ss ast)
+    (cond
+     ((and (null? ds) (null? ss))
+      ast)
+     (else
+      (prepend-stats ast (append ds ss)))))
+  
+  (define (rw-siblings-in-reverse ds ss ast-lst)
+    (for/fold ([ds ds] [ss ss] [lst '()]) ([ast (reverse ast-lst)])
+      (define-values (n-ds n-ss n-ast) (rw-sibling ds ss ast))
+      (values n-ds n-ss (cons n-ast lst))))
+
+  (define (lift-expr ast [tmp-id #f])
+    (unless tmp-id
+      (set! tmp-id (if (Var? ast)
+                       (another-ast-identifier (Var-id ast))
+                       (fresh-ast-identifier 'lifted))))
+    (define t (Expr-type ast))
+    (define def (rw-stat (annoless DefVar tmp-id t ast)))
+    (define ref (Var (hasheq 'type t) tmp-id))
+    (values def ref))
+  
+  ;; Rewrites expression `ast`, where `ds` is a list of variables to
+  ;; declare in the same lift context, and `ss` is a list of
+  ;; statements to go into the same lift context after any lifts from
+  ;; `ast`. Rewrites the entire expression `ast`, but only up to and
+  ;; including any LiftStatExpr nodes. Traverses in reverse evaluation
+  ;; order (in practice this means depth-first, mostly right-to-left).
+  (define (rw-sibling ds ss ast)
+    (cond
+     [(LiftStatExpr? ast)
+      (match-define (LiftStatExpr a id n-ss) ast)
+      (define t (Expr-type ast))
+      (define decl (annoless CxxDeclVar id t))
+      (define ref (Var (hasheq 'type t) id))
+      (values (cons decl ds) (append n-ss ss) ref)]
+     [(not (null? ss))
+      ;; Since some later subexpressions have been lifted, we must
+      ;; lift this one, too.
+      (define-values (def ref) (lift-expr ast))
+      (values ds (cons def ss) ref)]
+     [else
+      (match ast
+        [(Apply a f as)
+         (define-values (as-ds as-ss as-exprs)
+           (rw-siblings-in-reverse '() '() as))
+         ;; Arguments evaluate before application, and we need not
+         ;; lift the function application even if the argument
+         ;; expressions contain lifts.
+         (values (append as-ds ds)
+                 (append as-ss ss)
+                 (Apply a f as-exprs))]
+        [(IfExpr a c t e)
+         ;; If either `t` or `e` contain lifts, we must lift the
+         ;; entire conditional, and make it a statement so that we can
+         ;; keep the lifts in their branches. If `c` contains lifts,
+         ;; we can just lift those. We must lift the entire `c` if
+         ;; either branch had lifts.
+         (define-values (t-ds t-ss t-ast) (rw-expr t))
+         (define-values (e-ds e-ss e-ast) (rw-expr e))
+         (cond
+          [(and (null? t-ss) (null? e-ss))
+           (define-values (c-ds c-ss c-ast) (rw-expr c))
+           (values (append c-ds t-ds e-ds ds)
+                   (append c-ss ss)
+                   (IfExpr a c-ast t-ast e-ast))]
+          [else
+           (define-values (c-def c-ref) (lift-expr c))
+           (define typ (Expr-type ast))
+           (define if-id (fresh-ast-identifier 'lifted))
+           (define if-decl (annoless CxxDeclVar if-id typ))
+           (define if-ref (Var (hasheq 'type typ) if-id))
+           (define t-ast (wrap-expr-as-Assign if-ref t))
+           (define e-ast (wrap-expr-as-Assign if-ref e))
+           (values (cons if-decl ds)
+                   (cons c-def ss)
+                   (IfStat a c-ref t-ast e-ast))])]
+        [_
+         ;; The expression `ast` does not contain sub-expressions.
+         (values ds ss ast)])]))
+  
+  (define (rw-expr ast)
+    (rw-sibling '() '() ast))
+
+  (define (wrap-expr-as-Assign lv rv)
+    (rw-stat (annoless Assign lv rv)))
+  
+  ;; Processes any R-value expressions of the immediate C++ statement
+  ;; `ast`.
+  (define (rw-stat ast)
+    ;; Where a statement has multiple expressions, we must be sure to
+    ;; treat them as siblings, and retain appropriate order, since the
+    ;; lifts end up in the same context.
+    (match ast
+      [(DefVar a id t v)
+       #:when (has-lifts? v)
+       (define-values (ds ss n-v) (rw-expr v))
+       (wrap ds ss (DefVar a id t n-v))]
+      [(Assign a lv rv)
+       #:when (has-lifts? rv)
+       (define-values (ds ss n-rv) (rw-expr rv))
+       (wrap ds ss (Assign a lv n-rv))]
+      [(IfStat a c t e)
+       #:when (has-lifts? c)
+       (define-values (ds ss n-c) (rw-expr c))
+       (wrap ds ss (IfStat a n-c t e))]
+      [(CxxReturnOne a v)
+       #:when (has-lifts? v)
+       (define-values (ds ss n-v) (rw-expr v))
+       (wrap ds ss (CxxReturnOne a n-v))]
+      [_ ast]))
+  
+  (define rw-all-stats
+    (bottomup
+     (lambda (ast)
+       (if (or (Stat? ast) (DefVar? ast))
+           (rw-stat ast)
+           ast))))
+  
+  (rw-all-stats ast))
+
+(define (cxx-rm-LiftStatExpr def-lst)
+  (map def-rm-LiftStatExpr def-lst))
+
+;;; 
+;;; lifting of local functions
+;;; 
 
 (define (defs-lift-locals defs)
   (define n-defs (make-hasheq))
@@ -406,8 +602,16 @@ C++ back end.
   
   n-defs)
 
+;;; 
+;;; sorting of top-level declarations
+;;; 
+
 (define (cxx-decl-sort lst)
   (sort lst symbol<? #:key Def-id))
+
+;;; 
+;;; pretty-printing preparation
+;;; 
 
 (define (cxx->pp lst)
   (define (s->ss ast)
@@ -418,6 +622,17 @@ C++ back end.
     (topdown
      (lambda (ast)
        (match ast
+         [(? CxxDefun?)
+          (define b (CxxDefun-s ast))
+          (cond
+           ((BlockStat? b)
+            ast)
+           ((NoBody? b) 
+            ast)
+           (else
+            (struct-copy 
+             CxxDefun ast 
+             [s (annoless BlockStat (list b))])))]
          [(IfStat a c t e)
           (PpCxxIfStat a c (s->ss t) (s->ss e))]
          [_
@@ -445,11 +660,15 @@ C++ back end.
       boolean? void?)
   (generate-cxx-file kinds defs path-stem out banner?)
   ;;(pretty-print (defs-id->ast defs)) (exit)
+  (define defs-t
+    (defs-lift-locals defs))
   (define def-lst
     (thread1->
-     defs
-     defs-lift-locals
+     defs-t
      defs->cxx
+     cxx-rm-LiftStatExpr
+     (curry map ast-rm-SpliceStat)
+     (curry types-to-cxx defs-t)
      cxx-rename
      cxx-rm-CxxLabelDecl
      cxx-decl-sort

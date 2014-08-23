@@ -25,13 +25,13 @@
   (let ((decl* (map format-decl decl*)))
     (string-join decl* "\n\n")))
 
-(define (format-defun name modifs type args [stmt* null])
+(define (format-defun name modifs type args stmt)
   (pp (add-between (append modifs (list type)) " ")
       " " (symbol->string name) "(" `(in (gr sp ,args)) " )"
-      (if (null? stmt*)
+      (if (NoBody? stmt)
           ";"
           `((in " {"
-                ,(for/list ((x stmt*))
+                ,(for/list ([x (BlockStat-ss stmt)])
                    `(br ,(format-stat x)))
                 ) br "}"))))
 
@@ -47,12 +47,13 @@
      s)
     ((CxxDefun _ name modifs
                [format-type . produces . type]
-               [format-params . produces . args] stmt*)
-     (format-defun name modifs type args stmt*))
+               [format-params . produces . args]
+               stmt)
+     (format-defun name modifs type args stmt))
     ((Proto _ name modifs
             [format-type . produces . type]
             [format-params . produces . args])
-     (format-defun name modifs type args))
+     (format-defun name modifs type args the-NoBody))
     (else (ew-error 'format-decl "could not format" else))))
 
 (define (format-sub-stats ss)
@@ -96,10 +97,6 @@
 
 (define (format-expr expr)
   (match expr
-    ((GccStatExpr _ ss e)
-     `("({ " (in ,(for/list ((s ss))
-                    `(br ,(format-stat s)))
-                 br ,(format-expr e) ";") " })"))
     ((IfExpr _ [format-expr . produces . test]
              [format-expr . produces . conseq]
              [format-expr . produces . alt])
@@ -160,7 +157,7 @@
 
 (define (format-param arg)
   (match arg
-    ((CxxParam _ n [format-type . produces . t])
+    ((Param _ n [format-type . produces . t])
      (list t " " (symbol->string n)))
     (arg (ew-error 'format-param "could not format" arg))))
 

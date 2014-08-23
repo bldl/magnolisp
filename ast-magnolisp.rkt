@@ -172,6 +172,11 @@ It is rather important for all Ast derived node types to be
   (fresh-ast-identifier [sym 'g])
   (annoless Id sym (gensym sym)))
 
+(define-with-contract*
+  (-> Id? Id?)
+  (another-ast-identifier other)
+  (fresh-ast-identifier (Id-name other)))
+
 ;; Converts the specified syntax object identifier to an Id one,
 ;; making it ast-identifier=? to 'other' (if any is given).
 (define-with-contract*
@@ -286,7 +291,7 @@ It is rather important for all Ast derived node types to be
 ;;; 
 
 ;; For functions with no Magnolisp body.
-(define-ast* NoBody (Ast) ((no-term annos)))
+(define-ast* NoBody (Ast) ((no-term annos)) #:singleton (#hasheq()))
 
 (define-ast* ForeignTypeExpr (Ast) ((no-term annos)))
 
@@ -303,6 +308,10 @@ It is rather important for all Ast derived node types to be
 
 ;; Sequence of statements.
 (define-ast* BlockStat (Ast Stat StatCont) 
+  ((no-term annos) (list-of-term ss)))
+
+;; Spliced sequence of statements.
+(define-ast* SpliceStat (Ast Stat StatCont) 
   ((no-term annos) (list-of-term ss)))
 
 ;; Variable reference.
@@ -363,13 +372,14 @@ It is rather important for all Ast derived node types to be
 ;; kind is either 'user or 'system.
 (define-ast* Include (Ast) ((no-term annos) (no-term kind) (no-term s)))
 
-;; 'rtype' is the return type, only.
+;; 'rtype' is the return type, only. `s` is the body statement, which
+;; should be a `BlockStat` for printing, or it can be `NoBody` also.
 (define-ast* CxxDefun (Ast Def) ((no-term annos) (no-term id)
                                  (no-term modifs) (just-term rtype)
-                                 (list-of-term params) (list-of-term ss)))
+                                 (list-of-term params) (just-term s)))
 
 ;; A C++ function prototype declaration. No body, and some modifiers
-;; may have to be different to the function definition.
+;; may have to be different compared to the function definition.
 (define-ast* Proto (Ast Def) ((no-term annos) (no-term id)
                               (no-term modifs) (just-term rtype)
                               (list-of-term params)))
@@ -381,17 +391,17 @@ It is rather important for all Ast derived node types to be
 (define-ast* PpCxxIfStat (Ast) ((no-term annos) (just-term c)
                                 (list-of-term ts) (list-of-term es)))
 
-(define-ast* CxxParam (Ast Def) ((no-term annos) (no-term id)
-                                 (just-term t)))
-
 (define-ast* CxxDeclVar (Ast Def) ((no-term annos) (no-term id)
                                    (just-term t)))
 
-;; Statement expression (GCC extension). `e` is a `Var` expression of the
-;; result variable, which is declared within the block.
-(define-ast* GccStatExpr (Ast Expr StatCont) ((no-term annos)
-                                              (list-of-term ss) 
-                                              (just-term e)))
+;; A statement sequence `ss` to be lifted, such that the statements
+;; assign the result of the expression to the variable with Id `id`,
+;; which has yet to be declared. The result should always get
+;; assigned, at least if the lifted expression is ever to be
+;; evaluated.
+(define-ast* LiftStatExpr (Ast Expr StatCont) ((no-term annos)
+                                               (no-term id)
+                                               (list-of-term ss)))
 
 ;; Declares a label. `id` is the label Id; a node of this type
 ;; effectively binds it.

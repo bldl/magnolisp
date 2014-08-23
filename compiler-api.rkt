@@ -160,7 +160,7 @@ optimization.
           ;; declaration syntax corresponding to the function
           ;; definition.
           (when (hash-ref a1 'foreign #f)
-            (set! b (annoless NoBody)))
+            (set! b the-NoBody))
           ;;(writeln (list n (hash-ref a1 'top)))
           (Defun a1 n t p b))
          
