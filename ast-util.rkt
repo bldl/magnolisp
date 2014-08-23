@@ -140,31 +140,6 @@ Assumptions for AST node types:
             r-f-lst))
        #,(make-r-f-struct-copy nn-stx #'ast r-f-lst))))
 
-(define-for-syntax (make-some-rw-term nn-stx f-stx-lst)
-  (define nn-sym (syntax-e nn-stx))
-  (define r-f-lst (get-relevant-fields f-stx-lst))
-
-  (define bind-lst
-    (for/list ([fld r-f-lst])
-      (define kind (first fld))
-      (define fn-stx (second fld))
-      (define fn-sym (syntax-e fn-stx))
-      (with-syntax ([tmp (third fld)]
-                    [get (format-id nn-stx "~a-~a" nn-sym fn-sym)]
-                    [compute-r (case kind
-                                 [(just) #'(s v)]
-                                 [(list) #'(some-rw-list s v)])])
-        #'[tmp (let* ([v (get ast)]
-                      [r compute-r])
-              (if r (begin (set! any? #t) r) v))])))
-
-  (with-syntax ([(bind ...) bind-lst]
-                [copy (make-r-f-struct-copy nn-stx #'ast r-f-lst)])
-    #'(define (some-rw-term s ast)
-        (define any? #f)
-        (let (bind ...)
-          (and any? copy)))))
-
 (define-for-syntax (make-one-rw-term nn-stx f-stx-lst)
   (define nn-sym (syntax-e nn-stx))
   (define r-f-lst (get-relevant-fields f-stx-lst))
@@ -225,7 +200,6 @@ Assumptions for AST node types:
 (define-for-syntax (make-strategic nn-stx f-stx-lst)
   `(,(make-all-visit-term nn-stx f-stx-lst)
     ,(make-all-rw-term nn-stx f-stx-lst)
-    ,(make-some-rw-term nn-stx f-stx-lst)
     ,(make-one-rw-term nn-stx f-stx-lst)
     ,(make-get-term-fields f-stx-lst)
     ,(make-set-term-fields nn-stx f-stx-lst)))
@@ -543,5 +517,35 @@ Assumptions for AST node types:
                       (map inc f)))
     (check-equal? (set-term-fields t inc-lst)
                   (Tree (list (Atom 2) (Atom 3)))))
+  
+  (let ((t1 (Tree (list (Atom 1) (Atom 2))))
+        (t2 (Tree (list (Atom 1) (Tree null))))
+        (t3 (Tree (list (Tree null) (Tree null)))))
+    (define (rw-Tree ast)
+      (and (Tree? ast) (Atom 555)))
+    (define (rw-Atom ast)
+      (and (Atom? ast) (Tree null)))
+    (check-not-false ((all rw-Atom) t1))
+    (check-false ((all rw-Atom) t2))
+    (check-false ((all rw-Atom) t3))
+    (check-false ((all rw-Tree) t1))
+    (check-false ((all rw-Tree) t2))
+    (check-not-false ((all rw-Tree) t3))
+    (check-not-false ((some rw-Atom) t1))
+    (check-not-false ((some rw-Atom) t2))
+    (check-false ((some rw-Atom) t3))
+    (check-false ((some rw-Tree) t1))
+    (check-not-false ((some rw-Tree) t2))
+    (check-not-false ((some rw-Tree) t3))
+    (check-not-false ((one rw-Atom) t1))
+    (check-not-false ((one rw-Atom) t2))
+    (check-false ((one rw-Atom) t3))
+    (check-false ((one rw-Tree) t1))
+    (check-not-false ((one rw-Tree) t2))
+    (check-not-false ((one rw-Tree) t3))
+    (check-not-false ((one rw-Atom) ((one rw-Atom) t1)))
+    (check-false ((one rw-Atom) ((one rw-Atom) t2)))
+    (check-false ((some rw-Atom) ((some rw-Atom) t1)))
+    (void))
 
   (void))

@@ -53,7 +53,6 @@ Meta-Compilation of Language Abstractions (2006).
 (define-generics* strategic
   (all-visit-term s strategic)
   (all-rw-term s strategic)
-  (some-rw-term s strategic)
   (one-rw-term s strategic)
   (get-term-fields strategic)
   (set-term-fields strategic lst))
@@ -67,6 +66,16 @@ Meta-Compilation of Language Abstractions (2006).
 
 (define* (map-term-field f strategic)
   (set-term-fields strategic (map f (get-term-fields strategic))))
+
+(define* (some-rw-term s strategic)
+  (define o-lst (get-term-fields strategic))
+  (define any? #f)
+  (define (f v)
+    (define r (s v))
+    (if r (begin (set! any? #t) r) v))
+  (define n-lst (for/list ((fv o-lst))
+                  (if (list? fv) (map f fv) (f fv))))
+  (and any? (set-term-fields strategic n-lst)))
 
 ;;; 
 ;;; List access operations.
@@ -315,9 +324,6 @@ Meta-Compilation of Language Abstractions (2006).
              (all-visit-list s (List-lst strategic)))
            (define (all-rw-term s strategic)
              (define r (all-rw-list s (List-lst strategic)))
-             (and r (List r)))
-           (define (some-rw-term s strategic)
-             (define r (some-rw-list s (List-lst strategic)))
              (and r (List r)))
            (define (one-rw-term s strategic)
              (define r (one-rw-list s (List-lst strategic)))
