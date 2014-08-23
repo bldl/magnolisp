@@ -59,6 +59,16 @@ Meta-Compilation of Language Abstractions (2006).
   (set-term-fields strategic lst))
 
 ;;; 
+;;; Abstract term access operations.
+;;;
+
+(define* (for-each-term-field f strategic)
+  (for-each f (get-term-fields strategic)))
+
+(define* (map-term-field f strategic)
+  (set-term-fields strategic (map f (get-term-fields strategic))))
+
+;;; 
 ;;; List access operations.
 ;;;
 
