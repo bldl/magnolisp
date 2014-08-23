@@ -16,7 +16,7 @@ Assumptions for AST node types:
 
 (require "ast-serialize.rkt" "ast-view.rkt" "strategy.rkt"
          "util.rkt" "util/struct.rkt"
-         racket/generic unstable/struct
+         racket/generic racket/unsafe/ops unstable/struct
          (for-syntax racket/base racket/function racket/list
                      ;;racket/pretty 
                      racket/syntax syntax/parse)
@@ -189,11 +189,36 @@ Assumptions for AST node types:
     #'(define (one-rw-term s ast)
         (or choice ...))))
 
+;; E.g., '((#'lv . 1) (#'rv . 2))
+(define-for-syntax (to-term-fields-with-ix f-stx-lst)
+  (filter
+   car
+   (for/list ([f-stx f-stx-lst]
+              [i (in-naturals)])
+     (define n 
+       (syntax-case f-stx (no-term just-term list-of-term)
+         [(no-term fn-pat)
+          #f]
+         [(just-term fn-pat)
+          #'fn-pat]
+         [(list-of-term fn-pat)
+          #'fn-pat]))
+     (cons n i))))
+
+(define-for-syntax (make-term-field-accessors nn-stx f-stx-lst)
+  (define lst (to-term-fields-with-ix f-stx-lst))
+  
+  (with-syntax ([(ix ...) (map cdr lst)])
+    (list
+     #'(define (get-term-fields ast)
+         (list (unsafe-struct*-ref ast ix) ...)))))
+
 (define-for-syntax (make-strategic nn-stx f-stx-lst)
-  (list (make-all-visit-term nn-stx f-stx-lst)
-        (make-all-rw-term nn-stx f-stx-lst)
-        (make-some-rw-term nn-stx f-stx-lst)
-        (make-one-rw-term nn-stx f-stx-lst)))
+  `(,(make-all-visit-term nn-stx f-stx-lst)
+    ,(make-all-rw-term nn-stx f-stx-lst)
+    ,(make-some-rw-term nn-stx f-stx-lst)
+    ,(make-one-rw-term nn-stx f-stx-lst)
+    ,@(make-term-field-accessors nn-stx f-stx-lst)))
 
 ;;; 
 ;;; gen:syntactifiable
@@ -389,6 +414,11 @@ Assumptions for AST node types:
   (check-true (match empty [(Ast (? hash?)) #t] [_ #f]))
   (check-true (match empty [(Ast (? hash? h)) (hash-empty? h)] [_ #f]))
 
+  (check-equal? (get-term-fields the-Singleton) '())
+  (check-equal? (get-term-fields empty) '())
+  (check-eqv? 1 (length (get-term-fields (Some (hasheq 'x 5) empty))))
+  (check-eqv? 2 (length (get-term-fields object)))
+  
   (define rw-Singleton->Empty
      (lambda (ast)
        (match ast

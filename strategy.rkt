@@ -54,7 +54,8 @@ Meta-Compilation of Language Abstractions (2006).
   (all-visit-term s strategic)
   (all-rw-term s strategic)
   (some-rw-term s strategic)
-  (one-rw-term s strategic))
+  (one-rw-term s strategic)
+  (get-term-fields strategic))
 
 ;;; 
 ;;; List access operations.
@@ -309,7 +310,9 @@ Meta-Compilation of Language Abstractions (2006).
              (and r (List r)))
            (define (one-rw-term s strategic)
              (define r (one-rw-list s (List-lst strategic)))
-             (and r (List r)))])
+             (and r (List r)))
+           (define (get-term-fields strategic)
+             (list (List-lst strategic)))])
   
   (define lst (List '(1 2 3)))
   (let ((x 0))
