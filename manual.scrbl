@@ -460,6 +460,15 @@ which instructs the compiler to print out C++ code into standard output, with ba
 
 For sample Magnolisp programs, see the @filepath{test-*.rkt} files in the @filepath{tests} directory of the Magnolisp implementation codebase.
 
+@section{Software Download}
+
+A Git repository of the Magnolisp source code can be found at:
+@nested[#:style 'inset]{@url{https://github.com/bldl/magnolisp}}
+
+Racket version 6 is required to run the software. It may well be installable directly off GitHub with the command:
+
+@commandline{raco pkg install github://github.com/bldl/magnolisp/master}
+
 @section{License}
 
 Except where otherwise noted, the following license applies:
