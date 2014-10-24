@@ -104,8 +104,10 @@ compiler.
 (define (mpi->datum/resolve mpi)
   (resolved-module-path-name (module-path-index-resolve mpi)))
 
-(define* (id->datum/detailed id-stx #:conv-mpi mpi->datum)
-  (define b (identifier-binding id-stx))
+(define* (id->datum/detailed id-stx 
+                             #:conv-mpi mpi->datum
+                             #:phase [ph (syntax-local-phase-level)])
+  (define b (identifier-binding id-stx ph))
   (define name (syntax-e id-stx))
   (cond
    ((not b) `[,name : #f])
@@ -143,15 +145,20 @@ compiler.
 ;; and which do not, and what kind they are.
 (define* (id->datum/phase id #:conv-mpi dummy)
   (define (pick-glyph)
-    (define b-0 (identifier-binding id 0))
-    (define b-1 (identifier-binding id 1))
+    (define b- (identifier-binding id -1))
+    (define b0 (identifier-binding id 0))
+    (define b+ (identifier-binding id 1))
     (cond
-     ((not (or b-0 b-1)) "ø")
-     ((eq? b-0 'lexical) (assert (eq? b-1 'lexical)) "$")
+     ((not (or b- b0 b+)) "ø")
+     ((eq? b0 'lexical) 
+      (assert (eq? b- 'lexical)) 
+      (assert (eq? b+ 'lexical)) 
+      "$")
      (else
-      (format "~a~a"
-              (if b-0 (begin (assert (list? b-0)) "£") "")
-              (if b-1 (begin (assert (list? b-1)) "€") "")))))
+      (format "~a~a~a"
+              (if b- (begin (assert (list? b-)) "¥") "")
+              (if b0 (begin (assert (list? b0)) "£") "")
+              (if b+ (begin (assert (list? b+)) "€") "")))))
   (string->symbol
    (format "~a~a" (syntax-e id) (pick-glyph))))
 
