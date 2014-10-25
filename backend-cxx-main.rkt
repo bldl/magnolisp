@@ -568,7 +568,7 @@ C++ back end.
 ;;; removal of redundant jumps
 ;;; 
 
-(define a-noop (annoless BlockStat null))
+(define a-noop (annoless SpliceStat null))
 
 ;; Applies `f` to the elements of list `xs` in reverse order, which
 ;; matters as state `st` is threaded through the list transformation.
@@ -625,13 +625,12 @@ C++ back end.
     ;; Replace any unreferenced labels with no-ops.
     ((topdown
       (lambda (ast)
-        (define id (cond
-                    [(CxxLabelDef? ast) (CxxLabelDef-id ast)]
-                    [(CxxLabelDecl? ast) (CxxLabelDecl-id ast)]
-                    [else #f]))
-        (if (and id (not (set-member? targets (Id-bind id))))
-            a-noop
-            ast)))
+        (match ast
+          [(CxxLabel (? (lambda (id)
+                          (define bind (Id-bind id))
+                          (not (set-member? targets bind)))))
+           a-noop]
+          [_ ast])))
      s))
   
   (define (defun-optimize ast)
