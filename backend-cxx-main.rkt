@@ -565,6 +565,63 @@ C++ back end.
   (map def-rm-LiftStatExpr def-lst))
 
 ;;; 
+;;; removal of redundant jumps
+;;; 
+
+(define a-noop (annoless BlockStat null))
+
+;; Applies `f` to the elements of list `xs` in reverse order, which
+;; matters as state `st` is threaded through the list transformation.
+(define (map/reverse/state f st xs)
+  (for/fold ([st st] [lst '()]) ([x (reverse xs)])
+    (define-values (n-st n-x) (f st x))
+    (values n-st (cons n-x lst))))
+
+(define (cxx-fun-optimize def-lst)
+  ;; Note that a no-op does not change state.
+  (define (g st s)
+    ;;(writeln `(g on ,s))
+    (match s
+      [(? LetStat?)
+       (raise-assertion-error 
+        'cxx-fun-optimize
+        "assumed no LetStat")]
+      [(StatCont ss)
+       (define-values (n-st n-ss) (map/reverse/state g st ss))
+       (values n-st (StatCont-copy s n-ss))]
+      [(IfStat a c t e)
+       (define-values (st0 n-t) (g st t))
+       (define-values (st1 n-e) (g st e))
+       ;; We do account for the special case where both branches of an
+       ;; IfStat begin with the same label.
+       (values (and st0 st1 (ast-identifier=? st0 st1) st0)
+               (IfStat a c n-t n-e))]
+      [(CxxLabel a id) 
+       ;;(writeln `(store ,id))
+       (values id s)]
+      [(Goto _ (? (lambda (id) (and st (ast-identifier=? st id)))))
+       ;;(writeln `(delete ,s))
+       (values st a-noop)]
+      [(CxxLabelDecl _ _)
+       (values st s)]
+      [_ 
+       (values #f s)]))
+  
+  (define (stat-rm-goto-next s)
+    (define-values (st n-s) (g #f s))
+    n-s)
+  
+  (define (defun-optimize ast)
+    (define b (CxxDefun-s ast))
+    (define s (stat-rm-goto-next b))
+    (set-CxxDefun-s ast s))
+  
+  (map (lambda (def)
+         (if (CxxDefun? def)
+             (defun-optimize def)
+             def)) def-lst))
+
+;;; 
 ;;; lifting of local functions
 ;;; 
 
@@ -667,6 +724,7 @@ C++ back end.
      defs-t
      defs->cxx
      cxx-rm-LiftStatExpr
+     cxx-fun-optimize
      (curry map ast-rm-SpliceStat)
      (curry types-to-cxx defs-t)
      cxx-rename
