@@ -611,9 +611,32 @@ C++ back end.
     (define-values (st n-s) (g #f s))
     n-s)
   
+  (define (stat-rm-unused-labels s)
+    ;; The `targets` set is that of label `bind` values in `s` that
+    ;; are Goto targets.
+    (define targets (mutable-seteq))
+    ((topdown-visit
+      (lambda (ast)
+        (when (Goto? ast)
+          (define id (Goto-id ast))
+          (define bind (Id-bind id))
+          (set-add! targets bind))))
+     s)
+    ;; Replace any unreferenced labels with no-ops.
+    ((topdown
+      (lambda (ast)
+        (define id (cond
+                    [(CxxLabel? ast) (CxxLabel-id ast)]
+                    [(CxxLabelDecl? ast) (CxxLabelDecl-id ast)]
+                    [else #f]))
+        (if (and id (not (set-member? targets (Id-bind id))))
+            a-noop
+            ast)))
+     s))
+  
   (define (defun-optimize ast)
     (define b (CxxDefun-s ast))
-    (define s (stat-rm-goto-next b))
+    (define s (stat-rm-unused-labels (stat-rm-goto-next b)))
     (set-CxxDefun-s ast s))
   
   (map (lambda (def)
