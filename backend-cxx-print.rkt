@@ -91,7 +91,7 @@
      (list x " = " v ";"))
     ((Goto _ name)
      (string-append "goto " (format-ident name) ";"))
-    ((CxxLabel _ name)
+    ((CxxLabelDef _ name)
      (string-append (format-ident name) ":"))
     (else (ew-error 'format-stat "could not format" else))))
 

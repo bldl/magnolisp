@@ -181,9 +181,9 @@ C++ back end.
       ((CxxLabelDecl a id)
        (define-values (r-1 n-sym) (decide-name-for-id r id "l"))
        (values r-1 (CxxLabelDecl a n-sym)))
-      ((CxxLabel a id)
+      ((CxxLabelDef a id)
        (define sym (get-decision-for id))
-       (values r (CxxLabel a sym)))
+       (values r (CxxLabelDef a sym)))
       ((Goto a id)
        (define sym (get-decision-for id))
        (values r (Goto a sym)))
@@ -339,7 +339,7 @@ C++ back end.
         a rval
         `(,(annoless CxxLabelDecl lbl)
           ,@n-ss
-          ,(annoless CxxLabel lbl)))]
+          ,(annoless CxxLabelDef lbl)))]
       [(Literal a d)
        (Literal a (syntax->datum d))]
       [_
@@ -596,7 +596,7 @@ C++ back end.
        ;; IfStat begin with the same label.
        (values (and st0 st1 (ast-identifier=? st0 st1) st0)
                (IfStat a c n-t n-e))]
-      [(CxxLabel a id) 
+      [(CxxLabelDef a id) 
        ;;(writeln `(store ,id))
        (values id s)]
       [(Goto _ (? (lambda (id) (and st (ast-identifier=? st id)))))
@@ -626,7 +626,7 @@ C++ back end.
     ((topdown
       (lambda (ast)
         (define id (cond
-                    [(CxxLabel? ast) (CxxLabel-id ast)]
+                    [(CxxLabelDef? ast) (CxxLabelDef-id ast)]
                     [(CxxLabelDecl? ast) (CxxLabelDecl-id ast)]
                     [else #f]))
         (if (and id (not (set-member? targets (Id-bind id))))

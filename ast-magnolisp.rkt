@@ -28,6 +28,7 @@ Assumptions for AST node types:
 (define-view* Stat ())
 (define-view* StatCont (#:fields ss))
 (define-view* If ([#:field c] [#:field t] [#:field e]))
+(define-view* CxxLabel (#:fields id))
 
 (define (get-type ast)
   (hash-ref (Ast-annos ast) 'type #f))
@@ -407,10 +408,10 @@ Assumptions for AST node types:
 
 ;; Declares a label. `id` is the label Id; a node of this type
 ;; effectively binds it.
-(define-ast* CxxLabelDecl (Ast Stat) ((no-term annos) (no-term id)))
+(define-ast* CxxLabelDecl (Ast Stat CxxLabel) ((no-term annos) (no-term id)))
 
 ;; Label for the following statements. Itself a statement.
-(define-ast* CxxLabel (Ast Stat) ((no-term annos) (no-term id)))
+(define-ast* CxxLabelDef (Ast Stat CxxLabel) ((no-term annos) (no-term id)))
 
 ;; Where 'id' is a label Id. A statement.
 (define-ast* Goto (Ast Stat) ((no-term annos) (no-term id)))
