@@ -731,6 +731,32 @@ C++ back end.
   (examine-all (assign-val-nums def)))
 
 ;;; 
+;;; removal of unreferenced variables
+;;; 
+
+(define (fun-rm-unreferenced-var-decl def)
+  (define refs (mutable-seteq))
+  
+  ((topdown-visit
+    (lambda (ast)
+      (when (Var? ast)
+        (define id (Var-id ast))
+        (define bind (Id-bind id))
+        (set-add! refs bind))))
+   def)
+  
+  ((topdown
+    (lambda (ast)
+      (match ast
+        [(CxxDeclVar a id t)
+         (define bind (Id-bind id))
+         (if (set-member? refs bind)
+             ast
+             a-noop)]
+        [_ ast])))
+   def))
+
+;;; 
 ;;; removal of redundant jumps
 ;;; 
 
@@ -799,8 +825,10 @@ C++ back end.
   
   (define (defun-optimize ast)
     (define b (CxxDefun-s ast))
-    (define s (fun-propagate-copies
-               (stat-rm-unused-labels (stat-rm-goto-next b))))
+    (define s (fun-rm-unreferenced-var-decl
+               (fun-propagate-copies
+                (stat-rm-unused-labels 
+                 (stat-rm-goto-next b)))))
     (set-CxxDefun-s ast s))
   
   (map (lambda (def)
