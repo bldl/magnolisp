@@ -565,10 +565,171 @@ C++ back end.
   (map def-rm-LiftStatExpr def-lst))
 
 ;;; 
-;;; removal of redundant jumps
+;;; copy propagation
 ;;; 
 
 (define a-noop (annoless SpliceStat null))
+
+;; A Φ value type, as in compiler literature. The `set` is a set of
+;; value numbers.
+(struct Phi (set) #:transparent)
+
+;; Sums together value numbers `xs`. Where `xs` are all the same
+;; number, returns the number. Otherwise returns Phi(x ...), where `x`
+;; are all distinct numbers.
+(define (val-num+ . xs)
+  (define vs
+    (for/fold ((sum (seteq))) ((x xs))
+      (if (Phi? x)
+          (set-union sum (Phi-set x))
+          (set-add sum x))))
+  (if (= (set-count vs) 1)
+      (set-first vs)
+      (Phi vs)))
+
+(define (fun-propagate-copies def)
+  ;; (listof (list/c val-num lv rv))
+  (define to-examine null)
+  
+  (define (annos-add-val-num! a lv-id [rv #f])
+    (define val-num (gensym 'vn))
+    (define n-a (hash-set a 'val-num val-num))
+    (when (and rv (Var? rv))
+      (define item (list val-num lv-id rv))
+      (writeln `(potential ,item))
+      (set! to-examine (cons item to-examine)))
+    n-a)
+  
+  ;; Assigns value numbers to each "assignment", and adds potentials
+  ;; for removal to `to-examine`.
+  (define assign-val-nums
+    (topdown
+     (lambda (ast)
+       (match ast
+         [(Assign a lv rv)
+          (define n-a (annos-add-val-num! a (Var-id lv) rv))
+          (Assign n-a lv rv)]
+         [(CxxDeclVar a id t)
+          ast] ;; has no value
+         [(DefVar a id t rv)
+          (define n-a (annos-add-val-num! a id rv))
+          (DefVar n-a id t rv)]
+         [(Param a id t)
+          (define n-a (annos-add-val-num! a id))
+          (Param n-a id t)]
+         [_ ast]))))
+  
+  ;; Rewrite `def` to remove the assignment identified by
+  ;; `examine-item`, or fails returning #f. Traverses `def` in
+  ;; execution order in order to do data-flow analysis.
+  (define (rw-by-item examine-item def)
+    (writeln `(examining ,examine-item))
+    
+    (define tgt-num (first examine-item))
+    (define tgt-id (second examine-item))
+    (define tgt-bind (Id-bind tgt-id))
+    (define tgt-rv (third examine-item))
+    
+    (define id->val (make-parameter (make-hasheq)))
+    
+    (define (merge h1 h2)
+      (define h (make-hasheq))
+      (define keys (list->mutable-seteq (hash-keys h1)))
+      (for ((k (hash-keys h2)))
+        (set-add! keys k))
+      (for ((k (in-set keys)))
+        (define v1 (hash-ref h1 k 'nothing))
+        (define v2 (hash-ref h2 k 'nothing))
+        (hash-set! h k (val-num+ v1 v2)))
+      h)
+    
+    (define (rw-copy ast)
+      (parameterize ((id->val (hash-copy (id->val))))
+        (let ((ast (rw ast)))
+          (values (id->val) ast))))
+    
+    (define (rw ast)
+      (match ast
+        [(Assign a lv rv)
+         (define this-num (hash-ref a 'val-num))
+         (assert (Var? lv))
+         (define lv-id (Var-id lv))
+         (define lv-bind (Id-bind lv-id))
+         (begin0
+           (cond
+            [(and (eq? this-num tgt-num)
+                  (ast-identifier=? tgt-id lv-id))
+             (writeln `(deleting ,ast))
+             a-noop]
+            [else
+             (Assign a lv (rw rv))])
+           (hash-set! (id->val) lv-bind this-num))]
+        [(DefVar a id t rv)
+         (define this-num (hash-ref a 'val-num))
+         (define lv-bind (Id-bind id))
+         (begin0
+           (cond
+            [(eq? this-num tgt-num)
+             (CxxDeclVar a id t)]
+            [else
+             (define n-rv (rw rv))
+             (and n-rv
+                  (DefVar a id t n-rv))])
+           (hash-set! (id->val) lv-bind this-num))]
+        [(Param a id t)
+         (define this-num (hash-ref a 'val-num))
+         (assert (not (eq? this-num tgt-num)))
+         (define lv-bind (Id-bind id))
+         (hash-set! (id->val) lv-bind this-num)
+         ast]
+        [(IfStat a c t e)
+         (define n-c (rw c))
+         (define-values (t-st n-t) (rw-copy t))
+         (and n-t
+              (let ()
+                (define-values (e-st n-e) (rw-copy e))
+                (and n-e
+                     (let ()
+                       (id->val (merge t-st e-st))
+                       (IfStat a n-c n-t n-e)))))]
+        [(Var a (? (lambda (id) (ast-identifier=? id tgt-id)) id))
+         (define this-bind (Id-bind id))
+         (define this-num (hash-ref (id->val) this-bind))
+         (assert (not (eq? this-num 'nothing)))
+         (writeln `(Var id= ,id num= ,this-num))
+         (cond
+          ;; The target assignment is in effect here.
+          ((eq? this-num tgt-num)
+           tgt-rv)
+          ;; The target assignment might be in effect here, but we
+          ;; don't know, and hence cannot make this optimization.
+          ((Phi? this-num)
+           (define vs (Phi-set this-num))
+           (if (set-member? vs tgt-num)
+               #f
+               ast))
+          ;; The target assignment is not in effect here.
+          (else
+           ast))]
+        [_
+         (rw-all ast)]))
+    
+    (define rw-all
+      (all rw))
+    
+    (rw def))
+  
+  ;; Tries to rewrite `ast` to remove each of the assignments in
+  ;; `to-examine`, but preserves `ast` where removal is not possible.
+  (define (examine-all ast)
+    (for/fold ((ast ast)) ((item to-examine))
+      (or (rw-by-item item ast) ast)))
+  
+  (examine-all (assign-val-nums def)))
+
+;;; 
+;;; removal of redundant jumps
+;;; 
 
 ;; Applies `f` to the elements of list `xs` in reverse order, which
 ;; matters as state `st` is threaded through the list transformation.
@@ -635,7 +796,8 @@ C++ back end.
   
   (define (defun-optimize ast)
     (define b (CxxDefun-s ast))
-    (define s (stat-rm-unused-labels (stat-rm-goto-next b)))
+    (define s (fun-propagate-copies
+               (stat-rm-unused-labels (stat-rm-goto-next b))))
     (set-CxxDefun-s ast s))
   
   (map (lambda (def)
