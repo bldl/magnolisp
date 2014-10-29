@@ -596,7 +596,7 @@ C++ back end.
     (define n-a (hash-set a 'val-num val-num))
     (when (and rv (Var? rv))
       (define item (list val-num lv-id rv))
-      (writeln `(potential ,item))
+      ;;(writeln `(potential ,item))
       (set! to-examine (cons item to-examine)))
     n-a)
   
@@ -623,101 +623,96 @@ C++ back end.
   ;; `examine-item`, or fails returning #f. Traverses `def` in
   ;; execution order in order to do data-flow analysis.
   (define (rw-by-item examine-item def)
-    (writeln `(examining ,examine-item))
+    ;;(writeln `(examining ,examine-item))
     
     (define tgt-num (first examine-item))
     (define tgt-id (second examine-item))
     (define tgt-bind (Id-bind tgt-id))
     (define tgt-rv (third examine-item))
     
-    (define id->val (make-parameter (make-hasheq)))
-    
     (define (merge h1 h2)
-      (define h (make-hasheq))
       (define keys (list->mutable-seteq (hash-keys h1)))
       (for ((k (hash-keys h2)))
         (set-add! keys k))
-      (for ((k (in-set keys)))
+      (for/fold ((h #hasheq())) ((k (in-set keys)))
         (define v1 (hash-ref h1 k 'nothing))
         (define v2 (hash-ref h2 k 'nothing))
-        (hash-set! h k (val-num+ v1 v2)))
-      h)
+        (hash-set h k (val-num+ v1 v2))))
     
-    (define (rw-copy ast)
-      (parameterize ((id->val (hash-copy (id->val))))
-        (let ((ast (rw ast)))
-          (values (id->val) ast))))
-    
-    (define (rw ast)
+    (define (rw bind->val ast)
+      ;;(writeln `(rw of ,ast))
       (match ast
         [(Assign a lv rv)
          (define this-num (hash-ref a 'val-num))
          (assert (Var? lv))
          (define lv-id (Var-id lv))
          (define lv-bind (Id-bind lv-id))
-         (begin0
-           (cond
-            [(and (eq? this-num tgt-num)
-                  (ast-identifier=? tgt-id lv-id))
-             (writeln `(deleting ,ast))
-             a-noop]
-            [else
-             (Assign a lv (rw rv))])
-           (hash-set! (id->val) lv-bind this-num))]
+         (values (hash-set bind->val lv-bind this-num)
+                 (cond
+                  [(and (eq? this-num tgt-num)
+                        (ast-identifier=? tgt-id lv-id))
+                   ;;(writeln `(deleting ,ast))
+                   a-noop]
+                  [else
+                   (Assign a lv (rw-discard bind->val rv))]))]
         [(DefVar a id t rv)
          (define this-num (hash-ref a 'val-num))
          (define lv-bind (Id-bind id))
-         (begin0
-           (cond
-            [(eq? this-num tgt-num)
-             (CxxDeclVar a id t)]
-            [else
-             (define n-rv (rw rv))
-             (and n-rv
-                  (DefVar a id t n-rv))])
-           (hash-set! (id->val) lv-bind this-num))]
+         (values (hash-set bind->val lv-bind this-num)
+                 (cond
+                  [(eq? this-num tgt-num)
+                   (CxxDeclVar a id t)]
+                  [else
+                   (define n-rv (rw-discard bind->val rv))
+                   (and n-rv (DefVar a id t n-rv))]))]
         [(Param a id t)
          (define this-num (hash-ref a 'val-num))
          (assert (not (eq? this-num tgt-num)))
          (define lv-bind (Id-bind id))
-         (hash-set! (id->val) lv-bind this-num)
-         ast]
+         (values (hash-set bind->val lv-bind this-num) ast)]
         [(IfStat a c t e)
-         (define n-c (rw c))
-         (define-values (t-st n-t) (rw-copy t))
-         (and n-t
-              (let ()
-                (define-values (e-st n-e) (rw-copy e))
-                (and n-e
-                     (let ()
-                       (id->val (merge t-st e-st))
-                       (IfStat a n-c n-t n-e)))))]
+         (define n-c (rw-discard bind->val c))
+         (define-values (t-st n-t) (rw bind->val t))
+         (if (not n-t)
+             (values bind->val #f)
+             (let ()
+               (define-values (e-st n-e) (rw bind->val e))
+               (if (not n-e)
+                   (values bind->val #f)
+                   (values (merge t-st e-st)
+                           (IfStat a n-c n-t n-e)))))]
         [(Var a (? (lambda (id) (ast-identifier=? id tgt-id)) id))
          (define this-bind (Id-bind id))
-         (define this-num (hash-ref (id->val) this-bind))
+         (define this-num (hash-ref bind->val this-bind))
          (assert (not (eq? this-num 'nothing)))
-         (writeln `(Var id= ,id num= ,this-num))
-         (cond
-          ;; The target assignment is in effect here.
-          ((eq? this-num tgt-num)
-           tgt-rv)
-          ;; The target assignment might be in effect here, but we
-          ;; don't know, and hence cannot make this optimization.
-          ((Phi? this-num)
-           (define vs (Phi-set this-num))
-           (if (set-member? vs tgt-num)
-               #f
-               ast))
-          ;; The target assignment is not in effect here.
-          (else
-           ast))]
+         ;;(writeln `(Var id= ,id num= ,this-num))
+         (values bind->val
+                 (cond
+                  ;; The target assignment is in effect here.
+                  ((eq? this-num tgt-num)
+                   tgt-rv)
+                  ;; The target assignment might be in effect here, but we
+                  ;; don't know, and hence cannot make this optimization.
+                  ((Phi? this-num)
+                   (define vs (Phi-set this-num))
+                   (if (set-member? vs tgt-num)
+                       #f
+                       ast))
+                  ;; The target assignment is not in effect here.
+                  (else
+                   ast)))]
         [_
-         (rw-all ast)]))
+         (rw-all bind->val ast)]))
     
-    (define rw-all
-      (all rw))
+    (define (rw-discard bind->val ast)
+      (define-values (r n-ast) (rw bind->val ast))
+      n-ast)
     
-    (rw def))
+    (define (rw-all bind->val ast)
+      (stateful-all-rw-term rw bind->val ast))
+    
+    (let-values ([(dummy ast) (rw #hasheq() def)])
+      ast))
   
   ;; Tries to rewrite `ast` to remove each of the assignments in
   ;; `to-examine`, but preserves `ast` where removal is not possible.
