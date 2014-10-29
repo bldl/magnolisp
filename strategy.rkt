@@ -148,6 +148,23 @@ Meta-Compilation of Language Abstractions (2006).
   (and one? (set-term-fields strategic n-lst)))
 
 ;;; 
+;;; Stateful term access operators.
+;;; 
+
+;; Rewrites subterms of `ast` with strategy `f`, threading through
+;; state `st` in the process. The function `f` must take and return an
+;; extra state value, whose initial value is `st`.
+(define* (stateful-all-rw-term f st ast)
+  (let ([ast
+         (all-rw-term
+          (lambda (ast)
+            (let-values ([(sub-st ast) (f st ast)])
+              (set! st sub-st)
+              ast))
+          ast)])
+    (values st ast)))
+
+;;; 
 ;;; Primitive traversal operators for lists.
 ;;; 
 
