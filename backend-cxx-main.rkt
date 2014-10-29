@@ -712,6 +712,7 @@ C++ back end.
       (stateful-all-rw-term rw bind->val ast))
     
     (let-values ([(dummy ast) (rw #hasheq() def)])
+      ;;(pretty-print ast)
       ast))
   
   ;; Tries to rewrite `ast` to remove each of the assignments in
@@ -850,10 +851,11 @@ C++ back end.
 ;;; 
 
 (define (cxx->pp lst)
+  ;;(pretty-print `(cxx->pp ,lst))
   (define (s->ss ast)
     (cond
      ((BlockStat? ast) (BlockStat-ss ast))
-     (else ast)))
+     (else (list ast))))
   (define f
     (topdown
      (lambda (ast)
