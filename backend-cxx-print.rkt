@@ -83,7 +83,7 @@
        ,(format-sub-stats ts)
        ,(and (not (null? es))
              `(,(if (null? ts) 'br " ")
-               "else "
+               "else"
                ,(format-sub-stats es)))))
     ((CxxReturnOne _ [format-expr . produces . expr])
      (list "return " expr ";"))

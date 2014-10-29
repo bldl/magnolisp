@@ -392,16 +392,23 @@ C++ back end.
 ;;; statement unsplicing
 ;;; 
 
+(define (empty-BlockStat? ast)
+  (matches? ast (BlockStat _ (list))))
+
 (define (ast-rm-SpliceStat ast)
+  (define (pointless-nest? ast)
+    (or (SpliceStat? ast)
+        (empty-BlockStat? ast)))
+  
   (define un-nest
     (bottomup
      (lambda (ast)
        (match ast
-         [(StatCont (? (curry ormap SpliceStat?) ss))
+         [(StatCont (? (curry ormap pointless-nest?) ss))
           (define n-ss
             (apply append (for/list ((s ss))
-                            (if (SpliceStat? s)
-                                (SpliceStat-ss s)
+                            (if (pointless-nest? s)
+                                (StatCont-ss s)
                                 (list s)))))
           (StatCont-copy ast n-ss)]
          [else ast]))))
