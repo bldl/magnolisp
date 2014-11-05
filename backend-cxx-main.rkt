@@ -446,7 +446,8 @@ C++ back end.
 (define (def-rm-LiftStatExpr ast)
   ;; Wraps statement `ast` with the specified lifts, returning a new
   ;; statement. The statements `ss` are assumed to be in evaluation
-  ;; order. The declarations `ds` should be of type CxxDeclVar.
+  ;; order. The declarations `ds` should be of type CxxDeclVar, and
+  ;; their order does not matter.
   (define (wrap ds ss ast)
     (cond
      ((and (null? ds) (null? ss))
@@ -500,35 +501,40 @@ C++ back end.
                  (append as-ss ss)
                  (Apply a f as-exprs))]
         [(IfExpr a c t e)
-         ;; If either `t` or `e` contain lifts, we must lift the
-         ;; entire conditional, and make it a statement so that we can
-         ;; keep the lifts in their branches. If `c` contains lifts,
-         ;; we can just lift those. We must lift the entire `c` if
-         ;; either branch had lifts.
          (define-values (t-ds t-ss t-ast) (rw-expr t))
          (define-values (e-ds e-ss e-ast) (rw-expr e))
          (cond
           [(and (null? t-ss) (null? e-ss))
+           ;; There are no statement lifts in the branches, so it is
+           ;; enough to do any that appear in `c`.
            (define-values (c-ds c-ss c-ast) (rw-expr c))
            (values (append c-ds t-ds e-ds ds)
                    (append c-ss ss)
                    (IfExpr a c-ast t-ast e-ast))]
           [else
-           (define-values (c-def c-ref) (lift-expr c))
-           (define typ (Expr-type ast))
+           ;; Either `t` or `e` contain lifts. We must turn the entire
+           ;; IfExpr into an IfStat so that we can keep the `t` and
+           ;; `e` lifts in their branches. The branches must assign
+           ;; the expression result. We must furthermore process any
+           ;; lifts in the newly created IfStat (which contains no
+           ;; other statements), but said lifts can go into the new
+           ;; statement context.
+           (define if-typ (Expr-type ast))
            (define if-id (fresh-ast-identifier 'lifted))
-           (define if-decl (annoless CxxDeclVar if-id typ))
-           (define if-ref (Var (hasheq 'type typ) if-id))
+           (define if-decl (annoless CxxDeclVar if-id if-typ))
+           (define if-ref (Var (hasheq 'type if-typ) if-id))
            (define t-ast (wrap-expr-as-Assign if-ref t))
            (define e-ast (wrap-expr-as-Assign if-ref e))
+           (define if-ast (IfStat a c t-ast e-ast))
            (values (cons if-decl ds)
-                   (cons c-def ss)
-                   (IfStat a c-ref t-ast e-ast))])]
+                   (cons (rw-stat if-ast) ss)
+                   if-ref)])]
         [_
          ;; The expression `ast` does not contain sub-expressions.
          (values ds ss ast)])]))
   
   (define (rw-expr ast)
+    ;;(pretty-print `(rw-expr FROM ,ast))
     (rw-sibling '() '() ast))
 
   (define (wrap-expr-as-Assign lv rv)
@@ -566,7 +572,11 @@ C++ back end.
            (rw-stat ast)
            ast))))
   
-  (rw-all-stats ast))
+  (let ()
+    (define n-ast
+      (rw-all-stats ast))
+    ;;(pretty-print `(def-rm-LiftStatExpr FROM ,ast TO ,n-ast))
+    n-ast))
 
 (define (cxx-rm-LiftStatExpr def-lst)
   (map def-rm-LiftStatExpr def-lst))
@@ -661,7 +671,8 @@ C++ back end.
                    ;;(writeln `(deleting ,ast))
                    a-noop]
                   [else
-                   (Assign a lv (rw-discard bind->val rv))]))]
+                   (define n-rv (rw-discard bind->val rv)) 
+                   (and n-rv (Assign a lv n-rv))]))]
         [(DefVar a id t rv)
          (define this-num (hash-ref a 'val-num))
          (define lv-bind (Id-bind id))
@@ -824,11 +835,11 @@ C++ back end.
      s))
   
   (define (defun-optimize ast)
-    (define b (CxxDefun-s ast))
-    (define s (fun-rm-unreferenced-var-decl
-               (fun-propagate-copies
-                (stat-rm-unused-labels 
-                 (stat-rm-goto-next b)))))
+    (define s (CxxDefun-s ast))
+    (set! s (stat-rm-goto-next s))
+    (set! s (stat-rm-unused-labels s))
+    (set! s (fun-propagate-copies s))
+    (set! s (fun-rm-unreferenced-var-decl s))
     (set-CxxDefun-s ast s))
   
   (map (lambda (def)
