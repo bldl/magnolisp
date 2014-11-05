@@ -31,7 +31,7 @@
       (if (NoBody? stmt)
           ";"
           `((in " {"
-                ,(for/list ([x (BlockStat-ss stmt)])
+                ,(for/list ([x (CxxBlockStat-ss stmt)])
                    `(br ,(format-stat x)))
                 ) br "}"))))
 
@@ -64,7 +64,7 @@
 
 (define (format-stat stmt)
   (match stmt
-    ((BlockStat _ stmt*)
+    ((CxxBlockStat _ stmt*)
      (if (null? stmt*)
          "{}"
          `("{"

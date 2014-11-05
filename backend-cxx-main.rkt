@@ -299,8 +299,8 @@ C++ back end.
     (match ast
       [(IfStat a c t e)
        (IfStat a (expr->cxx c) (stat->cxx t) (stat->cxx e))]
-      [(BlockStat a ss)
-       (BlockStat a (map stat->cxx ss))]
+      [(SeqStat a ss)
+       (SeqStat a (map stat->cxx ss))]
       [(Return a e)
        (define tgt (b-tgt))
        (unless tgt
@@ -310,10 +310,10 @@ C++ back end.
        (define n-e
          (parameterize ((b-tgt #f))
            (expr->cxx e)))
-       (BlockStat a (list (annoless Assign (annoless Var (cdr tgt)) n-e)
+       (SeqStat a (list (annoless Assign (annoless Var (cdr tgt)) n-e)
                           (annoless Goto (car tgt))))]
       [(LetStat a dv ss)
-       (BlockStat a (cons (def->cxx dv) (map stat->cxx ss)))]
+       (SeqStat a (cons (def->cxx dv) (map stat->cxx ss)))]
       [(Assign a lhs rhs)
        (Assign a (expr->cxx lhs) (expr->cxx rhs))]
       [_
@@ -392,13 +392,13 @@ C++ back end.
 ;;; statement unsplicing
 ;;; 
 
-(define (empty-BlockStat? ast)
-  (matches? ast (BlockStat _ (list))))
+(define (empty-CxxBlockStat? ast)
+  (matches? ast (CxxBlockStat _ (list))))
 
-(define (ast-rm-SpliceStat ast)
+(define (ast-rm-SeqStat ast)
   (define (pointless-nest? ast)
-    (or (SpliceStat? ast)
-        (empty-BlockStat? ast)))
+    (or (SeqStat? ast)
+        (empty-CxxBlockStat? ast)))
   
   (define un-nest
     (bottomup
@@ -417,10 +417,10 @@ C++ back end.
     (bottomup
      (lambda (ast)
        (match ast
-         [(SpliceStat a ss)
+         [(SeqStat a ss)
           (match ss
             [(list s) s]
-            [_ (BlockStat a ss)])]
+            [_ (CxxBlockStat a ss)])]
          [_ ast]))))
   
   (convert (un-nest ast)))
@@ -441,7 +441,7 @@ C++ back end.
   (fix ast-contains? LiftStatExpr?))
 
 (define (prepend-stats s ss)
-  (annoless SpliceStat (append ss (list s))))
+  (annoless SeqStat (append ss (list s))))
 
 (define (def-rm-LiftStatExpr ast)
   ;; Wraps statement `ast` with the specified lifts, returning a new
@@ -585,7 +585,7 @@ C++ back end.
 ;;; copy propagation
 ;;; 
 
-(define a-noop (annoless SpliceStat null))
+(define a-noop (annoless SeqStat null))
 
 ;; A Φ value type, as in compiler literature. The `set` is a set of
 ;; value numbers.
@@ -862,7 +862,7 @@ C++ back end.
         [(and (LetStat? ast) (Defun? (LetStat-def ast)))
          (match-define (LetStat a b ss) ast)
          (do-Defun b)
-         (BlockStat a ss)]
+         (SeqStat a ss)]
         [else
          ast]))))
   
@@ -897,11 +897,11 @@ C++ back end.
 ;;; 
 
 (define (cxx->pp lst)
-  ;;(pretty-print `(cxx->pp ,lst))
   (define (s->ss ast)
     (cond
-     ((BlockStat? ast) (BlockStat-ss ast))
+     ((CxxBlockStat? ast) (CxxBlockStat-ss ast))
      (else (list ast))))
+  
   (define f
     (topdown
      (lambda (ast)
@@ -909,18 +909,19 @@ C++ back end.
          [(? CxxDefun?)
           (define b (CxxDefun-s ast))
           (cond
-           ((BlockStat? b)
+           ((CxxBlockStat? b)
             ast)
            ((NoBody? b) 
             ast)
            (else
             (struct-copy 
              CxxDefun ast 
-             [s (annoless BlockStat (list b))])))]
+             [s (annoless CxxBlockStat (list b))])))]
          [(IfStat a c t e)
           (PpCxxIfStat a c (s->ss t) (s->ss e))]
          [_
           ast]))))
+  
   (for/list ((ast lst))
     (f ast)))
   
@@ -952,7 +953,7 @@ C++ back end.
      defs->cxx
      cxx-rm-LiftStatExpr
      cxx-fun-optimize
-     (curry map ast-rm-SpliceStat)
+     (curry map ast-rm-SeqStat)
      (curry types-to-cxx defs-t)
      cxx-rename
      cxx-rm-CxxLabelDecl

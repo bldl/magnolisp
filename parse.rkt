@@ -195,7 +195,7 @@
     
     (if (= (length ast-lst) 1)
         (first ast-lst)
-        (syntaxed stx BlockStat ast-lst)))
+        (syntaxed stx SeqStat ast-lst)))
     
   (define (parse-define-value stx id-stx e-stx)
     ;;(writeln (list 'parse-define-value e-stx (syntax->datum e-stx)))
@@ -339,10 +339,10 @@
     (kernel-syntax-case*/phase stx 0 (values)
       (_
        (syntax-property stx 'in-racket)
-       (syntaxed stx BlockStat null))
+       (syntaxed stx SeqStat null))
       
       ((begin . bs)
-       (syntaxed stx BlockStat
+       (syntaxed stx SeqStat
                  (map parse-stat
                       (syntax->list #'bs))))
       
@@ -366,7 +366,7 @@
             (format "arguments not allowed for ~a in a statement position"
                     (syntax-e #'f))
             stx #'e))
-         (syntaxed stx BlockStat null)))
+         (syntaxed stx SeqStat null)))
 
       ((#%plain-app k e)
        (and (syntax-property stx 'local-ec) (identifier? #'k))

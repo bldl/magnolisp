@@ -310,11 +310,11 @@ Assumptions for AST node types:
                                  (just-term e)))
 
 ;; Sequence of statements.
-(define-ast* BlockStat (Ast Stat StatCont) 
+(define-ast* CxxBlockStat (Ast Stat StatCont) 
   ((no-term annos) (list-of-term ss)))
 
 ;; Spliced sequence of statements.
-(define-ast* SpliceStat (Ast Stat StatCont) 
+(define-ast* SeqStat (Ast Stat StatCont) 
   ((no-term annos) (list-of-term ss)))
 
 ;; Variable reference.
@@ -376,7 +376,7 @@ Assumptions for AST node types:
 (define-ast* Include (Ast) ((no-term annos) (no-term kind) (no-term s)))
 
 ;; 'rtype' is the return type, only. `s` is the body statement, which
-;; should be a `BlockStat` for printing, or it can be `NoBody` also.
+;; should be a `CxxBlockStat` for printing, or it can be `NoBody` also.
 (define-ast* CxxDefun (Ast Def) ((no-term annos) (no-term id)
                                  (no-term modifs) (just-term rtype)
                                  (list-of-term params) (just-term s)))

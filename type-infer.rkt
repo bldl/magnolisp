@@ -386,7 +386,7 @@
                                 expect-t)))))
        (return-type t)
        (void))
-      ((BlockStat _ ss)
+      ((SeqStat _ ss)
        (for-each ti-stat ss))
       ((LetStat _ b ss)
        (ti-def b)

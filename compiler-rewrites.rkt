@@ -132,19 +132,19 @@
 ;;; simplification
 ;;; 
 
-(define ast-nested-BlockStat->BlockStat
+(define ast-nested-SeqStat->SeqStat
   (topdown
    (repeat
     (lambda (ast)
       (define ss (and (StatCont? ast) (StatCont-ss ast)))
       ;;(when ss (pretty-print `(considering ,ast)))
       (cond
-       [(and ss (ormap BlockStat? ss))
+       [(and ss (ormap SeqStat? ss))
         ;;(pretty-print `(simplifying ,ast))
         (define n-ss
           (apply append (for/list ((s ss))
-                          (if (BlockStat? s)
-                              (BlockStat-ss s)
+                          (if (SeqStat? s)
+                              (SeqStat-ss s)
                               (list s)))))
         (set-StatCont-ss ast n-ss)]
        [else
@@ -183,13 +183,13 @@
      e]
     [(BlockExpr _ (list (IfStat a c (Return t-a t-e) (Return e-a e-e))))
      (IfExpr a c t-e e-e)]
-    [(BlockStat _ (list s))
+    [(SeqStat _ (list s))
      s]
     [else #f])))
 
 (define* ast-simplify
   (compose1->
-   ast-nested-BlockStat->BlockStat
+   ast-nested-SeqStat->SeqStat
    ast-rm-dead-code
    ast-simplify-multi-innermost
    ))
@@ -216,84 +216,3 @@
   (pretty-print
    (for/list (((id def) (in-dict defs)))
      `(DEF ,(syntax-e id) IS ,@(ast->list def annos)))))
-
-;;; 
-;;; sexp dumping
-;;; 
-
-(define (->symbol x)
-  (cond
-   ((symbol? x) x)
-   ((identifier? x) (syntax-e x))
-   ((Id? x) (Id-name x))
-   (else (unsupported x))))
-
-(define (?->symbol x)
-  (and x (->symbol x)))
-
-(define* (ast->sexp ast)
-  (match ast
-    ((DefVar _ id t v)
-     `(var ,(->symbol id) ,(ast->sexp t) ,(ast->sexp v)))
-    ((Param _ id t)
-     (->symbol id))
-    ((NoBody _)
-     'no-body)
-    ((Defun a id t ps b)
-     `(function (,(->symbol id) ,@(map ast->sexp ps))
-        #:annos ((type ,(ast->sexp t))
-                 (export ,(get-export-name-as-symbol a))
-                 (foreign ,(get-foreign-name-as-symbol a)))
-        ,(ast->sexp b)))
-    ((LetStat a d bs)
-     (define n (hash-ref a 'let-kind 'let))
-     `(,n (,(ast->sexp d))
-          ,@(map ast->sexp bs)))
-    ((LetExpr a d b)
-     (define n (hash-ref a 'let-kind 'let))
-     `(,n (,(ast->sexp d))
-          ,(ast->sexp b)))
-    ((BlockStat _ ss)
-     `(block-stat ,@(map ast->sexp ss)))
-    ((BlockExpr _ ss)
-     `(block-expr ,@(map ast->sexp ss)))
-    ((Return _ e)
-     `(return ,(ast->sexp e)))
-    ((Var _ id)
-     (->symbol id))
-    ((Lambda _ ps b)
-     `(lambda 
-          (,@(map ast->sexp ps))
-        ,(ast->sexp b)))
-    ((Assign _ lv rv)
-     `(set! ,(ast->sexp lv) ,(ast->sexp rv)))
-    ((IfExpr _ c t e)
-     `(if ,(ast->sexp c) ,(ast->sexp t) ,(ast->sexp e)))
-    ((IfStat _ c t e)
-     `(if ,(ast->sexp c) ,(ast->sexp t) ,(ast->sexp e)))
-    ((Literal _ d)
-     (syntax->datum d))
-    ((Apply _ f as)
-     `(,(ast->sexp f) ,@(map ast->sexp as)))
-    ((LetLocalEc _ k ss)
-     `(LetLocalEc ,(ast->sexp k) (,@(map ast->sexp ss))))
-    ((? RacketExpr)
-     'RacketExpr)
-    ((Label _ id)
-     (->symbol id))
-    ((NameT _ id)
-     (->symbol id))
-    ((FunT _ ats rt)
-     `(fn ,@(map ast->sexp ats) ,(ast->sexp rt)))
-    ((CxxNameT _ id)
-     `(C++ ,(->symbol id)))
-    ((AnyT _)
-     'unresolved)
-    ((ForeignTypeDecl _ id cxx-t)
-     `(typedef ,(->symbol id) ,(ast->sexp cxx-t)))
-    (_
-     (raise-argument-error
-      'ast->sexp "supported Ast?" ast))))
-
-(define* (ast-pp ast)
-  (pretty-print (ast->sexp ast)))
