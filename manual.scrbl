@@ -467,7 +467,7 @@ A Git repository of the Magnolisp source code can be found at:
 
 Racket version 6 is required to run the software. It may well be installable directly off GitHub with the command:
 
-@commandline{raco pkg install github://github.com/bldl/magnolisp/master}
+@commandline{raco pkg install git://github.com/bldl/magnolisp}
 
 @section{License}
 
