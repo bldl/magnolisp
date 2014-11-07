@@ -268,7 +268,7 @@ optimization.
 (define* compilation-state? St?)
 
 (define-with-contract
-  (-> hash? (values hash? (set/c symbol? #:cmp 'eq)))
+  (-> hash? (values hash? (set/c symbol? #:cmp 'eq) hash?))
   (merge-defs mods)
   
   (define eps-in-prog (mutable-seteq)) ;; of bind
@@ -316,7 +316,7 @@ optimization.
         (set-add! eps-in-prog bind)))
     (void)) ;; end (for ([(rr-mp mod) mods])
   ;;(pretty-print all-defs)
-  (values all-defs eps-in-prog))
+  (values all-defs eps-in-prog x-binds))
 
 ;; Returns a list of all Id-bind's appearing within a Def.
 (define-with-contract
@@ -371,37 +371,6 @@ optimization.
 ;;; 
 ;;; prelude
 ;;; 
-
-;; Loads a map of IDs by name of provided symbol, for the specified
-;; module. This will not work for symbols that have been renamed on
-;; export. Only includes IDs that (1) are defined within the module,
-;; (2) are variables rather than syntax, (3) are exported at phase
-;; level 0, and (4) are Magnolisp. The result will be #f for any Mod
-;; that has not been loaded.
-(define (build-provide-map mods mp)
-  (let* ((r-mp (resolve-module-path mp #f))
-         (rr-mp (r-mp->rr-mp r-mp))
-         (mod (hash-ref mods rr-mp #f)))
-    (and mod
-        (let ()
-          (define syms (mutable-seteq))
-          (define-values (vars stxs) (module->exports rr-mp))
-          ;;(writeln `(exports for ,mp are ,vars))
-          ;;(writeln `(stxs ,stxs))
-          (for ([var vars]
-                #:when (equal? (car var) 0))
-            (for ([sym-and-lst (cdr var)])
-              (define exp-sym (first sym-and-lst))
-              (define origins (second sym-and-lst))
-              ;; If something locally defined has been renamed on export,
-              ;; we cannot see the original name from 'origins'.
-              ;;(writeln `(origins of ,exp-sym in ,mp are ,origins))
-              (when (null? origins)
-                (set-add! syms exp-sym))))
-          (for/hasheq ([def (Mod-def-lst mod)]
-                       #:when (set-member? syms (Id-name (Def-id def))))
-            (define id (Def-id def))
-            (values (Id-name id) id))))))
 
 ;; Applies the identifier mappings specified by `bind->builtin`, which
 ;; maps bind values to bind values. Modifies mutable set `eps-in-prog`
@@ -499,41 +468,36 @@ optimization.
   ;;(pretty-print `(loaded modules ,mods)) (exit)
   ;;(displayln 'ast-after-marshaling) (for ([(x mod) mods]) (for ([def (Mod-def-lst mod)]) (ast-dump-loc-info def)))
   
-  ;; Make note of interesting prelude definitions (if it is even a
-  ;; dependency).
-  (define-values (predicate-id)
-    (let* ((mp 'magnolisp/prelude)
-           (syms (build-provide-map mods mp)))
-      (define (get-id sym)
-        (if (not syms)
-            (let ()
-              ;;(writeln `(generating fresh id for prelude ,sym)) (exit)
-              (fresh-ast-identifier sym))
-            (let ()
-              (define id (hash-ref syms sym #f))
-              (unless id
-                (error 'compile-modules
-                       "prelude does not define '~a': ~s"
-                       sym mp))
-              id)))
-      (values (get-id 'predicate))))
-  
   (set! mods (mods-rm-AnnoExpr mods))
   ;;(pretty-print mods) (exit)
-  (define-values (all-defs eps-in-prog) (merge-defs mods))
-  ;;(pretty-print all-defs) (exit)
+  (define-values (all-defs eps-in-prog rr-mp-sym->bind)
+    (merge-defs mods))
+  
+  (define prelude-rr-mp
+    (let* ((mp 'magnolisp/prelude)
+           (r-mp (resolve-module-path mp #f))
+           (rr-mp (r-mp->rr-mp r-mp)))
+      rr-mp))
+  (define prelude-predicate-bind
+    (hash-ref rr-mp-sym->bind 
+              (cons prelude-rr-mp 'predicate)
+              (gensym 'predicate)))
+  (define the-predicate-bind (Id-bind the-predicate))
+  (assert (not (eq? prelude-predicate-bind the-predicate-bind)))
+  (define bind->builtin
+    (hasheq prelude-predicate-bind the-predicate-bind))
+  ;;(pretty-print (list rr-mp-sym->bind bind->builtin)) (exit)
+  
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (define def-lst (hash-values all-defs))
   
-  (assert (not (ast-identifier=? predicate-id the-predicate)))
   (set! def-lst
         (switch-ids-for-builtins! def-lst eps-in-prog
-                                  (hasheq (Id-bind predicate-id)
-                                          (Id-bind the-predicate))))
+                                  bind->builtin))
 
   (set! def-lst (defs-optimize-if def-lst))
   (set! def-lst (map ast-pre-set-bool-lit-types def-lst))
-  (pretty-print `(prelude ,predicate-id built-in ,the-predicate defs ,def-lst eps ,eps-in-prog))
+  ;;(pretty-print `(prelude ,prelude-predicate-bind built-in ,the-predicate defs ,def-lst eps ,eps-in-prog))
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-rm-LetExpr def-lst))
