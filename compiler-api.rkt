@@ -330,6 +330,7 @@ optimization.
      (lambda (ast)
        (define id (name-ref-id/maybe ast))
        (when id
+         ;;(writeln `(found used Id ,id))
          (set-add! binds (Id-bind id)))
        (when (Expr? ast)
          (when-let t (Expr-type ast)
@@ -416,12 +417,23 @@ optimization.
     (define v (hash-ref bind->builtin bind #f))
     (if (not v)
         id
-        (struct-copy Id id [bind v])))
+        (set-Id-bind id v)))
   
   (define rw (curry ast-rw-Ids rw-id))
   
   (for/list ((def def-lst))
     (rw def)))
+
+(define (ast-pre-set-bool-lit-types ast)
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         ((Literal a (? boolean? d))
+          #:when (not (Expr-type ast))
+          (set-Expr-type ast the-predicate-NameT))
+         (_ ast)))))
+  (rw ast))
 
 ;;; 
 ;;; compilation
@@ -511,13 +523,15 @@ optimization.
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (define def-lst (hash-values all-defs))
   
+  (assert (not (ast-identifier=? predicate-id the-predicate)))
   (set! def-lst
         (switch-ids-for-builtins! def-lst eps-in-prog
                                   (hasheq (Id-bind predicate-id)
                                           (Id-bind the-predicate))))
-  
+
   (set! def-lst (defs-optimize-if def-lst))
-  ;;(pretty-print `(,def-lst EPS ,eps-in-prog)) (exit)
+  (set! def-lst (map ast-pre-set-bool-lit-types def-lst))
+  ;;(pretty-print `(prelude ,predicate-id built-in ,the-predicate defs ,def-lst eps ,eps-in-prog))
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-rm-LetExpr def-lst))

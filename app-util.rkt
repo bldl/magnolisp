@@ -16,6 +16,8 @@ compiler.
 ;;; gensym
 ;;; 
 
+;; Produces interned, deterministically-numbered symbols. They are
+;; only unique in a context as indicated by `r`.
 (define* (next-gensym r sym)
   (define num (hash-ref r sym 0))
   (define n-sym

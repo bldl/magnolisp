@@ -234,6 +234,8 @@ Assumptions for AST node types:
 ;; 'id' is an ID
 (define-ast* NameT (Ast Type NameUse) ((no-term annos) (no-term id)))
 
+(define* the-predicate-NameT (annoless NameT the-predicate))
+
 ;; 'ats' are the param types, and 'rt' is the return type
 (define-ast* FunT (Ast Type) ((no-term annos)
                               (list-of-term ats) (just-term rt)))
