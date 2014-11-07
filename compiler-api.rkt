@@ -481,14 +481,21 @@ optimization.
   (define prelude-predicate-bind
     (hash-ref rr-mp-sym->bind 
               (cons prelude-rr-mp 'predicate)
-              (gensym 'predicate)))
+              (thunk (gensym 'predicate))))
   (define the-predicate-bind (Id-bind the-predicate))
   (assert (not (eq? prelude-predicate-bind the-predicate-bind)))
   (define bind->builtin
     (hasheq prelude-predicate-bind the-predicate-bind))
   ;;(pretty-print (list rr-mp-sym->bind bind->builtin)) (exit)
   
-  ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
+  (define predicate-def
+    (annoless ForeignTypeDecl
+              the-predicate
+              (annoless ForeignNameT #'bool)))
+  ;;(pretty-print predicate-def)
+  ;;(pretty-print all-defs) (exit)
+  (hash-remove! all-defs prelude-predicate-bind)
+  (hash-set! all-defs the-predicate-bind predicate-def)
   (define def-lst (hash-values all-defs))
   
   (set! def-lst
