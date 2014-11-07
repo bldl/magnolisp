@@ -4,15 +4,17 @@
 
 (function (holds? x)
   (#:annos (type (fn int predicate)) foreign)
-  #t)
+  (not (= x 0)))
 
 (function (f x)
   (#:annos export (type (fn int int)))
   (do
     (if (holds? x)
-        (if (if true false true)
+        (if (if #t #f #t)
             (return 7)
-            (if false (return 8) (return (if true 9 10))))
+            (if #f (return 8) (return (if #t 9 10))))
         (return 1))))
 
-(f 5)
+(f 5) ;; => 9
+(f 0) ;; => 1
+

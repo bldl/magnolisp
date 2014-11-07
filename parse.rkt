@@ -140,7 +140,7 @@
     def)
   
   (define (make-Literal stx datum-stx)
-    (syntaxed stx Literal datum-stx))
+    (syntaxed stx Literal (syntax->datum datum-stx)))
   
   (define (make-LetStat stx kind-stx binds-stx exprs-stx)
     (define kind (syntax-e kind-stx))

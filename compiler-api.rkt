@@ -172,16 +172,13 @@ optimization.
 ;;; IfExpr and IfStat
 ;;; 
 
-(define (defs-optimize-if TRUE-id FALSE-id defs)
-  (define (make-f-pred id)
+(define (defs-optimize-if defs)
+  (define (make-lit-pred lit)
     (lambda (ast)
-      (and (Apply? ast)
-           (let ((f (Apply-f ast)))
-             (and (Var? f)
-                  (ast-identifier=? (Var-id f) id))))))
+      (matches? ast (Literal _ (? (curry equal? lit))))))
 
-  (define TRUE? (make-f-pred TRUE-id))
-  (define FALSE? (make-f-pred FALSE-id))
+  (define TRUE? (make-lit-pred #t))
+  (define FALSE? (make-lit-pred #f))
   
   (define rw
     (bottomup
@@ -263,10 +260,10 @@ optimization.
 
 (require "module-load.rkt")
 
-;; Compilation state. [mods hash?] maps resolved module paths to Mod
-;; objects. [defs hash?] maps bind symbols to AST nodes. [eps
-;; id-table?] has entry points as keys, and #t values.
-(struct St (mods defs eps) #:transparent)
+;; Compilation state. [defs hash?] maps bind symbols to AST nodes.
+;; [eps (set/c symbol? #:cmp 'eq)] contains bind symbols for program
+;; entry points.
+(struct St (defs eps) #:transparent)
 
 (define* compilation-state? St?)
 
@@ -404,7 +401,28 @@ optimization.
                        #:when (set-member? syms (Id-name (Def-id def))))
             (define id (Def-id def))
             (values (Id-name id) id))))))
-                
+
+;; Applies the identifier mappings specified by `bind->builtin`, which
+;; maps bind values to bind values. Modifies mutable set `eps-in-prog`
+;; in place. Returns a modified copy of `def-lst`.
+(define (switch-ids-for-builtins! def-lst eps-in-prog bind->builtin)
+  (for (((k v) bind->builtin))
+    (when (set-member? eps-in-prog k)
+      (set-remove! eps-in-prog k)
+      (set-add! eps-in-prog v)))
+
+  (define (rw-id id)
+    (define bind (Id-bind id))
+    (define v (hash-ref bind->builtin bind #f))
+    (if (not v)
+        id
+        (struct-copy Id id [bind v])))
+  
+  (define rw (curry ast-rw-Ids rw-id))
+  
+  (for/list ((def def-lst))
+    (rw def)))
+
 ;;; 
 ;;; compilation
 ;;;
@@ -471,7 +489,7 @@ optimization.
   
   ;; Make note of interesting prelude definitions (if it is even a
   ;; dependency).
-  (define-values (predicate-id TRUE-id FALSE-id)
+  (define-values (predicate-id)
     (let* ((mp 'magnolisp/prelude)
            (syms (build-provide-map mods mp)))
       (define (get-id sym)
@@ -484,11 +502,7 @@ optimization.
                        "prelude does not define '~a': ~s"
                        sym mp))
               id)))
-      (values (get-id 'predicate)
-              (get-id 'TRUE)
-              (get-id 'FALSE))))
-
-  ;;(writeln (list predicate-id TRUE-id FALSE-id))
+      (values (get-id 'predicate))))
 
   (set! mods (mods-rm-AnnoExpr mods))
   ;;(pretty-print mods) (exit)
@@ -497,7 +511,12 @@ optimization.
   ;;(pretty-print (map ast->sexp (dict-values all-defs))) (exit)
   (define def-lst (hash-values all-defs))
   
-  (set! def-lst (defs-optimize-if TRUE-id FALSE-id def-lst))
+  (set! def-lst
+        (switch-ids-for-builtins! def-lst eps-in-prog
+                                  (hasheq (Id-bind predicate-id)
+                                          (Id-bind the-predicate))))
+  
+  (set! def-lst (defs-optimize-if def-lst))
   ;;(pretty-print `(,def-lst EPS ,eps-in-prog)) (exit)
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
   ;;(pretty-print def-lst) (exit)
@@ -517,12 +536,12 @@ optimization.
   ;;(pretty-print def-lst)
   (set! all-defs (build-defs-table def-lst))
   ;;(pretty-print all-defs) (exit)
-  (set! all-defs (defs-type-infer predicate-id all-defs))
+  (set! all-defs (defs-type-infer all-defs))
   ;;(pretty-print (dict-values all-defs)) (exit)
   
   ;;(pretty-print (map ast->sexp (dict-values all-defs)))
   
-  (St mods all-defs eps-in-prog))
+  (St all-defs eps-in-prog))
 
 ;; Compiles the modules defined in the specified files. Returns a
 ;; compilation state with a full IR for the entire program. The

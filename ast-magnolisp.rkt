@@ -25,6 +25,7 @@ Assumptions for AST node types:
 (define-view* Anno ())
 (define-view* Type ())
 (define-view* Def (#:fields id))
+(define-view* NameUse (#:fields id))
 (define-view* Stat ())
 (define-view* StatCont (#:fields ss))
 (define-view* If ([#:field c] [#:field t] [#:field e]))
@@ -169,7 +170,8 @@ Assumptions for AST node types:
             (ast-identifier->string y)))
 
 ;; Creates a fresh identifier with the specified basename 'sym' that
-;; is not (yet) ast-identifier=? to any other.
+;; is not (yet) ast-identifier=? to any other. An uninterned value is
+;; given to `bind`.
 (define-with-contract*
   (->* () ((or/c symbol? string?)) Id?)
   (fresh-ast-identifier [sym 'g])
@@ -218,6 +220,9 @@ Assumptions for AST node types:
    (((base def) (in-dict defs)))
    (values base (rw def))))
 
+;; A built-in identifier that exceptionally uses an interned symbol.
+(define* the-predicate (annoless Id 'predicate 'predicate))
+
 ;;; 
 ;;; type expressions
 ;;; 
@@ -227,7 +232,7 @@ Assumptions for AST node types:
 (define-ast* VarT (Ast Type) ((no-term annos) (no-term sym)))
 
 ;; 'id' is an ID
-(define-ast* NameT (Ast Type) ((no-term annos) (no-term id)))
+(define-ast* NameT (Ast Type NameUse) ((no-term annos) (no-term id)))
 
 ;; 'ats' are the param types, and 'rt' is the return type
 (define-ast* FunT (Ast Type) ((no-term annos)
@@ -318,7 +323,7 @@ Assumptions for AST node types:
   ((no-term annos) (list-of-term ss)))
 
 ;; Variable reference.
-(define-ast* Var (Ast Expr) ((no-term annos) (no-term id)))
+(define-ast* Var (Ast Expr NameUse) ((no-term annos) (no-term id)))
 
 ;; Function value.
 (define-ast* Lambda (Ast Expr) ((no-term annos) (list-of-term params) 
@@ -356,7 +361,7 @@ Assumptions for AST node types:
                                     (just-term e)))
 
 ;; Label, either a binding or use context.
-(define-ast* Label (Ast Stat) ((no-term annos) (no-term id)))
+(define-ast* Label (Ast Stat NameUse) ((no-term annos) (no-term id)))
 
 ;; Block expression. Contains statements.
 (define-ast* BlockExpr (Ast Expr StatCont) 

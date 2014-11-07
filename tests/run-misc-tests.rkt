@@ -30,7 +30,7 @@
 (module m1 magnolisp
   (function (f)
     (#:annos export (type (fn predicate)))
-    true)
+    #t)
   (provide f))
 
 (check-compile-mgl-mod '(submod "." m1))
@@ -40,7 +40,7 @@
     (#:annos export
              (build (+= mixed-bad 1 "2"))
              (type (fn predicate)))
-    true)
+    #t)
   (define x 1))
 
 (check-not-compile-mgl-mod
@@ -59,7 +59,7 @@
   (function (f)
     (#:annos export (type (fn predicate)))
     (do
-      (var x true)
+      (var x #t)
       (var y (x))
       (return x)))
   (define x 3))

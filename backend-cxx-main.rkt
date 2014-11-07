@@ -324,6 +324,8 @@ C++ back end.
     (match ast
       [(? Var?)
        ast]
+      [(? Literal?)
+       ast]
       [(Apply a f es)
        (Apply a f (map expr->cxx es))]
       [(IfExpr a c t e)
@@ -340,8 +342,6 @@ C++ back end.
         `(,(annoless CxxLabelDecl lbl)
           ,@n-ss
           ,(annoless CxxLabelDef lbl)))]
-      [(Literal a d)
-       (Literal a (syntax->datum d))]
       [_
        (raise-argument-error
         'expr->cxx "supported Expr?" ast)]))

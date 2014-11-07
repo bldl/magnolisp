@@ -6,7 +6,7 @@
 
 (function (holds? x)
   (#:annos (type (fn int predicate)) foreign)
-  (begin-racket (begin 1 false)))
+  (begin-racket (begin 1 #f)))
 
 (function (f x)
   (#:annos export (type (fn int int)))

@@ -306,12 +306,12 @@
 ;; definitions having resolved type fields (where appropriate), and
 ;; expressions having resolved 'type' annotations.
 (define-with-contract*
-  (-> Id? hash? hash?)
-  (defs-type-infer predicate-id defs)
+  (-> hash? hash?)
+  (defs-type-infer defs)
   
   ;;(pretty-print (dict->list defs))
 
-  (define predicate-NameT (DefNameT-from-id predicate-id))
+  (define predicate-NameT (DefNameT-from-id the-predicate))
   
   (define lookup (fix lookup-type-from-defs defs))
 
@@ -480,13 +480,18 @@
        (define t (FunT-rt f-t))
        (expr-unify! ast t))
 
-      ((? Literal?)
+      ((Literal _ dat)
        ;; May have an explicit type annotation, instead of an
        ;; auto-assigned type variable. In any case, we cannot learn
-       ;; anything new here.
-       (define l-t (Expr-type ast))
-       (assert l-t)
-       l-t)
+       ;; anything new here, not unless the literal is of the built-in
+       ;; boolean type.
+       (cond
+        ((boolean? dat)
+         (expr-unify! ast predicate-NameT))
+        (else
+         (define l-t (Expr-type ast))
+         (assert l-t)
+         l-t)))
 
       ((IfExpr _ c t e)
        (define c-t (ti-expr c))

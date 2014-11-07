@@ -134,7 +134,7 @@ An annotation that marks a function definition as ``public''. That is, the funct
 An annotation that specifies the Magnolisp type of a function, variable, or expression.}
 
 @defform[(lit-of type-expr literal-expr)]{
-Annotates a literal, which by themselves are untyped in Magnolisp. While the literal @racket["foo"] is treated as a @racket[string?] value by Racket, the Magnolisp compiler will expect to determine the literal expression's Magnolisp type based on annotations. The @racket[lit-of] form allows one to ``cast'' a literal to a specific type for the compiler.
+Annotates a literal, which by themselves are generally untyped in Magnolisp. While the literal @racket["foo"] is treated as a @racket[string?] value by Racket, the Magnolisp compiler will expect to determine the literal expression's Magnolisp type based on annotations. The @racket[lit-of] form allows one to ``cast'' a literal to a specific type for the compiler.
 
 For example:
 @(interaction #:eval the-eval (lit-of int 5))
@@ -205,23 +205,10 @@ A statement that causes any enclosing @racket[do] block (which must exist) to yi
 
 A @deftech{predicate expression} is simply an expression of type @racket[predicate], which is the only predefined type in Magnolisp.
 
-The @racket[predicate] type and its associated operations are defined by the @racketmodname[magnolisp/prelude] module, which serves as the runtime library of Magnolisp. The @racketmodname[magnolisp/prelude] names are bound for phase level 0 in the @racketmodname[magnolisp] language.
+The @racket[predicate] type is defined by the @racketmodname[magnolisp/prelude] module, which serves as the runtime library of Magnolisp. The @racketmodname[magnolisp/prelude] names are bound for phase level 0 in the @racketmodname[magnolisp] language.
 
 @defthing[#:kind "type" predicate any/c]{
-A predefined type. The ``literals'' of this type are @racket[true] and @racket[false]. All conditional expressions in Magnolisp are of this type.
-}
-
-@deftogether[(
-@defproc[(TRUE) #t]
-@defproc[(FALSE) #f]
-)]{
-The only predefined run-time functions in Magnolisp are @racket[TRUE] and @racket[FALSE], which are both of type @racket[(fn predicate)]. While @racket[TRUE] and @racket[FALSE] are predefined, only Racket implementations are provided; suitable implementations must be provided for C++ as necessary, named @racketidfont{mgl_predicate}, @racketidfont{mgl_TRUE}, and @racketidfont{mgl_FALSE}, respectively. The expression @racket[(TRUE)] is expected to always evaluate to a true value, and @racket[(FALSE)] is expected to always evaluate to a false value; in Racket these evaluate to @racket[#t] and @racket[#f], respectively.}
-
-@deftogether[(
-@defidform[true]
-@defidform[false]
-)]{
-There is also shorthand syntax @racket[true] and @racket[false]; said syntaxes expand to @racket[(TRUE)] and  @racket[(FALSE)], respectively.}
+A predefined type. The ``literals'' of this type are @racket[#t] and @racket[#f]. All conditional expressions in Magnolisp are of this type. The corresponding C++ type is @racketidfont{bool}, and the corresponding constant values are @racketidfont{true} and @racketidfont{false}, respectively.}
 
 @subsection{Racket Forms}
 
@@ -376,7 +363,7 @@ An identifier. Not @emph{the} reserved @racket[#%magnolisp] identifier.}
 An identifier with a @emph{transformer binding}.}
 
 @specsubform[datum]{
-A piece of literal data. A @(racket (#,(racket quote) _datum)) form is a literal in Magnolisp, and its type must be possible to infer from context.}
+A piece of literal data. A @(racket (#,(racket quote) _datum)) form is a literal in Magnolisp, and its type must be possible to infer from context. Boolean literals are an exception, as their Magnolisp type is recognized as @racket[predicate].}
 
 @specsubform[Racket-form]{
 Any Racket core form.}

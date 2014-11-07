@@ -10,9 +10,9 @@
   (#:annos export (type (fn int predicate)))
   (do
     (var y (holds? x))
-    (let ((x true))
+    (let ((x #t))
       (set! y x))
     (return y)
-    (set! y false)))
+    (set! y #f)))
 
 (f 5)
