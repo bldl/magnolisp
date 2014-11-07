@@ -21,7 +21,8 @@ same variables at the same phase level).
 (require (for-syntax
           racket/base racket/dict racket/list racket/pretty
           syntax/id-table syntax/modresolve syntax/quote
-          "app-util.rkt" "ast-magnolisp.rkt" "ast-serialize.rkt"
+          ;;"app-util.rkt" 
+          "ast-magnolisp.rkt" "ast-serialize.rkt"
           "parse.rkt" "util.rkt"))
 
 (define-for-syntax (make-definfo-submodule orig-mb-id modbeg-stx)
@@ -55,12 +56,13 @@ same variables at the same phase level).
 
   (define id->bind (make-free-id-table #:phase 0))
   (define bind->binding (make-hasheq))
-  (define next-r #hasheq())
+  ;;(define next-r #hasheq())
 
   (define (rw-id id)
     (define bind (dict-ref id->bind id #f))
     (unless bind
-      (set!-values (next-r bind) (next-gensym next-r (syntax-e id)))
+      (set! bind (gensym (syntax-e id)))
+      ;;(set!-values (next-r bind) (next-gensym next-r (syntax-e id)))
       (dict-set! id->bind id bind))
     (define b (identifier-binding id 0))
     (define bi

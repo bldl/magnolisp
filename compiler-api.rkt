@@ -273,7 +273,7 @@ optimization.
   
   (define eps-in-prog (mutable-seteq)) ;; of bind
   (define all-defs (make-hasheq)) ;; bind -> Def
-  (define next-r #hasheq())
+  ;;(define next-r #hasheq())
   (define x-binds (make-hash)) ;; (cons/c rr-mp sym) -> bind
   (for ([(rr-mp mod) mods])
     (define def-lst (Mod-def-lst mod))
@@ -293,14 +293,16 @@ optimization.
           (define mp-and-sym (cons rr-mp sym))
           (set! p-bind (hash-ref x-binds mp-and-sym #f))
           (unless p-bind
-            (set!-values (next-r p-bind) (next-gensym next-r sym))
+            (set! p-bind (gensym sym))
+            ;;(set!-values (next-r p-bind) (next-gensym next-r sym))
             (hash-set! x-binds mp-and-sym p-bind))
           (hash-set! m->p-bind m-bind p-bind))
         (set-Id-bind id p-bind)]
        [(or (eq? 'lexical info) (not info))
         (define p-bind (hash-ref m->p-bind m-bind #f))
         (unless p-bind
-          (set!-values (next-r p-bind) (next-gensym next-r (Id-name id)))
+          (set! p-bind (gensym (Id-name id)))
+          ;;(set!-values (next-r p-bind) (next-gensym next-r (Id-name id)))
           (hash-set! m->p-bind m-bind p-bind))
         (set-Id-bind id p-bind)]))
     (define n-def-lst
@@ -506,7 +508,9 @@ optimization.
            (syms (build-provide-map mods mp)))
       (define (get-id sym)
         (if (not syms)
-            (fresh-ast-identifier sym)
+            (let ()
+              ;;(writeln `(generating fresh id for prelude ,sym)) (exit)
+              (fresh-ast-identifier sym))
             (let ()
               (define id (hash-ref syms sym #f))
               (unless id
@@ -515,7 +519,7 @@ optimization.
                        sym mp))
               id)))
       (values (get-id 'predicate))))
-
+  
   (set! mods (mods-rm-AnnoExpr mods))
   ;;(pretty-print mods) (exit)
   (define-values (all-defs eps-in-prog) (merge-defs mods))
@@ -530,7 +534,7 @@ optimization.
                                           (Id-bind the-predicate))))
 
   (set! def-lst (defs-optimize-if def-lst))
-  (set! def-lst (map ast-pre-set-bool-lit-types def-lst))
+  ;;(set! def-lst (map ast-pre-set-bool-lit-types def-lst))
   ;;(pretty-print `(prelude ,predicate-id built-in ,the-predicate defs ,def-lst eps ,eps-in-prog))
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
   ;;(pretty-print def-lst) (exit)
