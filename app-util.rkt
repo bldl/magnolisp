@@ -28,6 +28,17 @@ compiler.
                         (number->string num)))))
   (values (hash-set r sym (+ num 1)) n-sym))
 
+;; Produces interned, deterministically-numbered symbols. They are
+;; only unique in a context as indicated by `r`. This variant of
+;; `next-gensym` always adds a number to the generated symbol.
+(define* (next-gensym1 r sym)
+  (define num (hash-ref r sym 1))
+  (define n-sym
+    (string->symbol
+     (string-append (symbol->string sym) "_"
+                    (number->string num))))
+  (values (hash-set r sym (+ num 1)) n-sym))
+
 ;;; 
 ;;; identifier tables
 ;;; 
