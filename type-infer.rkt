@@ -11,7 +11,7 @@
 ;;; utilities
 ;;; 
 
-(define (DefNameT-from-id id)
+(define (NameT-from-id id)
   (ast-annotated id NameT id))
 
 (define (def-get-type def)
@@ -23,7 +23,7 @@
     ((Defun _ _ t _ _)
      t)
     ((ForeignTypeDecl _ id _)
-     (DefNameT-from-id id))))
+     (NameT-from-id id))))
 
 (define (def-set-type def t)
   (match def
@@ -311,8 +311,6 @@
   
   ;;(pretty-print (dict->list defs))
 
-  (define predicate-NameT (DefNameT-from-id the-predicate))
-  
   (define lookup (fix lookup-type-from-defs defs))
 
   ;; A mutable fact database of sorts, with VarT symbols as keys, and
@@ -393,7 +391,7 @@
        (for-each ti-stat ss))
       ((IfStat _ c t e)
        (define c-t (ti-expr c))
-       (unless (unify! predicate-NameT c-t)
+       (unless (unify! the-predicate-type c-t)
          (raise-language-error/ast
           "expected type 'predicate' for conditional"
           ast c
@@ -487,7 +485,7 @@
        ;; boolean type.
        (cond
         ((boolean? dat)
-         (expr-unify! ast predicate-NameT))
+         (expr-unify! ast the-predicate-type))
         (else
          (define l-t (Expr-type ast))
          (assert l-t)
@@ -495,7 +493,7 @@
 
       ((IfExpr _ c t e)
        (define c-t (ti-expr c))
-       (unless (unify! predicate-NameT c-t)
+       (unless (unify! the-predicate-type c-t)
          (raise-language-error/ast
           "expected type 'predicate' for conditional"
           ast c

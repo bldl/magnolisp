@@ -400,7 +400,7 @@ optimization.
        (match ast
          ((Literal a (? boolean? d))
           #:when (not (Expr-type ast))
-          (set-Expr-type ast the-predicate-NameT))
+          (set-Expr-type ast the-predicate-type))
          (_ ast)))))
   (rw ast))
 
@@ -482,7 +482,7 @@ optimization.
     (hash-ref rr-mp-sym->bind 
               (cons prelude-rr-mp 'predicate)
               (thunk (gensym 'predicate))))
-  (define the-predicate-bind (Id-bind the-predicate))
+  (define the-predicate-bind (Id-bind the-predicate-id))
   (assert (not (eq? prelude-predicate-bind the-predicate-bind)))
   (define bind->builtin
     (hasheq prelude-predicate-bind the-predicate-bind))
@@ -490,7 +490,7 @@ optimization.
   
   (define predicate-def
     (annoless ForeignTypeDecl
-              the-predicate
+              the-predicate-id
               (annoless ForeignNameT #'bool)))
   ;;(pretty-print predicate-def)
   ;;(pretty-print all-defs) (exit)
@@ -504,7 +504,7 @@ optimization.
 
   (set! def-lst (defs-optimize-if def-lst))
   (set! def-lst (map ast-pre-set-bool-lit-types def-lst))
-  ;;(pretty-print `(prelude ,prelude-predicate-bind built-in ,the-predicate defs ,def-lst eps ,eps-in-prog))
+  ;;(pretty-print `(prelude ,prelude-predicate-bind built-in ,the-predicate-id defs ,def-lst eps ,eps-in-prog))
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-rm-LetExpr def-lst))

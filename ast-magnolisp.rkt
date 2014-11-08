@@ -220,9 +220,6 @@ Assumptions for AST node types:
    (((base def) (in-dict defs)))
    (values base (rw def))))
 
-;; A built-in identifier that exceptionally uses an interned symbol.
-(define* the-predicate (annoless Id 'predicate 'predicate))
-
 ;;; 
 ;;; type expressions
 ;;; 
@@ -233,8 +230,6 @@ Assumptions for AST node types:
 
 ;; 'id' is an ID
 (define-ast* NameT (Ast Type NameUse) ((no-term annos) (no-term id)))
-
-(define* the-predicate-NameT (annoless NameT the-predicate))
 
 ;; 'ats' are the param types, and 'rt' is the return type
 (define-ast* FunT (Ast Type) ((no-term annos)
@@ -425,6 +420,15 @@ Assumptions for AST node types:
 
 ;; Top-level verbatim string.
 (define-ast* TlVerbatim (Ast) ((no-term annos) (no-term s)))
+
+;;; 
+;;; prelude
+;;; 
+
+;; A built-in identifier that exceptionally uses an interned symbol.
+(define* the-predicate-id (annoless Id 'predicate 'predicate))
+
+(define* the-predicate-type (annoless NameT the-predicate-id))
 
 ;;; 
 ;;; Id replacing AST rewrite
