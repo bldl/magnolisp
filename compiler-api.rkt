@@ -372,6 +372,44 @@ optimization.
 ;;; prelude
 ;;; 
 
+(define prelude-mp 'magnolisp/prelude)
+
+;; Builds a map of bind values in loaded prelude to the fixed bind
+;; values of definitions that are special to the compiler. The map
+;; makes it possible to switch the definitions over to said known
+;; values.
+(define (build-prelude-bind->bind rr-mp-sym->bind the-sym->bind)
+  (define prelude-rr-mp
+    (let* ((r-mp (resolve-module-path prelude-mp #f))
+           (rr-mp (r-mp->rr-mp r-mp)))
+      rr-mp))
+  
+  (for/hasheq (((sym the-bind) the-sym->bind))
+    (define prelude-bind 
+      (hash-ref rr-mp-sym->bind 
+                (cons prelude-rr-mp sym)
+                (thunk
+                 (error 'compile-modules
+                        "'~a' does not define '~a': ~s"
+                        prelude-mp sym prelude-rr-mp))))
+    (assert (not (eq? prelude-bind the-bind)))
+    (values prelude-bind the-bind)))
+
+;; Sets identifier references that matter to the compiler, but which
+;; Racket will not have resolved, so that they can be accounted for
+;; during whole-program optimization. The type names of literals are
+;; the only such dependencies.
+(define (ast-add-prelude-lit-types ast)
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         ((Literal a (? boolean? d))
+          #:when (not (Expr-type ast))
+          (set-Expr-type ast the-predicate-type))
+         (_ ast)))))
+  (rw ast))
+
 ;; Applies the identifier mappings specified by `bind->builtin`, which
 ;; maps bind values to bind values. Modifies mutable set `eps-in-prog`
 ;; in place. Returns a modified copy of `def-lst`.
@@ -392,17 +430,6 @@ optimization.
   
   (for/list ((def def-lst))
     (rw def)))
-
-(define (ast-pre-set-bool-lit-types ast)
-  (define rw
-    (topdown
-     (lambda (ast)
-       (match ast
-         ((Literal a (? boolean? d))
-          #:when (not (Expr-type ast))
-          (set-Expr-type ast the-predicate-type))
-         (_ ast)))))
-  (rw ast))
 
 ;;; 
 ;;; compilation
@@ -463,6 +490,10 @@ optimization.
         (apply load #f mp-and-rel))
       (loop)))
 
+  ;; Load prelude if not already loaded. It may be a dependency during
+  ;; compilation even if no Racket identifier references it.
+  (load #f prelude-mp #f)
+  
   ;;(writeln `(eps-in-prog ,eps-in-prog))
   ;;(writeln `(loaded mods ,(hash-keys mods)))
   ;;(pretty-print `(loaded modules ,mods)) (exit)
@@ -473,40 +504,21 @@ optimization.
   (define-values (all-defs eps-in-prog rr-mp-sym->bind)
     (merge-defs mods))
   
-  (define prelude-rr-mp
-    (let* ((mp 'magnolisp/prelude)
-           (r-mp (resolve-module-path mp #f))
-           (rr-mp (r-mp->rr-mp r-mp)))
-      rr-mp))
-  (define prelude-predicate-bind
-    (hash-ref rr-mp-sym->bind 
-              (cons prelude-rr-mp 'predicate)
-              (thunk (gensym 'predicate))))
-  (define the-predicate-bind (Id-bind the-predicate-id))
-  (assert (not (eq? prelude-predicate-bind the-predicate-bind)))
-  (define bind->builtin
-    (hasheq prelude-predicate-bind the-predicate-bind))
-  ;;(pretty-print (list rr-mp-sym->bind bind->builtin)) (exit)
+  (define prelude-bind->bind
+    (build-prelude-bind->bind 
+     rr-mp-sym->bind
+     (hasheq 'predicate (Id-bind the-predicate-id))))
   
-  (define predicate-def
-    (annoless ForeignTypeDecl
-              the-predicate-id
-              (annoless ForeignNameT #'bool)))
-  ;;(pretty-print predicate-def)
-  ;;(pretty-print all-defs) (exit)
-  (hash-remove! all-defs prelude-predicate-bind)
-  (hash-set! all-defs the-predicate-bind predicate-def)
   (define def-lst (hash-values all-defs))
   
   (set! def-lst
         (switch-ids-for-builtins! def-lst eps-in-prog
-                                  bind->builtin))
+                                  prelude-bind->bind))
 
   (set! def-lst (defs-optimize-if def-lst))
-  (set! def-lst (map ast-pre-set-bool-lit-types def-lst))
-  ;;(pretty-print `(prelude ,prelude-predicate-bind built-in ,the-predicate-id defs ,def-lst eps ,eps-in-prog))
+  (set! def-lst (map ast-add-prelude-lit-types def-lst))
+  ;;(pretty-print `(prelude-map ,prelude-bind->bind defs ,def-lst eps ,eps-in-prog))
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
-  ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-rm-LetExpr def-lst))
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-LetLocalEc->BlockExpr def-lst))

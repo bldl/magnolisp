@@ -208,7 +208,7 @@ A @deftech{predicate expression} is simply an expression of type @racket[predica
 The @racket[predicate] type is defined by the @racketmodname[magnolisp/prelude] module, which serves as the runtime library of Magnolisp. The @racketmodname[magnolisp/prelude] names are bound for phase level 0 in the @racketmodname[magnolisp] language.
 
 @defthing[#:kind "type" predicate any/c]{
-A predefined type. The ``literals'' of this type are @racket[#t] and @racket[#f]. All conditional expressions in Magnolisp are of this type. The corresponding C++ type is @racketidfont{bool}, and the corresponding constant values are @racketidfont{true} and @racketidfont{false}, respectively.}
+A predefined type. The literals of this type are @racket[#t] and @racket[#f]. All conditional expressions in Magnolisp are of this type. The corresponding C++ type is @racketidfont{bool}, and the corresponding constant values are @racketidfont{true} and @racketidfont{false}, respectively.}
 
 @subsection{Racket Forms}
 

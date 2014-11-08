@@ -94,7 +94,8 @@ Module loading.
 ;;; 
 
 ;; Loads the specified module. It is an error if the module path does
-;; not specify an existing module.
+;; not specify an existing module. The `ep?` value does not affect
+;; loading, but is merely stored in the returned module object.
 (define-with-contract*
   (-> resolve-module-path-result? module-path? boolean? Mod?)
   (Mod-load r-mp mp ep?)
