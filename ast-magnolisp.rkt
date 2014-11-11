@@ -341,8 +341,8 @@ Assumptions for AST node types:
 ;; A literal datum.
 (define-ast* Literal (Ast Expr) ((no-term annos) (no-term datum)))
 
-;; Function (or predicate) application, with function expression, and
-;; argument expressions.
+;; Function application, with a function expression, and argument
+;; expressions.
 (define-ast* Apply (Ast Expr) ((no-term annos) (just-term f) 
                                (list-of-term args)))
 
@@ -425,10 +425,11 @@ Assumptions for AST node types:
 ;;; prelude
 ;;; 
 
-;; A built-in identifier that exceptionally uses an interned symbol.
-(define* the-predicate-id (annoless Id 'predicate 'predicate))
+;; A built-in identifier. By convention any built-ins get the "bare"
+;; bind value, i.e. the same symbol as the name.
+(define* the-bool-id (annoless Id 'bool 'bool))
 
-(define* the-predicate-type (annoless NameT the-predicate-id))
+(define* the-bool-type (annoless NameT the-bool-id))
 
 ;;; 
 ;;; Id replacing AST rewrite

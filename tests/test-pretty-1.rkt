@@ -4,7 +4,7 @@
 (typedef string (#:annos foreign))
 (typedef DataBaseSession (#:annos foreign))
 
-(function (badCond) (#:annos (type (fn predicate)) foreign))
+(function (badCond) (#:annos (type (fn bool)) foreign))
 
 (function (openDataBase name)
   (#:annos (type (fn string DataBaseSession)))
@@ -12,7 +12,7 @@
 
 (function (main anEncoding aMaxNumThreads 
                 aDataBaseName aDoFlushToDisk)
-  #an(^(fn string int string predicate DataBaseSession) export)
+  #an(^(fn string int string bool DataBaseSession) export)
   (do
     (var enc anEncoding)
     (var th aMaxNumThreads)

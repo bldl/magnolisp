@@ -9,7 +9,7 @@
     ...))
 
 (declare-List-op 
- [empty? predicate]
+ [empty? bool]
  [head Elem]
  [tail List])
 

@@ -29,7 +29,7 @@
 
 (module m1 magnolisp
   (function (f)
-    (#:annos export (type (fn predicate)))
+    (#:annos export (type (fn bool)))
     #t)
   (provide f))
 
@@ -39,7 +39,7 @@
   (function (f)
     (#:annos export
              (build (+= mixed-bad 1 "2"))
-             (type (fn predicate)))
+             (type (fn bool)))
     #t)
   (define x 1))
 
@@ -57,7 +57,7 @@
 
 (module m4 magnolisp
   (function (f)
-    (#:annos export (type (fn predicate)))
+    (#:annos export (type (fn bool)))
     (do
       (var x #t)
       (var y (x))

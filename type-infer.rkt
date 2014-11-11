@@ -391,9 +391,10 @@
        (for-each ti-stat ss))
       ((IfStat _ c t e)
        (define c-t (ti-expr c))
-       (unless (unify! the-predicate-type c-t)
+       (unless (unify! the-bool-type c-t)
          (raise-language-error/ast
-          "expected type 'predicate' for conditional"
+          (format "expected type '~a' for conditional"
+                  (Id-name the-bool-id))
           ast c
           #:fields (list (list "actual type"
                                (ast-displayable/datum c-t)))))
@@ -485,7 +486,7 @@
        ;; boolean type.
        (cond
         ((boolean? dat)
-         (expr-unify! ast the-predicate-type))
+         (expr-unify! ast the-bool-type))
         (else
          (define l-t (Expr-type ast))
          (assert l-t)
@@ -493,9 +494,10 @@
 
       ((IfExpr _ c t e)
        (define c-t (ti-expr c))
-       (unless (unify! the-predicate-type c-t)
+       (unless (unify! the-bool-type c-t)
          (raise-language-error/ast
-          "expected type 'predicate' for conditional"
+          (format "expected type '~a' for conditional"
+                  (Id-name the-bool-id))
           ast c
           #:fields (list (list "actual type"
                                (ast-displayable/datum c-t)))))

@@ -161,7 +161,7 @@ For example:
 [type-expr type-id fn-type-expr]
 [fn-type-expr (fn type-expr ... type-expr)]]
 
-Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined type in Magnolisp is @racket[predicate], and any others must be declared using @racket[typedef].
+Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined type in Magnolisp is @racket[bool], and any others must be declared using @racket[typedef].
 
 @defform[(fn type-expr ... type-expr)]{
 A function type expression, containing type expressions for arguments and the return value, in that order. A Magnolisp function always returns a single value.}
@@ -172,7 +172,7 @@ A function type expression, containing type expressions for arguments and the re
 
 Unlike Racket, the Magnolisp language makes a distinction between statements and expressions. Although Magnolisp supports @emph{some} of the Racket language, a given Racket construct must typically appear only in a specific context (either statement or expression context).
 
-In Magnolisp, an @racket[if] form is either a statement or expression, depending on context. That is, depending on context the form is either @racket[(if _test-expr _then-expr _else-expr)] or @racket[(if _test-expr _then-stat _else-stat)]. The @racket[when] and @racket[unless] forms are always statements, and contain statements in their body. The @racket[_test-expr] conditional expression must always be of type @racket[predicate], and whether it holds depends on the ``truthiness'' of its value, as interpreted in C++ or Racket (as applicable).
+In Magnolisp, an @racket[if] form is either a statement or expression, depending on context. That is, depending on context the form is either @racket[(if _test-expr _then-expr _else-expr)] or @racket[(if _test-expr _then-stat _else-stat)]. The @racket[when] and @racket[unless] forms are always statements, and contain statements in their body. The @racket[_test-expr] conditional expression must always be of type @racket[bool], and whether it holds depends on the ``truthiness'' of its value, as interpreted in C++ or Racket (as applicable).
 
 A @racket[(begin _stat ...)] form, in Magnolisp, signifies a sequence of statements, itself constituting a statement. Similarly to Racket, to allow declarations to appear within a statement sequence, @racket[(let () _stat ...)] should be used instead.
 
@@ -199,15 +199,15 @@ For example:
 @defform[(return expr)]{
 A statement that causes any enclosing @racket[do] block (which must exist) to yield the value of the expression @racket[expr].}
 
-@subsection{Predicate Expressions}
+@subsection{Boolean Expressions}
 
 @(defmodule magnolisp/prelude)
 
-A @deftech{predicate expression} is simply an expression of type @racket[predicate], which is the only predefined type in Magnolisp.
+A boolean expression is simply an expression of type @racket[bool], which is the only predefined type in Magnolisp.
 
-The @racket[predicate] type is defined by the @racketmodname[magnolisp/prelude] module, which serves as the runtime library of Magnolisp. The @racketmodname[magnolisp/prelude] names are bound for phase level 0 in the @racketmodname[magnolisp] language.
+The @racket[bool] type is defined by the @racketmodname[magnolisp/prelude] module, which serves as the runtime library of Magnolisp. The @racketmodname[magnolisp/prelude] names are bound for phase level 0 in the @racketmodname[magnolisp] language.
 
-@defthing[#:kind "type" predicate any/c]{
+@defthing[#:kind "type" bool any/c]{
 A predefined type. The literals of this type are @racket[#t] and @racket[#f]. All conditional expressions in Magnolisp are of this type. The corresponding C++ type is @racketidfont{bool}, and the corresponding constant values are @racketidfont{true} and @racketidfont{false}, respectively.}
 
 @subsection{Racket Forms}
@@ -233,7 +233,7 @@ One use case is to @racket[local-require] a Racket definition into a context whe
 
 @(interaction #:eval the-eval
   (function (equal? x y) 
-    (#:annos [type (fn int int predicate)] foreign)
+    (#:annos [type (fn int int bool)] foreign)
     (begin-racket
       (local-require (only-in racket/base equal?))
       (equal? x y)))
@@ -363,7 +363,7 @@ An identifier. Not @emph{the} reserved @racket[#%magnolisp] identifier.}
 An identifier with a @emph{transformer binding}.}
 
 @specsubform[datum]{
-A piece of literal data. A @(racket (#,(racket quote) _datum)) form is a literal in Magnolisp, and its type must be possible to infer from context. Boolean literals are an exception, as their Magnolisp type is recognized as @racket[predicate].}
+A piece of literal data. A @(racket (#,(racket quote) _datum)) form is a literal in Magnolisp, and its type must be possible to infer from context. Boolean literals are an exception, as their Magnolisp type is recognized as @racket[bool].}
 
 @specsubform[Racket-form]{
 Any Racket core form.}

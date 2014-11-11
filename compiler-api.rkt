@@ -406,7 +406,7 @@ optimization.
        (match ast
          ((Literal a (? boolean? d))
           #:when (not (Expr-type ast))
-          (set-Expr-type ast the-predicate-type))
+          (set-Expr-type ast the-bool-type))
          (_ ast)))))
   (rw ast))
 
@@ -507,7 +507,8 @@ optimization.
   (define prelude-bind->bind
     (build-prelude-bind->bind 
      rr-mp-sym->bind
-     (hasheq 'predicate (Id-bind the-predicate-id))))
+     (for/hasheq ((id (list the-bool-id)))
+       (values (Id-name id) (Id-bind id)))))
   
   (define def-lst (hash-values all-defs))
   

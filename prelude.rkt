@@ -8,6 +8,6 @@ A library of built-in types and functions in Magnolisp.
 
 (require (for-syntax racket/base) "surface.rkt")
 
-(provide predicate)
+(provide bool)
 
-(typedef predicate (#:annos [foreign bool]))
+(typedef bool (#:annos [foreign bool]))

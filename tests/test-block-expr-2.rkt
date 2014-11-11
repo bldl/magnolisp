@@ -3,7 +3,7 @@
 (typedef int (#:annos foreign))
 
 (function (equal x y)
-  (#:annos (type (fn int int predicate)) foreign)
+  (#:annos (type (fn int int bool)) foreign)
   (begin-racket (equal? x y)))
 
 (function (default e f d) #an([export dflt])

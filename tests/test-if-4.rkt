@@ -3,7 +3,7 @@
 (typedef int (#:annos foreign))
 
 (function (holds? x)
-  (#:annos (type (fn int predicate)) foreign)
+  (#:annos (type (fn int bool)) foreign)
   (not (= x 0)))
 
 (function (f x)
