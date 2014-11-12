@@ -197,17 +197,29 @@ optimization.
 ;;; LetExpr
 ;;; 
 
+;; Later annotations in `hs` are of increasing significance. Any 'type
+;; annotations are treated specially.
+(define (merge-annos . hs)
+  (for/fold ((r #hasheq())) ((h hs))
+    (for (((k v) h))
+      (cond
+       ((and (eq? 'type k) (hash-has-key? r k) (AnyT? v))
+        (void))
+       (else
+        (set! r (hash-set r k v)))))
+    r))
+
 (define ast-rm-LetExpr
   (topdown
    (repeat
     (lambda (ast)
       (match ast
-        ;; Simple case. Just retain expression 'v'.
-        [(LetExpr _ (DefVar a1 bn t v) (Var a2 rn))
+        ;; Simple case, of the form (let ((x v)) x). Just retain
+        ;; expression 'v', and any annotations of `x`.
+        [(LetExpr a0 (DefVar a1 bn t v) (Var a2 rn))
          #:when (ast-identifier=? bn rn)
-         (define h (hash-merge a2 a1 (Ast-annos v)))
-         (unless (AnyT? t)
-           (set! h (hash-set h 'type t)))
+         (define a3 (Ast-annos v))
+         (define h (merge-annos a0 a2 a1 a3))
          (define n-ast (set-Ast-annos v h))
          ;;(writeln (list n-ast (Ast-annos n-ast)))
          n-ast]

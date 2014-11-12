@@ -2,7 +2,9 @@
 
 (typedef long #an(foreign))
 
-(function (h) #an(export)
-  (cast long 5))
+(function (id x) x)
 
-(h)
+(function (f x) #an(export)
+  (cast long (let ((x x)) (id x))))
+
+(f 8)

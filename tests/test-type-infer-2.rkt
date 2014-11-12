@@ -3,7 +3,7 @@
 (typedef long #an(foreign))
 
 (function (h) #an(export)
-  (cast long 5))
+  (cast long 6))
 
 (h)
 
@@ -16,3 +16,8 @@
   (cast long (let ((x x)) x)))
 
 (f 8)
+
+(function (ff x) #an(export)
+  (let ((x x)) (cast long x)))
+
+(ff 9)
