@@ -133,13 +133,14 @@ An annotation that marks a function definition as ``public''. That is, the funct
 @defform[(type type-expr)]{
 An annotation that specifies the Magnolisp type of a function, variable, or expression.}
 
-@defform[(lit-of type-expr literal-expr)]{
-Annotates a literal, which by themselves are generally untyped in Magnolisp. While the literal @racket["foo"] is treated as a @racket[string?] value by Racket, the Magnolisp compiler will expect to determine the literal expression's Magnolisp type based on annotations. The @racket[lit-of] form allows one to ``cast'' a literal to a specific type for the compiler.
+@defform[(cast type-expr expr)]{
+Annotates expression @racket[expr] with the type given by @racket[type-expr]. A @racket[cast] is commonly used to specify the type of a literal, which by themselves are generally untyped in Magnolisp. While the literal @racket["foo"] is treated as a @racket[string?] value by Racket, the Magnolisp compiler will expect to determine the literal expression's Magnolisp type based on annotations. The @racket[cast] form allows one to ``cast'' an expression to a specific type for the compiler.
 
 For example:
-@(interaction #:eval the-eval (lit-of int 5))
+@(interaction #:eval the-eval
+  (cast int 5))
 
-While generally only declarations require annotations, @racket[lit-of] demonstrates a specific case where it is useful to associate annotations with expressions.}
+While generally only declarations require annotations, @racket[cast] demonstrates a specific case where it is useful to associate annotations with expressions.}
 
 @defform[(let/annotate (anno-expr ...) expr)]{
 Explicitly annotates the expression @racket[expr] with the specified annotations. May be used to specify annotations for an identifier that is bound using the regular Racket binding forms such as @racket[define], @racket[let], @etc

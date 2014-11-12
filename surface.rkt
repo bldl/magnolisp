@@ -113,7 +113,7 @@ enough to be easily analyzable, and compilable to C++.
 (define-annos-wrapper* let-var)
 
 (define-syntax-rule*
-  (lit-of t d)
+  (cast t d)
   (let/annotate ([type t]) d))
 
 (define-syntax-rule (typedef-impl t (a ...))
