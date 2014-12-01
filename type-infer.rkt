@@ -3,8 +3,7 @@
 #|
 |#
 
-(require "ast-magnolisp.rkt"
-         "compiler-rewrites.rkt" "app-util.rkt"
+(require "app-util.rkt" "ast-magnolisp.rkt" "compiler-rewrites.rkt" 
          "strategy.rkt" "util.rkt")
 
 ;;; 
@@ -44,8 +43,8 @@
      "reference to unbound name" x))
   (def-get-type def))
 
-;; Returns #f for nodes that have no type.
-(define (ast-get-type ast)
+;; Returns #f for nodes that have no type, and for nodes of type Stat.
+(define (ast-get-nonfixed-type ast)
   (cond 
    [(Def? ast)
     (def-get-type ast)]
@@ -54,10 +53,12 @@
    [else
     #f]))
 
-(define (ast-set-type ast t)
-  (if (Def? ast)
-      (def-set-type ast t)
-      (set-Expr-type ast t)))
+(define (ast-set-nonfixed-type ast t)
+  (cond-or-fail
+   [(Def? ast)
+    (def-set-type ast t)]
+   [(Expr? ast)
+    (set-Expr-type ast t)]))
 
 (define (type=? x y)
   (cond
@@ -88,20 +89,20 @@
 ;;; init with fresh type variables
 ;;; 
 
-(define (fresh-type)
+(define (fresh-VarT)
   (annoless VarT (gensym "t")))
   
 (define type-AnyT->VarT
   (topdown
    (lambda (t)
      (cond
-      ((AnyT? t) (fresh-type))
+      ((AnyT? t) (fresh-VarT))
       (else t)))))
 
 (define (type-add-VarT t)
   (cond
-   ((not t) (fresh-type))
-   ((AnyT? t) (fresh-type))
+   ((not t) (fresh-VarT))
+   ((AnyT? t) (fresh-VarT))
    (else (type-AnyT->VarT t))))
 
 ;; For each expression in 'def', if it has no type expression, add one
@@ -130,8 +131,8 @@
             (cond
              ((AnyT? t)
               (annoless FunT
-                        (map (lambda (x) (fresh-type)) ps)
-                        (fresh-type)))
+                        (map (lambda (x) (fresh-VarT)) ps)
+                        (fresh-VarT)))
              ((FunT? t)
               (unless (= (length ps) (length (FunT-ats t)))
                 (raise-language-error/ast
@@ -158,13 +159,13 @@
 
 (define (defs-add-VarT defs)
   ;; First add types for bindings.
-  (set! defs (defs-map-each-def/Id defs def-add-VarT))
+  (set! defs (defs-map/bind def-add-VarT defs))
 
   ;; Sync local definitions info into 'defs' table.
   (set! defs (defs-table-update-locals/Id defs))
 
   ;; Now add types to expressions.
-  (set! defs (defs-map-each-def/Id defs (fix ast-expr-add-VarT defs)))
+  (set! defs (defs-map/bind (fix ast-expr-add-VarT defs) defs))
 
   defs)
 
@@ -175,11 +176,11 @@
 ;; Simplifies type 't' using any applicable substitions in 'h', which
 ;; maps VarT symbols to type expressions. Substitutions are applied
 ;; recursively. As a side effect, may update 'h' for purposes for
-;; memoization. Returns the simplified type. Note that eq? may be used
-;; to determine if any simplification took place.
+;; memoization. Returns the simplified type. Note that 'eq?' may be
+;; used to determine if any simplification took place.
 (define-with-contract
   (-> hash? Type? Type?)
-  (subst h t)
+  (subst! h t)
   
   ;; 'ix' of last successful lookup.
   (define last-ix 0)
@@ -208,10 +209,20 @@
      ((? NameT?)
       ast)
      ((FunT a ats rt)
-      (FunT a (map (fix subst h) ats) (subst h rt)))
+      (define n-ats (map (fix subst! h) ats))
+      (define n-rt (subst! h rt))
+      (if (and (eq? rt n-rt) (andmap eq? ats n-ats))
+          ast
+          (FunT a n-ats n-rt)))
+     ((PhiT a t u)
+      (define n-t (subst! h t))
+      (define n-u (subst! h u))
+      (if (and (eq? t n-t) (eq? u n-u))
+          ast
+          (PhiT a n-t n-u)))
      (else
       (raise-argument-error
-       'f "(or/c FunT? NameT? VarT?)"
+       'f "(or/c FunT? NameT? PhiT? VarT?)"
        1 ix ast))))
 
   (f 0 t))
@@ -220,7 +231,7 @@
 ;; substitutions [h mutable (hash/c symbol? Type?)]. As a side effect,
 ;; may modify 'h' to add new substitutions. Returns #t if 'x' and 'y'
 ;; are unifiable, and #f otherwise.
-(define (unify h x y)
+(define (unify! h x y)
   ;; 'x' and 'y' must have any substitutions applied.
   (define (f x y)
     (cond
@@ -247,13 +258,19 @@
       (define y-ats (FunT-ats y))
       (and
        (= (length x-ats) (length y-ats))
-       (unify h x-rt y-rt)
-       (andmap (fix unify h) x-ats y-ats)))
+       (unify! h x-rt y-rt)
+       (andmap (fix unify! h) x-ats y-ats)))
+     ((and (NameT? x) (PhiT? y))
+      (and (unify! x (PhiT-t1 y))
+           (unify! x (PhiT-t2 y))))
+     ((and (PhiT? x) (NameT? y))
+      (and (unify! (PhiT-t1 x) y)
+           (unify! (PhiT-t2 x) y)))
      (else
       #f)))
   
-  (define s-x (subst h x))
-  (define s-y (subst h y))
+  (define s-x (subst! h x))
+  (define s-y (subst! h y))
   (f s-x s-y))
 
 ;;; 
@@ -263,36 +280,53 @@
 ;; Ensures that no VarT type expressions remain in type expression
 ;; 't'. It is an error for any appearing VarT to not have an entry in
 ;; 'var-h', as that means that the program's (concrete) types cannot
-;; be fully determined. 'ctx-ast' is the expression or definition
-;; whose type is being simplified; it is only used for error
-;; reporting.
+;; be fully determined. Simplifies PhiT type expressions where it is
+;; possible to do so. 'ctx-ast' is the expression or definition whose
+;; type is being simplified; it is only used for error reporting.
 (define (type-rm-VarT var-h t ctx-ast)
   (define f
-    (topdown
+    (innermost
      (lambda (ast)
-       (cond
-        ((VarT? ast)
-         (define n-ast (subst var-h ast))
+       (match ast
+        [(? VarT?)
+         (define n-ast (subst! var-h ast))
          (when (VarT? n-ast)
            (raise-language-error/ast
             "cannot resolve concrete type"
             #:continued "program is not fully typed"
             ctx-ast t))
-         n-ast)
-        (else ast)))))
+         n-ast]
+        [(PhiT _ t u)
+         #:when (equal? t u)
+         (assert (not (VarT? t)))
+         t]
+        [_
+         #f]))))
   (f t))
 
 ;; Uses the 'var-h' table to substitute any VarT nodes in the type
 ;; fields and annotations of the program tree 'ast' with concrete type
-;; expressions.
+;; expressions. For nodes that end up with the unit type, checks that
+;; they are allowed to have such a type.
 (define (ast-rm-VarT var-h ast)
   (define f
     (topdown
      (lambda (ast)
-       (define t (ast-get-type ast))
-       (if t
-           (ast-set-type ast (type-rm-VarT var-h t ast))
-           ast))))
+       (cond
+        [(ast-get-nonfixed-type ast) =>
+         (lambda (t)
+           (define n-t (type-rm-VarT var-h t ast))
+           (define n-ast (ast-set-nonfixed-type ast n-t))
+           (when (and (Void-type? n-t) 
+                      (or (Var? n-ast) (Literal? n-ast)
+                          (DefVar? n-ast) (Param? n-ast)))
+             (raise-language-error/ast
+              "illegal type for a variable or literal"
+              n-ast n-t))
+           n-ast)]
+        [else
+         ast]))))
+
   (f ast))
 
 ;;; 
@@ -317,15 +351,26 @@
   ;; (possibly incomplete) type expressions as values.
   (define var-h (make-hasheq))
 
-  ;; Possibly adds a constraint between types 'x' and 'y'. Returns #t
-  ;; if they are unifiable or possibly solvable, and #f otherwise.
-  (define (unify! x y) ;; Type? Type? -> boolean?
-    (unify var-h x y))
+  ;; Possibly adds constraints between types 'x' and 'y'. Returns #t
+  ;; if the constraints are possibly solvable, and #f otherwise.
+  (define (type-unifies!? x y) ;; Type? Type? -> boolean?
+    (unify! var-h x y))
 
+  (define (type-unify! x y)
+    (unify! var-h x y)
+    y)
+  
   (define (expr-unify! e t)
     (define e-t (Expr-type e))
     (assert e-t)
-    (unify! e-t t)
+    (unless (type-unifies!? e-t t)
+      (raise-language-error/ast
+       "expression's type does not match its context"
+       #:fields (list (list "type of expression"
+                            (ast-displayable/datum e-t))
+                      (list "type required for context"
+                            (ast-displayable/datum t)))
+       e))
     t)
     
   (define (ti-def ast) ;; Def? -> void?
@@ -333,9 +378,11 @@
       ((? ForeignTypeDecl?)
        ;; Type can always be derived from 'id'.
        (void))
+      
       ((? Param?)
        ;; We cannot learn any new information here.
        (void))
+      
       ((Defun a id t ps b)
        ;; Type kind and arity correctness wrt parameters has already
        ;; been checked earlier. There is only any checking to do now
@@ -343,7 +390,7 @@
        (unless (NoBody? b)
          (define r-t (FunT-rt t))
          (define b-t (ti-expr b))
-         (unless (unify! r-t b-t)
+         (unless (type-unifies!? r-t b-t)
            (raise-language-error/ast
             "function return type does not match body expression"
             #:fields (list (list "declared return type"
@@ -352,9 +399,10 @@
                                  (ast-displayable/datum b-t)))
             ast b)))
        (void))
+      
       ((DefVar _ id t v)
        (define v-t (ti-expr v))
-       (unless (unify! t v-t)
+       (unless (type-unifies!? t v-t)
          (raise-language-error/ast
           "declared variable type does not match value expression"
           #:fields (list (list "declared type"
@@ -363,35 +411,44 @@
                                (ast-displayable/datum v-t)))
             ast v))
        (void))
+      
       (else
        (raise-argument-error
         'ti-def "supported Def?" ast))))
 
-  ;; Initialized to #f for each BlockExpr scope.
-  (define return-type (make-parameter #f))
+  ;; Keyed by `bind` for each LetLocalEc continuation. Unifiable types
+  ;; are expected for any AppLocalEc expressions within, and there
+  ;; should be at least one.
+  (define return-type (make-hasheq))
   
   (define (ti-stat ast) ;; Stat? -> void?
     (match ast
-      ((Return _ e)
+      ((AppLocalEc _ (Var _ k) e)
        (define t (ti-expr e))
-       (define expect-t (return-type))
-       (when (and expect-t (not (unify! expect-t t)))
-         (raise-language-error/ast
-          "conflicting return type in block"
-          ast e
-          #:fields (list (list "previously"
-                               (ast-displayable/datum
-                                expect-t)))))
-       (return-type t)
+       (define bind (Id-bind k))
+       (define expect-t (hash-ref return-type bind #f))
+       (cond
+        ((not expect-t)
+         (hash-set! return-type bind t))
+        (else 
+         (unless (type-unifies!? expect-t t)
+           (raise-language-error/ast
+            "conflicting return type in block"
+            ast e
+            #:fields (list (list "previously"
+                                 (ast-displayable/datum expect-t)))))))
        (void))
+      
       ((SeqStat _ ss)
        (for-each ti-stat ss))
+      
       ((LetStat _ b ss)
        (ti-def b)
        (for-each ti-stat ss))
+      
       ((IfStat _ c t e)
        (define c-t (ti-expr c))
-       (unless (unify! the-bool-type c-t)
+       (unless (type-unifies!? the-bool-type c-t)
          (raise-language-error/ast
           (format "expected type '~a' for conditional"
                   (Id-name the-bool-id))
@@ -400,31 +457,53 @@
                                (ast-displayable/datum c-t)))))
        (ti-stat t)
        (ti-stat e))
-      ((Assign _ lhs rhs)
+      
+      ((AssignStat _ lhs rhs)
        (define lhs-t (ti-expr lhs))
        (define rhs-t (ti-expr rhs))
-       (unless (unify! lhs-t rhs-t)
+       (unless (type-unifies!? lhs-t rhs-t)
          (raise-language-error/ast
           "assignment between different types"
           ast
           #:fields (list (list "lvalue type" (ast-displayable/datum lhs-t))
                          (list "rvalue type" (ast-displayable/datum rhs-t)))))
        (void))
+      
+      ((? VoidStat?)
+       (void))
+      
       (else
        (raise-argument-error
         'ti-stat "supported Stat?" ast))))
       
+  (define (ti-expr-seq ast-lst) ;; (listof Ast?) -> Type?
+    (define len (length ast-lst))
+    (assert (> len 0))
+    (let-values (((heads tail) (split-at ast-lst (- len 1))))
+      (for-each ti-expr heads)
+      (let ((t (ti-expr (car tail))))
+        t)))
+  
   (define (ti-expr ast) ;; Ast? -> Type?
     (match ast
-      ((BlockExpr _ ss)
-       (parameterize ((return-type #f))
-         (for-each ti-stat ss)
-         (define t (return-type))
-         (unless t
-           (raise-language-error/ast
-            "block expression without return"
-            ast))
-         (expr-unify! ast t)))
+      ((SeqExpr _ es)
+       (define t (ti-expr-seq es))
+       (expr-unify! ast t))
+      
+      ((LetExpr _ b es)
+       (ti-def b)
+       (define t (ti-expr-seq es))
+       (expr-unify! ast t))
+      
+      ((LetLocalEc _ (Var _ k) es)
+       (ti-expr-seq es)
+       (define bind (Id-bind k))
+       (define t (hash-ref return-type bind #f))
+       (unless t
+         (raise-language-error/ast
+          "escape block without result expressions"
+          ast))
+       (expr-unify! ast t))
 
       ((? Var?)
        (define t (lookup ast))
@@ -435,7 +514,7 @@
           ast))
        (expr-unify! ast t))
 
-      ((Apply _ f as)
+      ((ApplyExpr _ f as)
        ;; We bypass invoking (ti-expr f) here, as we only want to
        ;; allow FunT typed expressions in this context. We must still
        ;; be sure to set up a constraint for the expression 'f', lest
@@ -455,7 +534,7 @@
        ;; Now we can unify against the argument expressions' types,
        ;; and also the type of this expression. We could construct a
        ;; FunT instance from said information and leave the checking
-       ;; to 'unify', but we get better error messages by doing some
+       ;; to 'unify!', but we get better error messages by doing some
        ;; extra work here. We make sure to add the same constraints
        ;; separately here.
        (unless (= (length as) (length (FunT-ats f-t)))
@@ -466,16 +545,15 @@
           ast))
        (for ([e as] [p-t (FunT-ats f-t)])
          (define e-t (ti-expr e))
-         (unless (unify! p-t e-t)
+         (unless (type-unifies!? p-t e-t)
            (raise-language-error/ast
             "parameter type does not match that of argument"
-            #:fields (list
-                      (list "parameter type"
-                            (ast-displayable p-t)))
+            #:fields (list (list "parameter type"
+                                 (ast-displayable p-t)))
             ast e)))
 
-       ;; The type of the Apply expression must unify with the return
-       ;; type of the function.
+       ;; The type of the ApplyExpr expression must unify with the
+       ;; return type of the function.
        (define t (FunT-rt f-t))
        (expr-unify! ast t))
 
@@ -494,7 +572,7 @@
 
       ((IfExpr _ c t e)
        (define c-t (ti-expr c))
-       (unless (unify! the-bool-type c-t)
+       (unless (type-unifies!? the-bool-type c-t)
          (raise-language-error/ast
           (format "expected type '~a' for conditional"
                   (Id-name the-bool-id))
@@ -503,29 +581,55 @@
                                (ast-displayable/datum c-t)))))
        (define t-t (ti-expr t))
        (define e-t (ti-expr e))
-       (unless (unify! t-t e-t)
-         (raise-language-error/ast
-          "expected same type for both 'if' branches"
-          ast
-          #:fields (list
-                    (list "THEN branch type" (ast-displayable/datum t-t))
-                    (list "ELSE branch type" (ast-displayable/datum e-t))
-                    )))
-       (expr-unify! ast t-t))
+       (define discarded? (get-result-discarded ast))
+       (define ast-t (Expr-type ast))
+       (cond
+        [(and discarded?
+              (cond
+               ((VarT? ast-t) 
+                ;; Overall IfExpr type does not matter, and branch
+                ;; expression types need not unify.
+                #t)
+               ((NameT? ast-t) 
+                ;; A type for the IfExpr has been given explicitly,
+                ;; and branches must also be of that type.
+                #f)
+               (else
+                (raise-language-error/ast
+                 "unexpected type for conditional"
+                 ast ast-t))))
+         (define n-t (annoless PhiT t-t e-t))
+         (type-unify! ast-t n-t)]
+        [else
+         (unless (type-unifies!? t-t e-t)
+           (raise-language-error/ast
+            "expected same type for both 'if' branches"
+            ast
+            #:fields (list
+                      (list "THEN branch type" (ast-displayable/datum t-t))
+                      (list "ELSE branch type" (ast-displayable/datum e-t))
+                      )))
+         (type-unify! ast-t t-t)]))
+
+      ;; Statements can appear in an expression position. They are
+      ;; always of the unit type.
+      ((? Stat?)
+       (ti-stat ast)
+       the-Void-type)
 
       ((? RacketExpr?)
        (Expr-type ast))
-
+      
       (else
        (raise-argument-error
-        'ti-expr "supported Ast?" ast))))
+        'ti-expr "supported ExprLike?" ast))))
 
   (set! defs (defs-add-VarT defs))
   ;;(defs-dump defs '(type))
 
-  (for (((id def) (in-dict defs)))
+  (for ([(id def) (in-dict defs)])
     (ti-def def))
 
-  (set! defs (defs-map-each-def/Id defs (fix ast-rm-VarT var-h)))
+  (set! defs (defs-map/bind (fix ast-rm-VarT var-h) defs))
   
   defs)

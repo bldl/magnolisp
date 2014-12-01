@@ -127,8 +127,7 @@
     (check-redefinition id-stx stx)
     (define ast (parse-expr e-stx))
     (define ann-h (mk-annos stx id-stx))
-    (define t the-AnyT)
-    (define def (DefVar ann-h id-stx t ast))
+    (define def (DefVar ann-h id-stx the-AnyT ast))
     (when top?
       (set-def-in-mod! id-stx def))
     def)
@@ -142,22 +141,25 @@
   (define (make-Literal stx datum-stx)
     (syntaxed stx Literal (syntax->datum datum-stx)))
   
-  (define (make-LetStat stx kind-stx binds-stx exprs-stx)
-    (define kind (syntax-e kind-stx))
-    (define e-stx-lst (syntax->list exprs-stx))
-    (define e-ast-lst (map parse-stat e-stx-lst))
-    (define i-e-lst (syntax->list binds-stx))
+  ;; Parses all the different kinds of Let expressions (`let`,
+  ;; `letrec`, etc.). Any number of definition clauses, any number of
+  ;; variables each.
+  (define (parse-let-expr stx binds-stx exprs-stx)
+    (define kind (syntax-e (car (syntax-e stx))))
+    (define body-stx-lst (syntax->list exprs-stx))
+    (define body-ast-lst (map parse-expr body-stx-lst))
+    (define bind-stx-lst (syntax->list binds-stx))
 
     (define (wrap-in-let dv ast-lst)
       (define as (hasheq 'stx stx 'let-kind kind))
-      (list (LetStat as dv ast-lst)))
+      (list (LetExpr as dv ast-lst)))
 
     (define (wrap-in-let* dv-lst ast-lst)
       (for/fold ([ast-lst ast-lst]) ([dv (reverse dv-lst)])
         (wrap-in-let dv ast-lst)))
     
     (define ast-lst
-      (for/fold ([ast-lst e-ast-lst]) ([i-e (reverse i-e-lst)])
+      (for/fold ([ast-lst body-ast-lst]) ([i-e (reverse bind-stx-lst)])
         ;;(pretty-print `(BINDING ,(syntax->datum i-e)))
         (kernel-syntax-case*/phase i-e 0 (values)
           [((id ...) (#%plain-app values v ...))
@@ -178,7 +180,7 @@
              (wrap-in-let* dv-lst ast-lst))]
           
           [(() stat)
-           (cons (parse-stat #'stat) ast-lst)]
+           (cons (parse-expr #'stat) ast-lst)]
           
           [((id) v)
            (identifier? #'id)
@@ -188,19 +190,16 @@
           
           [_
            (raise-language-error
-            #f "illegal syntax for a let binding form"
+            #f 
+            (format "illegal syntax for a `~a` binding form" kind)
             stx i-e
             #:fields `(("binding"
                         ,(or (stx-binding-info i-e) 'unbound))))])))
     
     (if (= (length ast-lst) 1)
         (first ast-lst)
-        (syntaxed stx SeqStat ast-lst)))
+        (syntaxed stx SeqExpr ast-lst)))
     
-  (define (parse-define-value stx id-stx e-stx)
-    ;;(writeln (list 'parse-define-value e-stx (syntax->datum e-stx)))
-    (make-DefVar stx id-stx e-stx #:top? #t))       
-
   (define (parse-module-begin stx)
     (kernel-syntax-case/phase stx 0
       ((#%module-begin . bs)
@@ -236,15 +235,15 @@
             stx (third (syntax->list stx))))
          (for-each
           (lambda (id-stx e-stx)
-            (parse-define-value stx id-stx e-stx))
+            (make-DefVar stx id-stx e-stx #:top? #t))
           id-lst v-lst)))
 
       ;; Must come after the ((define-values (id ...) (#%plain-app
       ;; values v ...)) pattern.
       ((define-values (id) e)
        (identifier? #'id)
-       (parse-define-value stx #'id #'e))
-
+       (make-DefVar stx #'id #'e #:top? #t))
+      
       ((define-syntaxes . _)
        (void))
 
@@ -335,88 +334,28 @@
         #:fields `(("binding"
                     ,(or (stx-binding-info stx) 'unbound)))))))
   
-  (define (parse-stat stx)
+  (define (parse-multi-expr stx)
     (kernel-syntax-case*/phase stx 0 (values)
+      ((#%plain-app values . exprs)
+       (map parse-expr (syntax->list #'exprs)))
       (_
-       (syntax-property stx 'in-racket)
-       (syntaxed stx SeqStat null))
-      
-      ((begin . bs)
-       (syntaxed stx SeqStat
-                 (map parse-stat
-                      (syntax->list #'bs))))
-      
-      ((#%expression e)
-       (parse-stat #'e))
-      
-      ((if c t e)
-       (syntaxed stx IfStat
-                 (parse-expr #'c)
-                 (parse-stat #'t)
-                 (parse-stat #'e)))
-
-      ((#%plain-app f . e)
-       (and (identifier? #'f)
-            (or (free-identifier=? #'f #'void)
-                (free-identifier=? #'f #'values)))
-       (begin
-         (unless (null? (syntax-e #'e))
-           (raise-syntax-error
-            #f
-            (format "arguments not allowed for ~a in a statement position"
-                    (syntax-e #'f))
-            stx #'e))
-         (syntaxed stx SeqStat null)))
-
-      ((#%plain-app k e)
-       (and (syntax-property stx 'local-ec) (identifier? #'k))
-       (syntaxed stx AppLocalEc (self-syntaxed Label #'k) (parse-expr #'e)))
-      
-      ((let-values binds . exprs)
-       (make-LetStat stx (car (syntax-e stx)) #'binds #'exprs))
-
-      ((letrec-values binds . exprs)
-       (make-LetStat stx (car (syntax-e stx)) #'binds #'exprs))
-
-      ((letrec-syntaxes+values _ binds . exprs)
-       (make-LetStat stx (car (syntax-e stx)) #'binds #'exprs))
-
-      ((set! id expr)
-       (identifier? #'id)
-       (syntaxed stx Assign (parse-expr #'id) (parse-expr #'expr)))
-
-      (_ (raise-language-error
-          #f "illegal syntax in statement context" stx
-          #:fields `(("binding"
-                      ,(or (stx-binding-info stx) 'unbound)))))))
-
-  ;; All the arguments are syntax objects.
-  (define (parse-let-expr stx kind binds e)
-    (kernel-syntax-case/phase binds 0
-     (()
-      (parse-expr e))
-     (([(n) v])
-      (identifier? #'n)
-      (let ()
-        (define d-ast (make-DefVar stx #'n #'v))
-        (define e-ast (parse-expr e))
-        (define as (hasheq 'stx stx 'let-kind (syntax-e kind)))
-        (LetExpr as d-ast e-ast)))
-     (_
-      (raise-language-error
-       #f "illegal let expression" stx))))
+       (list (parse-expr stx)))))
   
-  ;; Inserts bindings into 'defs-in-mod' as a side effect. Returns an
-  ;; Ast object for non top-level things.
   (define (parse-expr stx)
-    ;;(stx-print-if-type-annoed stx)
-    ;;(writeln (list ctx stx))
-    
-    (kernel-syntax-case*/phase stx 0 (call/ec #%magnolisp)
+    (kernel-syntax-case*/phase stx 0 (call/ec values void #%magnolisp)
 
+      (_
+       (syntax-property stx 'magnolisp-nothing)
+       (syntaxed stx SeqExpr '()))
+      
       (_
        (syntax-property stx 'in-racket)
        (syntaxed stx RacketExpr))
+      
+      ((begin . bs)
+       (syntaxed stx SeqExpr
+                 (map parse-expr
+                      (syntax->list #'bs))))
       
       ;; These do appear as well.
       ((#%expression e)
@@ -440,7 +379,7 @@
          (define e-ast (parse-expr e-stx))
          (syntaxed stx Lambda par-ast-lst e-ast)))
       
-      ((if _ (#%plain-app #%magnolisp (quote k)) aa)
+      ((if _ (#%plain-app #%magnolisp (quote k)) _)
        (eq? 'foreign-type (syntax-e #'k))
        (syntaxed stx ForeignTypeExpr))
       
@@ -450,14 +389,32 @@
                  (parse-expr #'t)
                  (parse-expr #'e)))
 
+      ((#%plain-app void . exprs)
+       (let ()
+         (define e-lst (map parse-expr (syntax->list #'exprs)))
+         (if (null? e-lst)
+             (syntaxed stx VoidStat)
+             (syntaxed stx SeqExpr 
+                       (append e-lst (list (annoless VoidStat)))))))
+      
+      ((#%plain-app values e)
+       (parse-expr #'e))
+
+      ((#%plain-app values)
+       (syntaxed stx SeqExpr '()))
+
       ((#%plain-app call/ec
-        (#%plain-lambda (k) b ...))
+        (#%plain-lambda (k) . bs))
        (syntax-property stx 'local-ec)
-       (syntaxed stx
-        LetLocalEc (self-syntaxed Label #'k)
-        (map
-         parse-stat
-         (syntax->list #'(b ...)))))
+       (syntaxed stx LetLocalEc
+                 (Var (hasheq 'stx #'k 'type the-KontT) #'k) 
+                 (map parse-expr (syntax->list #'bs))))
+      
+      ((#%plain-app k e)
+       (and (syntax-property stx 'local-ec) (identifier? #'k))
+       (syntaxed stx AppLocalEc 
+                 (Var (hasheq 'stx #'k 'type the-KontT) #'k) 
+                 (parse-expr #'e)))
       
       ((#%plain-app p-expr . a-expr)
        (let ()
@@ -466,7 +423,7 @@
            ;; No first-class functions in Magnolisp.
            (raise-syntax-error #f "expected identifier"
                                stx #'p-expr))
-         (syntaxed stx Apply
+         (syntaxed stx ApplyExpr
           f-ast
           (map
            parse-expr
@@ -481,14 +438,18 @@
          (define e-ast (parse-expr #'e))
          (syntaxed stx AnnoExpr a-ast-lst e-ast)))
 
-      ((let-values binds e)
-       (parse-let-expr stx (car (syntax-e stx)) #'binds #'e))
+      ((let-values binds . exprs)
+       (parse-let-expr stx #'binds #'exprs))
       
-      ((letrec-values binds e)
-       (parse-let-expr stx (car (syntax-e stx)) #'binds #'e))
+      ((letrec-values binds . exprs)
+       (parse-let-expr stx #'binds #'exprs))
       
-      ((letrec-syntaxes+values _ binds e)
-       (parse-let-expr stx (car (syntax-e stx)) #'binds #'e))
+      ((letrec-syntaxes+values _ binds . exprs)
+       (parse-let-expr stx #'binds #'exprs))
+
+      ((set! id expr)
+       (identifier? #'id)
+       (syntaxed stx AssignStat (parse-expr #'id) (parse-expr #'expr)))
 
       ((quote lit)
        (make-Literal stx #'lit))

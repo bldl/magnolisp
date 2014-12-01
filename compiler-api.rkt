@@ -126,13 +126,13 @@ optimization.
 
 (define-with-contract
   (-> list? void?)
-  (defs-check-Apply-target def-lst)
+  (defs-check-ApplyExpr-target def-lst)
   (define bind->def (build-defs-table def-lst))
   (for-each
    (topdown-visit
     (lambda (ast)
       (match ast
-        ((Apply _ e _)
+        ((ApplyExpr _ e _)
          (assert (Var? e))
          (define id (Var-id e))
          (define def (ast-identifier-lookup bind->def id))
@@ -173,9 +173,8 @@ optimization.
 ;;; 
 
 (define (defs-optimize-if defs)
-  (define (make-lit-pred lit)
-    (lambda (ast)
-      (matches? ast (Literal _ (? (curry equal? lit))))))
+  (define ((make-lit-pred lit) ast)
+    (matches? ast (Literal _ (? (lambda (x) (equal? x lit))))))
 
   (define TRUE? (make-lit-pred #t))
   (define FALSE? (make-lit-pred #f))
@@ -184,7 +183,7 @@ optimization.
     (bottomup
      (lambda (ast)
        (match ast
-         [(If c t e)
+         [(IfExpr _ c t e)
           (cond
            [(TRUE? c) t]
            [(FALSE? c) e]
@@ -192,79 +191,6 @@ optimization.
          [_ ast]))))
 
   (map rw defs))
-
-;;; 
-;;; LetExpr
-;;; 
-
-;; Later annotations in `hs` are of increasing significance. Any 'type
-;; annotations are treated specially.
-(define (merge-annos . hs)
-  (for/fold ((r #hasheq())) ((h hs))
-    (for (((k v) h))
-      (cond
-       ((and (eq? 'type k) (hash-has-key? r k) (AnyT? v))
-        (void))
-       (else
-        (set! r (hash-set r k v)))))
-    r))
-
-(define ast-rm-LetExpr
-  (topdown
-   (repeat
-    (lambda (ast)
-      (match ast
-        ;; Simple case, of the form (let ((x v)) x). Just retain
-        ;; expression 'v', and any annotations of `x`.
-        [(LetExpr a0 (DefVar a1 bn t v) (Var a2 rn))
-         #:when (ast-identifier=? bn rn)
-         (define a3 (Ast-annos v))
-         (define h (merge-annos a0 a2 a1 a3))
-         (define n-ast (set-Ast-annos v h))
-         ;;(writeln (list n-ast (Ast-annos n-ast)))
-         n-ast]
-        ;; Complex case. Turn LetExpr into a BlockExpr + LetStat.
-        [(? LetExpr?)
-         (match-define (LetExpr a dv e) ast)
-         (define n-ast
-           (BlockExpr
-            a
-            (list
-             (LetStat
-              (hasheq 'let-kind (ast-anno-must ast 'let-kind))
-              dv
-              (list (annoless Return e))))))
-         n-ast]
-        [_ #f])))))
-
-;;; 
-;;; local escapes
-;;; 
-
-(define (ast-LetLocalEc->BlockExpr ast)
-  (define enclosing-id (make-parameter #f))
-  
-  (define (rw ast)
-    (match ast
-     ((LetLocalEc a (Label _ k) ss)
-      (parameterize ((enclosing-id k))
-        (BlockExpr a (map rw ss))))
-     ((AppLocalEc a (Label _ k) e)
-      (define e-id (enclosing-id))
-      (unless e-id
-        (raise-language-error/ast
-         "local escape without enclosing context"
-         ast))
-      (unless (ast-identifier=? e-id k)
-        (raise-language-error/ast
-         "local escape beyond its context"
-         ast k
-         #:fields (list (list "context" (ast-displayable e-id)))))
-      (Return a (rw e)))
-     (else
-      (all-rw-term rw ast))))
-
-  (rw ast))
 
 ;;; 
 ;;; program contents resolution
@@ -519,7 +445,7 @@ optimization.
   (define prelude-bind->bind
     (build-prelude-bind->bind 
      rr-mp-sym->bind
-     (for/hasheq ((id (list the-bool-id)))
+     (for/hasheq ((id builtin-type-id-lst))
        (values (Id-name id) (Id-bind id)))))
   
   (define def-lst (hash-values all-defs))
@@ -530,25 +456,25 @@ optimization.
 
   (set! def-lst (defs-optimize-if def-lst))
   (set! def-lst (map ast-add-prelude-lit-types def-lst))
-  ;;(pretty-print `(prelude-map ,prelude-bind->bind defs ,def-lst eps ,eps-in-prog))
+  ;;(pretty-print `(prelude-map ,prelude-bind->bind defs ,def-lst eps ,eps-in-prog)) (exit)
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
-  (set! def-lst (map ast-rm-LetExpr def-lst))
-  ;;(pretty-print def-lst) (exit)
-  (set! def-lst (map ast-LetLocalEc->BlockExpr def-lst))
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-simplify def-lst))
+  (set! def-lst (map de-racketize def-lst))
+  (defs-check-ApplyExpr-target def-lst)
+  ;;(pretty-print def-lst) (exit)
+  (set! def-lst (map ast-normalize-LetLocalEc def-lst))
+  ;;(pretty-print def-lst) (exit)
+  (set! def-lst (map ast-update-ExprLike-result-annos def-lst))
   ;;(pretty-print def-lst) (exit)
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values all-defs))))
-  ;;(pretty-print (dict->list all-defs)) (exit)
-  ;;(pretty-print (dict->list all-defs)) (exit)
-  ;;(pretty-print (dict->list id->bind)) (exit)
-  ;;(pretty-print (dict-values all-defs)) (exit)
-  (set! def-lst (map de-racketize def-lst))
-  (defs-check-Apply-target def-lst)
   ;;(pretty-print def-lst)
   (set! all-defs (build-defs-table def-lst))
   ;;(pretty-print all-defs) (exit)
   (set! all-defs (defs-type-infer all-defs))
+  ;;(pretty-print all-defs)
+  (set! all-defs (defs-map/bind ast-rm-dead-constants all-defs))
+  ;;(pretty-print all-defs) (exit)
   ;;(pretty-print (dict-values all-defs)) (exit)
   
   ;;(pretty-print (map ast->sexp (dict-values all-defs)))

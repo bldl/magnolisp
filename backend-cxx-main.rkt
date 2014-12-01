@@ -175,15 +175,15 @@ C++ back end.
        (define-values (r-1 n-v) (rw r v))
        (define-values (r-2 n-sym) (decide-name-for-id r-1 id "v"))
        (values r-2 (DefVar a n-sym t n-v)))
-      ((CxxDeclVar a id t)
+      ((DeclVar a id t)
        (define-values (r-2 n-sym) (decide-name-for-id r id "v"))
-       (values r-2 (CxxDeclVar a n-sym t)))
-      ((CxxLabelDecl a id)
+       (values r-2 (DeclVar a n-sym t)))
+      ((LabelDecl a id)
        (define-values (r-1 n-sym) (decide-name-for-id r id "l"))
-       (values r-1 (CxxLabelDecl a n-sym)))
-      ((CxxLabelDef a id)
+       (values r-1 (LabelDecl a n-sym)))
+      ((LabelDef a id)
        (define sym (get-decision-for id))
-       (values r (CxxLabelDef a sym)))
+       (values r (LabelDef a sym)))
       ((Goto a id)
        (define sym (get-decision-for id))
        (values r (Goto a sym)))
@@ -218,14 +218,14 @@ C++ back end.
   ;;(writeln ast-lst)
   ast-lst)
 
-(define (cxx-rm-CxxLabelDecl ast-lst)
+(define (cxx-rm-LabelDecl ast-lst)
   (define rw
     (topdown
      (lambda (ast)
        (match ast
-         [(StatCont ss)
-          #:when (ormap CxxLabelDecl? ss)
-          (StatCont-copy ast (filter (negate CxxLabelDecl?) ss))]
+         [(SeqCont ss)
+          #:when (ormap LabelDecl? ss)
+          (SeqCont-copy ast (filter (negate LabelDecl?) ss))]
          [_ ast]))))
   
   (map rw ast-lst))
@@ -275,8 +275,9 @@ C++ back end.
      (map cxx->partition def-lst))))
 
 (define (defs->cxx defs-t)
-  ;; When within a BlockExpr, this is (cons/c label-id var-id).
-  (define b-tgt (make-parameter #f))
+  ;; Tracks surrounding LetLocalEc scopes, by mapping continuation
+  ;; bind -> (cons/c label-id var-id).
+  (define le-tgt (make-parameter #hasheq()))
   
   (define (def->cxx ast)
     (match ast
@@ -284,9 +285,10 @@ C++ back end.
        (define foreign? (and (get-foreign-name a) #t))
        (CxxDefun a id null t
                  (map def->cxx ps)
-                 (if foreign?
-                     the-NoBody
-                     (annoless CxxReturnOne (expr->cxx b))))]
+                 (cond
+                  (foreign? the-NoBody)
+                  ((equal? (FunT-rt t) the-Void-type) (expr->cxx b))
+                  (else (annoless ReturnStat (expr->cxx b)))))]
       [(? Param?)
        ast]
       [(DefVar a id t v)
@@ -295,64 +297,139 @@ C++ back end.
        (raise-argument-error
         'def->cxx "supported Def?" ast)]))
   
-  (define (stat->cxx ast)
-    (match ast
-      [(IfStat a c t e)
-       (IfStat a (expr->cxx c) (stat->cxx t) (stat->cxx e))]
-      [(SeqStat a ss)
-       (SeqStat a (map stat->cxx ss))]
-      [(Return a e)
-       (define tgt (b-tgt))
-       (unless tgt
-         (raise-language-error/ast
-          "return without surrounding block expression"
-          ast))
-       (define n-e
-         (parameterize ((b-tgt #f))
-           (expr->cxx e)))
-       (SeqStat a (list (annoless Assign (annoless Var (cdr tgt)) n-e)
-                          (annoless Goto (car tgt))))]
-      [(LetStat a dv ss)
-       (SeqStat a (cons (def->cxx dv) (map stat->cxx ss)))]
-      [(Assign a lhs rhs)
-       (Assign a (expr->cxx lhs) (expr->cxx rhs))]
-      [_
-       (raise-argument-error
-        'stat->cxx "supported Stat?" ast)]))
-  
+  ;; Favors expressions in translation (as they are closer to the
+  ;; original), and statements otherwise. Leaves in some SeqExpr for
+  ;; the time being.
   (define (expr->cxx ast)
     (match ast
       [(? Var?)
        ast]
       [(? Literal?)
        ast]
-      [(Apply a f es)
-       (Apply a f (map expr->cxx es))]
+      [(? VoidStat?)
+       ast]
+      [(ApplyExpr a f es)
+       (ApplyExpr a f (map expr->cxx es))]
+      [(SeqExpr a ss)
+       (SeqExpr a (map expr->cxx ss))]
+      [(LetExpr a dv ss)
+       (SeqExpr a (cons (def->cxx dv) (map expr->cxx ss)))]
       [(IfExpr a c t e)
        (IfExpr a (expr->cxx c) (expr->cxx t) (expr->cxx e))]
-      [(BlockExpr a ss)
+      [(AssignStat a lhs rhs)
+       (AssignStat a (expr->cxx lhs) (expr->cxx rhs))]
+      [(LetLocalEc a (Var _ k) ss)
        (define t (Expr-type ast))
-       (define lbl (fresh-ast-identifier 'b))
-       (define rval (fresh-ast-identifier 'r))
+       (define void-t? (equal? t the-Void-type))
+       (define lbl-id (fresh-ast-identifier 'b))
+       (define rv-id (and (not void-t?)
+                          (fresh-ast-identifier 'r)))
+       (define tgt (cons lbl-id rv-id))
        (define n-ss
-         (parameterize ((b-tgt (cons lbl rval)))
-           (map stat->cxx ss)))
-       (LiftStatExpr
-        a rval
-        `(,(annoless CxxLabelDecl lbl)
-          ,@n-ss
-          ,(annoless CxxLabelDef lbl)))]
+         (parameterize ((le-tgt (hash-set (le-tgt) (Id-bind k) tgt)))
+           (map expr->cxx ss)))
+       (define es 
+         `(,(annoless LabelDecl lbl-id)
+           ,@n-ss
+           ,(annoless LabelDef lbl-id)))
+       (if void-t?
+           (SeqStat a es)
+           (LiftStatExpr a rv-id es))]
+      [(AppLocalEc a (Var _ k) e)
+       (define tgt (hash-ref (le-tgt) (Id-bind k) #f))
+       (unless tgt
+         (raise-language-error/ast
+          "local escape out of context"
+          ast (AppLocalEc-k ast)))
+       (define lbl-id (car tgt))
+       (define rv-id (cdr tgt))
+       (define n-e (expr->cxx e))
+       (define n-ast
+         (if rv-id
+             (SeqStat a 
+                      (list (annoless AssignStat (annoless Var rv-id) n-e)
+                            (annoless Goto lbl-id)))
+             (annoless Goto lbl-id)))
+       ;;(writeln n-ast)
+       n-ast]
       [_
        (raise-argument-error
-        'expr->cxx "supported Expr?" ast)]))
+        'expr->cxx "supported ExprLike?" ast)]))
+
+  (define def-lst (filter Defun? (hash-values defs-t)))
+  ;;(pretty-print def-lst) (exit)
+  (set! def-lst (map def->cxx def-lst))
+  ;;(pretty-print def-lst)
+  (set! def-lst (map CxxDefun-rm-SeqExpr def-lst))
+  ;;(pretty-print def-lst)
+  def-lst)
+
+(define (CxxDefun-rm-SeqExpr def)
+  (define (can-be-expr? ast)
+    (match ast
+      [(or (? Var?) (? Literal?) (? ApplyExpr?) (? IfExpr?))
+       #t]
+      [(or (? AssignStat?) (? Goto?) (? Def?) (? ReturnStat?)
+           (? SeqStat?) (? SeqExpr?) (? VoidStat?))
+       #f]
+      [_
+       (raise-argument-error
+        'can-be-expr? "supported ExprLike? or Def?" ast)]))
   
-  (filter
-   values
-   (map
-    def->cxx
-    (filter
-     Defun?
-     (hash-values defs-t)))))
+  (define (to-expr ast)
+    (match ast
+      [(or (? Var?) (? Literal?))
+       ast]
+      [(or (? ApplyExpr?) (? IfExpr?))
+       (all-rw-term to-expr ast)]
+      [(SeqExpr a es)
+       (define t (Expr-type ast))
+       (define void-t? (equal? t the-Void-type))
+       (define id (fresh-ast-identifier 'lifted))
+       (unless void-t?
+         (set! es (list-map-last
+                   (lambda (e) (annoless AssignStat
+                                    (annoless Var id) e)) es)))
+       (define ss (map to-stat es))
+       (LiftStatExpr (hasheq 'type t) id ss)]
+      [(LiftStatExpr a id ss)
+       (LiftStatExpr a id (map to-stat ss))]
+      [_
+       (raise-argument-error
+        'to-expr "supported ExprLike? or Def?" ast)]))
+  
+  (define (to-stat ast)
+    (match ast
+      [(or (? Var?) (? Literal?))
+       ;; Discarding result due to statement context.
+       (annoless SeqStat '())]
+      [(? ApplyExpr?)
+       (annoless ExprStat (all-rw-term to-expr ast))]
+      [(or (? AssignStat?) (? ReturnStat?))
+       (all-rw-term to-expr ast)]
+      [(DefVar a id t b)
+       (DefVar a id t (to-expr b))]
+      [(? SeqStat?)
+       (all-rw-term to-stat ast)]
+      [(SeqExpr a es)
+       ;; Due to the statement context, the result of the expression
+       ;; can be discarded.
+       (SeqStat a (map to-stat es))]
+      [(IfExpr a c t e)
+       ;; Discarding result due to statement context.
+       (IfStat a c (to-stat t) (to-stat e))]
+      [(VoidStat a)
+       ;; Discarding result due to statement context.
+       (SeqStat a '())]
+      [(or (? Goto?) (? DeclVar?) (? NoBody?) (? Label?))
+       ast]
+      [_
+       ;;(writeln `(result-discarded = ,(get-result-discarded ast)))
+       (raise-argument-error
+        'to-stat "supported ExprLike? or Def?" ast)]))
+  
+  (let ((s (CxxDefun-s def)))
+    (set-CxxDefun-s def (to-stat s))))
 
 (define (types-to-cxx defs-t def-lst)
   (define (type->cxx ast)
@@ -382,8 +459,8 @@ C++ back end.
           (Param a id (annoless RefT (annoless ConstT (type->cxx t))))]
          [(DefVar a id t v)
           (DefVar a id (type->cxx t) v)]
-         [(CxxDeclVar a id t)
-          (CxxDeclVar a id (type->cxx t))]
+         [(DeclVar a id t)
+          (DeclVar a id (type->cxx t))]
          [_ ast]))))
   
   (map rw-def def-lst))
@@ -404,13 +481,13 @@ C++ back end.
     (bottomup
      (lambda (ast)
        (match ast
-         [(StatCont (? (curry ormap pointless-nest?) ss))
+         [(SeqCont (? (curry ormap pointless-nest?) ss))
           (define n-ss
             (apply append (for/list ((s ss))
                             (if (pointless-nest? s)
-                                (StatCont-ss s)
+                                (SeqCont-ss s)
                                 (list s)))))
-          (StatCont-copy ast n-ss)]
+          (SeqCont-copy ast n-ss)]
          [else ast]))))
   
   (define convert
@@ -446,7 +523,7 @@ C++ back end.
 (define (def-rm-LiftStatExpr ast)
   ;; Wraps statement `ast` with the specified lifts, returning a new
   ;; statement. The statements `ss` are assumed to be in evaluation
-  ;; order. The declarations `ds` should be of type CxxDeclVar, and
+  ;; order. The declarations `ds` should be of type DeclVar, and
   ;; their order does not matter.
   (define (wrap ds ss ast)
     (cond
@@ -460,15 +537,20 @@ C++ back end.
       (define-values (n-ds n-ss n-ast) (rw-sibling ds ss ast))
       (values n-ds n-ss (cons n-ast lst))))
 
-  (define (lift-expr ast [tmp-id #f])
-    (unless tmp-id
-      (set! tmp-id (if (Var? ast)
-                       (another-ast-identifier (Var-id ast))
-                       (fresh-ast-identifier 'lifted))))
+  (define (lift-expr ast)
     (define t (Expr-type ast))
-    (define def (rw-stat (annoless DefVar tmp-id t ast)))
-    (define ref (Var (hasheq 'type t) tmp-id))
-    (values def ref))
+      (cond
+       ((equal? t the-Void-type)
+        (define def (rw-stat (annoless ExprStat ast)))
+        (define ref a-VoidExpr)
+        (values def ref))
+       (else
+        (define tmp-id (if (Var? ast)
+                           (another-ast-identifier (Var-id ast))
+                           (fresh-ast-identifier 'lifted)))
+        (define def (rw-stat (annoless DefVar tmp-id t ast)))
+        (define ref (Var (hasheq 'type t) tmp-id))
+        (values def ref))))
   
   ;; Rewrites expression `ast`, where `ds` is a list of variables to
   ;; declare in the same lift context, and `ss` is a list of
@@ -481,9 +563,13 @@ C++ back end.
      [(LiftStatExpr? ast)
       (match-define (LiftStatExpr a id n-ss) ast)
       (define t (Expr-type ast))
-      (define decl (annoless CxxDeclVar id t))
-      (define ref (Var (hasheq 'type t) id))
-      (values (cons decl ds) (append n-ss ss) ref)]
+      (cond
+       ((equal? t the-Void-type)
+        (values ds (append n-ss ss) a-VoidExpr))
+       (else
+        (define decl (annoless DeclVar id t))
+        (define ref (Var (hasheq 'type t) id))
+        (values (cons decl ds) (append n-ss ss) ref)))]
      [(not (null? ss))
       ;; Since some later subexpressions have been lifted, we must
       ;; lift this one, too.
@@ -491,7 +577,7 @@ C++ back end.
       (values ds (cons def ss) ref)]
      [else
       (match ast
-        [(Apply a f as)
+        [(ApplyExpr a f as)
          (define-values (as-ds as-ss as-exprs)
            (rw-siblings-in-reverse '() '() as))
          ;; Arguments evaluate before application, and we need not
@@ -499,7 +585,7 @@ C++ back end.
          ;; expressions contain lifts.
          (values (append as-ds ds)
                  (append as-ss ss)
-                 (Apply a f as-exprs))]
+                 (ApplyExpr a f as-exprs))]
         [(IfExpr a c t e)
          (define-values (t-ds t-ss t-ast) (rw-expr t))
          (define-values (e-ds e-ss e-ast) (rw-expr e))
@@ -521,7 +607,7 @@ C++ back end.
            ;; statement context.
            (define if-typ (Expr-type ast))
            (define if-id (fresh-ast-identifier 'lifted))
-           (define if-decl (annoless CxxDeclVar if-id if-typ))
+           (define if-decl (annoless DeclVar if-id if-typ))
            (define if-ref (Var (hasheq 'type if-typ) if-id))
            (define t-ast (wrap-expr-as-Assign if-ref t))
            (define e-ast (wrap-expr-as-Assign if-ref e))
@@ -538,7 +624,11 @@ C++ back end.
     (rw-sibling '() '() ast))
 
   (define (wrap-expr-as-Assign lv rv)
-    (rw-stat (annoless Assign lv rv)))
+    (define t (Expr-type rv))
+    (rw-stat
+     (if (equal? t the-Void-type)
+         (annoless ExprStat rv)
+         (annoless AssignStat lv rv))))
   
   ;; Processes any R-value expressions of the immediate C++ statement
   ;; `ast`.
@@ -551,18 +641,22 @@ C++ back end.
        #:when (has-lifts? v)
        (define-values (ds ss n-v) (rw-expr v))
        (wrap ds ss (DefVar a id t n-v))]
-      [(Assign a lv rv)
+      [(AssignStat a lv rv)
        #:when (has-lifts? rv)
        (define-values (ds ss n-rv) (rw-expr rv))
-       (wrap ds ss (Assign a lv n-rv))]
+       (wrap ds ss (AssignStat a lv n-rv))]
       [(IfStat a c t e)
        #:when (has-lifts? c)
        (define-values (ds ss n-c) (rw-expr c))
        (wrap ds ss (IfStat a n-c t e))]
-      [(CxxReturnOne a v)
+      [(ReturnStat a v)
        #:when (has-lifts? v)
        (define-values (ds ss n-v) (rw-expr v))
-       (wrap ds ss (CxxReturnOne a n-v))]
+       (wrap ds ss (ReturnStat a n-v))]
+      [(ExprStat a v)
+       #:when (has-lifts? v)
+       (define-values (ds ss n-v) (rw-expr v))
+       (wrap ds ss (ExprStat a n-v))]
       [_ ast]))
   
   (define rw-all-stats
@@ -588,7 +682,8 @@ C++ back end.
 (define a-noop (annoless SeqStat null))
 
 ;; A Φ value type, as in compiler literature. The `set` is a set of
-;; value numbers.
+;; value numbers. Each number is a symbol of the form 'vn* for an
+;; actual value, or 'nothing to indicate no value assignment.
 (struct Phi (set) #:transparent)
 
 ;; Sums together value numbers `xs`. Where `xs` are all the same
@@ -618,16 +713,14 @@ C++ back end.
     n-a)
   
   ;; Assigns value numbers to each "assignment", and adds potentials
-  ;; for removal to `to-examine`.
+  ;; for removal to `to-examine`. Note that a `DeclVar` has no value.
   (define assign-val-nums
     (topdown
      (lambda (ast)
        (match ast
-         [(Assign a lv rv)
+         [(AssignStat a lv rv)
           (define n-a (annos-add-val-num! a (Var-id lv) rv))
-          (Assign n-a lv rv)]
-         [(CxxDeclVar a id t)
-          ast] ;; has no value
+          (AssignStat n-a lv rv)]
          [(DefVar a id t rv)
           (define n-a (annos-add-val-num! a id rv))
           (DefVar n-a id t rv)]
@@ -636,7 +729,7 @@ C++ back end.
           (Param n-a id t)]
          [_ ast]))))
   
-  ;; Rewrite `def` to remove the assignment identified by
+  ;; Rewrites `def` to remove the assignment identified by
   ;; `examine-item`, or fails returning #f. Traverses `def` in
   ;; execution order in order to do data-flow analysis.
   (define (rw-by-item examine-item def)
@@ -646,6 +739,12 @@ C++ back end.
     (define tgt-id (second examine-item))
     (define tgt-bind (Id-bind tgt-id))
     (define tgt-rv (third examine-item))
+    
+    ;; For each Goto target (indexed by `bind` value), a sum of their
+    ;; bind->val assignments. All Gotos to a LabelDef will have been
+    ;; seen before we reach the LabelDef, and hence the set of
+    ;; assignments will be complete at that point.
+    (define label->bind->val (make-hasheq))
     
     (define (merge h1 h2)
       (define keys (list->mutable-seteq (hash-keys h1)))
@@ -659,7 +758,7 @@ C++ back end.
     (define (rw bind->val ast)
       ;;(writeln `(rw of ,ast))
       (match ast
-        [(Assign a lv rv)
+        [(AssignStat a lv rv)
          (define this-num (hash-ref a 'val-num))
          (assert (Var? lv))
          (define lv-id (Var-id lv))
@@ -672,14 +771,14 @@ C++ back end.
                    a-noop]
                   [else
                    (define n-rv (rw-discard bind->val rv)) 
-                   (and n-rv (Assign a lv n-rv))]))]
+                   (and n-rv (AssignStat a lv n-rv))]))]
         [(DefVar a id t rv)
          (define this-num (hash-ref a 'val-num))
          (define lv-bind (Id-bind id))
          (values (hash-set bind->val lv-bind this-num)
                  (cond
                   [(eq? this-num tgt-num)
-                   (CxxDeclVar a id t)]
+                   (DeclVar a id t)]
                   [else
                    (define n-rv (rw-discard bind->val rv))
                    (and n-rv (DefVar a id t n-rv))]))]
@@ -719,6 +818,21 @@ C++ back end.
                   ;; The target assignment is not in effect here.
                   (else
                    ast)))]
+        [(Goto _ id)
+         (define bind (Id-bind id))
+         (define lbl-vals 
+           (merge (hash-ref label->bind->val bind #hasheq()) bind->val))
+         (hash-set! label->bind->val bind lbl-vals)
+         (values bind->val ast)]
+        [(LabelDef _ id)
+         (define bind (Id-bind id))
+         (define lbl-vals 
+           (merge 
+            ;; any value assignments from Gotos to this label
+            (hash-ref label->bind->val bind #hasheq()) 
+            ;; the "fall-in" value assignments
+            bind->val))
+         (values lbl-vals ast)]
         [_
          (rw-all bind->val ast)]))
     
@@ -759,7 +873,7 @@ C++ back end.
   ((topdown
     (lambda (ast)
       (match ast
-        [(CxxDeclVar a id t)
+        [(DeclVar a id t)
          (define bind (Id-bind id))
          (if (set-member? refs bind)
              ast
@@ -787,9 +901,9 @@ C++ back end.
        (raise-assertion-error 
         'cxx-fun-optimize
         "assumed no LetStat")]
-      [(StatCont ss)
+      [(SeqCont ss)
        (define-values (n-st n-ss) (map/reverse/state g st ss))
-       (values n-st (StatCont-copy s n-ss))]
+       (values n-st (SeqCont-copy s n-ss))]
       [(IfStat a c t e)
        (define-values (st0 n-t) (g st t))
        (define-values (st1 n-e) (g st e))
@@ -797,13 +911,13 @@ C++ back end.
        ;; IfStat begin with the same label.
        (values (and st0 st1 (ast-identifier=? st0 st1) st0)
                (IfStat a c n-t n-e))]
-      [(CxxLabelDef a id) 
+      [(LabelDef a id) 
        ;;(writeln `(store ,id))
        (values id s)]
       [(Goto _ (? (lambda (id) (and st (ast-identifier=? st id)))))
        ;;(writeln `(delete ,s))
        (values st a-noop)]
-      [(CxxLabelDecl _ _)
+      [(LabelDecl _ _)
        (values st s)]
       [_ 
        (values #f s)]))
@@ -827,7 +941,7 @@ C++ back end.
     ((topdown
       (lambda (ast)
         (match ast
-          [(CxxLabel (? (lambda (id)
+          [(Label (? (lambda (id)
                           (define bind (Id-bind id))
                           (not (set-member? targets bind)))))
            a-noop]
@@ -838,14 +952,17 @@ C++ back end.
     (define s (CxxDefun-s ast))
     (set! s (stat-rm-goto-next s))
     (set! s (stat-rm-unused-labels s))
+    ;;(pretty-print `(,(CxxDefun-id ast) before ,s))
     (set! s (fun-propagate-copies s))
+    ;;(pretty-print `(,(CxxDefun-id ast) after ,s))
     (set! s (fun-rm-unreferenced-var-decl s))
     (set-CxxDefun-s ast s))
   
   (map (lambda (def)
          (if (CxxDefun? def)
              (defun-optimize def)
-             def)) def-lst))
+             def)) 
+       def-lst))
 
 ;;; 
 ;;; lifting of local functions
@@ -859,10 +976,10 @@ C++ back end.
     (topdown
      (lambda (ast)
        (cond
-        [(and (LetStat? ast) (Defun? (LetStat-def ast)))
-         (match-define (LetStat a b ss) ast)
+        [(and (LetExpr? ast) (Defun? (LetExpr-def ast)))
+         (match-define (LetExpr a b ss) ast)
          (do-Defun b)
-         (SeqStat a ss)]
+         (SeqExpr a ss)]
         [else
          ast]))))
   
@@ -876,12 +993,12 @@ C++ back end.
   
   (for ([(bind def) defs])
     (cond
-     ((Defun? def)
+     [(Defun? def)
       (when (ast-anno-maybe def 'top)
         (parameterize ((owner-id (Def-id def)))
-          (do-Defun def))))
-     (else
-      (hash-set! n-defs bind def))))
+          (do-Defun def)))]
+     [else
+      (hash-set! n-defs bind def)]))
   
   n-defs)
 
@@ -922,8 +1039,7 @@ C++ back end.
          [_
           ast]))))
   
-  (for/list ((ast lst))
-    (f ast)))
+  (map f lst))
   
 ;;; 
 ;;; driver routines
@@ -944,21 +1060,33 @@ C++ back end.
   (-> (listof symbol?) hash? path-string? (or/c #f output-port?)
       boolean? void?)
   (generate-cxx-file kinds defs path-stem out banner?)
-  ;;(pretty-print (defs-id->ast defs)) (exit)
+
   (define defs-t
     (defs-lift-locals defs))
+  
+  (define (pp-only obj)
+    (pretty-print obj)
+    obj)
+  
+  (define (pp-exit obj)
+    (pretty-print obj)
+    (exit))
+  
   (define def-lst
     (thread1->
      defs-t
      defs->cxx
      cxx-rm-LiftStatExpr
+     ;;pp-only
      cxx-fun-optimize
+     ;;pp-exit
      (curry map ast-rm-SeqStat)
      (curry types-to-cxx defs-t)
      cxx-rename
-     cxx-rm-CxxLabelDecl
+     cxx-rm-LabelDecl
      cxx-decl-sort
      cxx->pp))
+  
   (for ((kind kinds))
     (cond
      ((eq? kind 'cc)

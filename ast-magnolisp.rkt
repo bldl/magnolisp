@@ -15,7 +15,8 @@ Assumptions for AST node types:
          "app-util.rkt" "strategy.rkt"
          "util.rkt" "util/struct.rkt"
          racket/contract racket/dict racket/function racket/match
-         syntax/id-table)
+         syntax/id-table
+         (for-syntax racket/base racket/syntax))
 
 ;;; 
 ;;; abstract nodes
@@ -27,17 +28,50 @@ Assumptions for AST node types:
 (define-view* Def (#:fields id))
 (define-view* NameUse (#:fields id))
 (define-view* Stat ())
-(define-view* StatCont (#:fields ss))
+(define-view* SeqCont (#:fields ss))
 (define-view* If ([#:field c] [#:field t] [#:field e]))
-(define-view* CxxLabel (#:fields id))
+(define-view* Label (#:fields id))
 
-(define (get-type ast)
-  (hash-ref (Ast-annos ast) 'type #f))
+(define-syntax-rule*
+  (define-Ast-anno-accessors name get set)
+  (begin
+    (define (get ast)
+      (hash-ref (Ast-annos ast) 'name #f))
+    (define (set ast v)
+      (set-Ast-annos ast (hash-set (Ast-annos ast) 'name v)))))
+  
+(define-syntax-rule*
+  (define-Ast-anno-accessors* name get set)
+  (begin
+    (define-Ast-anno-accessors name get set)
+    (provide get set)))
 
-(define (set-type ast t)
-  (set-Ast-annos ast (hash-set (Ast-annos ast) 'type t)))
+(define-Ast-anno-accessors type get-type set-type)
 
 (define-view* Expr ([#:access type get-type set-type]))
+
+;; Either an Expr or a Stat, without any ad-hoc members.
+(define-view* ExprLike ([#:access type get-type set-type])
+  #:generics-options
+  (#:defaults ([Expr?
+                (define (ExprLike-type ast) (get-type ast))
+                (define (set-ExprLike-type ast t) (set-type ast t))
+                (define (ExprLike-copy ast t) (Expr-copy ast t))]
+               [Stat?
+                (define (ExprLike-type ast) the-Void-type)
+                (define (set-ExprLike-type ast t) (void))
+                (define (ExprLike-copy ast t) ast)])))
+
+(define* (ExprLike-set-type-from-annos ast annos)
+  (define t (hash-ref annos 'type #f))
+  (if (and t (not (AnyT? t)))
+      (set-ExprLike-type ast t)
+      ast))
+
+(define* (annos-with-type-from-ExprLike ast)
+  (define t (ExprLike-type ast))
+  (assert t)
+  (hasheq 'type t))
 
 ;;; 
 ;;; annotations
@@ -75,6 +109,9 @@ Assumptions for AST node types:
 
 (define* (ast-annotated ast typ . arg*)
   (apply typ (Ast-annos ast) arg*))
+
+(define* (annos-remove-type annos)
+  (hash-remove annos 'type))
 
 ;;; 
 ;;; original syntax, display, and reporting
@@ -147,7 +184,7 @@ Assumptions for AST node types:
 ;;; 
 
 (define (id-write v out mode)
-  (fprintf out "~a.~a" (Id-name v) (Id-bind v)))
+  (fprintf out "~a«~a»" (Id-name v) (Id-bind v)))
 
 ;; [name symbol?] is the name of the identifier. [bind symbol?] is
 ;; used for comparison with other identifiers, and solely determines
@@ -207,29 +244,32 @@ Assumptions for AST node types:
   (hash-set bind->def (Id-bind id) def))
 
 (define-with-contract*
-  (-> hash? procedure? void?)
-  (defs-for-each-def/Id defs f)
-  (for (((base def) (in-dict defs)))
-    (f def)))
-
-(define-with-contract*
-  (-> hash? procedure? hash?)
-  (defs-map-each-def/Id defs rw)
-  (for/dict
-   #hasheq()
-   (((base def) (in-dict defs)))
-   (values base (rw def))))
+  (-> procedure? hash? hash?)
+  (defs-map/bind rw defs)
+  (for/hasheq ([(bind def) (in-dict defs)])
+   (values bind (rw def))))
 
 ;;; 
 ;;; type expressions
 ;;; 
 
-(define-ast* AnyT (Ast Type) ((no-term annos)) #:singleton (#hasheq()))
+(define-ast* AnyT (Ast Type) 
+  ((no-term annos)) #:singleton (#hasheq()))
 
-(define-ast* VarT (Ast Type) ((no-term annos) (no-term sym)))
+(define-ast* VarT (Ast Type) 
+  ((no-term annos) (no-term sym)))
+
+;; Either type 't1' or 't2' (runtime determined).
+(define-ast* PhiT (Ast Type) 
+  ((no-term annos) (just-term t1) (just-term t2)))
+
+;; The type of a reified continuation.
+(define-ast* KontT (Ast Type)
+  ((no-term annos)) #:singleton (#hasheq()))
 
 ;; 'id' is an ID
-(define-ast* NameT (Ast Type NameUse) ((no-term annos) (no-term id)))
+(define-ast* NameT (Ast Type NameUse) 
+  ((no-term annos) (no-term id)))
 
 ;; 'ats' are the param types, and 'rt' is the return type
 (define-ast* FunT (Ast Type) ((no-term annos)
@@ -296,39 +336,52 @@ Assumptions for AST node types:
 ;;; 
 
 ;; For functions with no Magnolisp body.
-(define-ast* NoBody (Ast) ((no-term annos)) #:singleton (#hasheq()))
+(define-ast* NoBody (Ast) 
+  ((no-term annos)) #:singleton (#hasheq()))
 
 (define-ast* ForeignTypeExpr (Ast) ((no-term annos)))
 
 ;; 'def' contains a DefVar term. 'let-kind annotation has either
 ;; 'let-values or 'letrec-values or 'letrec-syntaxes+values; we mostly
 ;; do not care, since Racket has done name resolution.
-(define-ast* LetStat (Ast Stat StatCont) 
+(define-ast* LetStat (Ast Stat SeqCont) 
   ((no-term annos) (just-term def) (list-of-term ss)))
 
-;; We only allow a limited form of 'let' expressions. There is a
-;; 'let-kind annotation.
-(define-ast* LetExpr (Ast Expr) ((no-term annos) (just-term def) 
-                                 (just-term e)))
+;; There is a 'let-kind annotation.
+(define-ast* LetExpr (Ast Expr SeqCont) 
+  ((no-term annos) (just-term def) (list-of-term ss)))
 
 ;; Sequence of statements.
-(define-ast* CxxBlockStat (Ast Stat StatCont) 
+(define-ast* CxxBlockStat (Ast Stat SeqCont) 
   ((no-term annos) (list-of-term ss)))
 
 ;; Spliced sequence of statements.
-(define-ast* SeqStat (Ast Stat StatCont) 
+(define-ast* SeqStat (Ast Stat SeqCont) 
   ((no-term annos) (list-of-term ss)))
+
+;; Spliced sequence of expressions. Like `begin`.
+(define-ast* SeqExpr (Ast Expr SeqCont) 
+  ((no-term annos) (list-of-term ss)))
+
+;; A statement that does nothing.
+(define-ast* VoidStat (Ast Stat) ((no-term annos)))
+
+;; An expression of unit type (C++ only).
+(define-ast* VoidExpr (Ast Expr) ((no-term annos)))
 
 ;; Variable reference.
 (define-ast* Var (Ast Expr NameUse) ((no-term annos) (no-term id)))
 
 ;; Function value.
-(define-ast* Lambda (Ast Expr) ((no-term annos) (list-of-term params) 
-                                (just-term body)))
+(define-ast* Lambda (Ast Expr) 
+  ((no-term annos) (list-of-term params) (just-term body)))
 
-;; Assignment.
-(define-ast* Assign (Ast Stat) ((no-term annos) 
-                                (just-term lv) (just-term rv)))
+;; Assignment. Both expression and statement variants. In C++ it is an
+;; expression, and in Magnolisp it is a statement.
+(define-ast* AssignExpr (Ast Expr) 
+  ((no-term annos) (just-term lv) (just-term rv)))
+(define-ast* AssignStat (Ast Stat) 
+  ((no-term annos) (just-term lv) (just-term rv)))
 
 ;; If expression.
 (define-ast* IfExpr (Ast Expr If) ([no-term annos] [just-term c] 
@@ -343,32 +396,29 @@ Assumptions for AST node types:
 
 ;; Function application, with a function expression, and argument
 ;; expressions.
-(define-ast* Apply (Ast Expr) ((no-term annos) (just-term f) 
-                               (list-of-term args)))
+(define-ast* ApplyExpr (Ast Expr) ((no-term annos) (just-term f) 
+                                   (list-of-term args)))
+
+;; A statement that is just an expression with a discarded result.
+(define-ast* ExprStat (Ast Stat) 
+  ((no-term annos) (just-term e)))
 
 ;; Transient. Corresponds to a let/ec that only escapes to a local,
 ;; immediately surrounding call/cc continuation. 'k' is a label (an
 ;; ID) naming the continuation.
-(define-ast* LetLocalEc (Ast Expr) 
+(define-ast* LetLocalEc (Ast Expr SeqCont) 
   ((no-term annos) (just-term k) (list-of-term ss)))
 
 ;; Escapes to the named LetLocalEc continuation 'k' (an ID) with the
 ;; value given by expression 'e'.
-(define-ast* AppLocalEc (Ast Stat) ((no-term annos) (just-term k) 
-                                    (just-term e)))
+(define-ast* AppLocalEc (Ast Stat) 
+  ((no-term annos) (just-term k) (just-term e)))
 
-;; Label, either a binding or use context.
-(define-ast* Label (Ast Stat NameUse) ((no-term annos) (no-term id)))
-
-;; Block expression. Contains statements.
-(define-ast* BlockExpr (Ast Expr StatCont) 
-  ((no-term annos) (list-of-term ss)))
-
-;; Return statement. For now we only support single value returns. The
-;; semantics are to escape from a surrounding BlockExpr.
-(define-ast* Return (Ast Stat) ((no-term annos) (just-term e)))
-
-(define-ast* RacketExpr (Ast Expr) ((no-term annos)))
+;; A Racket expression. Should get dropped at some point during
+;; compilation as most back ends cannot handle it. Its type can also
+;; only be determined from context.
+(define-ast* RacketExpr (Ast Expr) 
+  ((no-term annos)))
 
 ;;; 
 ;;; C++
@@ -389,47 +439,88 @@ Assumptions for AST node types:
                               (no-term modifs) (just-term rtype)
                               (list-of-term params)))
 
-(define-ast* CxxReturnNone (Ast Stat) ((no-term annos)))
-
-(define-ast* CxxReturnOne (Ast Stat) ((no-term annos) (just-term e)))
+(define-ast* ReturnStat (Ast Stat) ((no-term annos) (just-term e)))
 
 (define-ast* PpCxxIfStat (Ast) ((no-term annos) (just-term c)
                                 (list-of-term ts) (list-of-term es)))
 
-(define-ast* CxxDeclVar (Ast Def) ((no-term annos) (no-term id)
-                                   (just-term t)))
+(define-ast* DeclVar (Ast Def) 
+  ((no-term annos) (no-term id) (just-term t)))
 
-;; A statement sequence `ss` to be lifted, such that the statements
-;; assign the result of the expression to the variable with Id `id`,
-;; which has yet to be declared. The result should always get
-;; assigned, at least if the lifted expression is ever to be
-;; evaluated.
-(define-ast* LiftStatExpr (Ast Expr StatCont) ((no-term annos)
-                                               (no-term id)
-                                               (list-of-term ss)))
+;; An expression whose value is given by variable `id`, and assigned
+;; to by the statement sequence `ss`, except where the expression has
+;; unit type. The variable will be automatically declared upon
+;; lifting, and the statements will be lifted to a suitable context.
+;; The result should always get assigned to by the statements, at
+;; least if the lifted expression is ever to be evaluated.
+(define-ast* LiftStatExpr (Ast Expr SeqCont) 
+  ((no-term annos) (no-term id) (list-of-term ss)))
 
 ;; Declares a label. `id` is the label Id; a node of this type
 ;; effectively binds it.
-(define-ast* CxxLabelDecl (Ast Stat CxxLabel) ((no-term annos) (no-term id)))
+(define-ast* LabelDecl (Ast Stat Label) 
+  ((no-term annos) (no-term id)))
 
 ;; Label for the following statements. Itself a statement.
-(define-ast* CxxLabelDef (Ast Stat CxxLabel) ((no-term annos) (no-term id)))
+(define-ast* LabelDef (Ast Stat Label) 
+  ((no-term annos) (no-term id)))
 
 ;; Where 'id' is a label Id. A statement.
-(define-ast* Goto (Ast Stat) ((no-term annos) (no-term id)))
+(define-ast* Goto (Ast Stat) 
+  ((no-term annos) (no-term id)))
 
 ;; Top-level verbatim string.
-(define-ast* TlVerbatim (Ast) ((no-term annos) (no-term s)))
+(define-ast* TlVerbatim (Ast) 
+  ((no-term annos) (no-term s)))
 
 ;;; 
-;;; prelude
+;;; built-in types
 ;;; 
 
-;; A built-in identifier. By convention any built-ins get the "bare"
-;; bind value, i.e. the same symbol as the name.
+(define ((make-NameT-pred id) ast)
+  (matches? ast (NameT _ (? (lambda (x) (ast-identifier=? x id))))))
+
+;; By convention any built-ins get the "bare" bind value, i.e. the
+;; same symbol as the name.
+(define-syntax (define-builtin-type* stx)
+  (syntax-case stx ()
+    ((_ name)
+     (let ((sym (syntax->datum #'name)))
+       (with-syntax ((the-id (format-id stx "the-~a-id" sym))
+                     (the-type (format-id stx "the-~a-type" sym))
+                     (type? (format-id stx "~a-type?" sym)))
+         #'(begin
+             (define* the-id (annoless Id 'name 'name))
+             (define* the-type (annoless NameT the-id))
+             (define* type? (make-NameT-pred the-id))))))))
+
+;; The unit type.
+(define-builtin-type* Void)
+
+;; The boolean type.
 (define* the-bool-id (annoless Id 'bool 'bool))
-
 (define* the-bool-type (annoless NameT the-bool-id))
+
+(define* builtin-type-id-lst
+  (list the-bool-id the-Void-id))
+
+(define* a-VoidExpr (VoidExpr (hasheq 'type the-Void-type)))
+
+;;; 
+;;; annotation merging
+;;; 
+
+;; Later annotations in `hs` are of increasing significance. Any 'type
+;; annotations are treated specially.
+(define* (merge-annos . hs)
+  (for/fold ((r #hasheq())) ((h hs))
+    (for (((k v) h))
+      (cond
+       ((and (eq? 'type k) (hash-has-key? r k) (AnyT? v))
+        (void))
+       (else
+        (set! r (hash-set r k v)))))
+    r))
 
 ;;; 
 ;;; Id replacing AST rewrite
@@ -459,9 +550,6 @@ Assumptions for AST node types:
          ((NameT a id)
           (define id-ast (rw-id id))
           (NameT a id-ast))
-         ((Label a id)
-          (define id-ast (rw-id id))
-          (Label a id-ast))
          (else
           (ast-rw-annos ast))))))
 

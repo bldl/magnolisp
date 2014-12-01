@@ -98,6 +98,19 @@
        (raise-assertion-error
         'cond-or-fail "no matching 'cond' clause")))]))
 
+(define-syntax* case-or-fail
+  (syntax-rules (else)
+    [(_ val-expr clause ... (else body ...))
+     (case val-expr clause ... (else body ...))]
+    [(_ val-expr clause ...)
+     (let ((v val-expr))
+       (case v
+         clause ...
+         (else
+          (raise-assertion-error
+           'case-or-fail 
+           "no matching 'case' clause for ~s" v))))]))
+
 (define* (hash-merge! h . others)
   (for ((other others))
     (for (([k v] other))
@@ -120,6 +133,19 @@
   (for ((p assocs))
     (set! h (hash-set h (car p) (cdr p))))
   h)
+
+(define* (list-map-last f lst)
+  (when (null? lst)
+    (error 'list-map-last "expected non-empty list"))
+  (define r '())
+  (let loop ((h (car lst))
+             (t (cdr lst)))
+    (if (null? t)
+        (set! r (cons (f h) r))
+        (begin
+          (set! r (cons h r))
+          (loop (car t) (cdr t)))))
+  (reverse r))
 
 (require (for-syntax syntax/for-body))
 

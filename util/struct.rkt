@@ -1,8 +1,5 @@
 #lang racket/base
 
-#|
-|#
-
 (provide struct-type-of
          struct-make-constructor
          struct-symbol)
@@ -22,6 +19,24 @@
 ;;; 
 ;;; dynamic-struct-copy
 ;;; 
+
+#|
+
+`dynamic-struct-copy` only works for #:transparent structures, and is
+probably horribly inefficient. Better to use generics in serious code,
+so that the generics is defined automatically when declaring a
+copyable struct.
+
+For example:
+> (struct A (a b) #:transparent)
+> (struct C A (c) #:transparent)
+> (struct D A (d) #:transparent)
+> (dynamic-struct-copy A (C 1 2 3) [b 5])
+(C 1 5 3)
+> (dynamic-struct-copy A (D 1 2 3) [b 5])
+(D 1 5 3)
+
+|#
 
 (provide dynamic-struct-copy)
 
@@ -44,7 +59,7 @@
 
 ;; 'e' must be an expression of structure. Say it is of type T. Then
 ;; the result expression will also have type T. Only fields of the
-;; base structure type 'n' can be replaced. Any non-replaced fields
+;; base structure type 'bt' can be replaced. Any non-replaced fields
 ;; retain their values. We do not yet support #:parent, as for
 ;; 'struct-copy'.
 (define-syntax (dynamic-struct-copy stx)

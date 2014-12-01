@@ -140,6 +140,13 @@ enough to be easily analyzable, and compilable to C++.
 (define-syntax-parameter* return
   (syntax-rules ()))
 
+(define-syntax (magnolisp-nothing stx)
+  (syntax-case stx ()
+    ((_ form)
+     (syntax-property
+      #'form
+      'magnolisp-nothing #t))))
+
 (define-syntax-rule*
   (do body ...)
   (let/local-ec k
@@ -148,7 +155,7 @@ enough to be easily analyzable, and compilable to C++.
        (syntax-rules ()
          [(_ v) (apply/local-ec k v)])])
      body ...
-     (values))))
+     (magnolisp-nothing (values)))))
 
 (define-syntax* (begin-racket stx)
   (syntax-case stx ()

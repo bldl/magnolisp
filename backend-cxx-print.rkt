@@ -75,7 +75,7 @@
        [format-type . produces . type]
        [format-expr . produces . expr])
      (list type " " ident " = " expr ";"))
-    ((CxxDeclVar _ [format-ident . produces . ident]
+    ((DeclVar _ [format-ident . produces . ident]
        [format-type . produces . type])
      (list type " " ident ";"))
     ((PpCxxIfStat _ [format-expr . produces . test] ts es)
@@ -85,14 +85,18 @@
              `(,(if (null? ts) 'br " ")
                "else"
                ,(format-sub-stats es)))))
-    ((CxxReturnOne _ [format-expr . produces . expr])
+    ((ReturnStat _ [format-expr . produces . expr])
      (list "return " expr ";"))
-    ((Assign _ [format-expr . produces . x] [format-expr . produces . v])
+    ((ReturnStat _ (? VoidStat?))
+     (list "return;"))
+    ((AssignStat _ [format-expr . produces . x] [format-expr . produces . v])
      (list x " = " v ";"))
     ((Goto _ name)
      (string-append "goto " (format-ident name) ";"))
-    ((CxxLabelDef _ name)
+    ((LabelDef _ name)
      (string-append (format-ident name) ":"))
+    ((ExprStat _ [format-expr . produces . expr])
+     (list expr ";"))
     (else (ew-error 'format-stat "could not format" else))))
 
 (define (format-expr expr)
@@ -100,7 +104,7 @@
     ((IfExpr _ [format-expr . produces . test]
              [format-expr . produces . conseq]
              [format-expr . produces . alt])
-     (list "(" test ") ? (" conseq ") : (" alt ")"))
+     (list "(" test " ? " conseq " : " alt ")"))
     ((Var _ var) (symbol->string var))
     ((Literal _ (? number? n))
      (number->string n))
@@ -108,8 +112,15 @@
      (if (not b) "false" "true"))
     ((Literal _ (? string? s))
      (string-append "\"" (escape-string-literal s) "\""))
-    ((Apply _ f [format-args . produces . args])
+    ((ApplyExpr _ f [format-args . produces . args])
      (list (format-expr f) "(" `(in (gr ,args)) ")"))
+    ((AssignExpr _ [format-expr . produces . x] [format-expr . produces . v])
+     (list "(" x " = " v ")"))
+    ((SeqExpr _ es)
+     (define xs (add-between (map format-expr es) '("," sp)))
+     (list "(" `(in (gr ,xs)) ")"))
+    ((VoidExpr _)
+     "(void)0")
     (else (ew-error 'format-expr "could not format" else))))
 
 (require (only-in rnrs/base-6 string-for-each))
