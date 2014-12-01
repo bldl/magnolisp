@@ -345,10 +345,6 @@
     (kernel-syntax-case*/phase stx 0 (call/ec values void #%magnolisp)
 
       (_
-       (syntax-property stx 'magnolisp-nothing)
-       (syntaxed stx SeqExpr '()))
-      
-      (_
        (syntax-property stx 'in-racket)
        (syntaxed stx RacketExpr))
       
