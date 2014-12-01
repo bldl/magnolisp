@@ -498,11 +498,11 @@ Assumptions for AST node types:
 (define-builtin-type* Void)
 
 ;; The boolean type.
-(define* the-bool-id (annoless Id 'bool 'bool))
-(define* the-bool-type (annoless NameT the-bool-id))
+(define* the-Bool-id (annoless Id 'Bool 'Bool))
+(define* the-Bool-type (annoless NameT the-Bool-id))
 
 (define* builtin-type-id-lst
-  (list the-bool-id the-Void-id))
+  (list the-Bool-id the-Void-id))
 
 (define* a-VoidExpr (VoidExpr (hasheq 'type the-Void-type)))
 

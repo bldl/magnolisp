@@ -14,7 +14,7 @@
   (add1 x))
 
 (function (holds? x) ;; whether x > 5
-  (#:annos (type (fn int bool)) foreign)
+  (#:annos (type (fn int Bool)) foreign)
   (begin-racket 1 (begin 2 (cmp (inc2 x) (inc (five))))))
 
 (function (f x)

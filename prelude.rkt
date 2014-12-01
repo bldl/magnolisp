@@ -8,7 +8,7 @@ A library of built-in types and functions in Magnolisp.
 
 (require (for-syntax racket/base) "surface.rkt")
 
-(provide bool Void)
+(provide Bool Void)
 
-(typedef bool (#:annos [foreign bool]))
+(typedef Bool (#:annos [foreign bool]))
 (typedef Void (#:annos [foreign void]))

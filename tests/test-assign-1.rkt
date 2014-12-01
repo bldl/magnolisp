@@ -3,11 +3,11 @@
 (typedef int (#:annos foreign))
 
 (function (holds? x)
-  (#:annos (type (fn int bool)) foreign)
+  (#:annos (type (fn int Bool)) foreign)
   #f)
 
 (function (f x)
-  (#:annos export (type (fn int bool)))
+  (#:annos export (type (fn int Bool)))
   (do
     (var y (holds? x))
     (let ((x #t))

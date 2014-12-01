@@ -5,7 +5,7 @@
 (function (add x y) (#:annos foreign [type (fn int int int)])
   (+ x y))
 
-(function (holds? x) (#:annos foreign [type (fn int bool)])
+(function (holds? x) (#:annos foreign [type (fn int Bool)])
   (= x 1))
 
 (function (main3 x) (#:annos export [type (fn int int)])

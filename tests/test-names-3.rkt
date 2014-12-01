@@ -5,7 +5,7 @@
 (typedef int (#:annos foreign))
 
 (function (equal? x y)
-  (#:annos (type (fn int int bool)) foreign)
+  (#:annos (type (fn int int Bool)) foreign)
   (begin-racket
    (local-require (only-in racket/base equal?))
    (equal? x y)))

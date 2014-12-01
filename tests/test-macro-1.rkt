@@ -3,7 +3,7 @@
 (typedef int (#:annos foreign))
 
 (function (equal x y)
-  (#:annos (type (fn int int bool)) foreign)
+  (#:annos (type (fn int int Bool)) foreign)
   (equal? x y))
 
 (function (compute x)

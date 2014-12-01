@@ -9,7 +9,7 @@ A local macro.
 (typedef int (#:annos foreign))
 
 (function (holds? x)
-  (#:annos (type (fn int bool)) foreign)
+  (#:annos (type (fn int Bool)) foreign)
   (= x 1))
 
 (function (f x) #an(export ^(fn int int))

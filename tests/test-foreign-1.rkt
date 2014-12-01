@@ -5,7 +5,7 @@
 (begin-racket 1 2 3 (void))
 
 (function (holds? x)
-  (#:annos [type (fn int bool)] foreign)
+  (#:annos [type (fn int Bool)] foreign)
   (begin-racket (begin 1 #f)))
 
 (function (f x)

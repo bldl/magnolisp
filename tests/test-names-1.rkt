@@ -6,10 +6,10 @@
  (require (only-in racket/base [equal? r.equal?])))
 
 (function (equal? x y)
-  (#:annos (type (fn int int bool)) foreign)
+  (#:annos (type (fn int int Bool)) foreign)
   (begin-racket (r.equal? x y)))
 
-(function (f x y) (#:annos export (type (fn int int bool)))
+(function (f x y) (#:annos export (type (fn int int Bool)))
   (equal? x y))
 
 (f 1 1)

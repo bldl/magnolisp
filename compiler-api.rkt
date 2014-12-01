@@ -344,7 +344,7 @@ optimization.
        (match ast
          ((Literal a (? boolean? d))
           #:when (not (Expr-type ast))
-          (set-Expr-type ast the-bool-type))
+          (set-Expr-type ast the-Bool-type))
          (_ ast)))))
   (rw ast))
 

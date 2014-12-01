@@ -9,7 +9,7 @@
     ...))
 
 (declare-List-op 
- [empty? bool]
+ [empty? Bool]
  [head Elem]
  [tail List])
 

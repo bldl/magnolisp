@@ -2,7 +2,7 @@
 
 (typedef int (#:annos foreign))
 
-(function (holds? x) (#:annos foreign [type (fn int bool)])
+(function (holds? x) (#:annos foreign [type (fn int Bool)])
   (> x 0))
 
 (function (f x y)
