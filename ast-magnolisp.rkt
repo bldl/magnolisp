@@ -73,6 +73,10 @@ Assumptions for AST node types:
   (assert t)
   (hasheq 'type t))
 
+(define* (Expr-typed? ast)
+  (define t (Expr-type ast))
+  (and t (not (AnyT? t))))
+
 ;;; 
 ;;; annotations
 ;;; 

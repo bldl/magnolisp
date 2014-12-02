@@ -988,7 +988,7 @@ C++ back end.
     (define oid (owner-id))
     (unless (ast-identifier=? id oid)
       (set! a (hash-set a 'owner-id oid)))
-    (set! b (ast-simplify (rw-body b)))
+    (set! b (ast-splice-SeqExpr (rw-body b)))
     (hash-set! n-defs (Id-bind id) (Defun a id t ps b)))
   
   (for ([(bind def) defs])

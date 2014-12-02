@@ -243,6 +243,27 @@
     (ast-splice-SeqExpr
      (dead->SeqExpr in-ast)))))
 
+(define* (ast-trim-dead-constants ast)
+  (define dead?
+    (lambda (e)
+      (or (Literal? e)
+          (RacketExpr? e)
+          (VoidStat? e)
+          (and (Var? e) (not (Expr-typed? e))))))
+  
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         [(SeqCont (list es ... e))
+          #:when (ormap dead? es)
+          (define n-es (filter (negate dead?) es))
+          (set-SeqCont-ss ast (append n-es (list e)))]
+         [else
+          ast]))))
+  
+  (rw (ast-splice-SeqExpr ast)))
+
 ;;; 
 ;;; simplification
 ;;; 
@@ -382,7 +403,7 @@
         [else
          #f])))))
        
-(define ast-simplify-multi-innermost
+(define* ast-simplify-multi-innermost
   (innermost
    (match-lambda
     [(LetLocalEc _ (Var _ k1) (list (AppLocalEc _ (Var _ k2) e)))
@@ -392,12 +413,6 @@
      #:when (equal? t e)
      (SeqExpr a (list c t))]
     [else #f])))
-
-(define* ast-simplify
-  (compose1->
-   ast-splice-SeqExpr
-   ast-simplify-multi-innermost
-   ))
 
 ;;; 
 ;;; AST dumping
