@@ -147,8 +147,7 @@ enough to be easily analyzable, and compilable to C++.
      ([return
        (syntax-rules ()
          [(_ v) (apply/local-ec k v)])])
-     body ...
-     (values))))
+     body ...)))
 
 (define-syntax* (begin-racket stx)
   (syntax-case stx ()
