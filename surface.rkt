@@ -51,7 +51,7 @@ enough to be easily analyzable, and compilable to C++.
     [(_ x ...)
      #`(CORE 'anno 'build (quote-syntax #,stx))]))
 
-(define-syntax* (let/annotate stx)
+(define-syntax* (let-annotate stx)
   (syntax-case stx ()
     [(_ (a ...) e)
      (syntax-property 
@@ -63,7 +63,7 @@ enough to be easily analyzable, and compilable to C++.
 ;; annotations are stored as expressions in a `let` wrapper.
 (define-syntax-rule*
   (anno a ... e)
-  (let/annotate (a ...) e))
+  (let-annotate (a ...) e))
 
 (define-for-syntax (decl-for-id id)
   (with-syntax ([impl-id (format-id id "~a-impl" (syntax-e id))]
@@ -91,7 +91,7 @@ enough to be easily analyzable, and compilable to C++.
      (function-impl (f p ...) (a ...) (void))]
     [(_ (f p ...) (a ...) b)
      (define f 
-       (let/annotate (a ...)
+       (let-annotate (a ...)
          (#%plain-lambda (p ...) b)))]))
     
 (define-annos-wrapper* function)
@@ -100,25 +100,25 @@ enough to be easily analyzable, and compilable to C++.
   (syntax-rules ()
     [(_ n (a ...) v)
      (define n
-       (let/annotate (a ...)
+       (let-annotate (a ...)
          v))]))
 
 (define-annos-wrapper* var)
 
 (define-syntax-rule
   (let-var-impl n (a ...) v b ...)
-  (let ([n (let/annotate (a ...) v)])
+  (let ([n (let-annotate (a ...) v)])
     b ...))
 
 (define-annos-wrapper* let-var)
 
 (define-syntax-rule*
   (cast t d)
-  (let/annotate ([type t]) d))
+  (let-annotate ([type t]) d))
 
 (define-syntax-rule (typedef-impl t (a ...))
   (define t 
-    (let/annotate (a ...)
+    (let-annotate (a ...)
       (CORE 'foreign-type))))
 
 (define-annos-wrapper* typedef)

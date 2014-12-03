@@ -86,14 +86,14 @@ For example:
 }
 
 @defform[(let-var id maybe-annos val-expr body)]{
-A shorthand for declaring a single, annotated, locally scoped variable. The variable @racket[id] with the initial value given by @racket[val-expr] is only in the scope of the @racket[body] expression. This form is equivalent to @racket[(let ((id (let/annotate (_anno-expr ...) val-expr))) body)].
+A shorthand for declaring a single, annotated, locally scoped variable. The variable @racket[id] with the initial value given by @racket[val-expr] is only in the scope of the @racket[body] expression. This form is equivalent to @racket[(let ((id (let-annotate (_anno-expr ...) val-expr))) body)].
 
 For example:
 @(interaction #:eval the-eval
   (let-var x (#:annos [type int]) 5
     (add1 x)))
 
-Where one uses other variants of @racketidfont{let}, it is still possible to specify annotations for the bindings with @racket[let/annotate].}
+Where one uses other variants of @racketidfont{let}, it is still possible to specify annotations for the bindings with @racket[let-annotate].}
 
 @subsection{Annotations}
 
@@ -116,7 +116,7 @@ The set of annotations that may be used in Magnolisp is open ended, to allow for
 
 It is not always necessary to explicitly specify a @racket[type] for a typed Magnolisp definition, as the Magnolisp compiler does whole-program type inference (in Hindley-Milner style). When evaluating as Racket, @racket[type] annotations are not used at all.
 
-For convenience, the @racketmodname[magnolisp] language installs a reader extension that supports annotation related shorthands: @litchar{#an}@racket[(_anno-expr ...)] is short for @racket[(#:annos _anno-expr ...)]; @litchar{#ap}@racket[(_anno-expr ...) _expr] is short for @racket[(let/annotate (_anno-expr ...) _expr)]; and @litchar{^}@racket[_type-expr] is short for @racket[(type _type-expr)]. For example, @litchar{#an}(@litchar{^}@racketidfont{int}) reads as @racket[(#:annos (type int))].
+For convenience, the @racketmodname[magnolisp] language installs a reader extension that supports annotation related shorthands: @litchar{#an}@racket[(_anno-expr ...)] is short for @racket[(#:annos _anno-expr ...)]; @litchar{#ap}@racket[(_anno-expr ...) _expr] is short for @racket[(let-annotate (_anno-expr ...) _expr)]; and @litchar{^}@racket[_type-expr] is short for @racket[(type _type-expr)]. For example, @litchar{#an}(@litchar{^}@racketidfont{int}) reads as @racket[(#:annos (type int))].
 
 @deftogether[(
 @defform[(foreign C++-id)]
@@ -142,14 +142,14 @@ For example:
 
 While generally only declarations require annotations, @racket[cast] demonstrates a specific case where it is useful to associate annotations with expressions.}
 
-@defform[(let/annotate (anno-expr ...) expr)]{
+@defform[(let-annotate (anno-expr ...) expr)]{
 Explicitly annotates the expression @racket[expr] with the specified annotations. May be used to specify annotations for an identifier that is bound using the regular Racket binding forms such as @racket[define], @racket[let], @etc
 
 For example:
 @(interaction #:eval the-eval
-  (define x (let/annotate ([type int]) 5))
+  (define x (let-annotate ([type int]) 5))
   x
-  (let ([x (let/annotate ([type int]) 6)])
+  (let ([x (let-annotate ([type int]) 6)])
     x))
 }
 
@@ -294,7 +294,7 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
 [Racket-expr #,(rkt-nt expr)]
 [in-racket-form #,(flagged in-racket (racket _Racket-form))]
 [mgl-expr #,(ign-nt in-racket-form)
-	  (begin mgl-expr ...)
+	  (begin mgl-expr ...+)
           (#%expression mgl-expr)
           (#%plain-lambda (id ...) mgl-expr)
 	  (if #,(ign-nt Racket-expr) 
@@ -328,7 +328,7 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
       [() mgl-expr]
       [(id) mgl-expr]]
 [local-ec-block (#,(sub-flag local-ec) #%plain-app #,(indirect-id call/ec) 
-                (#%plain-lambda (id) mgl-expr ...))]
+                (#%plain-lambda (id) mgl-expr ...+))]
 [local-ec-jump #,(flagged local-ec (racket (#%plain-app id-expr mgl-expr)))]
 [id-expr id (#%top . id) (#%expression id-expr)]
 [mgl-anno-expr #,(harnessed anno-expr)]
