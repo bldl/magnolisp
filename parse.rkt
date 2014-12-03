@@ -333,14 +333,7 @@
         #f "illegal syntax at module level" stx
         #:fields `(("binding"
                     ,(or (stx-binding-info stx) 'unbound)))))))
-  
-  (define (parse-multi-expr stx)
-    (kernel-syntax-case*/phase stx 0 (values)
-      ((#%plain-app values . exprs)
-       (map parse-expr (syntax->list #'exprs)))
-      (_
-       (list (parse-expr stx)))))
-  
+    
   (define (parse-expr stx)
     (kernel-syntax-case*/phase stx 0 (call/ec values void #%magnolisp)
 

@@ -13,7 +13,7 @@
 
 This is @deftech{Magnolisp}, a small, experimental language and implementation. It is experimental in its implementation technique, which is to replace the phase level 0 (runtime) language of @link["http://racket-lang.org/"]{Racket} with something non-Racket (here: Magnolisp), and translate it into another language (here: C++) for execution.
 
-Magnolisp is an amalgamation of Racket and the likewise experimental programming language @link["http://magnolia-lang.org/"]{Magnolia}. Its algebraic language is inspired by Magnolia (or a subset thereof), but adapted for a more natural fit with Racket. Racket provides the module and macro systems. Magnolia is a good fit for C++ translation as it is designed for natural and efficient mapping to most mainstream languages.
+Magnolisp is inspired by Racket and the likewise experimental programming language @link["http://magnolia-lang.org/"]{Magnolia}. Its algebraic language resembles Racket's, and Racket also provides the module and macro systems. The language is restricted in ways similar to Magnolia, with the restrictions designed to support static reasoning about code, and to allow for fairly direct mapping to most mainstream languages.
 
 Magnolisp is intended to explore and demonstrate techniques for source-to-source compilation on top of Racket, not to support writing of useful applications.
 
@@ -45,7 +45,7 @@ As Magnolisp has almost no standard library, it is ultimately necessary to defin
               ([maybe-body code:blank expr])]{
 Declares a function. The (optional) body of a function is a single expression, which must produce a single value.
 
-Unlike in Racket, no @emph{tail-call optimization} may be assumed even when a recursive function application appears in @emph{tail position}.
+Unlike in Racket, no tail-call elimination may be assumed even when a recursive function application appears in @emph{tail position}.
 
 Providing a body is optional in the case where the function is declared as @racket[foreign], in which case the compiler will ignore any body @racket[expr]. When a function without a body is invoked as Racket, the result is @|void-const|. When a @racket[foreign] function with a body is invoked as Racket, the body may be implemented in full Racket, typically to ``simulate'' the behavior of the C++ implementation. To implement a function body in Racket syntax instead of Magnolisp syntax, enclose the body expression within a @racket[begin-racket] form.
 
@@ -86,7 +86,7 @@ For example:
 }
 
 @defform[(let-var id maybe-annos val-expr body)]{
-A shorthand for declaring a single, annotated, locally scoped variable. The variable @racket[id] with the initial value given by @racket[val-expr] is only in the scope of the @racket[body] expression. Where no annotations are given, this form is equivalent to @racket[(let ((id val-expr)) body)]. With or without annotations, this form is semantically equivalent to the expression @racket[(do (var id maybe-annos val-expr) (return body))], provided that @racket[id] does not appear in @racket[val-expr].
+A shorthand for declaring a single, annotated, locally scoped variable. The variable @racket[id] with the initial value given by @racket[val-expr] is only in the scope of the @racket[body] expression. This form is equivalent to @racket[(let ((id (let/annotate (_anno-expr ...) val-expr))) body)].
 
 For example:
 @(interaction #:eval the-eval
@@ -162,54 +162,57 @@ For example:
 [type-expr type-id fn-type-expr]
 [fn-type-expr (fn type-expr ... type-expr)]]
 
-Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined type in Magnolisp is @racket[Bool], and any others must be declared using @racket[typedef].
+Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined types in Magnolisp are @racket[Void] and @racket[Bool], and any others must be declared using @racket[typedef].
 
 @defform[(fn type-expr ... type-expr)]{
-A function type expression, containing type expressions for arguments and the return value, in that order. A Magnolisp function always returns a single value.}
+A function type expression, containing type expressions the function's arguments and its return value, in that order. A Magnolisp function always returns a single value.}
 
 @subsection{Statements and Expressions}
 
 @(declare-exporting magnolisp/surface)
 
-Unlike Racket, the Magnolisp language makes a distinction between statements and expressions. Although Magnolisp supports @emph{some} of the Racket language, a given Racket construct must typically appear only in a specific context (either statement or expression context).
+Like Racket (and unlike C++), the Magnolisp language makes no distinction between statements and expressions. Some expressions yield no useful value, however; such expressions conceptually produce a result of type @racket[Void] (such result values do exist at Racket run time, but not at C++ run time). Some expressions yield @emph{no} values (or @emph{multiple} values), but are merely used as a syntactic device, and only allowed to appear in certain contexts.
 
-In Magnolisp, an @racket[if] form is either a statement or expression, depending on context. That is, depending on context the form is either @racket[(if _test-expr _then-expr _else-expr)] or @racket[(if _test-expr _then-stat _else-stat)]. The @racket[when] and @racket[unless] forms are always statements, and contain statements in their body. The @racket[_test-expr] conditional expression must always be of type @racket[Bool], and whether it holds depends on the ``truthiness'' of its value, as interpreted in C++ or Racket (as applicable).
+Magnolisp borrows a number of constructs from Racket (or Scheme). For example, there is a conditional form @racket[(if _test-expr _then-expr _else-expr)], as well as the derived forms @racket[(when _test-expr _then-expr ...+)] and @racket[(unless _test-expr _then-expr ...+)]. The @racket[_test-expr] conditional expression must always be of type @racket[Bool], and whether it holds depends on the ``truthiness'' of its value, as interpreted in C++ or Racket (as applicable). The branches of an @racket[if] must generally be of the same type, except where the result of the @racket[if] form is discarded. The @racket[when] and @racket[unless] can generally only appear in such result-discarding contexts, as they have an implicit ``else'' branch of type @racket[Void].
 
-A @racket[(begin _stat ...)] form, in Magnolisp, signifies a sequence of statements, itself constituting a statement. Similarly to Racket, to allow declarations to appear within a statement sequence, @racket[(let () _stat ...)] should be used instead.
+A @racket[(begin _body _...)] form, in Magnolisp, signifies a sequence of expressions, itself constituting an expression. Similarly to Racket, to allow declarations to appear within an expression sequence, @racket[(let () _body _...)] should be used instead.
 
-The @racket[(let ([_id _expr] ...) _body ...+)], @racket[(let* ([_id _expr] ...) _body ...+)], and @racket[(letrec ([_id _expr] ...) _body ...+)] forms are statements in Magnolisp, and the @racket[_body]s must likewise be statements. The named variant of @racket[let] is not supported. A limited form of @racketidfont{let} is supported in expression context---see @racket[let-var].
+The @racket[(let ([_id _expr] _...) _body ...+)], @racket[(let* ([_id _expr] _...) _body ...+)], and @racket[(letrec ([_id _expr] _...) _body ...+)] forms are also available in Magnolisp, but the named variant of @racket[let] is not supported.
 
-The @racket[(set! _id _expr)] form is an assignment statement in Magnolisp.
+The @racket[(set! _id _expr)] form is likewise available in Magnolisp, supporting assignment to variables.
 The left-hand side expression @racket[_id] must be a reference to a bound variable.
 (The @racket[_id] may naturally instead be a transformer binding to an assignment transformer, in which case the form is macro transformed as normal.)
 
-In Magnolisp, @racket[(void)] signifies a statement with no effect. Unlike in Racket, arguments are not allowed. The @racket[(values)] form likewise signifies a statement with no effect, when it appears in a statement position. The two differ only when evaluating as Racket, as the former may only appear in a 1-value context, and the latter in a 0-value context.
+In Magnolisp, @racket[(void _expr _...)] is an expression with no useful result (the result is of the unit type @racket[Void]). Any arguments to @racket[void] are evaluated as usual, but they are not used. The @racket[(values)] form signifies ``nothing,'' and has no result; hence it is an error for @racket[(values)] to appear in a position where the context expects a result. In result expecting contexts, the former may only appear in a 1-value context, and the latter in a 0-value context (there are few in Magnolisp).
 
-The @racket[var], @racket[function], and @racket[typedef] declaration forms may appear in a statement position, provided the position is within a Racket @emph{internal-definition context} (and not Racket @emph{expression context}). The same is true of @racketidfont{define} forms that conform to the restricted syntax supported by the Magnolisp compiler.
+The @racket[var], @racket[function], and @racket[typedef] declaration forms may appear in a Racket @emph{internal-definition context} (and not Racket @emph{expression context}). The same is true of @racketidfont{define} forms that conform to the restricted syntax supported by the Magnolisp compiler.
 
-@defform[(do stat ...)]{
-An @deftech{expression block} containing a sequence of statements. As the term implies, an expression block is an expression, despite containing statements. The block must produce a single value by @racket[return]ing it. Control must not reach the end of a block expression---the @racket[return] statement must be invoked somewhere before control ``falls out'' of the block. The returned value becomes the value of the containing @racket[do] expression.
+@defform[(do expr ...)]{
+An @deftech{expression block} containing a sequence of expressions. As the term implies, an expression block is itself an expression. The block must produce a single value by @racket[return]ing it, or by letting it ``fall out'' of the block. The returned or fallen-out value becomes the value of the containing @racket[do] expression. All value giving expressions in a block must be of the same type.
 
 For example:
 @(interaction #:eval the-eval
-  (do (void)
-      (return 1)
-      (return 2)))
+  (do (when #t
+        (return (five)))
+      (seven)))
 }
 
 @defform[(return expr)]{
-A statement that causes any enclosing @racket[do] block (which must exist) to yield the value of the expression @racket[expr].}
+An expression that causes any enclosing @racket[do] block (which must exist) to yield the value of the expression @racket[expr].}
 
-@subsection{Boolean Expressions}
+@subsection{Standard Library}
 
 @(defmodule magnolisp/prelude)
 
-A boolean expression is simply an expression of type @racket[Bool], which is the only predefined type in Magnolisp.
+A boolean expression is simply an expression of type @racket[Bool], which is one of the two predefined types in Magnolisp. The other one is @racket[Void], which is Magnolisp's unit type (whose values carry no information).
 
-The @racket[Bool] type is defined by the @racketmodname[magnolisp/prelude] module, which serves as the runtime library of Magnolisp. The @racketmodname[magnolisp/prelude] names are bound for phase level 0 in the @racketmodname[magnolisp] language.
+The @racket[Bool] and @racket[Void] types are defined by the @racketmodname[magnolisp/prelude] module, which serves as the runtime library of Magnolisp. The @racketmodname[magnolisp/prelude] names are bound for phase level 0 in the @racketmodname[magnolisp] language.
 
 @defthing[#:kind "type" Bool any/c]{
-A predefined type. The literals of this type are @racket[#t] and @racket[#f]. All conditional expressions in Magnolisp are of this type. The corresponding C++ type is @racketidfont{bool}, and the corresponding constant values are @racketidfont{true} and @racketidfont{false}, respectively.}
+A predefined type. The literals of this type are @racket[#t] and @racket[#f]. All conditional expressions in Magnolisp are of this type. The corresponding C++ type is @racketidfont{bool}, and the corresponding C++ constant values are @racketidfont{true} and @racketidfont{false}, respectively.}
+
+@defthing[#:kind "type" Void any/c]{
+A predefined type. There are no literals for @racket[Void] values, but the Magnolisp core form @racket[(void _expr _...)] evaluates such a value, at least conceptually. Such values may not actually exist at C++ run time. The corresponding C++ type is @racketidfont{void}.}
 
 @subsection{Racket Forms}
 
@@ -219,7 +222,7 @@ To use Racket code in a runtime context, you may wrap the code in a form that in
 Code so wrapped must be grammatically correct Racket, but not necessarily Magnolisp. The wrapping forms merely switch syntaxes, and have no effect on the namespace used for evaluating the enclosed sub-forms; the surrounding namespace is still in effect. Nesting of the wrapping forms is allowed.
 
 @defform[(begin-racket Racket-form ...)]{
-A Racket expression that is equivalent to writing @racket[(let () Racket-form ...)]. The Magnolisp semantics is to: ignore such forms when at module top-level; treat such forms as no-ops in statement context; and treat them as uncompilable expressions when appearing in an expression position. Uncompilable expressions are acceptable for as long as they are not part of a compiled program, or can be optimized away.
+A Racket expression that is equivalent to writing @racket[(let () Racket-form _...)]. The Magnolisp semantics is to: ignore such forms when at module top-level; and treat them as uncompilable expressions when appearing in an expression position. Uncompilable expressions are acceptable for as long as they are not part of a compiled program, or can be optimized away.
 
 For example:
 @(interaction #:eval the-eval
@@ -242,7 +245,7 @@ One use case is to @racket[local-require] a Racket definition into a context whe
 }
 
 @defform[(begin-for-racket Racket-form ...)]{
-Like @racket[begin-racket], but equivalent to writing @racket[(begin Racket-form ...)], and hence not necessarily a Racket expression. Intended particularly for allowing the splicing of Racket definitions into the enclosing context, which is not possible with @racket[begin-racket].
+Like @racket[begin-racket], but equivalent to writing @racket[(begin Racket-form _...)], and hence not necessarily a Racket expression. Intended particularly for allowing the splicing of Racket definitions into the enclosing context, which is not possible with @racket[begin-racket].
 
 For example:
 @(interaction #:eval the-eval
@@ -269,7 +272,7 @@ For example:
 
 @(declare-exporting magnolisp/surface)
 
-As far as the Magnolisp compiler is concerned, a Magnolisp program is fully expanded if it conforms to the following grammar.
+As far as the Magnolisp compiler is concerned, a Magnolisp program is fully expanded if it conforms to the following grammar. Any syntactic ambiguities are resolved in favor of the first matching grammar rule.
 
 A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-terminal @racket[_nt] in the ``Fully Expanded Programs'' section of the Racket Reference. A form @(elem (racket _form) (subscript "ign")) denotes language that is ignored by the Magnolisp compiler, but which may be useful when evaluating as Racket. A form @(elem (racket _form) (subscript (racket _property ≠ #f))) means the form @racket[_form] whose syntax object has the property named @racket[_property] set to a true value. Form @(elem (racket (_sub-form ...)) (subscript (racket _property ≠ #f))) is alternatively written as @(racket (#,(subscript (racket _property ≠ #f)) _sub-form ...)). Anything of the form @(indirect-id _id) is actually a non-terminal like @racketvarfont{id-expr}, but for the specific identifier @racketvarfont{id}.
 
@@ -284,43 +287,50 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
                 module-level-def
                 #,(ign (racket (define-syntaxes (trans-id ...) Racket-expr)))
                 #,(ign-nt Racket-expr)
-                in-racket-form]
+                #,(ign-nt in-racket-form)]
 [module-level-def (define-values (id) mgl-expr)
 		  (define-values (id ...) 
                     (#%plain-app #,(indirect-id values) mgl-expr ...))]
 [Racket-expr #,(rkt-nt expr)]
-[in-racket-form #,(ign-flag in-racket (racket _Racket-form))]
-[mgl-expr id
+[in-racket-form #,(flagged in-racket (racket _Racket-form))]
+[mgl-expr #,(ign-nt in-racket-form)
+	  (begin mgl-expr ...)
+          (#%expression mgl-expr)
           (#%plain-lambda (id ...) mgl-expr)
 	  (if #,(ign-nt Racket-expr) 
               (#%plain-app #%magnolisp (quote foreign-type))
               #,(ign-nt Racket-expr))
 	  (if mgl-expr mgl-expr mgl-expr)
+      	  (#%plain-app #,(indirect-id void) mgl-expr ...)
+	  (#%plain-app #,(indirect-id values) mgl-expr)
+	  (#%plain-app #,(indirect-id values))
+          local-ec-block
+	  local-ec-jump
+	  (#%plain-app id-expr mgl-expr ...)
 	  (#,(sub-flag annotate) 
            let-values ([() (begin mgl-anno-expr 
                                   (#%plain-app values))] 
                        ...) 
              mgl-expr)
-	  (let-values () mgl-expr)
-	  (letrec-values () mgl-expr)
-	  (letrec-syntaxes+values
+      	  (let-values (bind-in-let ...) mgl-expr ...+)
+          (letrec-values (bind-in-let ...) mgl-expr ...+)
+          (letrec-syntaxes+values
               ([(trans-id ...) #,(ign-nt Racket-expr)] ...)
-              ()
-            mgl-expr)
-	  (let-values ([(id) mgl-expr]) mgl-expr)
-	  (letrec-values ([(id) mgl-expr]) mgl-expr)
-	  (letrec-syntaxes+values
-              ([(trans-id ...) #,(ign-nt Racket-expr)] ...)
-              ([(id) mgl-expr])
-            mgl-expr)
+              (bind-in-let ...)
+            mgl-expr ...+)
+	  (set! id mgl-expr)
 	  #,(racket (#,(racket quote) _datum))
-          local-ec-expr
-	  (#%plain-app id-expr mgl-expr ...)
           (#%top . id)
-          (#%expression mgl-expr)
-          in-racket-form]
-[local-ec-expr (#,(sub-flag local-ec) #%plain-app #,(indirect-id call/ec) 
-                (#%plain-lambda (id) stat ...))]
+	  id]
+[bind-in-let
+      [(id ...) 
+       (#%plain-app #,(indirect-id values) mgl-expr ...)]
+      [() mgl-expr]
+      [(id) mgl-expr]]
+[local-ec-block (#,(sub-flag local-ec) #%plain-app #,(indirect-id call/ec) 
+                (#%plain-lambda (id) mgl-expr ...))]
+[local-ec-jump #,(flagged local-ec (racket (#%plain-app id-expr mgl-expr)))]
+[id-expr id (#%top . id) (#%expression id-expr)]
 [mgl-anno-expr #,(harnessed anno-expr)]
 [anno-expr (#%plain-app #%magnolisp (quote anno) 
             (quote type) type-expr)
@@ -332,33 +342,12 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
 [fn-type-expr (if #,(ign-nt Racket-expr)
                   (#%plain-app #%magnolisp 'fn type-expr ...+)
                   #,(ign-nt Racket-expr))]
-[stat (if mgl-expr stat stat)
-      (begin stat ...)
-      (let-values (bind-in-let ...) stat ...+)
-      (letrec-values (bind-in-let ...) stat ...+)
-      (letrec-syntaxes+values
-          ([(trans-id ...) #,(ign-nt Racket-expr)] ...)
-          (bind-in-let ...)
-        stat ...+)
-      (set! id mgl-expr)
-      (#%plain-app #,(indirect-id values))
-      (#%plain-app #,(indirect-id void))
-      local-ec-jump
-      (#%expression stat)
-      in-racket-form]
-[bind-in-let
-      [(id ...) 
-       (#%plain-app #,(indirect-id values) mgl-expr ...)]
-      [() stat]
-      [(id) mgl-expr]]
-[local-ec-jump #,(flagged local-ec (racket (#%plain-app id-expr mgl-expr)))]
-[id-expr id (#%top . id) (#%expression id-expr)]
 ]
 
 where:
 
 @specsubform[id]{
-An identifier. Not @emph{the} reserved @racket[#%magnolisp] identifier.}
+An identifier.}
 
 @specsubform[trans-id]{
 An identifier with a @emph{transformer binding}.}
@@ -370,19 +359,19 @@ A piece of literal data. A @(racket (#,(racket quote) _datum)) form is a literal
 Any Racket core form.}
 
 @specsubform[in-racket-form]{
-Any Racket form that has the syntax property @racket['in-racket] set to a true value. These are ignored by the Magnolisp compiler where possible, and it is an error if they persist in contexts where they ultimately cannot be ignored. The @racket[begin-racket] and @racket[begin-for-racket] forms are implemented through this mechanism.}
+Any Racket form that has the syntax property @racket['in-racket] set to a true value. These are ignored by the Magnolisp compiler where possible, and it is an error if they persist in contexts where they ultimately cannot be ignored. (The @racket[begin-racket] and @racket[begin-for-racket] forms are implemented through this mechanism.)}
 
 @specsubform[submodule-form]{
-Submodules are not actually supported by the @racketmodname[magnolisp] language, but the Magnolisp compiler does allow them to appear, and merely ignores them.}
+A Racket submodule definition. Submodules are not actually supported by the @racketmodname[magnolisp] language, but the Magnolisp compiler does allow them to appear, and merely ignores them.}
 
 @specsubform[anno-expr]{
 An annotation expression, containing an identifier @racket[_id] naming the kind of annotation, and an expression specifying the ``value'' of the annotation. In the generic case, any symbol can be used to name an annotation kind, and any @racket[quote]d or @racket[quote-syntax]ed datum can give the value. Only annotations of kind @racket['type] are parsed in a specific way.}
 
-@specsubform[local-ec-expr]{
+@specsubform[local-ec-block]{
 A restricted form of @racket[call/ec] invocation, which is flagged with the syntax property @racket['local-ec]. The semantic restriction is that non-local escapes (beyond the enclosing function's body) are not allowed.}
 
 @specsubform[local-ec-jump]{
-A restricted form of escape continuation invocation, flagged with the syntax property @racket['local-ec]. The escape must be local.}
+A restricted form of escape continuation invocation, flagged with the syntax property @racket['local-ec]. The escape must be local, and it must be within the lexical scope of a matching @racket[_local-ec-block].}
 
 @warning{For some of the @(indirect-id id) non-terminals, the current parser actually assumes a direct @racket[_id].}
 
