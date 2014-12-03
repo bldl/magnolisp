@@ -295,6 +295,7 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
 [in-racket-form #,(flagged in-racket (racket _Racket-form))]
 [mgl-expr #,(ign-nt in-racket-form)
 	  (begin mgl-expr ...+)
+	  (begin0 mgl-expr mgl-expr ...)
           (#%expression mgl-expr)
           (#%plain-lambda (id ...) mgl-expr ...+)
 	  (if #,(ign-nt Racket-expr) 

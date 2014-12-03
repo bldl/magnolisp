@@ -346,6 +346,16 @@
                  (map parse-expr
                       (syntax->list #'bs))))
       
+      ((begin0 e . bs)
+       (let ()
+         (define e-ast (parse-expr #'e))
+         (define b-ast-lst (map parse-expr (syntax->list #'bs)))
+         (cond
+          ((null? b-ast-lst)
+           e-ast)
+          (else
+           (syntaxed stx Begin0 (cons e-ast b-ast-lst))))))
+      
       ;; These do appear as well.
       ((#%expression e)
        (parse-expr #'e))

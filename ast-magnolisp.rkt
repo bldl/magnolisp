@@ -367,6 +367,9 @@ Assumptions for AST node types:
 (define-ast* SeqExpr (Ast Expr SeqCont) 
   ((no-term annos) (list-of-term ss)))
 
+(define-ast* Begin0 (Ast Expr SeqCont) 
+  ((no-term annos) (list-of-term ss)))
+
 ;; A statement that does nothing.
 (define-ast* VoidStat (Ast Stat) ((no-term annos)))
 

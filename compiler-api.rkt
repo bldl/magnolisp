@@ -120,6 +120,20 @@ optimization.
             (Def-process-annos (Def-rm-AnnoExpr def))))
     (values rr-mp (struct-copy Mod mod [def-lst def-lst]))))
 
+;;; 
+;;; Begin0 translation
+;;; 
+
+(define ast-rm-Begin0
+  (bottomup
+   (lambda (ast)
+     (match ast
+       ((Begin0 a (list e bs ..1))
+        (define id (fresh-ast-identifier 'begin0))
+        (define dv (annoless DefVar id the-AnyT e))
+        (LetExpr a dv (append bs (list (annoless Var id)))))
+       (_ ast)))))
+
 ;;;
 ;;; de-Racketization
 ;;;
@@ -454,6 +468,7 @@ optimization.
         (switch-ids-for-builtins! def-lst eps-in-prog
                                   prelude-bind->bind))
 
+  (set! def-lst (map ast-rm-Begin0 def-lst))
   (set! def-lst (defs-optimize-if def-lst))
   (set! def-lst (map ast-add-prelude-lit-types def-lst))
   ;;(pretty-print `(prelude-map ,prelude-bind->bind defs ,def-lst eps ,eps-in-prog)) (exit)
