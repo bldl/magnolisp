@@ -296,7 +296,7 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
 [mgl-expr #,(ign-nt in-racket-form)
 	  (begin mgl-expr ...+)
           (#%expression mgl-expr)
-          (#%plain-lambda (id ...) mgl-expr)
+          (#%plain-lambda (id ...) mgl-expr ...+)
 	  (if #,(ign-nt Racket-expr) 
               (#%plain-app #%magnolisp (quote foreign-type))
               #,(ign-nt Racket-expr))

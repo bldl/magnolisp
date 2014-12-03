@@ -89,10 +89,10 @@ enough to be easily analyzable, and compilable to C++.
   (syntax-rules ()
     [(_ (f p ...) (a ...))
      (function-impl (f p ...) (a ...) (void))]
-    [(_ (f p ...) (a ...) b)
+    [(_ (f p ...) (a ...) b ...)
      (define f 
        (let-annotate (a ...)
-         (#%plain-lambda (p ...) b)))]))
+         (#%plain-lambda (p ...) b ...)))]))
     
 (define-annos-wrapper* function)
 

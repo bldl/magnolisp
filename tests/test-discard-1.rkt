@@ -4,6 +4,6 @@
 
 (function (f x)
   (#:annos export (type (fn int int)))
-  (let () (cast int 1) x (cast int 2) 3))
+  1 x 2 3)
 
 (f 5)

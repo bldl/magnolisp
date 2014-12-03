@@ -354,9 +354,6 @@
        (let ()
          (define par-id-lst (syntax->list #'formals))
          (define e-stx-lst (syntax->list #'exprs))
-         (when (> (length e-stx-lst) 1)
-           (raise-syntax-error
-            #f "function body must be a single expression" stx))
          (define par-ast-lst
            (map (lambda (id)
                   ;; Annotations would probably have to be propagated
@@ -364,8 +361,12 @@
                   ;; that must wait until later.
                   (make-Param stx id))
                 par-id-lst))
-         (define e-stx (first e-stx-lst))
-         (define e-ast (parse-expr e-stx))
+         (define e-ast-lst (map parse-expr e-stx-lst))
+         (define e-ast
+           (case (length e-ast-lst)
+             ((0) (assert #f))
+             ((1) (first e-ast-lst))
+             (else (annoless SeqExpr e-ast-lst))))
          (syntaxed stx Lambda par-ast-lst e-ast)))
       
       ((if _ (#%plain-app #%magnolisp (quote k)) _)
