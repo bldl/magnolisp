@@ -36,6 +36,16 @@ C++ back end.
   (-> string? string?) (uncrustify s)
   (exe-filter s '("/usr/bin/uncrustify" "-l" "cpp" "-q")))
 
+;; This one is one of the tools in Clang. Does line breaking.
+;; http://clang.llvm.org/docs/ClangFormat.html
+;; Can be customized by creating a configuration file.
+;; To get started with creating a configuration, can do
+;; clang-format -dump-config > ~/.clang-format
+;; (clang-format "void main() { int x = 1; return; }")
+(define-with-contract*
+  (-> string? string?) (clang-format s)
+  (exe-filter s (list (find-executable-path "clang-format"))))
+
 ;;; 
 ;;; C++ identifiers
 ;;; 
