@@ -1104,9 +1104,12 @@ C++ back end.
       (define path (path-add-suffix path-stem sfx))
       (define filename (path-basename-as-string path))
       (define basename (path-basename-only-as-string filename))
-      (define hh-incl (annoless Include 'user (path-basename-as-string (path-add-suffix path-stem (get-suffix 'hh)))))
+      (define hh-incl 
+        (annoless Include 'user 
+                  (path-basename-as-string 
+                   (path-add-suffix path-stem (get-suffix 'hh)))))
       (define c-unit
-        (append (list hh-incl)
+        (append (if (memq 'hh kinds) (list hh-incl) null)
                 (defs->partition 'private-prototypes def-lst)
                 (defs->partition 'private-implementations def-lst)))
       ;;(for-each writeln c-unit) (exit)

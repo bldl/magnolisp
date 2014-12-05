@@ -511,6 +511,23 @@ optimization.
   (apply compile-modules mp-lst))
 
 ;;; 
+;;; private APIs
+;;; 
+
+(define-with-contract*
+  (-> St? (or/c #f syntax?))
+  (get-expected-anno-value st)
+  
+  (define defs (St-defs st))
+  
+  (let/ec k
+    (for (((id def) (in-dict defs)))
+      (define v (ast-anno-maybe def 'expected))
+      (when v
+        (k v)))
+    #f))
+
+;;; 
 ;;; code generation
 ;;; 
 

@@ -51,6 +51,11 @@ enough to be easily analyzable, and compilable to C++.
     [(_ x ...)
      #`(CORE 'anno 'build (quote-syntax #,stx))]))
 
+(define-syntax* (expected stx)
+  (syntax-case stx ()
+    [(_ x)
+     #'(CORE 'anno 'expected (quote-syntax x))]))
+
 (define-syntax* (let-annotate stx)
   (syntax-case stx ()
     [(_ (a ...) e)

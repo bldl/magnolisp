@@ -23,7 +23,43 @@
       (ctrl 'wait)
       (get-output-string out))))
 
-(provide exe-filter)
+;; Feeds standard input into the system command `cmd`. Function `f`
+;; takes an output port as an argument, and should write the input
+;; there. Throws an exception on failure, including a non-zero exit
+;; code.
+(define (exe-consume-input cmd f)
+  (define-values (in user-out) (make-pipe #f 'exe-in 'out-via-exe-consume-input))
+  (define out (open-output-nowhere))
+  (define err (open-output-nowhere))
+  (define r (apply process*/ports out in err cmd))
+  (define ctrl (fifth r))
+  (with-handlers ((exn:fail? (lambda (e) 
+                               (ctrl 'interrupt)
+                               (raise e))))
+    (f user-out))
+  (close-output-port user-out)
+  (ctrl 'wait)
+  (define exit-code (ctrl 'exit-code))
+  (unless exit-code
+    (error 'exe-consume-input 
+           "command unexpectedly still running after wait: ~s" cmd))
+  (unless (= exit-code 0)
+    (error 'exe-consume-input 
+           "command exited with error code ~a: ~s" exit-code cmd)))
+
+;; Gets standard output of the specified command, which is not subject
+;; to shell expansion. Returns #f if the command fails.
+;; E.g.
+;; (exe-std-output/maybe `(,(find-executable-path "clang") "--version"))
+(define (exe-std-output/maybe cmd)
+  (let ((out (open-output-string))
+        (err (open-output-nowhere)))
+    (parameterize ((current-output-port out)
+                   (current-error-port err))
+      (and (apply system* cmd)
+           (get-output-string out)))))
+
+(provide exe-filter exe-consume-input exe-std-output/maybe)
 
 #|
 
