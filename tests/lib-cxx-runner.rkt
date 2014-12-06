@@ -4,7 +4,9 @@
 
 (typedef int (#:annos foreign))
 
-(function (put-int x) (#:annos foreign [type (fn int Void)]))
+(function (put-int x) 
+  (#:annos foreign [type (fn int Void)])
+  (displayln x))
 
 (function (inc x)
   (#:annos (type (fn int int)) foreign)
