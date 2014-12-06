@@ -19,7 +19,7 @@ executable, and then comparing actual output against expected output.
   (let-and s (exe-std-output/maybe (list exe "--version"))
     (let ((re #px"^clang[[:space:]]+version[[:space:]]+([[:digit:]]+)[.]([[:digit:]]+)[.]([[:digit:]]+)[[:space:]]+"))
       (let-and m (regexp-match re s)
-        (map string->number (list (second m) (third m) (fourth m)))))))
+        (map string->number (take (cdr m) 3))))))
     
 (define-syntax (this-source stx)
   (quasisyntax/loc stx (unsyntax (syntax-source stx))))
@@ -32,7 +32,7 @@ executable, and then comparing actual output against expected output.
 
 ;; Like `delete-file`, but does not throw if the file does not exist.
 (define (maybe-delete-file fn)
-  (with-handlers ((exn:fail:filesystem? (lambda (e) (void))))
+  (with-handlers ((exn:fail:filesystem? void))
     (delete-file fn)))
 
 ;; The provided cleanup `action` expression should not fail. Produces
@@ -72,7 +72,7 @@ executable, and then comparing actual output against expected output.
     (cc-fun a.out generate)
     (or (exe-std-output/maybe (list a.out))
         (error 'compile-and-run-one-mgl-file
-               "running of compiled test program ~s for ~s failed" a.out fn)))
+               "running of compiled test program ~a for ~a failed" a.out fn)))
   
   (define out-str
     (with-temporary-file cc-and-run))
@@ -83,7 +83,7 @@ executable, and then comparing actual output against expected output.
   
   (unless (equal? actual expected)
     (error 'compile-and-run-one-mgl-file
-           "test program ~a output differs from `expected` (actual: ~s, expected: ~s)" 
+           "test program ~a output differs from `expected`\nactual: ~s\nexpected: ~s" 
            fn actual expected))
   
   (void))
@@ -101,7 +101,7 @@ executable, and then comparing actual output against expected output.
   ;; Run no tests without a suitable compiler.
   (when cc-fun
     (for ((bn (directory-list mgl-file-dir))
-          #:when (regexp-match? "^cxx-.*[.]rkt$" bn))
+          #:when (regexp-match-exact? #rx"test-run-.*[.]rkt" bn))
       (define fn (build-path mgl-file-dir bn))
       (check-not-exn
        (thunk (compile-and-run-one-mgl-file cc-fun fn))

@@ -21,14 +21,15 @@
       (generate-files
        st '((build (gnu-make qmake c ruby))
             (cxx (cc hh)))
-       #:out (open-output-nowhere)
-       )))
+       #:out (open-output-nowhere))))
    (format "failed to compile program ~a" fn)))
     
 (define (compile-mgl-files)
   (for ((bn (directory-list mgl-file-dir))
-        #:when (regexp-match? "^test-.*[.]rkt$" bn))
+        #:when (regexp-match-exact? #rx"test-(?!run-).*[.]rkt" bn))
     (define fn (build-path mgl-file-dir bn))
+    ;;(displayln fn)
     (compile-mgl-file fn)))
 
-(compile-mgl-files)
+(module* test #f
+  (compile-mgl-files))
