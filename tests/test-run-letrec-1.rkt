@@ -14,6 +14,6 @@
     (return z)))
 
 (function (run)
-  (#:annos export [type (fn Void)] [expected (9 10 11)])
+  (#:annos export [type (fn Void)] [expected 9 10 11])
   (f 8)
   (void))
