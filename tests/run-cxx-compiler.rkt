@@ -80,13 +80,8 @@ executable, and then comparing actual output against expected output.
   (define actual 
     (for/list ((dat (in-port read (open-input-string out-str))))
       dat))
-  
-  (unless (equal? actual expected)
-    (error 'compile-and-run-one-mgl-file
-           "test program ~a output differs from `expected`\nactual: ~s\nexpected: ~s" 
-           fn actual expected))
-  
-  (void))
+
+  (values actual expected))
   
 (define (compile-and-run-mgl-files)
   (define cc-fun ;; (-> path-string? (-> output-port? any/c) void?)
@@ -103,9 +98,17 @@ executable, and then comparing actual output against expected output.
     (for ((bn (directory-list mgl-file-dir))
           #:when (regexp-match-exact? #rx"test-run-.*[.]rkt" bn))
       (define fn (build-path mgl-file-dir bn))
-      (check-not-exn
-       (thunk (compile-and-run-one-mgl-file cc-fun fn))
-       (format "run-via-C++ test failed for file ~a" fn)))))
+      (with-handlers ((exn:fail?
+                       (lambda (e)
+                         (fail 
+                          (format 
+                           "run-via-C++ test: failed with ~s for ~a"
+                           e bn)))))
+        (let-values (((actual expected)
+                      (compile-and-run-one-mgl-file cc-fun fn)))
+          (check-equal? 
+           actual expected
+           (format "run-via-C++ test: un`expected` output for ~a" bn)))))))
 
 (module* test #f
   (compile-and-run-mgl-files))
