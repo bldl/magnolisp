@@ -1,4 +1,4 @@
-#lang magnolisp
+#lang magnolisp/2014
 
 (function (f)
   (#:annos export (type (fn Bool)))

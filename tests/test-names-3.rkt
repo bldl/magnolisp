@@ -1,4 +1,4 @@
-#lang magnolisp
+#lang magnolisp/2014
 
 (require (rename-in "lib-names-3.rkt" [g eight]))
 

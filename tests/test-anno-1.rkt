@@ -1,4 +1,4 @@
-#lang magnolisp
+#lang magnolisp/2014
 
 (typedef int #an(foreign))
 (typedef long #an(foreign))

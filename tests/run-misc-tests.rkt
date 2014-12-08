@@ -13,8 +13,7 @@
     (generate-files
      st '((build (gnu-make qmake c ruby))
           (cxx (cc hh)))
-     #:out (open-output-nowhere)
-     )))
+     #:out (open-output-nowhere))))
 
 (define (check-compile-mgl-mod mod)
   (check-not-exn
@@ -27,7 +26,7 @@
    (thunk (compile-mgl-mod mod))
    (format "no expected failure compiling program ~a" mod)))
 
-(module m1 magnolisp
+(module m1 magnolisp/2014
   (function (f)
     (#:annos export (type (fn Bool)))
     #t)
@@ -35,7 +34,7 @@
 
 (check-compile-mgl-mod '(submod "." m1))
 
-(module m2 magnolisp
+(module m2 magnolisp/2014
   (function (f)
     (#:annos export
              (build (+= mixed-bad 1 "2"))
@@ -47,7 +46,7 @@
  '(submod "." m2)
  #rx"type mismatch")
 
-(module m3 magnolisp
+(module m3 magnolisp/2014
   (function (f) (#:annos export) 1)
   (define x 3)) ;; xxx if do not have this last (unused) definition, then some things are not defined, and we do not get syntax-source-module for #%module-begin either, may be related
 
@@ -55,7 +54,7 @@
  '(submod "." m3)
  #rx"program is not fully typed")
 
-(module m4 magnolisp
+(module m4 magnolisp/2014
   (function (f)
     (#:annos export (type (fn Bool)))
     (do

@@ -1,4 +1,4 @@
-#lang magnolisp
+#lang magnolisp/2014
 
 (typedef Elem (#:annos foreign))
 (typedef List (#:annos foreign))

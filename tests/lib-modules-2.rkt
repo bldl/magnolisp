@@ -1,4 +1,4 @@
-#lang magnolisp
+#lang magnolisp/2014
 
 (typedef Int (#:annos foreign))
 (provide Int)

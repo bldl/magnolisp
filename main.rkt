@@ -4,17 +4,42 @@
 
 Defines a Racket module language for Magnolisp.
 
-We export racket/base as the macro programming language, and we also
-provide racket/base as runtime language at present as well. Such
-language may be used, but it will not be compiled into C++.
-
-The idea is not to use Magnolisp as the macro programming language, as
-Racket ought to be better for that purpose. We will not provide any
-Magnolisp for-syntax.
-
 |#
 
-(provide (except-out (all-from-out racket/base) #%module-begin))
+(provide 
+ ;; `require` forms
+ require only-in except-in prefix-in rename-in combine-in
+ relative-in only-meta-in
+ local-require
+         
+ ;; `provide` forms
+ provide all-defined-out all-from-out rename-out except-out
+ prefix-out struct-out combine-out protect-out
+         
+ ;; `require` and `provide` forms
+ for-syntax for-template for-label for-meta
+ 
+ ;; top-level syntax
+ begin-for-syntax define-syntax define-syntaxes define-syntax-rule
+ 
+ ;; top-level definitions
+ define define-values
+ 
+ ;; quotation
+ quote quasiquote unquote
+ 
+ ;; expressions
+ #%top #%expression #%datum 
+ #%plain-app #%app ;;(rename-out [#%plain-app #%app])
+ begin begin0
+ let let* letrec 
+ let-values let*-values letrec-values 
+ let-syntax let-syntaxes letrec-syntax letrec-syntaxes
+ letrec-syntaxes+values
+ set! 
+ #%plain-lambda lambda
+ if when unless 
+ values void)
 
 (require "modbeg.rkt")
 (provide (rename-out [module-begin #%module-begin]))

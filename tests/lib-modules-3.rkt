@@ -1,4 +1,4 @@
-#lang magnolisp
+#lang magnolisp/2014
 
 (define (eight) 8)
 
