@@ -1,7 +1,7 @@
 #lang scribble/manual
 @(require scribble/eval "manual-util.rkt"
 	  (for-label syntax/modresolve
-	             magnolisp/prelude magnolisp/surface
+	             magnolisp/core magnolisp/prelude magnolisp/surface
                      (except-in racket/base #%module-begin)))
 
 @(define the-eval (make-base-eval))
@@ -215,59 +215,16 @@ A predefined type. The literals of this type are @racket[#t] and @racket[#f]. Al
 @defthing[#:kind "type" Void any/c]{
 A predefined type. There are no literals for @racket[Void] values, but the Magnolisp core form @racket[(void _expr _...)] evaluates such a value, at least conceptually. Such values may not actually exist at C++ run time. The corresponding C++ type is @racketidfont{void}.}
 
-@subsection{Racket Forms}
+@subsection{Magnolisp Core Syntax}
 
-@(declare-exporting magnolisp/surface)
+@(defmodule magnolisp/core)
 
-To use Racket code in a runtime context, you may wrap the code in a form that indicates that the code is only intended for evaluation as Racket. 
-Code so wrapped must be grammatically correct Racket, but not necessarily Magnolisp. The wrapping forms merely switch syntaxes, and have no effect on the namespace used for evaluating the enclosed sub-forms; the surrounding namespace is still in effect. Nesting of the wrapping forms is allowed.
+Magnolisp core syntax is encoded primarily in terms of Racket's core forms. Magnolisp core forms that have no Racket counterpart, however, are encoded in terms of the @racket[#%magnolisp] variable, which is treated specially by the Magnolisp compiler. The @racket[#%magnolisp] binding is exported from the @racketmodname[magnolisp/core] module.
 
-@defform[(begin-racket Racket-form ...)]{
-A Racket expression that is equivalent to writing @racket[(let () Racket-form _...)]. The Magnolisp semantics is to: ignore such forms when at module top-level; and treat them as uncompilable expressions when appearing in an expression position. Uncompilable expressions are acceptable for as long as they are not part of a compiled program, or can be optimized away.
+It is possible to define multiple different surface syntaxes for Magnolisp, and these can be defined as libraries similar to the @racketmodname[magnolisp/surface] syntax definition used by the @racketmodname[magnolisp] language. All Magnolisp language variants must, however, refer to the same core bindings (i.e., as exported from @racketmodname[racket/base] and @racketmodname[magnolisp/core]) and (as applicable) to the same standard library built-ins (i.e., those in @racketmodname[magnolisp/prelude]), as no other bindings are treated specially by the Magnolisp compiler.
 
-For example:
-@(interaction #:eval the-eval
-   (function (three) (#:annos foreign [type (-> int)])
-     (begin-racket 
-       (define x 1) 
-       (set! x (begin 2 3)) 
-       x))
-   (three))
-
-One use case is to @racket[local-require] a Racket definition into a context where a Magnolisp definition by the same name is being implemented. For example:
-
-@(interaction #:eval the-eval
-  (function (equal? x y) 
-    (#:annos [type (-> int int Bool)] foreign)
-    (begin-racket
-      (local-require (only-in racket/base equal?))
-      (equal? x y)))
-  (equal? "foo" "foo"))
-}
-
-@defform[(begin-for-racket Racket-form ...)]{
-Like @racket[begin-racket], but equivalent to writing @racket[(begin Racket-form _...)], and hence not necessarily a Racket expression. Intended particularly for allowing the splicing of Racket definitions into the enclosing context, which is not possible with @racket[begin-racket].
-
-For example:
-@(interaction #:eval the-eval
-   (begin-for-racket
-     (define six 6)
-     (define (one-more x) (let dummy () (+ x 1))))
-   (function (eight) (#:annos foreign [type (-> int)])
-     (one-more (one-more six)))
-   (eight))
-}
-
-@defform[(define-for-racket rest ...)]{
-Shorthand for writing @racket[(begin-for-racket (define rest ...))]. Intended for introducing a single binding into the enclosing context, with a definition given in the Racket language.
-
-For example:
-@(interaction #:eval the-eval
-   (define-for-racket two (begin 1 2))
-   (function (four) (#:annos foreign [type (-> int)])
-     (begin-racket (* (begin 1 2) two)))
-   (four))
-}
+@defthing[#:kind "binding" #%magnolisp any/c]{
+A value binding whose identifier is used to uniquely identify some Magnolisp core syntactic forms. It always appears in the application position of a Racket @racket[#%plain-app] core form. The value of the variable does not matter when compiling as Magnolisp, as it is never used. To prevent evaluation as Racket, all the syntactic constructs exported by @racketmodname[magnolisp] surround @racket[#%magnolisp] applications with a ``short-circuiting'' Racket expression.}
 
 @subsection{Fully Expanded Programs}
 
@@ -377,8 +334,59 @@ A restricted form of escape continuation invocation, flagged with the syntax pro
 
 @warning{For some of the @(indirect-id id) non-terminals, the current parser actually assumes a direct @racket[_id].}
 
-@defthing[#%magnolisp any/c]{
-A value binding whose identifier is used to uniquely identify some Magnolisp core syntactic forms. It always appears in the application position of a Racket @racket[#%plain-app] core form. The value of the variable does not matter when compiling an Magnolisp, as it is never used. To prevent evaluation as Racket, all the syntactic constructs exported by @racketmodname[magnolisp] surround @racket[#%magnolisp] applications with a ``short-circuiting'' Racket expression.}
+@subsection{Racket Forms}
+
+@(declare-exporting magnolisp/surface)
+
+To use Racket code in a runtime context, you may wrap the code in a form that indicates that the code is only intended for evaluation as Racket. 
+Code so wrapped must be grammatically correct Racket, but not necessarily Magnolisp. The wrapping forms merely switch syntaxes, and have no effect on the namespace used for evaluating the enclosed sub-forms; the surrounding namespace is still in effect. Nesting of the wrapping forms is allowed.
+
+@defform[(begin-racket Racket-form ...)]{
+A Racket expression that is equivalent to writing @racket[(let () Racket-form _...)]. The Magnolisp semantics is to: ignore such forms when at module top-level; and treat them as uncompilable expressions when appearing in an expression position. Uncompilable expressions are acceptable for as long as they are not part of a compiled program, or can be optimized away.
+
+For example:
+@(interaction #:eval the-eval
+   (function (three) (#:annos foreign [type (-> int)])
+     (begin-racket 
+       (define x 1) 
+       (set! x (begin 2 3)) 
+       x))
+   (three))
+
+One use case is to @racket[local-require] a Racket definition into a context where a Magnolisp definition by the same name is being implemented. For example:
+
+@(interaction #:eval the-eval
+  (function (equal? x y) 
+    (#:annos [type (-> int int Bool)] foreign)
+    (begin-racket
+      (local-require (only-in racket/base equal?))
+      (equal? x y)))
+  (equal? "foo" "foo"))
+}
+
+@defform[(begin-for-racket Racket-form ...)]{
+Like @racket[begin-racket], but equivalent to writing @racket[(begin Racket-form _...)], and hence not necessarily a Racket expression. Intended particularly for allowing the splicing of Racket definitions into the enclosing context, which is not possible with @racket[begin-racket].
+
+For example:
+@(interaction #:eval the-eval
+   (begin-for-racket
+     (define six 6)
+     (define (one-more x) (let dummy () (+ x 1))))
+   (function (eight) (#:annos foreign [type (-> int)])
+     (one-more (one-more six)))
+   (eight))
+}
+
+@defform[(define-for-racket rest ...)]{
+Shorthand for writing @racket[(begin-for-racket (define rest ...))]. Intended for introducing a single binding into the enclosing context, with a definition given in the Racket language.
+
+For example:
+@(interaction #:eval the-eval
+   (define-for-racket two (begin 1 2))
+   (function (four) (#:annos foreign [type (-> int)])
+     (begin-racket (* (begin 1 2) two)))
+   (four))
+}
 
 @section{Evaluation}
 

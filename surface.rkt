@@ -3,16 +3,15 @@
 #|
 
 This module implements the (default) surface syntax of the Magnolisp
-language, and such language is not meant to be used in macro
-programming. This is because the runtime language must be restricted
-enough to be easily analyzable, and compilable to C++.
+language.
 
 |#
 
 (require "core.rkt" "util.rkt"
          racket/stxparam
          (for-syntax "app-util.rkt" "util.rkt"
-                     racket/base racket/syntax syntax/parse)) 
+                     racket/base racket/syntax 
+                     syntax/parse)) 
 
 ;; If is not okay to use `(and #f ...)` here, as `and` may insert an
 ;; `#%expression` form in the middle, which our parser does not
