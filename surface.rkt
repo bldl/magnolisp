@@ -21,7 +21,7 @@ enough to be easily analyzable, and compilable to C++.
   (if #f (#%magnolisp kind rest ...) #f))
 
 ;; Function type expression.
-(define-syntax-rule* (fn at ... rt)
+(define-syntax-rule* (-> at ... rt)
   (CORE 'fn at ... rt))
 
 ;; Type annotation.

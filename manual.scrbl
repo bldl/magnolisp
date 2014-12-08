@@ -57,11 +57,11 @@ For example:
 @(racketblock+eval #:eval the-eval
   (function (identity x) 
     x)
-  (function (five) (#:annos export [type (fn int)])
+  (function (five) (#:annos export [type (-> int)])
     5)
-  (function (inc x) (#:annos foreign [type (fn int int)])
+  (function (inc x) (#:annos foreign [type (-> int int)])
     (add1 x))
-  (function (seven) (#:annos foreign [type (fn int)])
+  (function (seven) (#:annos foreign [type (-> int)])
     (begin-racket 1 2 3 4 5 6 7)))
 
 Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in multiple different type contexts within a single program.}
@@ -158,13 +158,13 @@ For example:
 @(declare-exporting magnolisp/surface)
 
 @racketgrammar*[
-#:literals (fn)
+#:literals (->)
 [type-expr type-id fn-type-expr]
-[fn-type-expr (fn type-expr ... type-expr)]]
+[fn-type-expr (-> type-expr ... type-expr)]]
 
 Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined types in Magnolisp are @racket[Void] and @racket[Bool], and any others must be declared using @racket[typedef].
 
-@defform[(fn type-expr ... type-expr)]{
+@defform[(-> type-expr ... type-expr)]{
 A function type expression, containing type expressions the function's arguments and its return value, in that order. A Magnolisp function always returns a single value.}
 
 @subsection{Statements and Expressions}
@@ -226,7 +226,7 @@ A Racket expression that is equivalent to writing @racket[(let () Racket-form _.
 
 For example:
 @(interaction #:eval the-eval
-   (function (three) (#:annos foreign [type (fn int)])
+   (function (three) (#:annos foreign [type (-> int)])
      (begin-racket 
        (define x 1) 
        (set! x (begin 2 3)) 
@@ -237,7 +237,7 @@ One use case is to @racket[local-require] a Racket definition into a context whe
 
 @(interaction #:eval the-eval
   (function (equal? x y) 
-    (#:annos [type (fn int int Bool)] foreign)
+    (#:annos [type (-> int int Bool)] foreign)
     (begin-racket
       (local-require (only-in racket/base equal?))
       (equal? x y)))
@@ -252,7 +252,7 @@ For example:
    (begin-for-racket
      (define six 6)
      (define (one-more x) (let dummy () (+ x 1))))
-   (function (eight) (#:annos foreign [type (fn int)])
+   (function (eight) (#:annos foreign [type (-> int)])
      (one-more (one-more six)))
    (eight))
 }
@@ -263,7 +263,7 @@ Shorthand for writing @racket[(begin-for-racket (define rest ...))]. Intended fo
 For example:
 @(interaction #:eval the-eval
    (define-for-racket two (begin 1 2))
-   (function (four) (#:annos foreign [type (fn int)])
+   (function (four) (#:annos foreign [type (-> int)])
      (begin-racket (* (begin 1 2) two)))
    (four))
 }
