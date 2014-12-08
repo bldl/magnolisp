@@ -9,8 +9,7 @@
          racket/contract racket/dict racket/function racket/list
          racket/match racket/pretty
          syntax/id-table syntax/kerncase syntax/parse syntax/stx
-         (for-template racket/base
-                       (only-in "surface.rkt" #%magnolisp)))
+         (for-template racket/base "core.rkt"))
 
 ;;; 
 ;;; debugging utilities

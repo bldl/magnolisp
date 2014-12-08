@@ -9,14 +9,10 @@ enough to be easily analyzable, and compilable to C++.
 
 |#
 
-(require "util.rkt"
+(require "core.rkt" "util.rkt"
          racket/stxparam
          (for-syntax "app-util.rkt" "util.rkt"
                      racket/base racket/syntax syntax/parse)) 
-
-;; Yes we are providing this. If the programmer wants to hack our core
-;; language, they may.
-(define* #%magnolisp #f)
 
 ;; If is not okay to use `(and #f ...)` here, as `and` may insert an
 ;; `#%expression` form in the middle, which our parser does not
