@@ -143,20 +143,13 @@ language.
          [(_ v) (apply/local-ec k v)])])
      body ...)))
 
-(define-syntax* (begin-racket stx)
-  (syntax-case stx ()
-    [(_ e ...)
-     (syntax-property
-      (syntax/loc stx (let () e ...))
-      'in-racket #t)]))
+(define-syntax (in-racket stx)
+  (syntax-parse stx
+    [(_ form)
+     (syntax-property #'form 'in-racket #t)]))
 
-(define-syntax* (begin-for-racket stx)
-  (syntax-case stx ()
-    [(_ e ...)
-     (syntax-property
-      (syntax/loc stx (begin e ...))
-      'in-racket #t)]))
+(define-syntax-rule* (begin-racket form ...)
+  (in-racket (begin form ...)))
 
-(define-syntax-rule*
-  (define-for-racket rest ...)
-  (begin-for-racket (define rest ...)))
+(define-syntax-rule* (let-racket e ...)
+  (in-racket (let () e ...)))
