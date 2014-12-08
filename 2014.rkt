@@ -16,7 +16,7 @@ Magnolisp for-syntax.
 |#
 
 (module reader syntax/module-reader 
-  magnolisp/main
+  magnolisp/2014
   #:wrapper1 (lambda (t)
                ;; No need to replace reader altogether, just override
                ;; readtable.
@@ -34,8 +34,8 @@ Magnolisp for-syntax.
 (require (for-syntax racket/base))
 (provide (for-syntax (all-from-out racket/base)))
 
-(require "surface.rkt")
-(provide (all-from-out "surface.rkt"))
+(require "surface-2014.rkt")
+(provide (all-from-out "surface-2014.rkt"))
 
 (require "prelude.rkt")
 (provide (all-from-out "prelude.rkt"))

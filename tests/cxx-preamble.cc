@@ -4,8 +4,9 @@
 #define MGL_PROTO static
 #define MGL_FUNC static
 
-static void put_int(int x) {
+static int put_int(int x) {
   std::cout << x << std::endl;
+  return x;
 }
 
 static int inc(int x) {

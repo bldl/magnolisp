@@ -1,5 +1,7 @@
 #lang magnolisp/2014
 
+(require magnolisp/core)
+
 (define int #ap(foreign) (if #f (#%magnolisp 'foreign-type) #f))
 
 (define f
