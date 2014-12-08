@@ -2,7 +2,7 @@
 @(require scribble/eval "manual-util.rkt"
 	  (for-label syntax/modresolve
 	             magnolisp/prelude magnolisp/surface
-                     (except-in racket/base do #%module-begin)))
+                     (except-in racket/base #%module-begin)))
 
 @(define the-eval (make-base-eval))
 @(the-eval '(require magnolisp/prelude magnolisp/surface))
@@ -23,9 +23,9 @@ Magnolisp is intended to explore and demonstrate techniques for source-to-source
 
 The Magnolisp language relies on Racket for its module and macro systems. All of Racket may be used for macro programming. The @racketmodname[racket/base] language is provided by default for phase level 1 (compile time).
 
-The @racketmodname[racket/base] definitions (with the exception of the @racket-do form) are also available at phase level 0 by default. They may also be used in runtime code, and evaluated as @racketmodname[magnolisp]. However, only a small subset of Racket can be handled by the Magnolisp compiler, and either the Magnolisp Racket language or the Magnolisp compiler will report errors as appropriate for uncompilable language.
+A small subset of @racketmodname[racket/base] definitions is also available at phase level 0 by default, as these may be used in runtime code, and evaluated as @racketmodname[magnolisp] in the Racket VM. However, only a small subset of Racket can be handled by the Magnolisp compiler, and either the Magnolisp Racket language or the Magnolisp compiler will report errors as appropriate for uncompilable language.
 
-When a @racketmodname[magnolisp] module is evaluated as Racket, any module top-level runtime expressions will also get evaluated; this feature is intended to facilitate testing during development. The Magnolisp compiler, on the other hand, discards top-level expressions, and also any top-level definitions that are not actually part of the program being compiled. One motivation for making most of the @racketmodname[racket/base] bindings available for runtime code is their potential usefulness in code invoked by top-level expressions.
+When a @racketmodname[magnolisp] module is evaluated as Racket, any module top-level runtime expressions will also get evaluated; this feature is intended to facilitate testing during development. The Magnolisp compiler, on the other hand, discards top-level expressions, and also any top-level definitions that are not actually part of the program being compiled.
 
 @subsection{Modules and Macros}
 
@@ -187,18 +187,19 @@ In Magnolisp, @racket[(void _expr _...)] is an expression with no useful result 
 
 The @racket[var], @racket[function], and @racket[typedef] declaration forms may appear in a Racket @emph{internal-definition context} (and not Racket @emph{expression context}). The same is true of @racketidfont{define} forms that conform to the restricted syntax supported by the Magnolisp compiler.
 
-@defform[(do expr ...)]{
-An @deftech{expression block} containing a sequence of expressions. As the term implies, an expression block is itself an expression. The block must produce a single value by @racket[return]ing it, or by letting it ``fall out'' of the block. The returned or fallen-out value becomes the value of the containing @racket[do] expression. All value giving expressions in a block must be of the same type.
+@defform[(begin-return expr ...)]{
+A @deftech{return block} containing a sequence of expressions. The block must produce a single value by @racket[return]ing it, or by letting it ``fall out'' of the block. The returned or fallen-out value becomes the value of the containing @racket[begin-return] expression. All value giving expressions in a block must be of the same type.
 
 For example:
 @(interaction #:eval the-eval
-  (do (when #t
-        (return (five)))
-      (seven)))
+  (begin-return
+    (when #t
+      (return (five)))
+    (seven)))
 }
 
 @defform[(return expr)]{
-An expression that causes any enclosing @racket[do] block (which must exist) to yield the value of the expression @racket[expr].}
+An expression that causes any enclosing @racket[begin-return] block (which must exist) to yield the value of the expression @racket[expr].}
 
 @subsection{Standard Library}
 

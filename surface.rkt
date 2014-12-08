@@ -142,7 +142,7 @@ enough to be easily analyzable, and compilable to C++.
   (syntax-rules ()))
 
 (define-syntax-rule*
-  (do body ...)
+  (begin-return body ...)
   (let/local-ec k
     (syntax-parameterize
      ([return

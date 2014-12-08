@@ -1,9 +1,9 @@
-#lang magnolisp/2014
+#lang magnolisp
 
 (typedef int #an(foreign))
 (typedef long #an(foreign))
 
-(function (g) #an(^(fn int))
+(function (g) #an(^(-> int))
   (id 555))
 
 (function (f) #an(export)
@@ -13,8 +13,11 @@
   x)
 
 (function (h-1) #an(export)
-  (do (void) (return (f))))
+  (begin-return 
+    (void) 
+    (return (f))))
 
 (function (h-2) #an(export)
-  (do (var v (f)) (return v)))
-
+  (begin-return
+   (var v (f)) 
+   (return v)))

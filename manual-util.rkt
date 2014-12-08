@@ -9,13 +9,12 @@ Utilities for authoring manual.scrbl.
 (require "util.rkt" scribble/manual)
 
 (begin ;; trick from Racket docs
-  (define-syntax-rule (bind id-1 id-2 id-3)
+  (define-syntax-rule (bind id-2 id-3)
     (begin
       (require (for-label racket/base))
-      (define* id-1 (racket do))
       (define* id-2 (racket #%module-begin))
       (define* id-3 (racket if))))
-  (bind racket-do racket-module-begin racket-if))
+  (bind racket-module-begin racket-if))
 
 (define* (warning . str)
   (list "(" (italic "Warning: ") str ")"))
