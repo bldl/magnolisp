@@ -4,5 +4,4 @@
 (function (run)
   (#:annos export [type (fn Void)] [expected 1 2])
   (put-int 1)
-  (put-int 2)
-  (void))
+  (put-int 2))

@@ -27,8 +27,7 @@
   (put-int (main2 5))
   (put-int (main3 5))
   (put-int (main4 5))
-  (put-int (main5 5))
-  (void))
+  (put-int (main5 5)))
 
 (run)
 
