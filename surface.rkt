@@ -13,12 +13,6 @@ language.
                      racket/base racket/syntax 
                      syntax/parse)) 
 
-;; If is not okay to use `(and #f ...)` here, as `and` may insert an
-;; `#%expression` form in the middle, which our parser does not
-;; recognize as the particular core syntax.
-(define-syntax-rule (CORE kind rest ...)
-  (if #f (#%magnolisp kind rest ...) #f))
-
 ;; Function type expression.
 (define-syntax-rule* (-> at ... rt)
   (CORE 'fn at ... rt))
