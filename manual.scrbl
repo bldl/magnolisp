@@ -57,11 +57,11 @@ For example:
 @(racketblock+eval #:eval the-eval
   (function (identity x) 
     x)
-  (function (five) (#:annos export [type (-> int)])
+  (function (five) #:: (export [type (-> int)])
     5)
-  (function (inc x) (#:annos foreign [type (-> int int)])
+  (function (inc x) #:: (foreign [type (-> int int)])
     (add1 x))
-  (function (seven) (#:annos foreign [type (-> int)])
+  (function (seven) #:: (foreign [type (-> int)])
     (begin-racket 1 2 3 4 5 6 7)))
 
 Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in multiple different type contexts within a single program.}
@@ -71,8 +71,8 @@ Declares a type. Presently only foreign types may be declared, and @racket[id] g
 
 For example:
 @(racketblock+eval #:eval the-eval
-  (typedef int (#:annos foreign))
-  (typedef long (#:annos [foreign my_cxx_long])))
+  (typedef int #:: (foreign))
+  (typedef long #:: ([foreign my_cxx_long])))
 }
 
 @defform[(var id maybe-annos expr)]{
@@ -81,7 +81,7 @@ Declares a local variable with the name @racket[id], and the (initial) value giv
 For example:
 @(interaction #:eval the-eval
   (let ()
-    (var x (#:annos [type int]) 5)
+    (var x #:: ([type int]) 5)
     (add1 x)))
 }
 
@@ -91,7 +91,7 @@ For example:
 
 @racketgrammar*[
 #:literals (export foreign type)
-[maybe-annos code:blank (#:annos anno-expr ...)]
+[maybe-annos code:blank (code:line #:: (anno-expr ...))]
 [anno-expr export-anno-expr foreign-anno-expr type-anno-expr ...]
 [export-anno-expr export (export C++-id)]
 [foreign-anno-expr foreign (foreign C++-id)]
@@ -106,7 +106,7 @@ The set of annotations that may be used in Magnolisp is open ended, to allow for
 
 It is not always necessary to explicitly specify a @racket[type] for a typed Magnolisp definition, as the Magnolisp compiler does whole-program type inference (in Hindley-Milner style). When evaluating as Racket, @racket[type] annotations are not used at all.
 
-For convenience, the @racketmodname[magnolisp] language installs a reader extension that supports annotation related shorthands: @litchar{#an}@racket[(_anno-expr ...)] is short for @racket[(#:annos _anno-expr ...)]; @litchar{#ap}@racket[(_anno-expr ...) _expr] is short for @racket[(let-annotate (_anno-expr ...) _expr)]; and @litchar{^}@racket[_type-expr] is short for @racket[(type _type-expr)]. For example, @litchar{#an}(@litchar{^}@racketidfont{int}) reads as @racket[(#:annos (type int))].
+For convenience, the @racketmodname[magnolisp] language installs a reader extension that supports annotation related shorthands: @litchar{#ap}@racket[(_anno-expr ...) _expr] is short for @racket[(let-annotate (_anno-expr ...) _expr)]; and @litchar{^}@racket[_type-expr] is short for @racket[(type _type-expr)]. For example, @litchar{#ap}(@litchar{^}@racketidfont{int}) @racket[_expr] reads as @racket[(let-annotate ((type int)) _expr)].
 
 @deftogether[(
 @defform[(foreign C++-id)]
@@ -338,7 +338,7 @@ For example:
    (begin-racket
      (define six 6)
      (define (one-more x) (let dummy () (+ x 1))))
-   (function (eight) (#:annos foreign [type (-> int)])
+   (function (eight) #:: (foreign [type (-> int)])
      (one-more (one-more six)))
    (eight))
 }
@@ -348,7 +348,7 @@ A Racket expression that is equivalent to writing @racket[(let () Racket-expr _.
 
 For example:
 @(interaction #:eval the-eval
-   (function (three) (#:annos foreign [type (-> int)])
+   (function (three) #:: (foreign [type (-> int)])
      (let-racket 
        (define x 1) 
        (set! x (begin 2 3)) 
@@ -359,7 +359,7 @@ One use case is to @racket[local-require] a Racket definition into a context whe
 
 @(interaction #:eval the-eval
   (function (equal? x y) 
-    (#:annos [type (-> int int Bool)] foreign)
+    #:: ([type (-> int int Bool)] foreign)
     (let-racket
       (local-require (only-in racket/base equal?))
       (equal? x y)))
