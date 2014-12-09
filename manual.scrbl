@@ -85,16 +85,6 @@ For example:
     (add1 x)))
 }
 
-@defform[(let-var id maybe-annos val-expr body)]{
-A shorthand for declaring a single, annotated, locally scoped variable. The variable @racket[id] with the initial value given by @racket[val-expr] is only in the scope of the @racket[body] expression. This form is equivalent to @racket[(let ((id (let-annotate (_anno-expr ...) val-expr))) body)].
-
-For example:
-@(interaction #:eval the-eval
-  (let-var x (#:annos [type int]) 5
-    (add1 x)))
-
-Where one uses other variants of @racketidfont{let}, it is still possible to specify annotations for the bindings with @racket[let-annotate].}
-
 @subsection{Annotations}
 
 @(declare-exporting magnolisp/surface)

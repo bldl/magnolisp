@@ -98,13 +98,6 @@ language.
 
 (define-annos-wrapper* var)
 
-(define-syntax-rule
-  (let-var-impl n (a ...) v b ...)
-  (let ([n (let-annotate (a ...) v)])
-    b ...))
-
-(define-annos-wrapper* let-var)
-
 (define-syntax-rule (typedef-impl t (a ...))
   (define t 
     (let-annotate (a ...)
