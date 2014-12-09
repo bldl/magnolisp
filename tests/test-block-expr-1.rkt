@@ -1,23 +1,23 @@
 #lang magnolisp
 
-(typedef int #an(foreign))
-(typedef long #an(foreign))
+(typedef int #:: (foreign))
+(typedef long #:: (foreign))
 
-(function (g) #an(^(-> int))
+(function (g) #:: (^(-> int))
   (id 555))
 
-(function (f) #an(export)
+(function (f) #:: (export)
   (g))
 
 (function (id x)
   x)
 
-(function (h-1) #an(export)
+(function (h-1) #:: (export)
   (begin-return 
     (void) 
     (return (f))))
 
-(function (h-2) #an(export)
+(function (h-2) #:: (export)
   (begin-return
    (var v (f)) 
    (return v)))

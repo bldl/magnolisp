@@ -2,11 +2,8 @@
 
 #|
 
-A reader extension to implement annotation shorthand, for both
-in-declaration use, and to precede any form.
-
-#an(x ...) is short for (#:annos x ...), which are expected to appear
-within declarations.
+A reader extension to implement annotation shorthand, to precede any
+form, and for type annotations.
 
 #ap(x ...) f is short for (let-annotate (x ...) f), where 'f' is any
 arbitrary annotated form.
@@ -54,20 +51,6 @@ T), where 'T' can be any type expression.
 ;;; #a annotations
 ;;; 
 
-;; (x ...) -> (#:annos x ...)
-(define read-annos-declaration
-  (lambda (ch in src line col pos)
-    (let ((t (read-syntax src in)))
-      (when (eof-object? t)
-        (raise-read-eof-error
-         "expected datum to follow #an"
-         src line col pos #f))
-      (unless (stx-list? t)
-        (raise-read-error
-         (format "expected list to follow #an (got: ~s)" t)
-         src line col pos #f))
-      (quasisyntax/loc t (#:annos (unsyntax-splicing t))))))
-
 ;; (x ...) f -> (let-annotate (x ...) f)
 (define read-anno-form
   (lambda (ch in src line col pos)
@@ -96,15 +79,14 @@ T), where 'T' can be any type expression.
      (let ((kind-ch (read-char in)))
        (when (eof-object? kind-ch)
          (raise-read-eof-error
-          "expected 'n' or 'p' to follow #a"
+          "expected 'p' to follow #a"
           src line col pos #f))
        (define read-hash-a-content
          (cond
-          ((eqv? kind-ch #\n) read-annos-declaration)
           ((eqv? kind-ch #\p) read-anno-form)
           (else
            (raise-read-error
-            (format "expected 'n' or 'p' to follow #a, got ~s" kind-ch)
+            (format "expected 'p' to follow #a, got ~s" kind-ch)
             src line col pos #f))))
        ;; See also 'port-next-location'.
        (when col (set! col (+ col 1)))
@@ -141,10 +123,6 @@ T), where 'T' can be any type expression.
              "^T"
              "#ap(foo bar baz) 5"
              "#ap(^T export (perms X Y)) 7"
-             "#an(^T)"
-             "(function (f) #an(^T export (import #f)) 5)"
-             ;;"#anexternal #at(fn Int Int) (function (f x))"
-             ;;"#anfoo #anbar #anbaz 5"
              )))
        (define in (open-input-string s))
      (for/list ((obj (in-port read in)))

@@ -58,52 +58,39 @@ language.
   (cast t d)
   (let-annotate ([type t]) d))
 
-(define-for-syntax (decl-for-id id)
-  (with-syntax ([impl-id (format-id id "~a-impl" (syntax-e id))]
-                [id id])
-    #'(define-syntax* id
-        (syntax-rules ()
-          [(_ n (#:annos a (... ...)) b (... ...))
-           (impl-id n (a (... ...)) b (... ...))]
-          [(_ n b (... ...))
-           (impl-id n () b (... ...))]))))
+(begin-for-syntax
+  (define-splicing-syntax-class maybe-annos
+    #:description "annotations for a definition"
+    #:attributes (bs)
+    (pattern
+     (~optional
+      (~seq #:: (~and (a:expr ...) as)))
+     #:attr bs (if (attribute as) #'as #'()))))
 
-;; For each passed ID, defines syntax with an optional #:annos
-;; specifier. Each ID must have an -impl binding, which expects a
-;; compulsory annotation listing at the same position.
-(define-syntax* (define-annos-wrapper* stx)
-  (syntax-case stx ()
-    [(_ ids ...)
-     (let ()
-       (define id-lst (syntax->list #'(ids ...)))
-       #`(begin #,@(map decl-for-id id-lst)))]))
+(define-syntax* (function stx)
+  (syntax-parse stx
+    [(_ (f:id p:id ...) as:maybe-annos)
+     #'(define f
+         (let-annotate as.bs
+             (#%plain-lambda (p ...) (void))))]
+    [(_ (f:id p:id ...) as:maybe-annos b:expr ...+)
+     #'(define f
+         (let-annotate as.bs 
+             (#%plain-lambda (p ...) b ...)))]))
 
-(define-syntax function-impl
-  (syntax-rules ()
-    [(_ (f p ...) (a ...))
-     (function-impl (f p ...) (a ...) (void))]
-    [(_ (f p ...) (a ...) b ...)
-     (define f 
-       (let-annotate (a ...)
-         (#%plain-lambda (p ...) b ...)))]))
-    
-(define-annos-wrapper* function)
+(define-syntax* (var stx)
+  (syntax-parse stx
+    [(_ n:id as:maybe-annos v:expr)
+     #'(define n
+         (let-annotate as.bs 
+             v))]))
 
-(define-syntax var-impl
-  (syntax-rules ()
-    [(_ n (a ...) v)
-     (define n
-       (let-annotate (a ...)
-         v))]))
-
-(define-annos-wrapper* var)
-
-(define-syntax-rule (typedef-impl t (a ...))
-  (define t 
-    (let-annotate (a ...)
-      (CORE 'foreign-type))))
-
-(define-annos-wrapper* typedef)
+(define-syntax* (typedef stx)
+  (syntax-parse stx
+    [(_ t:id as:maybe-annos)
+     #'(define t 
+         (let-annotate as.bs 
+             (CORE 'foreign-type)))]))
 
 (define-syntax* (let/local-ec stx)
   (syntax-parse stx

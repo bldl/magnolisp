@@ -10,5 +10,5 @@ A library of built-in types and functions in Magnolisp.
 
 (provide Bool Void)
 
-(typedef Bool (#:annos [foreign bool]))
-(typedef Void (#:annos [foreign void]))
+(typedef Bool #:: ([foreign bool]))
+(typedef Void #:: ([foreign void]))
