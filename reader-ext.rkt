@@ -8,10 +8,8 @@ in-declaration use, and to precede any form.
 #an(x ...) is short for (#:annos x ...), which are expected to appear
 within declarations.
 
-#ap(x ...) f is short for (anno x ... f), where 'f' is any arbitrary
-annotated form. We follow the Scheme tradition by turning these into
-forms, namely 'anno' forms, and libraries can then decide on the
-semantics of each kind of annotation.
+#ap(x ...) f is short for (let-annotate (x ...) f), where 'f' is any
+arbitrary annotated form.
 
 Orthogonally to the above, we also support ^T as shorthand for (type
 T), where 'T' can be any type expression.
@@ -27,7 +25,7 @@ T), where 'T' can be any type expression.
 
 ;; We do not need and should not have any enrichment while reading
 ;; syntax.
-(define anno-id-stx (strip-context #'anno))
+(define anno-id-stx (strip-context #'let-annotate))
 (define type-id-stx (strip-context #'type))
 
 ;;; 
@@ -70,7 +68,7 @@ T), where 'T' can be any type expression.
          src line col pos #f))
       (quasisyntax/loc t (#:annos (unsyntax-splicing t))))))
 
-;; (x ...) f -> (anno x ... f)
+;; (x ...) f -> (let-annotate (x ...) f)
 (define read-anno-form
   (lambda (ch in src line col pos)
     (let ((s (read-syntax src in)))
@@ -88,8 +86,7 @@ T), where 'T' can be any type expression.
            (format "expected datum to follow #ap annotation ~s" s)
            src line col pos #f))
         (quasisyntax/loc (make-loc-stx src line col pos)
-          ((unsyntax anno-id-stx) (unsyntax-splicing s)
-           (unsyntax d)))))))
+          ((unsyntax anno-id-stx) (unsyntax s) (unsyntax d)))))))
 
 (define read-hash-a-form
   (case-lambda
@@ -137,7 +134,7 @@ T), where 'T' can be any type expression.
 ;;; tests
 ;;; 
 
-(module* main #f
+(module* test #f
   (require "util.rkt")
   (with-magnolisp-readtable
    (for ((s (list

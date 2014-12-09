@@ -45,6 +45,7 @@ language.
     [(_ x ...)
      #'(CORE 'anno 'expected (quote-syntax (x ...)))]))
 
+;; A form that annotates not an identifier, but any expression.
 (define-syntax* (let-annotate stx)
   (syntax-case stx ()
     [(_ (a ...) e)
@@ -53,11 +54,9 @@ language.
         (let-values ([() (begin a (values))] ...) e))
       'annotate #t)]))
 
-;; A form that annotates not an identifier, but any expression. The
-;; annotations are stored as expressions in a `let` wrapper.
 (define-syntax-rule*
-  (anno a ... e)
-  (let-annotate (a ...) e))
+  (cast t d)
+  (let-annotate ([type t]) d))
 
 (define-for-syntax (decl-for-id id)
   (with-syntax ([impl-id (format-id id "~a-impl" (syntax-e id))]
@@ -106,10 +105,6 @@ language.
 
 (define-annos-wrapper* let-var)
 
-(define-syntax-rule*
-  (cast t d)
-  (let-annotate ([type t]) d))
-
 (define-syntax-rule (typedef-impl t (a ...))
   (define t 
     (let-annotate (a ...)
@@ -118,15 +113,15 @@ language.
 (define-annos-wrapper* typedef)
 
 (define-syntax* (let/local-ec stx)
-  (syntax-case stx ()
+  (syntax-parse stx
     [(_ . rest)
      (syntax-property
       (syntax/loc stx (let/ec . rest))
       'local-ec #t)]))
 
 (define-syntax* (apply/local-ec stx)
-  (syntax-case stx ()
-    [(_ k e)
+  (syntax-parse stx
+    [(_ k:id e:expr)
      (syntax-property
       (syntax/loc stx (k e))
       'local-ec #t)]))
@@ -143,13 +138,13 @@ language.
          [(_ v) (apply/local-ec k v)])])
      body ...)))
 
-(define-syntax (in-racket stx)
+(define-syntax (flag-as-in-racket stx)
   (syntax-parse stx
     [(_ form)
      (syntax-property #'form 'in-racket #t)]))
 
 (define-syntax-rule* (begin-racket form ...)
-  (in-racket (begin form ...)))
+  (flag-as-in-racket (begin form ...)))
 
 (define-syntax-rule* (let-racket e ...)
-  (in-racket (let () e ...)))
+  (flag-as-in-racket (let () e ...)))
