@@ -24,7 +24,7 @@ Magnolisp for-syntax.
                    (t)))
   ;; Import readtable. Note that it needs to be in the `reader`
   ;; submodule scope, not the outer one.
-  (require magnolisp/reader-ext))
+  (require magnolisp/reader-ext-2014))
 
 (provide (except-out (all-from-out racket/base) #%module-begin))
 
