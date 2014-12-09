@@ -425,6 +425,8 @@ which instructs the compiler to print out C++ code into standard output, with ba
 
 For sample Magnolisp programs, see the @filepath{test-*.rkt} files in the @filepath{tests} directory of the Magnolisp implementation codebase.
 
+Note that some of the example programs are written in Magnolisp language variants other than @racketmodname[magnolisp] (which is the only one documented here), but the differences are typically minor and superficial.
+
 @section{Software Download}
 
 A Git repository of the Magnolisp source code can be found at:

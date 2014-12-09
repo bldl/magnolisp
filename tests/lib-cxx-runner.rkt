@@ -1,18 +1,20 @@
-#lang magnolisp/2014
+#lang magnolisp
+
+(require (prefix-in r. racket/base)) 
 
 (provide int put-int putting-int inc)
 
-(typedef int (#:annos foreign))
+(typedef int #:: (foreign))
 
 (function (put-int x) 
-  (#:annos foreign [type (fn int Void)])
-  (displayln x))
+  #:: (foreign [type (-> int Void)])
+  (r.displayln x))
 
 (function (putting-int x) 
-  (#:annos foreign [type (fn int int)])
-  (displayln x)
+  #:: (foreign [type (-> int int)])
+  (r.displayln x)
   x)
 
 (function (inc x)
-  (#:annos (type (fn int int)) foreign)
-  (add1 x))
+  #:: ((type (-> int int)) foreign)
+  (r.add1 x))
