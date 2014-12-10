@@ -2,7 +2,7 @@
 
 (require (prefix-in r. racket/base)) 
 
-(provide int put-int putting-int inc)
+(provide int put-int putting-int inc non-zero?)
 
 (typedef int #:: (foreign))
 
@@ -18,3 +18,7 @@
 (function (inc x)
   #:: ((type (-> int int)) foreign)
   (r.add1 x))
+
+(function (non-zero? x) 
+  #:: ([type (-> int Bool)] foreign)
+  (r.not (r.= x 0)))

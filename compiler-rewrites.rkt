@@ -343,20 +343,25 @@
          (values target (LetExpr a n-dv es)))]
       [(LetLocalEc a k es)
        ;; We normalize so that if `es` does not already end with a
-       ;; definite escape to `k` or beyond, we add such an escape as
-       ;; the last thing to evaluate within `es`.
+       ;; definite escape to `k` or beyond, we add an escape to `k` as
+       ;; the last thing to evaluate within `es`. It follows that if
+       ;; there is no escape to `k`, than the corresponding
+       ;; `LetLocalEc` block has no value at all.
        (define k-id (Var-id k))
        (define target (Id-bind k-id))
        (parameterize ((scopes (cons target (scopes))))
          (let-values (((es-target es) (rw-lst es)))
            (cond
             (es-target
-             (unless (memq es-target (scopes))
+             (cond
+              ((not (memq es-target (scopes)))
                (error 'ast-normalize-LetLocalEc
                       "escapes ~a beyond context ~a"
                       es-target (scopes)))
-             (values (and (not (eq? es-target target)) es-target)
-                     (LetLocalEc a k es)))
+              ((eq? es-target target)
+               (values #f (LetLocalEc a k es)))
+              (else ;; always escapes beyond this block
+               (values es-target (SeqExpr a es)))))
             (else
              (define n-es (list-map-last
                            (lambda (e) (annoless AppLocalEc k e))
@@ -381,7 +386,7 @@
      (else
       (all-rw-term rw-any-LetLocalEc ast))))
           
-  (rw-any-LetLocalEc in-ast))
+  (ast-splice-SeqExpr (rw-any-LetLocalEc in-ast)))
 
 ;; Where a SeqExpr appears within another SeqCont of some kind,
 ;; inlines the SeqExpr contents within the outer container.
@@ -407,7 +412,7 @@
   (innermost
    (match-lambda
     [(LetLocalEc _ (Var _ k1) (list (AppLocalEc _ (Var _ k2) e)))
-     (ast-identifier=? k1 k2)
+     #:when (ast-identifier=? k1 k2)
      e]
     [(IfExpr a c t e)
      #:when (equal? t e)

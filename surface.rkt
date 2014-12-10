@@ -99,7 +99,7 @@ language.
       (syntax/loc stx (let/ec . rest))
       'local-ec #t)]))
 
-(define-syntax* (apply/local-ec stx)
+(define-syntax* (app/local-ec stx)
   (syntax-parse stx
     [(_ k:id e:expr)
      (syntax-property
@@ -115,7 +115,7 @@ language.
     (syntax-parameterize
      ([return
        (syntax-rules ()
-         [(_ v) (apply/local-ec k v)])])
+         [(_ v) (app/local-ec k v)])])
      body ...)))
 
 (define-syntax (flag-as-in-racket stx)

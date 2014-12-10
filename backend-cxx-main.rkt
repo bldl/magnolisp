@@ -369,7 +369,7 @@ C++ back end.
   (define def-lst (filter Defun? (hash-values defs-t)))
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (map def->cxx def-lst))
-  ;;(pretty-print def-lst)
+  ;;(pretty-print def-lst) (exit)
   (set! def-lst (map CxxDefun-rm-SeqExpr def-lst))
   ;;(pretty-print def-lst)
   def-lst)
@@ -431,6 +431,9 @@ C++ back end.
       [(VoidStat a)
        ;; Discarding result due to statement context.
        (SeqStat a '())]
+      [(LiftStatExpr a id ss)
+       (define dv (annoless DeclVar id (Expr-type ast)))
+       (SeqStat a (cons dv (map to-stat ss)))]
       [(or (? Goto?) (? DeclVar?) (? NoBody?) (? Label?))
        ast]
       [_
@@ -1086,6 +1089,7 @@ C++ back end.
     (thread1->
      defs-t
      defs->cxx
+     ;;pp-exit
      cxx-rm-LiftStatExpr
      ;;pp-only
      cxx-fun-optimize

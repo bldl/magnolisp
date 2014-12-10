@@ -123,6 +123,40 @@ An annotation that marks a function definition as ``public''. That is, the funct
 @defform[(type type-expr)]{
 An annotation that specifies the Magnolisp type of a function, variable, or expression.}
 
+@subsection[#:tag "type-expressions"]{Type Expressions}
+
+@(declare-exporting magnolisp/surface)
+
+@racketgrammar*[
+#:literals (->)
+[type-expr type-id fn-type-expr]
+[fn-type-expr (-> type-expr ... type-expr)]]
+
+Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined types in Magnolisp are @racket[Void] and @racket[Bool], and any others must be declared using @racket[typedef].
+
+@defform[(-> type-expr ... type-expr)]{
+A function type expression, containing type expressions the function's arguments and its return value, in that order. A Magnolisp function always returns a single value.}
+
+@subsection{Expressions}
+
+@(declare-exporting magnolisp/surface)
+
+Like Racket (and unlike C++), the Magnolisp language makes no distinction between statements and expressions. Some expressions yield no useful value, however; such expressions conceptually produce a result of type @racket[Void] (such result values do exist at Racket run time, but not at C++ run time). Some expressions yield @emph{no} values (or @emph{multiple} values), but are merely used as a syntactic device, and only allowed to appear in certain contexts.
+
+Magnolisp borrows a number of constructs from Racket (or Scheme). For example, there is a conditional form @racket[(if _test-expr _then-expr _else-expr)], as well as the derived forms @racket[(when _test-expr _then-expr ...+)] and @racket[(unless _test-expr _then-expr ...+)]. The @racket[_test-expr] conditional expression must always be of type @racket[Bool], and whether it holds depends on the ``truthiness'' of its value, as interpreted in C++ or Racket (as applicable). The branches of an @racket[if] must generally be of the same type, except where the result of the @racket[if] form is discarded. The @racket[when] and @racket[unless] can generally only appear in such result-discarding contexts, as they have an implicit ``else'' branch of type @racket[Void].
+
+A @racket[(begin _body _...)] form, in Magnolisp, signifies a sequence of expressions, itself constituting an expression. Similarly to Racket, to allow declarations to appear within an expression sequence, @racket[(let () _body _...)] should be used instead.
+
+The @racket[(let ([_id _expr] _...) _body ...+)], @racket[(let* ([_id _expr] _...) _body ...+)], and @racket[(letrec ([_id _expr] _...) _body ...+)] forms are also available in Magnolisp, but the named variant of @racket[let] is not supported.
+
+The @racket[(set! _id _expr)] form is likewise available in Magnolisp, supporting assignment to variables.
+The left-hand side expression @racket[_id] must be a reference to a bound variable.
+(The @racket[_id] may naturally instead be a transformer binding to an assignment transformer, in which case the form is macro transformed as normal.)
+
+In Magnolisp, @racket[(void _expr _...)] is an expression with no useful result (the result is of the unit type @racket[Void]). Any arguments to @racket[void] are evaluated as usual, but they are not used. The @racket[(values)] form signifies ``nothing,'' and has no result; hence it is an error for @racket[(values)] to appear in a position where the context expects a result. In result expecting contexts, the former may only appear in a 1-value context, and the latter in a 0-value context (there are few in Magnolisp).
+
+The @racket[var], @racket[function], and @racket[typedef] declaration forms may appear in a Racket @emph{internal-definition context} (and not Racket @emph{expression context}). The same is true of @racketidfont{define} forms that conform to the restricted syntax supported by the Magnolisp compiler.
+
 @defform[(cast type-expr expr)]{
 Annotates expression @racket[expr] with the type given by @racket[type-expr]. A @racket[cast] is commonly used to specify the type of a literal, which by themselves are generally untyped in Magnolisp. While the literal @racket["foo"] is treated as a @racket[string?] value by Racket, the Magnolisp compiler will expect to determine the literal expression's Magnolisp type based on annotations. The @racket[cast] form allows one to ``cast'' an expression to a specific type for the compiler.
 
@@ -143,41 +177,7 @@ For example:
     x))
 }
 
-@subsection[#:tag "type-expressions"]{Type Expressions}
-
-@(declare-exporting magnolisp/surface)
-
-@racketgrammar*[
-#:literals (->)
-[type-expr type-id fn-type-expr]
-[fn-type-expr (-> type-expr ... type-expr)]]
-
-Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined types in Magnolisp are @racket[Void] and @racket[Bool], and any others must be declared using @racket[typedef].
-
-@defform[(-> type-expr ... type-expr)]{
-A function type expression, containing type expressions the function's arguments and its return value, in that order. A Magnolisp function always returns a single value.}
-
-@subsection{Statements and Expressions}
-
-@(declare-exporting magnolisp/surface)
-
-Like Racket (and unlike C++), the Magnolisp language makes no distinction between statements and expressions. Some expressions yield no useful value, however; such expressions conceptually produce a result of type @racket[Void] (such result values do exist at Racket run time, but not at C++ run time). Some expressions yield @emph{no} values (or @emph{multiple} values), but are merely used as a syntactic device, and only allowed to appear in certain contexts.
-
-Magnolisp borrows a number of constructs from Racket (or Scheme). For example, there is a conditional form @racket[(if _test-expr _then-expr _else-expr)], as well as the derived forms @racket[(when _test-expr _then-expr ...+)] and @racket[(unless _test-expr _then-expr ...+)]. The @racket[_test-expr] conditional expression must always be of type @racket[Bool], and whether it holds depends on the ``truthiness'' of its value, as interpreted in C++ or Racket (as applicable). The branches of an @racket[if] must generally be of the same type, except where the result of the @racket[if] form is discarded. The @racket[when] and @racket[unless] can generally only appear in such result-discarding contexts, as they have an implicit ``else'' branch of type @racket[Void].
-
-A @racket[(begin _body _...)] form, in Magnolisp, signifies a sequence of expressions, itself constituting an expression. Similarly to Racket, to allow declarations to appear within an expression sequence, @racket[(let () _body _...)] should be used instead.
-
-The @racket[(let ([_id _expr] _...) _body ...+)], @racket[(let* ([_id _expr] _...) _body ...+)], and @racket[(letrec ([_id _expr] _...) _body ...+)] forms are also available in Magnolisp, but the named variant of @racket[let] is not supported.
-
-The @racket[(set! _id _expr)] form is likewise available in Magnolisp, supporting assignment to variables.
-The left-hand side expression @racket[_id] must be a reference to a bound variable.
-(The @racket[_id] may naturally instead be a transformer binding to an assignment transformer, in which case the form is macro transformed as normal.)
-
-In Magnolisp, @racket[(void _expr _...)] is an expression with no useful result (the result is of the unit type @racket[Void]). Any arguments to @racket[void] are evaluated as usual, but they are not used. The @racket[(values)] form signifies ``nothing,'' and has no result; hence it is an error for @racket[(values)] to appear in a position where the context expects a result. In result expecting contexts, the former may only appear in a 1-value context, and the latter in a 0-value context (there are few in Magnolisp).
-
-The @racket[var], @racket[function], and @racket[typedef] declaration forms may appear in a Racket @emph{internal-definition context} (and not Racket @emph{expression context}). The same is true of @racketidfont{define} forms that conform to the restricted syntax supported by the Magnolisp compiler.
-
-@defform[(begin-return expr ...)]{
+@defform[(begin-return expr ...+)]{
 A @deftech{return block} containing a sequence of expressions. The block must produce a single value by @racket[return]ing it, or by letting it ``fall out'' of the block. The returned or fallen-out value becomes the value of the containing @racket[begin-return] expression. All value giving expressions in a block must be of the same type.
 
 For example:
@@ -190,6 +190,25 @@ For example:
 
 @defform[(return expr)]{
 An expression that causes any enclosing @racket[begin-return] block (which must exist) to yield the value of the expression @racket[expr].}
+
+@defform[(let/local-ec k body ...+)]{
+A more general variant of @racket[begin-return] which assigns a label @racket[k] to the escape continuation. The value of the overall expression is given either by the last expression of its body, or the argument expression @racket[_expr] of any evaluated @racket[(app/local-ec k _expr)] within the body.
+
+For example:
+@(interaction #:eval the-eval
+  (let/local-ec outer-k
+    (when #f
+      (app/local-ec outer-k 5))
+    (begin-return
+      (when #f
+        (return 6))
+      (let/local-ec inner-k
+        (app/local-ec outer-k 7))
+      8)))
+}
+
+@defform[(app/local-ec k expr)]{
+An expression that causes a jump to a surrounding continuation labeled by @racket[k], with the continuation yielding the value given by expression @racket[expr]. It is possible to jump beyond other, intermediate @racket[let/local-ec] (or @racket[begin-return]) blocks, but jumping outside the surrounding function body is not possible.}
 
 @subsection{Standard Library}
 
