@@ -18,6 +18,9 @@ custom-install-bin :
 clean :
 	find -name compiled -type d -print0 | xargs -0 --no-run-if-empty rm -r
 
+setup :
+	raco setup magnolisp
+
 # takes a long time
 clean-with-raco :
 	raco setup --clean magnolisp
@@ -30,6 +33,12 @@ bytecode :
 
 api-doc :
 	-rm -r doc
+	mkdir -p doc/manual
+	scribble ++xref-in setup/xref load-collections-xref --html --dest doc/manual --dest-name index.html manual.scrbl
+
+# creates a slightly different directory structure
+api-doc-with-raco :
+	-rm -r doc
 	raco setup --no-zo --no-launcher --no-install --no-post-install magnolisp
 
 DIST_HOME := $(PWD)/dist
@@ -37,12 +46,11 @@ DIST_HOME := $(PWD)/dist
 rm-dist :
 	-rm -r $(DIST_HOME)
 
-# for this rule to produce .pdf, must do setup first, it seems
-pdf :
-	-mkdir $(DIST_HOME)
-	raco setup --no-zo --no-launcher --no-install --no-post-install --verbose --doc-pdf $(DIST_HOME) magnolisp
+pdf-manual :
+	mkdir -p $(DIST_HOME)
+	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --pdf --dest $(DIST_HOME) --dest-name manual.pdf manual.scrbl
 
-html-doc :
+html-manual :
 	-rm -r $(DIST_HOME)/manual
 	mkdir -p $(DIST_HOME)/manual
 	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --html --dest $(DIST_HOME)/manual --dest-name index.html manual.scrbl
@@ -60,11 +68,8 @@ pkg :
 
 website-local :
 
-website : rm-dist html-doc pdf pkg website-local
+website : rm-dist html-manual pdf-manual pkg website-local
 	chmod -R a+rX $(DIST_HOME)
-
-setup :
-	raco setup magnolisp
 
 test :
 	raco test --direct --run-if-absent tests/run-*.rkt
