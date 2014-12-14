@@ -1,22 +1,22 @@
-#lang magnolisp/2014
+#lang magnolisp
 
 (function (f)
-  (#:annos export (type (fn Bool)))
+  #:: (export (type (-> Bool)))
   #t)
 
 (f)
 
 (function (g)
-  (#:annos export (type (fn Bool)))
-  (do
+  #:: (export (type (-> Bool)))
+  (begin-return
     (var r #f)
     (return r)))
 
 (g)
 
 (function (h)
-  (#:annos export (type (fn Bool)))
-  (do
+  #:: (export (type (-> Bool)))
+  (begin-return
     (var r #f)
     (var x r)
     (return x)))

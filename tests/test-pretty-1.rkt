@@ -1,19 +1,19 @@
-#lang magnolisp/2014
+#lang magnolisp
 
-(typedef int (#:annos foreign))
-(typedef string (#:annos foreign))
-(typedef DataBaseSession (#:annos foreign))
+(typedef int #:: (foreign))
+(typedef string #:: (foreign))
+(typedef DataBaseSession #:: (foreign))
 
-(function (badCond) (#:annos (type (fn Bool)) foreign))
+(function (badCond) #:: ((type (-> Bool)) foreign))
 
 (function (openDataBase name)
-  (#:annos (type (fn string DataBaseSession)))
+  #:: ((type (-> string DataBaseSession)))
   1)
 
 (function (main anEncoding aMaxNumThreads 
                 aDataBaseName aDoFlushToDisk)
-  #an(^(fn string int string Bool DataBaseSession) export)
-  (do
+  #:: (^(-> string int string Bool DataBaseSession) export)
+  (begin-return
     (var enc anEncoding)
     (var th aMaxNumThreads)
     (var name aDataBaseName)

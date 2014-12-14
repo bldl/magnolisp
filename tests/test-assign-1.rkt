@@ -1,14 +1,14 @@
-#lang magnolisp/2014
+#lang magnolisp
 
-(typedef int (#:annos foreign))
+(typedef int #:: (foreign))
 
 (function (holds? x)
-  (#:annos (type (fn int Bool)) foreign)
+  #:: ((type (-> int Bool)) foreign)
   #f)
 
 (function (f x)
-  (#:annos export (type (fn int Bool)))
-  (do
+  #:: (export (type (-> int Bool)))
+  (begin-return
     (var y (holds? x))
     (let ((x #t))
       (set! y x))

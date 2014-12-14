@@ -1,9 +1,9 @@
-#lang magnolisp/2014
+#lang magnolisp
 (require "lib-cxx-runner.rkt")
 
 (function (f x)
-  (#:annos (type (fn int int)))
-  (do
+  #:: ((type (-> int int)))
+  (begin-return
     (var y (inc x)) ;; y = 9
     (put-int y)
     (set! y (inc y)) ;; y = 10
@@ -14,6 +14,6 @@
     (return z)))
 
 (function (run)
-  (#:annos export [type (fn Void)] [expected 9 10 11])
+  #:: (export [type (-> Void)] [expected 9 10 11])
   (f 8)
   (void))

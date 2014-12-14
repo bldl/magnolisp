@@ -1,7 +1,7 @@
-#lang magnolisp/2014
+#lang magnolisp
 
 ;; we use `Bool` values, but do not explicitly refer to the type
-(function (f) (#:annos export)
+(function (f) #:: (export)
   (let ((x #f))
     x))
 

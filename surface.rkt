@@ -128,3 +128,21 @@ language.
 
 (define-syntax-rule* (let-racket e ...)
   (flag-as-in-racket (let () e ...)))
+
+(define-syntax* (let-racket/require stx)
+  (define-syntax-class sym-spec
+    #:description "import spec for `let-racket/require`"
+    #:attributes (spec)
+    (pattern
+     (sym:id ...)
+     #:attr spec (with-syntax ((rb (datum->syntax stx 'racket/base)))
+                   #'(only-in rb sym ...)))
+    (pattern
+     (sym:id ... #:from mp:expr)
+     #:attr spec #'(only-in mp sym ...)))
+  
+  (syntax-parse stx
+    ((_ (req:sym-spec ...) e:expr ...+)
+     #'(let-racket
+        (local-require req.spec ...)
+        e ...))))
