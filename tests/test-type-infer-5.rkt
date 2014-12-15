@@ -1,10 +1,10 @@
-#lang magnolisp/2014
+#lang magnolisp
 
-(typedef long #an(foreign))
+(typedef long #:: (foreign))
 
 (function (id x) x)
 
-(function (f x) #an(export)
+(function (f x) #:: (export)
   (cast long (let ((x x)) (id x))))
 
 (f 8)

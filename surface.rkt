@@ -17,6 +17,11 @@ language.
 (define-syntax-rule* (-> at ... rt)
   (CORE 'fn at ... rt))
 
+;; ∃t,... u type expression, where `t` are type parameter names, and
+;; `u` is a type expression.
+(define-syntax-rule* (exists t ... u)
+  (CORE 'exists (let ((t #f) ...) u)))
+
 ;; Type annotation.
 (define-syntax-rule* (type t)
   (CORE 'anno 'type t))

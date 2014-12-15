@@ -46,8 +46,17 @@
 ;;; 
 
 (define (parse-type-expr t-e)
+  (define tp->sym (make-parameter (make-immutable-free-id-table #:phase 0)))
+  
   (let loop ([stx t-e])
     (kernel-syntax-case*/phase stx 0 (#%magnolisp)
+      [id
+       (identifier? #'id)
+       (let ()
+         (define sym (free-id-table-ref (tp->sym) #'id #f))
+         (if sym
+             (syntaxed stx VarT sym)
+             (syntaxed stx NameT #'id)))]
       [(if _ (#%plain-app #%magnolisp (quote f) p ... r) _)
        (eq? 'fn (syntax-e #'f))
        (let ()
@@ -55,9 +64,19 @@
          (define p-ast-lst (map loop p-stx-lst))
          (define r-ast (loop #'r))
          (syntaxed stx FunT p-ast-lst r-ast))]
-      [id
-       (identifier? #'id)
-       (syntaxed stx NameT #'id)]
+      [(if _ (#%plain-app #%magnolisp (quote q)
+                          (let-values (((tp) _) ...)
+                            sub-t)) _)
+       (eq? 'exists (syntax-e #'q))
+       (let ()
+         (define tp-lst (syntax->list #'(tp ...)))
+         (define h
+           (for/fold ((h (tp->sym))) ((id tp-lst))
+             (free-id-table-set h id (gensym (syntax-e id)))))
+         (define ast
+           (parameterize ((tp->sym h))
+             (loop #'sub-t)))
+         ast)]
       [_
        (raise-language-error
         #f "illegal type expression"
