@@ -39,7 +39,7 @@ For defining macros and macro-expansion time computation, the relevant Racket fa
 
 In Magnolisp, it is possible to declare @racket[function]s, types (with @racket[typedef]), and @racket[var]iables; of these, variable definitions are not allowed at the top level. The Magnolisp binding forms are in the @racketmodname[magnolisp/surface] library. The @racketmodname[magnolisp] language provides @racketmodname[magnolisp/surface] at phase level 0.
 
-As Magnolisp has almost no standard library, it is ultimately necessary to define primitive types and functions (flagged as @racket[foreign]) in order to be able to compile programs that do anything useful.
+As Magnolisp has almost no standard library, it is ultimately necessary to define primitive types and functions (flagged as @racket[foreign]) in order to be able to compile programs that do anything useful. For this reason there is also a @racket[primitives] convenience form for declaring multiple @racket[foreign] types and/or functions at once.
 
 @defform/subs[(function (id arg ...) maybe-annos maybe-body)
               ([maybe-body code:blank expr])]{
@@ -84,6 +84,13 @@ For example:
     (var x #:: ([type int]) 5)
     (add1 x)))
 }
+
+@defform/subs[#:literals (::)
+(primitives declaration ...)
+  ([declaration
+    [#:type id]
+    [#:function (id arg ...) :: fn-type-expr]])]{
+Declares the specified types and functions as @racket[foreign] primitives, whose C++ name is assumed to be the same as the Magnolisp name. Any declared functions will have no Racket implementation.}
 
 @subsection{Annotations}
 

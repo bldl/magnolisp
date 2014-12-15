@@ -25,12 +25,9 @@
 
 ;; Feeds standard input into the system command `cmd`. Function `f`
 ;; takes an output port as an argument, and should write the input
-;; there. Throws an exception on failure, including a non-zero exit
-;; code.
-(define (exe-consume-input cmd f)
+;; there. Returns the exit code, unless altogether fails to run.
+(define (exe-consume-input/exit-code cmd f #:out out #:err err)
   (define-values (in user-out) (make-pipe #f 'exe-in 'out-via-exe-consume-input))
-  (define out (open-output-nowhere))
-  (define err (open-output-nowhere))
   (define r (apply process*/ports out in err cmd))
   (define ctrl (fifth r))
   (with-handlers ((exn:fail? (lambda (e) 
@@ -43,9 +40,28 @@
   (unless exit-code
     (error 'exe-consume-input 
            "command unexpectedly still running after wait: ~s" cmd))
+  exit-code)
+
+;; Feeds standard input into the system command `cmd`. Function `f`
+;; takes an output port as an argument, and should write the input
+;; there. Throws an exception on failure, including a non-zero exit
+;; code, including output from the command if `detail` is 'stdout,
+;; 'stderr, or 'both.
+(define (exe-consume-input cmd f #:detail [detail #f])
+  (define out? (memq detail '(stdout both)))
+  (define err? (memq detail '(stderr both)))
+  (define out (if out? (open-output-string) (open-output-nowhere)))
+  (define err (if err? (open-output-string) (open-output-nowhere)))
+  (define exit-code
+    (exe-consume-input/exit-code cmd f #:out out #:err err))
+  (define (get-detail)
+    (with-output-to-string
+      (lambda ()
+       (when out? (newline) (display (get-output-string out)))
+       (when err? (newline) (display (get-output-string err))))))
   (unless (= exit-code 0)
     (error 'exe-consume-input 
-           "command exited with error code ~a: ~s" exit-code cmd)))
+           "command exited with error code ~a: ~s~a" exit-code cmd (get-detail))))
 
 ;; Gets standard output of the specified command, which is not subject
 ;; to shell expansion. Returns #f if the command fails.

@@ -146,3 +146,15 @@ language.
      #'(let-racket
         (local-require req.spec ...)
         e ...))))
+
+(define-syntax* primitives
+  (syntax-rules (::)
+    [(_) (begin)]
+    [(_ [#:type t] . more)
+     (begin 
+       (typedef t #:: (foreign))
+       (primitives . more))]
+    [(_ [#:function form :: t] . more)
+     (begin 
+       (function form #:: ([type t] foreign))
+       (primitives . more))]))

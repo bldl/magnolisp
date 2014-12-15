@@ -2,12 +2,17 @@
 
 (require (prefix-in r. racket/base)) 
 
-(provide int put-int putting-int inc non-zero?)
+(provide int long put-int put-long putting-int inc non-zero? ->long)
 
 (typedef int #:: (foreign))
+(typedef long #:: (foreign))
 
 (function (put-int x) 
   #:: (foreign [type (-> int Void)])
+  (r.displayln x))
+
+(function (put-long x) 
+  #:: (foreign [type (-> long Void)])
   (r.displayln x))
 
 (function (putting-int x) 
@@ -22,3 +27,7 @@
 (function (non-zero? x) 
   #:: ([type (-> int Bool)] foreign)
   (r.not (r.= x 0)))
+
+(function (->long x)
+  #:: ([type (-> int long)] foreign)
+  x)

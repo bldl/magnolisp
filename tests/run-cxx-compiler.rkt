@@ -40,13 +40,18 @@ executable, and then comparing actual output against expected output.
 ;; `action` as the last one.
 (define-syntax-rule (ensure body #:finally action)
   (let ((cleanup (lambda () action)))
-    (with-handlers ((exn:fail (lambda (e) (cleanup) (raise e))))
-      (begin0 body
-              (cleanup)))))
+    (with-handlers ((exn:fail? (lambda (e) 
+                                 (cleanup) 
+                                 (raise e))))
+      (begin0 
+        body
+        (cleanup)))))
 
 (define (with-temporary-file f)
   (let ((fn (make-temporary-file)))
     (ensure (f fn) #:finally (maybe-delete-file fn))))
+
+(define show-cxx-code? (make-parameter #f))
 
 (define (compile-and-run-one-mgl-file cc-fun fn)
   (define st (compile-files fn))
@@ -66,7 +71,8 @@ executable, and then comparing actual output against expected output.
     (generate-files st '((cxx (cc))) #:banner #f #:out out)
     (call-with-input-file postamble (lambda (in) (copy-port in out))))
   
-  ;;(generate (current-output-port))
+  (when (show-cxx-code?)
+    (generate (current-output-port)))
 
   (define (cc-and-run a.out)
     (cc-fun a.out generate)
@@ -83,7 +89,8 @@ executable, and then comparing actual output against expected output.
 
   (values actual expected))
   
-(define (compile-and-run-mgl-files)
+(define (compile-and-run-mgl-files [list-files
+                                    (thunk (directory-list mgl-file-dir))])
   (define cc-fun ;; (-> path-string? (-> output-port? any/c) void?)
     (let-and exe (find-executable-path "clang")
       (let-and ver (query-clang-version exe)
@@ -91,11 +98,11 @@ executable, and then comparing actual output against expected output.
              (lambda (a.out generate)
                (let ((cmd `(,exe "-x" "c++" "-std=c++14" 
                             "-o" ,a.out "-lstdc++" "-")))
-                 (exe-consume-input cmd generate)))))))
+                 (exe-consume-input cmd generate #:detail 'stderr)))))))
   
   ;; Run no tests without a suitable compiler.
   (when cc-fun
-    (for ((bn (directory-list mgl-file-dir))
+    (for ((bn (list-files))
           #:when (regexp-match-exact? #rx"test-run-.*[.]rkt" bn))
       (define fn (build-path mgl-file-dir bn))
       (with-handlers ((exn:fail?
@@ -109,6 +116,8 @@ executable, and then comparing actual output against expected output.
           (check-equal? 
            actual expected
            (format "run-via-C++ test: un`expected` output for ~a" bn)))))))
+
+;;(parameterize ((show-cxx-code? #t)) (compile-and-run-mgl-files (thunk '("test-run-compsys-1.rkt"))))
 
 (module* test #f
   (compile-and-run-mgl-files))
