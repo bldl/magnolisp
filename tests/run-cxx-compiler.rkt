@@ -117,7 +117,7 @@ executable, and then comparing actual output against expected output.
            actual expected
            (format "run-via-C++ test: un`expected` output for ~a" bn)))))))
 
-;;(parameterize ((show-cxx-code? #t)) (compile-and-run-mgl-files (thunk '("test-run-compsys-1.rkt"))))
+;;(parameterize ((show-cxx-code? #f)) (compile-and-run-mgl-files (thunk '("test-run-sum-3.rkt"))))
 
 (module* test #f
   (compile-and-run-mgl-files))
