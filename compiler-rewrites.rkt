@@ -121,6 +121,72 @@
       y))
 
 ;;; 
+;;; types
+;;; 
+
+(define* (NameT-from-id id)
+  (ast-annotated id NameT id))
+
+(define* (def-get-type def)
+  (match def
+    ((DefVar _ _ t _)
+     t)
+    ((Param _ _ t)
+     t)
+    ((Defun _ _ t _ _)
+     t)
+    ((ForeignTypeDecl _ id _)
+     (NameT-from-id id))))
+
+(define* (def-set-type def t)
+  (match def
+    ((DefVar a id _ v)
+     (DefVar a id t v))
+    ((Param a id _)
+     (Param a id t))
+    ((Defun a id _ ps b)
+     (Defun a id t ps b))
+    ((? ForeignTypeDecl?)
+     def)))
+
+;; Returns #f for nodes that have no type, and for nodes of type Stat.
+(define* (ast-get-nonfixed-type ast)
+  (cond 
+   [(Def? ast)
+    (def-get-type ast)]
+   [(Expr? ast)
+    (Expr-type ast)]
+   [else
+    #f]))
+
+(define* (ast-set-nonfixed-type ast t)
+  (cond-or-fail
+   [(Def? ast)
+    (def-set-type ast t)]
+   [(Expr? ast)
+    (set-Expr-type ast t)]))
+
+;; Applies `f` to each type expression in `ast`, once, in an
+;; unspecified order (skips nodes that have no type, or whose type
+;; cannot be modified). Also passes typed node to `f`, as information
+;; only. Variations of this may be implemented in terms of
+;; ast-get-nonfixed-type and ast-set-nonfixed-type as necessary.
+(define* (ast-map-type-expr f ast)
+  (let rw ((ast ast))
+    (match ast
+      ((DefVar a id t v)
+       (DefVar a id (f ast t) (rw v)))
+      ((Param a id t)
+       (Param a id (f ast t)))
+      ((Defun a id t ps b)
+       (Defun a id (f ast t) (map rw ps) (rw b)))
+      ((Expr t)
+       #:when t
+       (Expr-copy (all-rw-term rw ast) (f ast t)))
+      (_
+       (all-rw-term rw ast)))))
+
+;;; 
 ;;; ExprLike annotations
 ;;; 
 

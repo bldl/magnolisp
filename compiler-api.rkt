@@ -384,6 +384,36 @@ optimization.
     (rw def)))
 
 ;;; 
+;;; ExistsT removal
+;;; 
+
+(define (ast-rm-ExistsT def)
+  (define (f dummy t-expr)
+    (define bind->sym (make-hasheq))
+    
+    (define (g ast)
+      (match ast
+        ((NameT a (Id _ _ bind))
+         ;;(writeln `(,ast when ,bind->sym))
+         (define sym (hash-ref bind->sym bind #f))
+         (if sym
+             (VarT a sym)
+             ast))
+        ((ExistsT _ ns t)
+         (for ((n ns))
+           (match-define (NameT _ (Id _ name bind)) n)
+           (assert (not (hash-has-key? bind->sym bind)))
+           (hash-set! bind->sym bind (gensym name)))
+         ;;(writeln bind->sym)
+         (g t))
+        (_
+         (all-rw-term g ast))))
+    
+    (g t-expr))
+  
+  (ast-map-type-expr f def))
+
+;;; 
 ;;; compilation
 ;;;
 
@@ -468,6 +498,7 @@ optimization.
         (switch-ids-for-builtins! def-lst eps-in-prog
                                   prelude-bind->bind))
 
+  (set! def-lst (map ast-rm-ExistsT def-lst))
   (set! def-lst (map ast-rm-Begin0 def-lst))
   ;;(pretty-print def-lst)
   (set! def-lst (defs-optimize-if def-lst))

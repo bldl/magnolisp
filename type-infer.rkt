@@ -10,31 +10,6 @@
 ;;; utilities
 ;;; 
 
-(define (NameT-from-id id)
-  (ast-annotated id NameT id))
-
-(define (def-get-type def)
-  (match def
-    ((DefVar _ _ t _)
-     t)
-    ((Param _ _ t)
-     t)
-    ((Defun _ _ t _ _)
-     t)
-    ((ForeignTypeDecl _ id _)
-     (NameT-from-id id))))
-
-(define (def-set-type def t)
-  (match def
-    ((DefVar a id _ v)
-     (DefVar a id t v))
-    ((Param a id _)
-     (Param a id t))
-    ((Defun a id _ ps b)
-     (Defun a id t ps b))
-    ((? ForeignTypeDecl?)
-     def)))
-
 (define (lookup-type-from-defs defs x)
   (assert (Var? x))
   (define def (ast-identifier-lookup defs (Var-id x)))
@@ -42,23 +17,6 @@
     (raise-language-error/ast
      "reference to unbound name" x))
   (def-get-type def))
-
-;; Returns #f for nodes that have no type, and for nodes of type Stat.
-(define (ast-get-nonfixed-type ast)
-  (cond 
-   [(Def? ast)
-    (def-get-type ast)]
-   [(Expr? ast)
-    (Expr-type ast)]
-   [else
-    #f]))
-
-(define (ast-set-nonfixed-type ast t)
-  (cond-or-fail
-   [(Def? ast)
-    (def-set-type ast t)]
-   [(Expr? ast)
-    (set-Expr-type ast t)]))
 
 (define (type=? x y)
   (cond
@@ -309,25 +267,17 @@
 ;; expressions. For nodes that end up with the unit type, checks that
 ;; they are allowed to have such a type.
 (define (ast-rm-VarT var-h ast)
-  (define f
-    (topdown
-     (lambda (ast)
-       (cond
-        [(ast-get-nonfixed-type ast) =>
-         (lambda (t)
-           (define n-t (type-rm-VarT var-h t ast))
-           (define n-ast (ast-set-nonfixed-type ast n-t))
-           (when (and (Void-type? n-t) 
-                      (or (Var? n-ast) (Literal? n-ast)
-                          (DefVar? n-ast) (Param? n-ast)))
-             (raise-language-error/ast
-              "illegal type for a variable or literal"
-              n-ast n-t))
-           n-ast)]
-        [else
-         ast]))))
+  (define (rw ast t)
+    (define n-t (type-rm-VarT var-h t ast))
+    (when (and (Void-type? n-t) 
+               (or (Var? ast) (Literal? ast)
+                   (DefVar? ast) (Param? ast)))
+      (raise-language-error/ast
+       "illegal type for a variable or literal"
+       ast n-t))
+    n-t)
 
-  (f ast))
+  (ast-map-type-expr rw ast))
 
 ;;; 
 ;;; API
@@ -549,7 +499,11 @@
            (raise-language-error/ast
             "parameter type does not match that of argument"
             #:fields (list (list "parameter type"
-                                 (ast-displayable p-t)))
+                                 (ast-displayable p-t))
+                           (list "argument type"
+                                 (ast-displayable e-t))
+                           (list "argument type (AST)"
+                                 e-t))
             ast e)))
 
        ;; The type of the ApplyExpr expression must unify with the
