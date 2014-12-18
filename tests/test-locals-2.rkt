@@ -1,14 +1,14 @@
-#lang magnolisp/2014
+#lang magnolisp
 
-(typedef int (#:annos foreign))
+(typedef int #:: (foreign))
 
 (function (f x)
-  (#:annos export (type (fn int int)))
-  (do
-    (function (g x) #an(^(fn int int)) x)
+  #:: (export (type (-> int int)))
+  (begin-return
+    (function (g x) #:: (^(-> int int)) x)
     (return
-     (do
-       (function (g x) #an(^(fn int int)) x)
+     (begin-return
+       (function (g x) #:: (^(-> int int)) x)
        (return (g x))))))
 
 (f 1)
