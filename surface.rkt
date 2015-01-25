@@ -22,6 +22,10 @@ language.
 (define-syntax-rule* (exists t ... u)
   (CORE 'exists (let ((t #f) ...) u)))
 
+;; `t` is a type name, and each `u` is a parameter type expression.
+(define-syntax-rule* (<> t u ...)
+  (CORE 'parameterized t u ...))
+
 ;; Type annotation.
 (define-syntax-rule* (type t)
   (CORE 'anno 'type t))

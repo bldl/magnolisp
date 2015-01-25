@@ -68,6 +68,14 @@
                               (syntaxed id NameT id)))
          (define sub-ast (loop #'sub-t))
          (syntaxed stx ExistsT tp-ast-lst sub-ast))]
+      [(if _ (#%plain-app #%magnolisp (quote f) t p ...) _)
+       (and (eq? 'parameterized (syntax-e #'f))
+            (identifier? #'t))
+       (let ()
+         (define t-ast (loop #'t))
+         (define p-stx-lst (syntax->list #'(p ...)))
+         (define p-ast-lst (map loop p-stx-lst))
+         (syntaxed stx ParamT t-ast p-ast-lst))]
       [_
        (raise-language-error
         #f "illegal type expression"

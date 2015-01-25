@@ -456,9 +456,11 @@ C++ back end.
        (match def
          ((ForeignTypeDecl _ _ cxx-t)
           cxx-t))]
+      [(ParamT a t ats)
+       (ParamT a (type->cxx t) (map type->cxx ats))]
       [_
        (raise-argument-error
-        'type->cxx "supported Type?" ast)]))
+        'type->cxx "(or/c NameT? ParamT?)" ast)]))
   
   (define rw-def
     (topdown

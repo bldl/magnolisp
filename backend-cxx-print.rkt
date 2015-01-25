@@ -158,6 +158,10 @@
      (list (format-type t) " const"))
     ((RefT _ t)
      (list (format-type t) "&"))
+    ((ParamT _ t ps)
+     `(,(format-type t) "<"
+       ,(add-between (map format-type ps) '("," sp))
+       ">"))
     (else (ew-error 'format-type "could not format" else))))
 
 (define (format-params args)

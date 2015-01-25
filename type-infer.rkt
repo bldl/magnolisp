@@ -32,6 +32,14 @@
     (and (= (length x-ats) (length y-ats))
          (type=? x-rt y-rt)
          (andmap type=? x-ats y-ats)))
+   ((and (ParamT? x) (ParamT? y))
+    (define x-t (ParamT-t x))
+    (define y-t (ParamT-t y))
+    (define x-ats (ParamT-ats x))
+    (define y-ats (ParamT-ats y))
+    (and (type=? x-t y-t)
+         (= (length x-ats) (length y-ats))
+         (andmap type=? x-ats y-ats)))
    (else #f)))
 
 (define (variable-type? t)
@@ -167,7 +175,7 @@
      ((? NameT?)
       ast)
      ((FunT a ats rt)
-      (define n-ats (map (fix subst! h) ats))
+      (define n-ats (map (curry subst! h) ats))
       (define n-rt (subst! h rt))
       (if (and (eq? rt n-rt) (andmap eq? ats n-ats))
           ast
@@ -178,12 +186,23 @@
       (if (and (eq? t n-t) (eq? u n-u))
           ast
           (PhiT a n-t n-u)))
+     ((ParamT a bt ats)
+      (define n-bt (subst! h bt))
+      (define n-ats (map (curry subst! h) ats))
+      (if (and (eq? bt n-bt) (andmap eq? ats n-ats))
+          ast
+          (ParamT a n-bt n-ats)))
      (else
       (raise-argument-error
-       'f "(or/c FunT? NameT? PhiT? VarT?)"
+       'f "(or/c FunT? NameT? ParamT? PhiT? VarT?)"
        1 ix ast))))
 
   (f 0 t))
+
+(define (unify-with-PhiT? x)
+  (or (NameT? x)
+      (and (ParamT? x)
+           (NameT? (ParamT-t x)))))
 
 ;; Unifies types 'x' and 'y', in the context of the given
 ;; substitutions [h mutable (hash/c symbol? Type?)]. As a side effect,
@@ -217,13 +236,22 @@
       (and
        (= (length x-ats) (length y-ats))
        (unify! h x-rt y-rt)
-       (andmap (fix unify! h) x-ats y-ats)))
-     ((and (NameT? x) (PhiT? y))
-      (and (unify! x (PhiT-t1 y))
-           (unify! x (PhiT-t2 y))))
-     ((and (PhiT? x) (NameT? y))
+       (andmap (curry unify! h) x-ats y-ats)))
+     ((and (ParamT? x) (ParamT? y))
+      (define x-t (ParamT-t x))
+      (define y-t (ParamT-t y))
+      (define x-ats (ParamT-ats x))
+      (define y-ats (ParamT-ats y))
+      (and
+       (= (length x-ats) (length y-ats))
+       (unify! h x-t y-t)
+       (andmap (curry unify! h) x-ats y-ats)))
+     ((and (PhiT? x) (unify-with-PhiT? y))
       (and (unify! (PhiT-t1 x) y)
            (unify! (PhiT-t2 x) y)))
+     ((and (PhiT? y) (unify-with-PhiT? x))
+      (and (unify! x (PhiT-t1 y))
+           (unify! x (PhiT-t2 y))))
      (else
       #f)))
   

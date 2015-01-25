@@ -278,6 +278,10 @@ Assumptions for AST node types:
 (define-ast* NameT (Ast Type)
   ((no-term annos) (no-term id)))
 
+;; parameterized type 't' is always a 'NameT'
+(define-ast* ParamT (Ast Type)
+  ((no-term annos) (just-term t) (list-of-term ats)))
+
 ;; 'ats' are the param types, and 'rt' is the return type
 (define-ast* FunT (Ast Type) 
   ((no-term annos) (list-of-term ats) (just-term rt)))
