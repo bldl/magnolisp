@@ -26,7 +26,6 @@ Assumptions for AST node types:
 (define-view* Anno ())
 (define-view* Type ())
 (define-view* Def (#:fields id))
-(define-view* NameUse (#:fields id))
 (define-view* Stat ())
 (define-view* SeqCont (#:fields ss))
 (define-view* If ([#:field c] [#:field t] [#:field e]))
@@ -276,24 +275,24 @@ Assumptions for AST node types:
   ((no-term annos)) #:singleton (#hasheq()))
 
 ;; 'id' is an ID
-(define-ast* NameT (Ast Type NameUse) 
+(define-ast* NameT (Ast Type)
   ((no-term annos) (no-term id)))
 
 ;; 'ats' are the param types, and 'rt' is the return type
-(define-ast* FunT (Ast Type) ((no-term annos)
-                              (list-of-term ats) (just-term rt)))
+(define-ast* FunT (Ast Type) 
+  ((no-term annos) (list-of-term ats) (just-term rt)))
 
 ;; 'id' is an identifier
-(define-ast* ForeignNameT (Ast Type) ((no-term annos) (no-term id)))
-
-;; 'id' is a symbol
-(define-ast* CxxNameT (Ast Type) ((no-term annos) (no-term id)))
+(define-ast* ForeignNameT (Ast Type) 
+  ((no-term annos) (no-term id)))
 
 ;; C++ only
-(define-ast* ConstT (Ast Type) ((no-term annos) (just-term t)))
+(define-ast* ConstT (Ast Type) 
+  ((no-term annos) (just-term t)))
 
 ;; C++ only
-(define-ast* RefT (Ast Type) ((no-term annos) (just-term t)))
+(define-ast* RefT (Ast Type) 
+  ((no-term annos) (just-term t)))
 
 ;;; 
 ;;; annotations
@@ -381,7 +380,7 @@ Assumptions for AST node types:
 (define-ast* VoidExpr (Ast Expr) ((no-term annos)))
 
 ;; Variable reference.
-(define-ast* Var (Ast Expr NameUse) ((no-term annos) (no-term id)))
+(define-ast* Var (Ast Expr) ((no-term annos) (no-term id)))
 
 ;; Function value.
 (define-ast* Lambda (Ast Expr) 

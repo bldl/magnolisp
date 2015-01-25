@@ -152,7 +152,7 @@
 
 (define (format-type t)
   (match t
-    ((CxxNameT _ (? symbol? s))
+    ((NameT _ (? symbol? s))
      (symbol->string s))
     ((ConstT _ t)
      (list (format-type t) " const"))

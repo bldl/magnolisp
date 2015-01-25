@@ -220,7 +220,7 @@ C++ back end.
      (lambda (ast)
        (match ast
          ((ForeignNameT a id)
-          (CxxNameT a (syntax-e id)))
+          (NameT a (syntax-e id)))
          (_ ast)))))
 
   (set! ast-lst (map (fix rw-drop r) ast-lst))
