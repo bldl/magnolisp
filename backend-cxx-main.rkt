@@ -130,13 +130,19 @@ C++ back end.
     (values n-r n-sym))
 
   ;; Gets decided name for an ID reference.
-  (define (get-decision-for id)
+  (define (get-decision-for-id id)
     (define sym (lookup-cxx-name id))
     (unless sym
       (raise-assertion-error
        'cxx-rename
        "expected C++ name to have been decided for ~s" id))
     sym)
+
+  (define (get-or-decide-for-id r id stem)
+    (define sym (lookup-cxx-name id))
+    (if sym
+        (values r sym)
+        (decide-name-for-id r id stem)))
   
   ;; We must collect all top-level IDs (and decide on their C++ name)
   ;; before renaming any locals.
@@ -171,10 +177,10 @@ C++ back end.
   (define (rw r ast)
     (match ast
       ((Var a id)
-       (define sym (get-decision-for id))
+       (define sym (get-decision-for-id id))
        (values r (Var a sym)))
       ((CxxDefun a id m t ps b)
-       (define n-sym (get-decision-for id))
+       (define n-sym (get-decision-for-id id))
        (define-values (r-dummy n-ast)
          (rw-all r (CxxDefun a n-sym m t ps b)))
        (values r n-ast))
@@ -188,15 +194,12 @@ C++ back end.
       ((DeclVar a id t)
        (define-values (r-2 n-sym) (decide-name-for-id r id "v"))
        (values r-2 (DeclVar a n-sym t)))
-      ((LabelDecl a id)
-       (define-values (r-1 n-sym) (decide-name-for-id r id "l"))
-       (values r-1 (LabelDecl a n-sym)))
       ((LabelDef a id)
-       (define sym (get-decision-for id))
-       (values r (LabelDef a sym)))
+       (define-values (n-r n-sym) (get-or-decide-for-id r id "l"))
+       (values n-r (LabelDef a n-sym)))
       ((Goto a id)
-       (define sym (get-decision-for id))
-       (values r (Goto a sym)))
+       (define-values (n-r n-sym) (get-or-decide-for-id r id "l"))
+       (values n-r (Goto a n-sym)))
       (_
        (rw-all r ast))))
 
@@ -227,18 +230,6 @@ C++ back end.
   (set! ast-lst (map rw-type-refs ast-lst))
   ;;(writeln ast-lst)
   ast-lst)
-
-(define (cxx-rm-LabelDecl ast-lst)
-  (define rw
-    (topdown
-     (lambda (ast)
-       (match ast
-         [(SeqCont ss)
-          #:when (ormap LabelDecl? ss)
-          (SeqCont-copy ast (filter (negate LabelDecl?) ss))]
-         [_ ast]))))
-  
-  (map rw ast-lst))
 
 ;;; 
 ;;; C++ translation
@@ -339,8 +330,7 @@ C++ back end.
          (parameterize ((le-tgt (hash-set (le-tgt) (Id-bind k) tgt)))
            (map expr->cxx ss)))
        (define es 
-         `(,(annoless LabelDecl lbl-id)
-           ,@n-ss
+         `(,@n-ss
            ,(annoless LabelDef lbl-id)))
        (if void-t?
            (SeqStat a es)
@@ -434,7 +424,7 @@ C++ back end.
       [(LiftStatExpr a id ss)
        (define dv (annoless DeclVar id (Expr-type ast)))
        (SeqStat a (cons dv (map to-stat ss)))]
-      [(or (? Goto?) (? DeclVar?) (? NoBody?) (? Label?))
+      [(or (? Goto?) (? DeclVar?) (? NoBody?) (? LabelDef?))
        ast]
       [_
        ;;(writeln `(result-discarded = ,(get-result-discarded ast)))
@@ -926,14 +916,12 @@ C++ back end.
        ;; IfStat begin with the same label.
        (values (and st0 st1 (ast-identifier=? st0 st1) st0)
                (IfStat a c n-t n-e))]
-      [(LabelDef a id) 
+      [(LabelDef _ id) 
        ;;(writeln `(store ,id))
        (values id s)]
       [(Goto _ (? (lambda (id) (and st (ast-identifier=? st id)))))
        ;;(writeln `(delete ,s))
        (values st a-noop)]
-      [(LabelDecl _ _)
-       (values st s)]
       [_ 
        (values #f s)]))
   
@@ -956,9 +944,9 @@ C++ back end.
     ((topdown
       (lambda (ast)
         (match ast
-          [(Label (? (lambda (id)
-                          (define bind (Id-bind id))
-                          (not (set-member? targets bind)))))
+          [(LabelDef _ (? (lambda (id)
+                            (define bind (Id-bind id))
+                            (not (set-member? targets bind)))))
            a-noop]
           [_ ast])))
      s))
@@ -1099,7 +1087,6 @@ C++ back end.
      (curry map ast-rm-SeqStat)
      (curry types-to-cxx defs-t)
      cxx-rename
-     cxx-rm-LabelDecl
      cxx-decl-sort
      cxx->pp))
   

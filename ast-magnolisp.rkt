@@ -29,7 +29,6 @@ Assumptions for AST node types:
 (define-view* Stat ())
 (define-view* SeqCont (#:fields ss))
 (define-view* If ([#:field c] [#:field t] [#:field e]))
-(define-view* Label (#:fields id))
 
 (define-syntax-rule*
   (define-Ast-anno-accessors name get set)
@@ -470,13 +469,9 @@ Assumptions for AST node types:
 (define-ast* LiftStatExpr (Ast Expr SeqCont) 
   ((no-term annos) (no-term id) (list-of-term ss)))
 
-;; Declares a label. `id` is the label Id; a node of this type
-;; effectively binds it.
-(define-ast* LabelDecl (Ast Stat Label) 
-  ((no-term annos) (no-term id)))
-
-;; Label for the following statements. Itself a statement.
-(define-ast* LabelDef (Ast Stat Label) 
+;; Label for the following statements. Itself a statement. `id` is the
+;; label Id.
+(define-ast* LabelDef (Ast Stat)
   ((no-term annos) (no-term id)))
 
 ;; Where 'id' is a label Id. A statement.
