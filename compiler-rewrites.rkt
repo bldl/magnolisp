@@ -252,6 +252,20 @@
   
   (values (reverse univ-names) n-t))
 
+;; Replaces all universal types in `in-t` with specific types, which
+;; in practice will be fresh `VarT` nodes. The appearing `ForAllT`
+;; quantifiers are removed.
+(define* (type-expr-rm-ForAllT/use in-t)
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         ((ForAllT a ns t)
+          (ExistsT a ns t))
+         (_ ast)))))
+  
+  (type-expr-rm-ExistsT (rw in-t)))
+
 ;;; 
 ;;; ExprLike annotations
 ;;; 

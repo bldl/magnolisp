@@ -10,13 +10,25 @@
 ;;; utilities
 ;;; 
 
-(define (lookup-type-from-defs defs x)
+(define (lookup-def-from-defs defs x)
   (assert (Var? x))
   (define def (ast-identifier-lookup defs (Var-id x)))
   (unless def
     (raise-language-error/ast
      "reference to unbound name" x))
-  (def-get-type def))
+  def)
+
+(define (lookup-type-from-defs defs x)
+  (def-get-type (lookup-def-from-defs defs x)))
+
+(define (lookup-use-type-from-defs defs x)
+  (define def (lookup-def-from-defs defs x))
+  (match def
+    ((Defun (? (lambda (a) (hash-has-key? a 'type-params)) as) id t ps b)
+     (define g-t (hash-ref as 'generic-type))
+     (type-expr-rm-ForAllT/use g-t))
+    (_
+     (def-get-type def))))
 
 (define (type=? x y)
   (cond
@@ -323,7 +335,11 @@
   
   ;;(pretty-print (dict->list defs))
 
-  (define lookup (fix lookup-type-from-defs defs))
+  (define (lookup x) 
+    (lookup-type-from-defs defs x))
+
+  (define (lookup-use x) 
+    (lookup-use-type-from-defs defs x))
 
   ;; A mutable fact database of sorts, with VarT symbols as keys, and
   ;; (possibly incomplete) type expressions as values.
@@ -497,7 +513,7 @@
        ;; allow FunT typed expressions in this context. We must still
        ;; be sure to set up a constraint for the expression 'f', lest
        ;; its type be left unresolved.
-       (define f-t (lookup f))
+       (define f-t (lookup-use f))
        (expr-unify! f f-t)
 
        ;; We have done prior work to ensure that a function
