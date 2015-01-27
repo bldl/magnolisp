@@ -187,6 +187,72 @@
        (all-rw-term rw ast)))))
 
 ;;; 
+;;; ExistsT removal
+;;; 
+
+;; The `t-expr` argument must be a full type expression. This is
+;; required so that all the type variables associated with any ExistsT
+;; within `t-expr` get processed here.
+(define* (type-expr-rm-ExistsT t-expr)
+  (define bind->sym (make-hasheq))
+    
+  (let loop ((ast t-expr))
+    (match ast
+      ((NameT a (Id _ _ bind))
+       ;;(writeln `(,ast when ,bind->sym))
+       (define sym (hash-ref bind->sym bind #f))
+       (if sym
+           (VarT a sym)
+           ast))
+      ((ExistsT _ ns t)
+       (for ((n ns))
+         (match-define (NameT _ (Id _ name bind)) n)
+         (assert (not (hash-has-key? bind->sym bind)))
+         (hash-set! bind->sym bind (gensym name)))
+       ;;(writeln bind->sym)
+       (loop t))
+      (_
+       (all-rw-term loop ast)))))
+
+(define* (ast-rm-ExistsT def)
+  (define (f dummy t-expr)
+    (type-expr-rm-ExistsT t-expr))
+  (ast-map-type-expr f def))
+
+;;; 
+;;; ForAllT removal
+;;; 
+
+;; Rewrites the `in-t` type expression to remove ForAllT quantifiers.
+;; Also returns a list of appearing universal types, preserving their
+;; order.
+(define* (type-expr-rm-ForAllT/def in-t)
+  (define univ-names '())
+  (define univ-binds (mutable-seteq))
+  
+  (define (univ-bind? bind)
+    (set-member? univ-binds bind))
+
+  (define (annos-flag a)
+    (hash-set a 'type-param #t))
+  
+  (define n-t
+    (let loop ((ast in-t))
+      (match ast
+        ((NameT a (and (Id _ _ (? univ-bind?)) id))
+         (NameT (annos-flag a) id))
+        ((ForAllT _ ns t)
+         (for ((n ns))
+           (match-define (NameT a (and (Id _ _ bind) id)) n)
+           (set-add! univ-binds bind)
+           (set! univ-names (cons (NameT (annos-flag a) id) univ-names)))
+         (loop t))
+        (_
+         (all-rw-term loop ast)))))
+  
+  (values (reverse univ-names) n-t))
+
+;;; 
 ;;; ExprLike annotations
 ;;; 
 

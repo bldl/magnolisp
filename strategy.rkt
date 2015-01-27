@@ -379,16 +379,3 @@ Meta-Compilation of Language Abstractions (2006).
     (check-eqv? x 9)
     ((seq-visit-break (all-visit s) br (all-visit s)) lst)
     (check-eqv? x 12)))
-
-;;; 
-;;; Dynamic rule scope.
-;;; 
-
-;; x ... must be defined as parameters, so that they are visible to
-;; all the relevant strategies. This combinator restores x ... to
-;; their previous values after the strategy s has been executed.
-(define-syntax-rule*
-  (scoped ((x v) ...) s)
-  (lambda (ast)
-    (parameterize ((x v) ...)
-      (s ast))))

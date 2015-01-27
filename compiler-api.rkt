@@ -160,6 +160,15 @@ optimization.
         (_ (void)))))
    def-lst))
 
+(define (topdown-has-matching? p? ast)
+  (let/ec k
+    ((topdown-visit
+      (lambda (x)
+        (when (p? x) 
+          (k #t))))
+     ast)
+    #f))
+
 (define-with-contract
   (-> Def? Def?)
   (de-racketize ast)
@@ -168,17 +177,25 @@ optimization.
     (topdown
      (lambda (ast)
        (match ast
-         ((DefVar a1 n t (Lambda a2 p b))
+         [(DefVar a1 n t (Lambda a2 p b))
           ;; Retain annos from the binding, which has any information
           ;; associated with the binding. It should also have the
           ;; declaration syntax corresponding to the function
           ;; definition.
-          (when (hash-ref a1 'foreign #f)
-            (set! b the-NoBody))
-          ;;(writeln (list n (hash-ref a1 'top)))
-          (Defun a1 n t p b))
-         
-         (_ ast)))))
+          (define foreign? (and (hash-ref a1 'foreign #f) #t))
+          (define n-b (if foreign? the-NoBody b))
+          (when (topdown-has-matching? ForAllT? t)
+            (unless foreign?
+              (raise-language-error/ast
+               "non-`foreign` function has generic type"
+               ast t))
+            (set! a1 (hash-set a1 'generic-type t))
+            (define-values (u-lst u-t)
+              (type-expr-rm-ForAllT/def t))
+            (set! a1 (hash-set a1 'type-params u-lst))
+            (set! t u-t))
+          (Defun a1 n t p n-b)]
+         [_ ast]))))
   
   (rw ast))
 
@@ -382,36 +399,6 @@ optimization.
   
   (for/list ((def def-lst))
     (rw def)))
-
-;;; 
-;;; ExistsT removal
-;;; 
-
-(define (ast-rm-ExistsT def)
-  (define (f dummy t-expr)
-    (define bind->sym (make-hasheq))
-    
-    (define (g ast)
-      (match ast
-        ((NameT a (Id _ _ bind))
-         ;;(writeln `(,ast when ,bind->sym))
-         (define sym (hash-ref bind->sym bind #f))
-         (if sym
-             (VarT a sym)
-             ast))
-        ((ExistsT _ ns t)
-         (for ((n ns))
-           (match-define (NameT _ (Id _ name bind)) n)
-           (assert (not (hash-has-key? bind->sym bind)))
-           (hash-set! bind->sym bind (gensym name)))
-         ;;(writeln bind->sym)
-         (g t))
-        (_
-         (all-rw-term g ast))))
-    
-    (g t-expr))
-  
-  (ast-map-type-expr f def))
 
 ;;; 
 ;;; compilation

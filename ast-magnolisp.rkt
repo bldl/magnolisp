@@ -265,6 +265,10 @@ Assumptions for AST node types:
 (define-ast* ExistsT (Ast Type)
   ((no-term annos) (list-of-term ns) (just-term t)))
 
+;; `ns` is (listof NameT?)
+(define-ast* ForAllT (Ast Type)
+  ((no-term annos) (list-of-term ns) (just-term t)))
+
 ;; Either type 't1' or 't2' (runtime determined).
 (define-ast* PhiT (Ast Type) 
   ((no-term annos) (just-term t1) (just-term t2)))

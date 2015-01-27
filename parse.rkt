@@ -61,13 +61,16 @@
       [(if _ (#%plain-app #%magnolisp (quote q)
                           (let-values (((tp) _) ...)
                             sub-t)) _)
-       (eq? 'exists (syntax-e #'q))
+       (or (eq? 'exists (syntax-e #'q))
+           (eq? 'for-all (syntax-e #'q)))
        (let ()
+         (define for-all? (eq? 'for-all (syntax-e #'q)))
          (define tp-id-lst (syntax->list #'(tp ...)))
          (define tp-ast-lst (for/list ((id tp-id-lst))
                               (syntaxed id NameT id)))
          (define sub-ast (loop #'sub-t))
-         (syntaxed stx ExistsT tp-ast-lst sub-ast))]
+         (syntaxed stx (if for-all? ForAllT ExistsT)
+                   tp-ast-lst sub-ast))]
       [(if _ (#%plain-app #%magnolisp (quote f) t p ...) _)
        (and (eq? 'parameterized (syntax-e #'f))
             (identifier? #'t))
