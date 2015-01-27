@@ -435,17 +435,25 @@ C++ back end.
     (set-CxxDefun-s def (to-stat s))))
 
 (define (types-to-cxx defs-t def-lst)
+  (define (annos-type-param? as)
+    (hash-ref as 'type-param #f))
+  
   (define (type->cxx ast)
     (match ast
-      [(NameT _ id)
-       (define def (ast-identifier-lookup defs-t id))
-       (unless def
-         (raise-language-error/ast
-          "reference to unbound type ID"
-          ast id))
-       (match def
-         ((ForeignTypeDecl _ _ cxx-t)
-          cxx-t))]
+      [(NameT a id)
+       (cond
+        [(annos-type-param? a)
+         ;; Has no specified C++ name, so leave as is.
+         ast]
+        [else
+         (define def (ast-identifier-lookup defs-t id))
+         (unless def
+           (raise-language-error/ast
+            "reference to unbound type ID"
+            ast id))
+         (match def
+           ((ForeignTypeDecl _ _ cxx-t)
+            cxx-t))])]
       [(ParamT a t ats)
        (ParamT a (type->cxx t) (map type->cxx ats))]
       [_
