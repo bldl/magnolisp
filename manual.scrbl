@@ -1,11 +1,13 @@
 #lang scribble/manual
 @(require scribble/eval "manual-util.rkt"
 	  (for-label syntax/modresolve
-	             magnolisp/core magnolisp/prelude magnolisp/surface
-                     (except-in racket/base #%module-begin)))
+	             (prefix-in r. (only-in racket/base define))
+	             magnolisp/compiler-api magnolisp/core
+		     (only-in magnolisp/surface my-define)
+		     (only-meta-in 0 magnolisp)))
 
 @(define the-eval (make-base-eval))
-@(the-eval '(require magnolisp/prelude magnolisp/surface))
+@(the-eval '(require magnolisp))
 
 @title{Magnolisp}
 
@@ -19,7 +21,9 @@ Magnolisp is intended to explore and demonstrate techniques for source-to-source
 
 @section{Magnolisp the Language}
 
-@defmodulelang[magnolisp]
+@; the sources are tried in order
+@defmodulelang[magnolisp
+  #:use-sources (magnolisp/prelude magnolisp/surface magnolisp/main)]
 
 The Magnolisp language relies on Racket for its module and macro systems. All of Racket may be used for macro programming. The @racketmodname[racket/base] language is provided by default for phase level 1 (compile time).
 
@@ -35,19 +39,27 @@ For defining macros and macro-expansion time computation, the relevant Racket fa
 
 @subsection{Defining Forms}
 
-@(defmodule magnolisp/surface)
+@;defmodule[magnolisp/surface]
 
-In Magnolisp, it is possible to declare @racket[function]s, types (with @racket[typedef]), and @racket[var]iables; of these, variable definitions are not allowed at the top level. The Magnolisp binding forms are in the @racketmodname[magnolisp/surface] library. The @racketmodname[magnolisp] language provides @racketmodname[magnolisp/surface] at phase level 0.
+In Magnolisp, it is possible to @racket[define] functions, types, and variables; of these, variable definitions are not allowed at the top level.
 
 As Magnolisp has almost no standard library, it is ultimately necessary to define primitive types and functions (flagged as @racket[foreign]) in order to be able to compile programs that do anything useful. For this reason there is also a @racket[primitives] convenience form for declaring multiple @racket[foreign] types and/or functions at once.
 
-@defform/subs[(function (id arg ...) maybe-annos maybe-body)
-              ([maybe-body code:blank expr])]{
-Declares a function. The (optional) body of a function is a single expression, which must produce a single value.
+@defform*[((define id maybe-annos expr)
+	   (define (id arg ...) maybe-annos expr ...))]{
+The first form declares a local variable with the name @racket[id], and the (initial) value given by @racket[expr]. A @racket[type] annotation may be included to specify the Magnolisp type of the variable.
+
+For example:
+@(interaction #:eval the-eval
+  (let ()
+    (define x #:: ([type int]) 5)
+    (add1 x)))
+
+The second form declares a function. The (optional) body of a function is a sequence of expressions, which (if present) must produce a single value.
 
 Unlike in Racket, no tail-call elimination may be assumed even when a recursive function application appears in @emph{tail position}.
 
-Providing a body is optional in the case where the function is declared as @racket[foreign], in which case the compiler will ignore any body @racket[expr]. When a function without a body is invoked as Racket, the result is @|void-const|. When a @racket[foreign] function with a body is invoked as Racket, the body may be implemented in full Racket, typically to ``simulate'' the behavior of the C++ implementation. To implement a function body in Racket syntax instead of Magnolisp syntax, enclose the body expression within a @racket[begin-racket] form.
+Where the function is declared as @racket[foreign], the Magnolisp compiler will ignore any body @racket[expr ...] sequence. When a function without a body is invoked as Racket, the result is @|void-const|. When a @racket[foreign] function has a body, it is typically there to ``simulate'' the behavior of the C++ implementation in the Racket VM. For purposes of simulation it can be useful to make use of the full Racket runtime language; to implement a function body in Racket syntax instead of Magnolisp syntax, enclose the body expression within a @racket[begin-racket] form.
 
 A function with the @racket[export] flag in its annotations indicates that the function is part of the public API of a program that includes the containing module. When a function is used merely as a dependency (i.e., its containing module was not specified as being a part of the program), any @racket[export] flag is ignored.
 
@@ -55,16 +67,25 @@ When a function includes a @racket[type] annotation, the type expression must be
 
 For example:
 @(racketblock+eval #:eval the-eval
-  (function (identity x) 
+  (define (identity x) 
     x)
-  (function (five) #:: (export [type (-> int)])
+  (define (five) #:: (export [type (-> int)])
     5)
-  (function (inc x) #:: (foreign [type (-> int int)])
+  (define (inc x) #:: (foreign [type (-> int int)])
     (add1 x))
-  (function (seven) #:: (foreign [type (-> int)])
+  (define (seven) #:: (foreign [type (-> int)])
     (begin-racket 1 2 3 4 5 6 7)))
 
 Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in multiple different type contexts within a single program.}
+
+@defform/subs[(function (id arg ...) maybe-annos maybe-body)
+              ([maybe-body code:blank expr])]{
+@deprecated[#:what "form" @racket[define]]{}
+Declares a function.}
+
+@defform[(var id maybe-annos expr)]{
+@deprecated[#:what "form" @racket[define]]{}
+Declares a local variable.}
 
 @defform[(typedef id maybe-annos)]{
 Declares a type. Presently only foreign types may be declared, and @racket[id] gives the corresponding Magnolisp name. The @racket[foreign] annotation should always be provided.
@@ -73,16 +94,6 @@ For example:
 @(racketblock+eval #:eval the-eval
   (typedef int #:: (foreign))
   (typedef long #:: ([foreign my_cxx_long])))
-}
-
-@defform[(var id maybe-annos expr)]{
-Declares a local variable with the name @racket[id], and the (initial) value given by @racket[expr]. A @racket[type] annotation may be included to specify the Magnolisp type of the variable.
-
-For example:
-@(interaction #:eval the-eval
-  (let ()
-    (var x #:: ([type int]) 5)
-    (add1 x)))
 }
 
 @defform/subs[#:literals (::)
@@ -94,7 +105,7 @@ Declares the specified types and functions as @racket[foreign] primitives, whose
 
 @subsection{Annotations}
 
-@(declare-exporting magnolisp/surface)
+@;declare-exporting[magnolisp/surface]
 
 @racketgrammar*[
 #:literals (export foreign type)
@@ -132,7 +143,7 @@ An annotation that specifies the Magnolisp type of a function, variable, or expr
 
 @subsection[#:tag "type-expressions"]{Type Expressions}
 
-@(declare-exporting magnolisp/surface)
+@;declare-exporting[magnolisp/surface]
 
 @racketgrammar*[
 #:literals (->)
@@ -146,7 +157,7 @@ A function type expression, containing type expressions the function's arguments
 
 @subsection{Expressions}
 
-@(declare-exporting magnolisp/surface)
+@;declare-exporting[magnolisp/surface]
 
 Like Racket (and unlike C++), the Magnolisp language makes no distinction between statements and expressions. Some expressions yield no useful value, however; such expressions conceptually produce a result of type @racket[Void] (such result values do exist at Racket run time, but not at C++ run time). Some expressions yield @emph{no} values (or @emph{multiple} values), but are merely used as a syntactic device, and only allowed to appear in certain contexts.
 
@@ -162,7 +173,7 @@ The left-hand side expression @racket[_id] must be a reference to a bound variab
 
 In Magnolisp, @racket[(void _expr _...)] is an expression with no useful result (the result is of the unit type @racket[Void]). Any arguments to @racket[void] are evaluated as usual, but they are not used. The @racket[(values)] form signifies ``nothing,'' and has no result; hence it is an error for @racket[(values)] to appear in a position where the context expects a result. In result expecting contexts, the former may only appear in a 1-value context, and the latter in a 0-value context (there are few in Magnolisp).
 
-The @racket[var], @racket[function], and @racket[typedef] declaration forms may appear in a Racket @emph{internal-definition context} (and not Racket @emph{expression context}). The same is true of @racketidfont{define} forms that conform to the restricted syntax supported by the Magnolisp compiler.
+The @racket[define] and @racket[typedef] declaration forms may appear in a Racket @emph{internal-definition context} (and not Racket @emph{expression context}). The same is true of @racket[define-values] forms that conform to the restricted syntax supported by the Magnolisp compiler.
 
 @defform[(cast type-expr expr)]{
 Annotates expression @racket[expr] with the type given by @racket[type-expr]. A @racket[cast] is commonly used to specify the type of a literal, which by themselves are generally untyped in Magnolisp. While the literal @racket["foo"] is treated as a @racket[string?] value by Racket, the Magnolisp compiler will expect to determine the literal expression's Magnolisp type based on annotations. The @racket[cast] form allows one to ``cast'' an expression to a specific type for the compiler.
@@ -219,7 +230,7 @@ An expression that causes a jump to a surrounding continuation labeled by @racke
 
 @subsection{Standard Library}
 
-@(defmodule magnolisp/prelude)
+@defmodule[magnolisp/prelude]
 
 A boolean expression is simply an expression of type @racket[Bool], which is one of the two predefined types in Magnolisp. The other one is @racket[Void], which is Magnolisp's unit type (whose values carry no information).
 
@@ -237,14 +248,12 @@ A predefined type. There are no literals for @racket[Void] values, but the Magno
 
 Magnolisp core syntax is encoded primarily in terms of Racket's core forms. Magnolisp core forms that have no Racket counterpart, however, are encoded in terms of the @racket[#%magnolisp] variable, which is treated specially by the Magnolisp compiler. The @racket[#%magnolisp] binding is exported from the @racketmodname[magnolisp/core] module.
 
-It is possible to define multiple different surface syntaxes for Magnolisp, and these can be defined as libraries similar to the @racketmodname[magnolisp/surface] syntax definition used by the @racketmodname[magnolisp] language. All Magnolisp language variants must, however, refer to the same core bindings (i.e., as exported from @racketmodname[racket/base] and @racketmodname[magnolisp/core]) and (as applicable) to the same standard library built-ins (i.e., those in @racketmodname[magnolisp/prelude]), as no other bindings are treated specially by the Magnolisp compiler.
+It is possible to define multiple different surface syntaxes for Magnolisp, and these can be defined as libraries similar to the @racketidfont{magnolisp/surface} syntax definition used by the @racketmodname[magnolisp] language. All Magnolisp language variants must, however, refer to the same core bindings (i.e., as exported from @racketmodname[racket/base] and @racketmodname[magnolisp/core]) and (as applicable) to the same standard library built-ins (i.e., those in @racketmodname[magnolisp/prelude]), as no other bindings are treated specially by the Magnolisp compiler.
 
 @defthing[#:kind "binding" #%magnolisp any/c]{
 A value binding whose identifier is used to uniquely identify some Magnolisp core syntactic forms. It always appears in the application position of a Racket @racket[#%plain-app] core form. The value of the variable does not matter when compiling as Magnolisp, as it is never used. To prevent evaluation as Racket, all the syntactic constructs exported by @racketmodname[magnolisp] surround @racket[#%magnolisp] applications with a ``short-circuiting'' Racket expression.}
 
 @subsection{Fully Expanded Programs}
-
-@(declare-exporting magnolisp/surface)
 
 As far as the Magnolisp compiler is concerned, a Magnolisp program is fully expanded if it conforms to the following grammar. Any syntactic ambiguities are resolved in favor of the first matching grammar rule.
 
@@ -352,7 +361,7 @@ A restricted form of escape continuation invocation, flagged with the syntax pro
 
 @subsection{Racket Forms}
 
-@(declare-exporting magnolisp/surface)
+@;declare-exporting[magnolisp/surface]
 
 To include Racket code in a phase level 0 context that is significant to Magnolisp, you may wrap the code in a form that indicates that the code is only intended for parsing as Racket. Code so wrapped must be grammatically correct Racket, but not necessarily Magnolisp. The wrapping forms @racket[begin-racket] and @racket[let-racket] merely switch syntaxes, and have no effect on the namespace used for evaluating the enclosed sub-forms; the surrounding namespace is still in effect. Nesting of the wrapping forms is allowed.
 
@@ -361,10 +370,11 @@ A Racket form that is equivalent to writing @racket[(begin Racket-form _...)], a
 
 For example:
 @(interaction #:eval the-eval
+   (require (prefix-in r. (only-in racket/base define)))
    (begin-racket
-     (define six 6)
-     (define (one-more x) (let dummy () (+ x 1))))
-   (function (eight) #:: (foreign [type (-> int)])
+     (r.define six 6)
+     (r.define (one-more x) (let dummy () (+ x 1))))
+   (define (eight) #:: (foreign [type (-> int)])
      (one-more (one-more six)))
    (eight))
 }
@@ -374,23 +384,12 @@ A Racket expression that is equivalent to writing @racket[(let () Racket-expr _.
 
 For example:
 @(interaction #:eval the-eval
-   (function (three) #:: (foreign [type (-> int)])
+   (define (three) #:: (foreign [type (-> int)])
      (let-racket 
-       (define x 1) 
+       (r.define x 1) 
        (set! x (begin 2 3)) 
        x))
-   (three))
-
-One use case is to @racket[local-require] a Racket definition into a context where a Magnolisp definition by the same name is being implemented. For example:
-
-@(interaction #:eval the-eval
-  (function (equal? x y) 
-    #:: ([type (-> int int Bool)] foreign)
-    (let-racket
-      (local-require (only-in racket/base equal?))
-      (equal? x y)))
-  (equal? "foo" "foo"))
-}
+   (three))}
 
 @section{Evaluation}
 
@@ -466,7 +465,7 @@ Racket version 6 is required to run the software. It may well be installable dir
 
 Except where otherwise noted, the following license applies:
 
-Copyright © 2012-2014 University of Bergen and the authors.
+Copyright © 2012-2015 University of Bergen and the authors.
 
 Authors: Tero Hasu
 

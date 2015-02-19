@@ -2,14 +2,14 @@
 
 (typedef int #:: (foreign))
 
-(function (holds? x)
+(define (holds? x) 
   #:: ((type (-> int Bool)) foreign)
   #f)
 
-(function (f x)
+(define (f x)
   #:: (export (type (-> int Bool)))
   (begin-return
-    (var y (holds? x))
+    (define y (holds? x))
     (let ((x #t))
       (set! y x))
     (return y)

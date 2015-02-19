@@ -2,7 +2,7 @@
 
 #|
 
-This module implements the (default) surface syntax of the Magnolisp
+This module implements the (default) syntactic forms of the Magnolisp
 language.
 
 |#
@@ -62,6 +62,8 @@ language.
 ;; A form that annotates not an identifier, but any expression.
 (define-syntax* (let-annotate stx)
   (syntax-case stx ()
+    [(_ () e)
+     #'e]
     [(_ (a ...) e)
      (syntax-property 
       (syntax/loc stx
@@ -81,6 +83,26 @@ language.
       (~seq #:: (~and (a:expr ...) as)))
      #:attr bs (if (attribute as) #'as #'()))))
 
+(define-syntax* (my-define stx)
+  (syntax-parse stx
+    [(_ n:id as:maybe-annos v:expr)
+     #'(define n
+         (let-annotate as.bs 
+             v))]
+    [(_ (f:id p:id ...) as:maybe-annos)
+     #'(define f
+         (let-annotate as.bs
+             (#%plain-lambda (p ...) (void))))]
+    [(_ (f:id p:id ...) as:maybe-annos b:expr ...+)
+     #'(define f
+         (let-annotate as.bs 
+             (#%plain-lambda (p ...) b ...)))]
+    [(_ #:type t:id as:maybe-annos)
+     #'(define t 
+         (let-annotate as.bs 
+             (CORE 'foreign-type)))]))
+
+;; DEPRECATED
 (define-syntax* (function stx)
   (syntax-parse stx
     [(_ (f:id p:id ...) as:maybe-annos)
@@ -92,6 +114,7 @@ language.
          (let-annotate as.bs 
              (#%plain-lambda (p ...) b ...)))]))
 
+;; DEPRECATED
 (define-syntax* (var stx)
   (syntax-parse stx
     [(_ n:id as:maybe-annos v:expr)
@@ -170,5 +193,5 @@ language.
        (primitives . more))]
     [(_ [#:function form :: t] . more)
      (begin 
-       (function form #:: ([type t] foreign))
+       (my-define form #:: ([type t] foreign))
        (primitives . more))]))

@@ -1,8 +1,10 @@
 #lang magnolisp
 
-(typedef int #:: (foreign))
+(define #:type int #:: (foreign))
 
-(function (run x) #:: (export)
-  (var y x)
-  (var z #:: (^int) y)
+(define (run x) #:: (export)
+  (define y x)
+  (define z #:: (^int) y)
   z)
+
+(run 7)

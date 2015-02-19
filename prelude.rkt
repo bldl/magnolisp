@@ -6,7 +6,7 @@ A library of built-in types and functions in Magnolisp.
 
 |#
 
-(require (for-syntax racket/base) "surface.rkt")
+(require "surface.rkt")
 
 (provide Bool Void)
 
