@@ -2,9 +2,13 @@
 @(require scribble/eval "manual-util.rkt"
 	  (for-label syntax/modresolve
 	             (prefix-in r. (only-in racket/base define))
+                     @; a trick to get only the original exports
+		     (combine-in
+		       (only-meta-in 0 magnolisp/main)
+		       magnolisp/surface
+		       magnolisp/prelude)
 	             magnolisp/compiler-api magnolisp/core
-		     (only-in magnolisp/surface my-define)
-		     (only-meta-in 0 magnolisp/main)))
+		     ))
 
 @(define the-eval (make-base-eval))
 @(the-eval '(require magnolisp/main))
@@ -37,9 +41,9 @@ For defining macros and macro-expansion time computation, the relevant Racket fa
 
 @section{Syntactic Forms}
 
-@declare-exporting[magnolisp/main #:use-sources (magnolisp/surface)]
+@defmodule[magnolisp/surface]
 
-The surface syntax of Magnolisp consists of a collection of Magnolisp-specific forms, as well as a selection of supported Racket forms.
+The surface syntax of Magnolisp consists of a collection of Magnolisp-specific forms, as well as a selection of supported Racket forms. The @racketmodname[magnolisp/surface] module defines the Magnolisp-specific ones, and the @racketmodname[magnolisp] language exports these at phase level 0.
 
 @subsection{Defining Forms}
 
@@ -56,9 +60,8 @@ For example:
   (typedef long #:: ([foreign my_cxx_long])))
 }
 
-@defform*[#:id [my-define #'define]
-          ((my-define id maybe-annos expr)
-	   (my-define (id arg ...) maybe-annos expr ...))]{
+@defform*[((define id maybe-annos expr)
+	   (define (id arg ...) maybe-annos expr ...))]{
 The first form declares a local variable with the name @racket[id], and the (initial) value given by @racket[expr]. A @racket[type] annotation may be included to specify the Magnolisp type of the variable.
 
 For example:
@@ -90,8 +93,6 @@ For example:
 
 Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in multiple different type contexts within a single program.}
 
-@subsubsection{Syntax for Backward Compatibility}
-
 @defform/subs[(function (id arg ...) maybe-annos maybe-body)
               ([maybe-body code:blank expr])]{
 @deprecated[#:what "form" @racket[define]]{}
@@ -100,8 +101,6 @@ Declares a function.}
 @defform[(var id maybe-annos expr)]{
 @deprecated[#:what "form" @racket[define]]{}
 Declares a local variable.}
-
-@subsubsection{Shorthand Forms}
 
 @defform/subs[#:literals (::)
 (primitives declaration ...)
@@ -279,7 +278,7 @@ A predefined type. There are no literals for @racket[Void] values, but the Magno
 
 Magnolisp core syntax is encoded primarily in terms of Racket's core forms. Magnolisp core forms that have no Racket counterpart, however, are encoded in terms of the @racket[#%magnolisp] variable, which is treated specially by the Magnolisp compiler. The @racket[#%magnolisp] binding is exported from the @racketmodname[magnolisp/core] module.
 
-It is possible to define multiple different surface syntaxes for Magnolisp, and these can be defined as libraries similar to the @racketidfont{magnolisp/surface} syntax definition used by the @racketmodname[magnolisp] language. All Magnolisp language variants must, however, refer to the same core bindings (i.e., as exported from @racketmodname[racket/base] and @racketmodname[magnolisp/core]) and (as applicable) to the same standard library built-ins (i.e., those in @racketmodname[magnolisp/prelude]), as no other bindings are treated specially by the Magnolisp compiler.
+It is possible to define multiple different surface syntaxes for Magnolisp, and these can be defined as libraries similar to the @racketmodname[magnolisp/surface] syntax definition used by the @racketmodname[magnolisp] language. All Magnolisp language variants must, however, refer to the same core bindings (i.e., as exported from @racketmodname[racket/base] and @racketmodname[magnolisp/core]) and (as applicable) to the same standard library built-ins (i.e., those in @racketmodname[magnolisp/prelude]), as no other bindings are treated specially by the Magnolisp compiler.
 
 @defthing[#:kind "binding" #%magnolisp any/c]{
 A value binding whose identifier is used to uniquely identify some Magnolisp core syntactic forms. It always appears in the application position of a Racket @racket[#%plain-app] core form. The value of the variable does not matter when compiling as Magnolisp, as it is never used. To prevent evaluation as Racket, all the syntactic constructs exported by @racketmodname[magnolisp] surround @racket[#%magnolisp] applications with a ``short-circuiting'' Racket expression.}

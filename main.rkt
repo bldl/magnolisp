@@ -48,8 +48,7 @@ Defines a Racket module language for Magnolisp.
 (provide (for-syntax (all-from-out racket/base)))
 
 (require "surface.rkt")
-(provide (except-out (all-from-out "surface.rkt") my-define)
-         (rename-out [my-define define]))
+(provide (all-from-out "surface.rkt"))
 
 (require "prelude.rkt")
 (provide (all-from-out "prelude.rkt"))

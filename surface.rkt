@@ -83,7 +83,9 @@ language.
       (~seq #:: (~and (a:expr ...) as)))
      #:attr bs (if (attribute as) #'as #'()))))
 
-(define-syntax* (my-define stx)
+(provide (rename-out [my-define define]))
+
+(define-syntax (my-define stx)
   (syntax-parse stx
     [(_ n:id as:maybe-annos v:expr)
      #'(define n
