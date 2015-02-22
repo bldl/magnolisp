@@ -113,7 +113,7 @@ Module loading.
        `(submod ,outer ,@sub ,name))
       (_
        `(submod ,mp ,name))))
-  (define sub-mp (make-sub-mp r-mp 'magnolisp-s2s))
+  (define sub-mp (make-sub-mp r-mp 'magnolisp-cxx))
 
   (define def-lst #f)
 
