@@ -96,7 +96,7 @@ same variables at the same phase level).
       (define def-lst #,(syntactifiable-mkstx def-lst))
       (provide r-mp bind->binding def-lst)))
 
-(define-for-syntax (modify-mb stx)
+(define-syntax (module-begin stx)
   (syntax-case stx ()
     ((orig-mb . bodies)
      (let ()
@@ -116,6 +116,3 @@ same variables at the same phase level).
            ;;(pretty-print (syntax->datum/binding sm-stx #:conv-id id->datum/phase))
            ;;(pretty-print (syntax->datum/binding sm-stx #:pred (lambda (x) (memq x '(equal? r.equal?)))))
            mb-stx))))))
-
-(define-syntax (module-begin stx)
-  (modify-mb stx))
