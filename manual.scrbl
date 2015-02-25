@@ -228,6 +228,21 @@ For example:
 @defform[(app/local-ec k expr)]{
 An expression that causes a jump to a surrounding continuation labeled by @racket[k], with the continuation yielding the value given by expression @racket[expr]. It is possible to jump beyond other, intermediate @racket[let/local-ec] (or @racket[begin-return]) blocks, but jumping outside the surrounding function body is not possible.}
 
+@defform[(if-target name then-expr else-expr)]{
+A compile-time conditional expression that depends on the intended execution target. Currently the only meaningful target language @racket[name] is @racketidfont{cxx}, which stands for C++. When code is being compiled for a target matching @racket[name], only @racket[then-expr] will be included in generated executable code; otherwise it is @racket[else-expr] that will be subject to evaluation in the target environment.
+
+Note that there is no specific support for execution-target-conditional macro expansion in Magnolisp (such conditionality is possible, but Magnolisp itself has no supporting mechanisms for it). Instead, to generate different code for different targets, one may use @racket[if-target] to macro generate code for @emph{all} targets at once (currently only C++ and Racket). The choice of which alternative code fragment to evaluate will be made after Magnolisp programs' macros have been expanded, but still at compile-time, either during source-to-source or bytecode compilation (depending on the execution target).
+
+For example:
+@(interaction #:eval the-eval
+  (if-target cxx (seven) (five)))
+}
+
+@defform[(if-cxx then-expr else-expr)]{
+A shorthand for @racket[(if-target cxx then-expr else-expr)].
+
+See also: @racket[begin-racket], @racket[let-racket].}
+
 @subsection{Racket Forms}
 
 To include Racket code in a phase level 0 context that is significant to Magnolisp, you may wrap the code in a form that indicates that the code is only intended for parsing as Racket. Code so wrapped must be grammatically correct Racket, but not necessarily Magnolisp. The wrapping forms @racket[begin-racket] and @racket[let-racket] merely switch syntaxes, and have no effect on the namespace used for evaluating the enclosed sub-forms; the surrounding namespace is still in effect. Nesting of the wrapping forms is allowed.
@@ -289,7 +304,15 @@ A value binding whose identifier is used to uniquely identify some Magnolisp cor
 
 As far as the Magnolisp compiler is concerned, a Magnolisp program is fully expanded if it conforms to the following grammar. Any syntactic ambiguities are resolved in favor of the first matching grammar rule.
 
-A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-terminal @racket[_nt] in @secref["fully-expanded" #:doc '(lib "scribblings/reference/reference.scrbl")] of the Racket Reference. A form @(elem (racket _form) (subscript "ign")) denotes language that is ignored by the Magnolisp compiler, but which may be useful when evaluating as Racket. A form @(elem (racket _form) (subscript (racket _pname ≠ _pval))) means the form @racket[_form] whose syntax object has the property named @racket[_pname] set to a value that is not @racket[_pval]. Form @(elem (racket (_sub-form ...)) (subscript (racket _pname ≠ _pval))) is alternatively written as @(racket (#,(subscript (racket _pname ≠ _pval)) _sub-form ...)). Anything of the form @(indirect-id _id) is actually a non-terminal like @racketvarfont{id-expr}, but for the specific identifier @racketvarfont{id}.
+A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-terminal @racket[_nt] in @secref["fully-expanded" #:doc '(lib "scribblings/reference/reference.scrbl")] of the Racket Reference. 
+
+A form @(elem (racket _form) (subscript "ign")) denotes language that is ignored by the Magnolisp compiler, but which may be useful when evaluating as Racket.
+
+A form @(elem (racket _form) (subscript (racket _pname = _pval))) means the form @racket[_form] whose syntax object has the property named @racket[_pname] set to the value @racket[_pval]. 
+A form @(elem (racket _form) (subscript (racket _pname ≠ _pval))) means the form @racket[_form] whose syntax object has the property named @racket[_pname] set to some value that is not @racket[_pval]. 
+A form @(elem (racket (_sub-form ...)) (subscript (racket _pname _=/≠ _pval))) may alternatively be written as @(racket (#,(subscript (racket _pname _=/≠ _pval)) _sub-form ...)). 
+
+Anything of the form @(indirect-id _id) is actually a non-terminal like @racketvarfont{id-expr}, but for the specific identifier @racketvarfont{id}.
 
 @racketgrammar*[
 #:literals (begin begin-for-syntax call/ec define-values define-syntaxes if let-values letrec-values letrec-syntaxes+values quote set! values void #%expression #%magnolisp #%plain-app #%plain-lambda #%provide #%require #%top)
@@ -307,12 +330,13 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
 		  (define-values (id ...) 
                     (#%plain-app #,(indirect-id values) mgl-expr ...))]
 [Racket-expr #,(rkt-nt expr)]
-[in-racket-form #,(prop-sub (racket _Racket-form) for-target ≠ 'cxx)]
+[in-racket-form #,(stxpropped (racket _Racket-form) for-target ≠ 'cxx)]
 [mgl-expr #,(ign-nt in-racket-form)
 	  (begin mgl-expr ...+)
 	  (begin0 mgl-expr mgl-expr ...)
           (#%expression mgl-expr)
           (#%plain-lambda (id ...) mgl-expr ...+)
+          if-target-expr
 	  (if #,(ign-nt Racket-expr) 
               (#%plain-app #%magnolisp (quote foreign-type))
               #,(ign-nt Racket-expr))
@@ -323,7 +347,7 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
           local-ec-block
 	  local-ec-jump
 	  (#%plain-app id-expr mgl-expr ...)
-	  (#,(sub-flag annotate) 
+	  (#,(stxprop-elem annotate) 
            let-values ([() (begin mgl-anno-expr 
                                   (#%plain-app values))] 
                        ...) 
@@ -343,9 +367,15 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
        (#%plain-app #,(indirect-id values) mgl-expr ...)]
       [() mgl-expr]
       [(id) mgl-expr]]
-[local-ec-block (#,(sub-flag local-ec) #%plain-app #,(indirect-id call/ec) 
-                (#%plain-lambda (id) mgl-expr ...+))]
-[local-ec-jump #,(flagged local-ec (racket (#%plain-app id-expr mgl-expr)))]
+[local-ec-block (#,(stxprop-elem local-ec) 
+                 #%plain-app #,(indirect-id call/ec) 
+                 (#%plain-lambda (id) mgl-expr ...+))]
+[local-ec-jump #,(stxpropped (racket (#%plain-app id-expr mgl-expr)) local-ec)]
+[if-target-expr
+          (#,(stxprop-elem if-target = 'cxx)
+           if #,(ign-nt Racket-expr) mgl-expr #,(ign-nt Racket-expr))
+          (#,(stxprop-elem if-target ≠ 'cxx)
+           if #,(ign-nt Racket-expr) #,(ign-nt Racket-expr) mgl-expr)]
 [id-expr id (#%top . id) (#%expression id-expr)]
 [mgl-anno-expr #,(harnessed anno-expr)]
 [anno-expr (#%plain-app #%magnolisp (quote anno) 
@@ -376,6 +406,9 @@ Any Racket core form.}
 
 @specsubform[in-racket-form]{
 Any Racket form that has the syntax property @racket['for-target] set to some value that is not @racket['cxx], meaning that the form is not intended for compilation to C++. These are ignored by the Magnolisp compiler where possible, and it is an error if they persist in contexts where they ultimately cannot be ignored. (The @racket[begin-racket] and @racket[begin-for-racket] forms are implemented through this mechanism.)}
+
+@specsubform[if-target-expr]{
+Indicates a choice between two expressions that is conditional on the compilation target language. Where the syntax property @racket['if-target] is set to the value @racket['cxx], the Magnolisp compiler will only compile the first expression. If it is set to some other value (indicating another target language), only the second expression will be compiled. (The @racket[if-target] form is implemented through this mechanism.)}
 
 @specsubform[submodule-form]{
 A Racket submodule definition. Submodules are not actually supported by the @racketmodname[magnolisp] language, but the Magnolisp compiler does allow them to appear, and merely ignores them.}

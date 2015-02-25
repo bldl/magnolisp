@@ -46,30 +46,35 @@ Utilities for authoring manual.scrbl.
      #`(elem (racket id)
              (subscript (italic "id-expr"))))))
 
-(define-syntax (flag stx)
-  (syntax-case stx (≠)
-    ((_ id)
-     #`(racket '#,(syntax-e #'id) ≠ #f))
-    ((_ id ≠ val)
-     #`(racket '#,(syntax-e #'id) ≠ #,(syntax->datum #'val)))
-    ))
-
-(define-syntax* (sub-flag stx)
+;; An equation expressing a syntax property condition.
+(define-syntax (stxprop-equ stx)
   (syntax-case stx ()
     ((_ id)
-     #`(subscript (flag id)))))
+     #`(racket 'id ≠ #f))
+    ((_ id cmp-op val)
+     #`(racket 'id cmp-op #,(syntax->datum #'val)))
+    ))
+
+;; To use as the first element in a form, or as a suffix for a form.
+(define-syntax* (stxprop-elem stx)
+  (syntax-case stx ()
+    ((_ id)
+     #'(subscript (stxprop-equ id)))
+    ((_ id cmp-op val)
+     #'(subscript (stxprop-equ id cmp-op val)))
+    ))
+
+;; To associate with a form as a whole.
+(define-syntax* (stxpropped stx)
+  (syntax-case stx ()
+    ((_ form pname)
+     #'(elem form (stxprop-elem pname)))
+    ((_ form pname cmp-op pval)
+     #'(elem form (stxprop-elem pname cmp-op pval)))
+    ))
 
 (define-syntax-rule* (ign-flag name form)
-  (elem form (subscript (elem (flag name) ",ign"))))
-
-(define-syntax-rule* 
-  (flagged flag form)
-  (elem form (sub-flag flag)))
-
-(define-syntax* (prop-sub stx)
-  (syntax-case stx (≠)
-    ((_ form pname ≠ pval)
-     #'(elem form (subscript (flag pname ≠ pval))))))
+  (elem form (subscript (elem (stxprop-equ name) ",ign"))))
 
 (define-syntax-rule*
   (harnessed form)

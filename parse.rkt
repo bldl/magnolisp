@@ -402,6 +402,16 @@
              ((1) (first e-ast-lst))
              (else (annoless SeqExpr e-ast-lst))))
          (syntaxed stx Lambda par-ast-lst e-ast)))
+
+      ((if _ t e)
+       (syntax-property stx 'if-target)
+       (let ()
+         (define name (syntax-property stx 'if-target))
+         (define ast
+           (if (eq? name 'cxx)
+               (parse-expr #'t)
+               (parse-expr #'e)))
+         ast))
       
       ((if _ (#%plain-app #%magnolisp (quote k)) _)
        (eq? 'foreign-type (syntax-e #'k))

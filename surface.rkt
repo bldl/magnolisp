@@ -157,6 +157,16 @@ language.
          [(_ v) (app/local-ec k v)])])
      body ...)))
 
+(define-syntax* (if-target stx)
+  (syntax-parse stx
+    [(_ name:id t:expr e:expr)
+     (syntax-property 
+      #'(if #f t e)
+      'if-target (syntax-e #'name))]))
+
+(define-syntax-rule* (if-cxx t e)
+  (if-target cxx t e))
+
 (define-syntax (flag-as-for-racket stx)
   (syntax-parse stx
     [(_ form)
