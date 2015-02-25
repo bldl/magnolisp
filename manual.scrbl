@@ -173,7 +173,7 @@ The left-hand side expression @racket[_id] must be a reference to a bound variab
 
 In Magnolisp, @racket[(void _expr _...)] is an expression with no useful result (the result is of the unit type @racket[Void]). Any arguments to @racket[void] are evaluated as usual, but they are not used. The @racket[(values)] form signifies ``nothing,'' and has no result; hence it is an error for @racket[(values)] to appear in a position where the context expects a result. In result expecting contexts, the former may only appear in a 1-value context, and the latter in a 0-value context (there are few in Magnolisp).
 
-The @racket[define] and @racket[typedef] declaration forms may appear in a Racket @emph{internal-definition context} (and not Racket @emph{expression context}). The same is true of @racket[define-values] forms that conform to the restricted syntax supported by the Magnolisp compiler.
+The @racket[define] declaration forms may appear in a Racket @emph{internal-definition context} (and not Racket @emph{expression context}). The same is true of @racket[define-values] forms that conform to the restricted syntax supported by the Magnolisp compiler.
 
 @defform[(cast type-expr expr)]{
 Annotates expression @racket[expr] with the type given by @racket[type-expr]. A @racket[cast] is commonly used to specify the type of a literal, which by themselves are generally untyped in Magnolisp. While the literal @racket["foo"] is treated as a @racket[string?] value by Racket, the Magnolisp compiler will expect to determine the literal expression's Magnolisp type based on annotations. The @racket[cast] form allows one to ``cast'' an expression to a specific type for the compiler.
@@ -185,14 +185,14 @@ For example:
 While generally only declarations require annotations, @racket[cast] demonstrates a specific case where it is useful to associate annotations with expressions.}
 
 @defform[(let-annotate (anno-expr ...) expr)]{
-Explicitly annotates the expression @racket[expr] with the specified annotations. May be used to specify annotations for an identifier that is bound using the regular Racket binding forms such as @racket[define], @racket[let], @etc
+Explicitly annotates the expression @racket[expr] with the specified annotations. May be used to specify annotations for an identifier that is bound using the regular Racket binding forms such as @racket[let], @racket[let*], @etc
 
 For example:
 @(interaction #:eval the-eval
-  (define x (let-annotate ([type int]) 5))
-  x
   (let ([x (let-annotate ([type int]) 6)])
-    x))
+    x)
+  (define-values (nine) (let-annotate ([type int]) 9))
+  nine)
 }
 
 @defform[(begin-return expr ...+)]{
@@ -253,8 +253,10 @@ For example:
 @(interaction #:eval the-eval
    (define (three) #:: (foreign [type (-> int)])
      (let-racket 
-       (r.define x 1) 
-       (set! x (begin 2 3)) 
+       (define-values (x y)
+         (let ()
+           (values 1 2))) 
+       (set! x (let dummy () (one-more y)))
        x))
    (three))}
 
@@ -287,7 +289,7 @@ A value binding whose identifier is used to uniquely identify some Magnolisp cor
 
 As far as the Magnolisp compiler is concerned, a Magnolisp program is fully expanded if it conforms to the following grammar. Any syntactic ambiguities are resolved in favor of the first matching grammar rule.
 
-A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-terminal @racket[_nt] in @secref["fully-expanded" #:doc '(lib "scribblings/reference/reference.scrbl")] of the Racket Reference. A form @(elem (racket _form) (subscript "ign")) denotes language that is ignored by the Magnolisp compiler, but which may be useful when evaluating as Racket. A form @(elem (racket _form) (subscript (racket _property ≠ #f))) means the form @racket[_form] whose syntax object has the property named @racket[_property] set to a true value. Form @(elem (racket (_sub-form ...)) (subscript (racket _property ≠ #f))) is alternatively written as @(racket (#,(subscript (racket _property ≠ #f)) _sub-form ...)). Anything of the form @(indirect-id _id) is actually a non-terminal like @racketvarfont{id-expr}, but for the specific identifier @racketvarfont{id}.
+A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-terminal @racket[_nt] in @secref["fully-expanded" #:doc '(lib "scribblings/reference/reference.scrbl")] of the Racket Reference. A form @(elem (racket _form) (subscript "ign")) denotes language that is ignored by the Magnolisp compiler, but which may be useful when evaluating as Racket. A form @(elem (racket _form) (subscript (racket _pname ≠ _pval))) means the form @racket[_form] whose syntax object has the property named @racket[_pname] set to a value that is not @racket[_pval]. Form @(elem (racket (_sub-form ...)) (subscript (racket _pname ≠ _pval))) is alternatively written as @(racket (#,(subscript (racket _pname ≠ _pval)) _sub-form ...)). Anything of the form @(indirect-id _id) is actually a non-terminal like @racketvarfont{id-expr}, but for the specific identifier @racketvarfont{id}.
 
 @racketgrammar*[
 #:literals (begin begin-for-syntax call/ec define-values define-syntaxes if let-values letrec-values letrec-syntaxes+values quote set! values void #%expression #%magnolisp #%plain-app #%plain-lambda #%provide #%require #%top)
@@ -305,7 +307,7 @@ A non-terminal @(elem (racket _nt) (subscript "rkt")) is as documented for non-t
 		  (define-values (id ...) 
                     (#%plain-app #,(indirect-id values) mgl-expr ...))]
 [Racket-expr #,(rkt-nt expr)]
-[in-racket-form #,(flagged in-racket (racket _Racket-form))]
+[in-racket-form #,(prop-sub (racket _Racket-form) for-target ≠ 'cxx)]
 [mgl-expr #,(ign-nt in-racket-form)
 	  (begin mgl-expr ...+)
 	  (begin0 mgl-expr mgl-expr ...)
@@ -373,7 +375,7 @@ A piece of literal data. A @(racket (#,(racket quote) _datum)) form is a literal
 Any Racket core form.}
 
 @specsubform[in-racket-form]{
-Any Racket form that has the syntax property @racket['in-racket] set to a true value. These are ignored by the Magnolisp compiler where possible, and it is an error if they persist in contexts where they ultimately cannot be ignored. (The @racket[begin-racket] and @racket[begin-for-racket] forms are implemented through this mechanism.)}
+Any Racket form that has the syntax property @racket['for-target] set to some value that is not @racket['cxx], meaning that the form is not intended for compilation to C++. These are ignored by the Magnolisp compiler where possible, and it is an error if they persist in contexts where they ultimately cannot be ignored. (The @racket[begin-racket] and @racket[begin-for-racket] forms are implemented through this mechanism.)}
 
 @specsubform[submodule-form]{
 A Racket submodule definition. Submodules are not actually supported by the @racketmodname[magnolisp] language, but the Magnolisp compiler does allow them to appear, and merely ignores them.}

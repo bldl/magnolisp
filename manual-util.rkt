@@ -47,9 +47,12 @@ Utilities for authoring manual.scrbl.
              (subscript (italic "id-expr"))))))
 
 (define-syntax (flag stx)
-  (syntax-case stx ()
+  (syntax-case stx (≠)
     ((_ id)
-     #`(racket '#,(syntax->datum #'id) ≠ #f))))
+     #`(racket '#,(syntax-e #'id) ≠ #f))
+    ((_ id ≠ val)
+     #`(racket '#,(syntax-e #'id) ≠ #,(syntax->datum #'val)))
+    ))
 
 (define-syntax* (sub-flag stx)
   (syntax-case stx ()
@@ -62,6 +65,11 @@ Utilities for authoring manual.scrbl.
 (define-syntax-rule* 
   (flagged flag form)
   (elem form (sub-flag flag)))
+
+(define-syntax* (prop-sub stx)
+  (syntax-case stx (≠)
+    ((_ form pname ≠ pval)
+     #'(elem form (subscript (flag pname ≠ pval))))))
 
 (define-syntax-rule*
   (harnessed form)

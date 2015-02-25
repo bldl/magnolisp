@@ -232,10 +232,14 @@
           #:fields `(("binding"
                       ,(or (stx-binding-info stx) 'unbound)))))))
 
+  (define (for-non-cxx-target stx)
+    (define v (syntax-property stx 'for-target))
+    (and v (not (eq? v 'cxx))))
+  
   (define (parse-module-level stx)
     (kernel-syntax-case*/phase stx 0 (values)
       (_
-       (syntax-property stx 'in-racket)
+       (for-non-cxx-target stx)
        (void))
 
       ((begin-for-syntax . _)
@@ -358,7 +362,7 @@
     (kernel-syntax-case*/phase stx 0 (call/ec values void #%magnolisp)
 
       (_
-       (syntax-property stx 'in-racket)
+       (for-non-cxx-target stx)
        (syntaxed stx RacketExpr))
       
       ((begin . bs)

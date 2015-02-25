@@ -144,14 +144,14 @@
     [(_ e ...)
      (syntax-property
       (syntax/loc stx (let () e ...))
-      'in-racket #t)]))
+      'for-target 'racket)]))
 
 (define-syntax* (begin-for-racket stx)
   (syntax-case stx ()
     [(_ e ...)
      (syntax-property
       (syntax/loc stx (begin e ...))
-      'in-racket #t)]))
+      'for-target 'racket)]))
 
 (define-syntax-rule*
   (define-for-racket rest ...)

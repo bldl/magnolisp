@@ -157,16 +157,16 @@ language.
          [(_ v) (app/local-ec k v)])])
      body ...)))
 
-(define-syntax (flag-as-in-racket stx)
+(define-syntax (flag-as-for-racket stx)
   (syntax-parse stx
     [(_ form)
-     (syntax-property #'form 'in-racket #t)]))
+     (syntax-property #'form 'for-target 'racket)]))
 
 (define-syntax-rule* (begin-racket form ...)
-  (flag-as-in-racket (begin form ...)))
+  (flag-as-for-racket (begin form ...)))
 
 (define-syntax-rule* (let-racket e ...)
-  (flag-as-in-racket (let () e ...)))
+  (flag-as-for-racket (let () e ...)))
 
 (define-syntax* (let-racket/require stx)
   (define-syntax-class sym-spec
