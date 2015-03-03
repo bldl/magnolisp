@@ -78,6 +78,8 @@ optimization.
   
   (set-Ast-annos ast ann-h))
 
+;; Removes `AnnoExpr` nodes by incorporating their information into
+;; surrounding nodes' annotation fields.
 (define-with-contract
   (-> Def? Def?)
   (Def-rm-AnnoExpr def)
@@ -88,7 +90,8 @@ optimization.
       (lambda (ast)
         (match ast
           [(AnnoExpr a as-1 (AnnoExpr _ as-2 e))
-           (AnnoExpr a (hash-merge-2 as-2 as-1) e)]
+           ;;(pretty-print `(MERGING ,as-1 with ,as-2))
+           (AnnoExpr a (append as-1 as-2) e)]
           [_ #f])))))
   
   (define rw-incorporate
@@ -114,10 +117,9 @@ optimization.
 
 (define (mods-rm-AnnoExpr mods)
   (for/hasheq ([(rr-mp mod) mods])
-    (define def-lst (Mod-def-lst mod))
-    (set! def-lst
-          (for/list ([def def-lst])
-            (Def-process-annos (Def-rm-AnnoExpr def))))
+    (define def-lst 
+      (for/list ([def (Mod-def-lst mod)])
+        (Def-process-annos (Def-rm-AnnoExpr def))))
     (values rr-mp (struct-copy Mod mod [def-lst def-lst]))))
 
 ;;; 

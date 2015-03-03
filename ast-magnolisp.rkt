@@ -524,7 +524,8 @@ Assumptions for AST node types:
 ;;; 
 
 ;; Later annotations in `hs` are of increasing significance. Any 'type
-;; annotations are treated specially.
+;; annotations are treated specially, so that `AnyT` types are not as
+;; significant as others.
 (define* (merge-annos . hs)
   (for/fold ((r #hasheq())) ((h hs))
     (for (((k v) h))
