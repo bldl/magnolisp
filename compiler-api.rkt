@@ -26,17 +26,17 @@ optimization.
 ;;; AnnoExpr removal
 ;;; 
 
-(define (Anno-kind+value ast)
+(define (Anno->values ast)
   (cond
    ((TypeAnno? ast) (values 'type (TypeAnno-t ast)))
    ((GenericAnno? ast) (values (GenericAnno-kind ast) (GenericAnno-datum ast)))
    (else (raise-argument-error 
-          'Anno-kind+value
+          'Anno->values
           "supported Anno object" ast))))
 
-(define (Anno-ast-lst->h as)
-  (for/hasheq ([anno-ast as])
-    (Anno-kind+value anno-ast)))
+(define (Anno->hash ast)
+  (define-values (k v) (Anno->values ast))
+  (hasheq k v))
 
 (define (Def-process-annos ast)
   (define ann-h (Ast-annos ast))
@@ -93,6 +93,11 @@ optimization.
            ;;(pretty-print `(MERGING ,as-1 with ,as-2))
            (AnnoExpr a (append as-1 as-2) e)]
           [_ #f])))))
+
+  (define (merge-into-hash h ast-lst)
+    ;; Use separate hashes to preserve conflicting keys, and to thus
+    ;; allow `merge-annos` to decide how to deal with conflicts.
+    (apply merge-annos h (map Anno->hash ast-lst)))
   
   (define rw-incorporate
     (topdown
@@ -101,16 +106,15 @@ optimization.
         ;;(when (DefVar? ast) (writeln ast))
         (match ast
           [(DefVar a id t (AnnoExpr _ as e))
-           (define ann-h (Anno-ast-lst->h as))
-           (set! a (hash-merge-2 a ann-h))
-           (when-let n-t (hash-ref a 'type #f)
-             (set! a (hash-remove a 'type))
+           ;;(pretty-print `(WITH ANNOS ,ast))
+           (define n-a (merge-into-hash a as))
+           (when-let n-t (hash-ref n-a 'type #f)
+             (set! n-a (hash-remove n-a 'type))
              (set! t n-t))
-           (DefVar a id t e)]
+           (DefVar n-a id t e)]
           [(AnnoExpr _ as e)
            ;;(writeln `(bare AnnoExpr seen ,ast))
-           (define ann-h (Anno-ast-lst->h as))
-           (modify-ast-annos e (lambda (h) (hash-merge-2 h ann-h)))]
+           (modify-ast-annos e (lambda (h) (merge-into-hash h as)))]
           [_ #f])))))
   
   (rw-incorporate (rw-merge def)))

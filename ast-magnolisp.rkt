@@ -527,13 +527,13 @@ Assumptions for AST node types:
 ;; annotations are treated specially, so that `AnyT` types are not as
 ;; significant as others.
 (define* (merge-annos . hs)
-  (for/fold ((r #hasheq())) ((h hs))
-    (for (((k v) h))
+  (for/fold ([r #hasheq()]) ([h hs])
+    (for ([(k v) h])
       (cond
-       ((and (eq? 'type k) (hash-has-key? r k) (AnyT? v))
-        (void))
-       (else
-        (set! r (hash-set r k v)))))
+       [(and (eq? 'type k) (hash-has-key? r k) (AnyT? v))
+        (void)]
+       [else
+        (set! r (hash-set r k v))]))
     r))
 
 ;;; 
