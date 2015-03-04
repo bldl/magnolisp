@@ -349,7 +349,9 @@ properties.
            (yield (TE #f s))
            (when ind-col
              (set! ind-col (+ ind-col (string-length s))))]
-          [(or (Space) #\space 'sp)
+          [(? char? c)
+           (parse (string c))]
+          [(or (Space) 'sp)
            (cond
             [(= in-group 0)
              (parse " ")]
@@ -385,7 +387,7 @@ properties.
 
 (module+ test
   (require rackunit)
-  (define doc1 (Group `("A" #\space ,(Group `("B" #\space "C")))))
+  (define doc1 (Group `("A" sp ,(Group `("B" sp "C")))))
   (for ([w '(2 4 6)])
     (displayln `(w = ,w))
     (pp doc1 #:page-width w)
