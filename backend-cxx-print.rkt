@@ -111,7 +111,7 @@
     ((Literal _ (? boolean? b))
      (if (not b) "false" "true"))
     ((Literal _ (? string? s))
-     (string-append "\"" (escape-string-literal s) "\""))
+     (string->narrow-cxx-string-literal s))
     ((ApplyExpr _ f [format-args . produces . args])
      (list (format-expr f) "(" `(in (gr ,args)) ")"))
     ((AssignExpr _ [format-expr . produces . x] [format-expr . produces . v])
@@ -176,16 +176,36 @@
      (list t " " (symbol->string n)))
     (arg (ew-error 'format-param "could not format" arg))))
 
-(define (escape-string-literal s)
-  (if (zero? (string-length s))
-      ""
-      (string-append
-       (case (string-ref s 0)
-         ((#\newline) "\\n\"\n\"")
-         ((#\") "\\\"")
-         (else (string (string-ref s 0))))
-       (escape-string-literal
-        (substring s 1 (string-length s))))))
+(define (string-pad s up-to-len pad-ch)
+  (define len (string-length s))
+  (if (>= len up-to-len)
+      s
+      (let ((n (- up-to-len len)))
+        (string-append (make-string n pad-ch) s))))
+
+(define (char->octal-escape c)
+  (define s (format "~o" (char->integer c)))
+  (list "\\" (string-pad s 3 #\0)))
+
+(define (string->narrow-cxx-string-literal s)
+  (list
+   "\""
+   (for/list ([c (in-string s)])
+     (cond
+       [(char=? c #\newline) "\\n"]
+       [(char=? c #\return) "\\r"]
+       [(char=? c #\tab) "\\t"]
+       [(char=? c #\\) "\\\\"]
+       [(char=? c #\") "\\\""]
+       [(char-iso-control? c) (char->octal-escape c)]
+       [else
+        (define n (char->integer c))
+        (when (> n 127)
+          (raise-argument-error
+           'string->narrow-cxx-string-literal
+           "ASCII string" s))
+        c]))
+    "\""))
 
 #|
 
