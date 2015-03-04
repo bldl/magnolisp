@@ -112,6 +112,8 @@
      (if (not b) "false" "true"))
     ((Literal _ (? string? s))
      (string->narrow-cxx-string-literal s))
+    ((Literal _ (? symbol? sym))
+     `("mgl_SYMBOL(" ,(string->narrow-cxx-string-literal (symbol->string sym)) ")"))
     ((ApplyExpr _ f [format-args . produces . args])
      (list (format-expr f) "(" `(in (gr ,args)) ")"))
     ((AssignExpr _ [format-expr . produces . x] [format-expr . produces . v])
