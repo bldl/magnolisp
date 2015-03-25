@@ -140,7 +140,16 @@ language.
      #'(define-values ()
          (begin
            (CORE 'declare n e)
-           (values)))]))
+           (values)))]
+    [(_ (f:id p:id ...) as:maybe-annos)
+     #'(declare f
+         (let-annotate as.bs
+             (#%plain-lambda (p ...) (void))))]
+    [(_ #:type t:id as:maybe-annos)
+     #'(declare t 
+         (let-annotate as.bs 
+             (abstract-type)))]
+    ))
 
 (define-syntax* (let/local-ec stx)
   (syntax-parse stx
