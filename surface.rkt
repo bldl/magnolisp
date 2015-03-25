@@ -83,6 +83,9 @@ language.
       (~seq #:: (~and (a:expr ...) as)))
      #:attr bs (if (attribute as) #'as #'()))))
 
+(define-syntax-rule* (abstract-type)
+  (CORE 'foreign-type))
+
 (provide (rename-out [my-define define]))
 
 (define-syntax (my-define stx)
@@ -102,7 +105,7 @@ language.
     [(_ #:type t:id as:maybe-annos)
      #'(define t 
          (let-annotate as.bs 
-             (CORE 'foreign-type)))]))
+             (abstract-type)))]))
 
 ;; DEPRECATED
 (define-syntax* (function stx)
@@ -129,7 +132,15 @@ language.
     [(_ t:id as:maybe-annos)
      #'(define t 
          (let-annotate as.bs 
-             (CORE 'foreign-type)))]))
+             (abstract-type)))]))
+
+(define-syntax* (declare stx)
+  (syntax-parse stx
+    [(_ n:id e:expr)
+     #'(define-values ()
+         (begin
+           (CORE 'declare n e)
+           (values)))]))
 
 (define-syntax* (let/local-ec stx)
   (syntax-parse stx

@@ -326,9 +326,16 @@ Anything of the form @(indirect-id _id) is actually a non-terminal like @racketv
                 #,(ign (racket (define-syntaxes (trans-id ...) Racket-expr)))
                 #,(ign-nt Racket-expr)
                 #,(ign-nt in-racket-form)]
-[module-level-def (define-values (id) mgl-expr)
+[module-level-def (define-values ()
+                    (begin
+	              (if #,(ign-nt Racket-expr) 
+                          (#%plain-app #%magnolisp (quote declare)
+			    id mgl-expr)
+                          #,(ign-nt Racket-expr))
+		      (#%plain-app values)))
+                  (define-values (id) mgl-expr)
 		  (define-values (id ...) 
-                    (#%plain-app #,(indirect-id values) mgl-expr ...))]
+                    (#%plain-app values mgl-expr ...))]
 [Racket-expr #,(rkt-nt expr)]
 [in-racket-form #,(stxpropped (racket _Racket-form) for-target ≠ 'cxx)]
 [mgl-expr #,(ign-nt in-racket-form)

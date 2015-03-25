@@ -237,7 +237,7 @@
     (and v (not (eq? v 'cxx))))
   
   (define (parse-module-level stx)
-    (kernel-syntax-case*/phase stx 0 (values)
+    (kernel-syntax-case*/phase stx 0 (#%magnolisp values)
       (_
        (for-non-cxx-target stx)
        (void))
@@ -245,6 +245,16 @@
       ((begin-for-syntax . _)
        (void))
 
+      ;; This form binds nothing in Racket, but for C++ it does have
+      ;; the effect of binding something, in the same way as the form
+      ;; (define-values (id) e) would.
+      ((define-values ()
+         (begin
+           (if _ (#%plain-app #%magnolisp (quote d) id e) _)
+           (#%plain-app values)))
+       (and (eq? 'declare (syntax-e #'d)) (identifier? #'id))
+       (make-DefVar stx #'id #'e #:top? #t))
+      
       ;; We support (values v ...) in an expression position only
       ;; directly in binding form value expressions.
       ((define-values (id ...) (#%plain-app values v ...))
