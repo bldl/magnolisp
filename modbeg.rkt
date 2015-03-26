@@ -95,7 +95,8 @@ same variables at the same phase level).
       (define r-mp #,(syntactifiable-mkstx orig-r-mp))
       (define bind->binding #,(syntactifiable-mkstx bind->binding))
       (define def-lst #,(syntactifiable-mkstx def-lst))
-      (provide r-mp bind->binding def-lst)))
+      (define prelude-lst '(magnolisp/prelude))
+      (provide r-mp bind->binding def-lst prelude-lst)))
 
 (define-syntax (module-begin stx)
   (syntax-case stx ()

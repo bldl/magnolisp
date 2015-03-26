@@ -85,10 +85,12 @@ Module loading.
 ;; [bind->binding hash?] contains binding information for Magnolisp
 ;; identifiers appearing in the module (reflecting the module from
 ;; which each binding originates, not any re-exports). [ep? boolean?]
-;; indicates whether the module is an entry point one.
-(concrete-struct* Mod
-                  (r-mp bind->binding def-lst ep?)
-                  #:transparent)
+;; indicates whether the module is an entry point one. The
+;; `prelude-lst` field is a list of module paths specifying the
+;; runtime libraries required by the module.
+(concrete-struct* 
+ Mod (r-mp bind->binding def-lst ep? prelude-lst)
+ #:transparent)
 
 ;;; 
 ;;; loading
@@ -131,7 +133,7 @@ Module loading.
   
   (cond
     ((not has-submod?)
-     (Mod r-mp #hasheq() null ep?))
+     (Mod r-mp #hasheq() null ep? null))
     (else
      (define original-r-mp (load-field 'r-mp #f))
      (when (and original-r-mp (not (equal? r-mp original-r-mp)))
@@ -143,4 +145,8 @@ Module loading.
      (define bind->binding (load-field 'bind->binding #t))
      (define def-lst (load-field 'def-lst #t))
        
-     (Mod r-mp bind->binding def-lst ep?))))
+     (Mod r-mp 
+          bind->binding 
+          def-lst 
+          ep?
+          (load-field 'prelude-lst #t)))))

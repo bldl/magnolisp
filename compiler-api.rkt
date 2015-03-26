@@ -433,8 +433,9 @@ optimization.
 (define (load-program ep-mp-lst rel-to-path-v)
   ;; resolved-module-path? is eq? comparable
   (define mods (make-hasheq)) ;; rr-mp -> Mod
-  
-  (define dep-q null) ;; deps queued for loading
+
+  ;; Dependencies queued for loading
+  (define dep-q null) ;; (listof (list/c mp rel-to-path-v))
 
   (define (load ep? mp rel-to-path-v)
     ;;(writeln `(load mp ,mp))
@@ -450,6 +451,14 @@ optimization.
       ;;(writeln `(LOADED ,rr-mp ,r-mp ,mp ,mod))
 
       (define def-lst (Mod-def-lst mod))
+
+      ;; Queue all runtime libraries for loading. They may be a
+      ;; dependencies during compilation even if they are not for
+      ;; Racket VM execution.
+      (set! dep-q (append
+                   (for/list ((mp (Mod-prelude-lst mod)))
+                     (list mp r-mp))
+                   dep-q))
       
       ;; Build a list of dependencies for this module from the
       ;; bind->binding table. Stored as (list dep-r-mp rel-r-mp) per
@@ -463,7 +472,7 @@ optimization.
       (hash-set! mods rr-mp mod)))
 
   ;; Load all the "entry" modules.
-  (for ((mp ep-mp-lst))
+  (for ([mp ep-mp-lst])
     (load #t mp rel-to-path-v))
 
   ;; Keep loading dependencies until all loaded.
@@ -471,14 +480,10 @@ optimization.
     (unless (null? dep-q)
       (define mp-lst dep-q)
       (set! dep-q null)
-      (for ((mp-and-rel mp-lst))
+      (for ([mp-and-rel mp-lst])
         ;;(writeln mp-and-rel)
         (apply load #f mp-and-rel))
       (loop)))
-
-  ;; Load prelude if not already loaded. It may be a dependency during
-  ;; compilation even if no Racket identifier references it.
-  (load #f prelude-mp #f)
 
   mods)
 
