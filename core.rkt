@@ -9,7 +9,11 @@ variants.
 
 |#
 
-(provide #%magnolisp CORE)
+(provide #%magnolisp CORE Bool Void)
+
+;;; 
+;;; core syntax
+;;; 
 
 (define #%magnolisp #f)
 
@@ -18,3 +22,10 @@ variants.
 ;; recognize as the particular core syntax.
 (define-syntax-rule (CORE kind rest ...)
   (if #f (#%magnolisp kind rest ...) #f))
+
+;;; 
+;;; compiler built-ins
+;;; 
+
+(define Bool #f)
+(define Void #f)

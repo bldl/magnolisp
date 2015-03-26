@@ -252,6 +252,7 @@ optimization.
   (define x-binds (make-hash)) ;; (cons/c rr-mp sym) -> bind
   (for ([(rr-mp mod) mods])
     (define def-lst (Mod-def-lst mod))
+    ;;(pretty-print `(before-merge-of ,rr-mp : ,(map Def-id def-lst)))
     (define bind->binding (Mod-bind->binding mod))
     ;;(pretty-print `(,rr-mp ,(Mod-r-mp mod) bind->binding ,bind->binding))
     (define m->p-bind (make-hasheq)) ;; local bind -> global bind
@@ -290,7 +291,7 @@ optimization.
         (define bind (Id-bind (Def-id def)))
         (set-add! eps-in-prog bind)))
     (void)) ;; end (for ([(rr-mp mod) mods])
-  ;;(pretty-print all-defs)
+  ;;(pretty-print `(after-merge ,(map Def-id (hash-values all-defs))))
   (values all-defs eps-in-prog x-binds))
 
 ;; Returns a list of all Id-bind's appearing within a Def.
@@ -355,11 +356,11 @@ optimization.
 ;; values.
 (define (build-prelude-bind->bind rr-mp-sym->bind the-sym->bind)
   (define prelude-rr-mp
-    (let* ((r-mp (resolve-module-path prelude-mp #f))
-           (rr-mp (r-mp->rr-mp r-mp)))
+    (let* ([r-mp (resolve-module-path prelude-mp #f)]
+           [rr-mp (r-mp->rr-mp r-mp)])
       rr-mp))
   
-  (for/hasheq (((sym the-bind) the-sym->bind))
+  (for/hasheq ([(sym the-bind) the-sym->bind])
     (define prelude-bind 
       (hash-ref rr-mp-sym->bind 
                 (cons prelude-rr-mp sym)
@@ -389,7 +390,7 @@ optimization.
 ;; maps bind values to bind values. Modifies mutable set `eps-in-prog`
 ;; in place. Returns a modified copy of `def-lst`.
 (define (switch-ids-for-builtins! def-lst eps-in-prog bind->builtin)
-  (for (((k v) bind->builtin))
+  (for ([(k v) bind->builtin])
     (when (set-member? eps-in-prog k)
       (set-remove! eps-in-prog k)
       (set-add! eps-in-prog v)))
@@ -402,9 +403,8 @@ optimization.
         (set-Id-bind id v)))
   
   (define rw (curry ast-rw-Ids rw-id))
-  
-  (for/list ((def def-lst))
-    (rw def)))
+
+  (map rw def-lst))
 
 ;;; 
 ;;; compilation
@@ -478,11 +478,12 @@ optimization.
   ;;(pretty-print mods) (exit)
   (define-values (all-defs eps-in-prog rr-mp-sym->bind)
     (merge-defs mods))
+  ;;(pretty-print (list all-defs eps-in-prog rr-mp-sym->bind)) (exit)
   
   (define prelude-bind->bind
     (build-prelude-bind->bind 
      rr-mp-sym->bind
-     (for/hasheq ((id builtin-type-id-lst))
+     (for/hasheq ([id builtin-type-id-lst])
        (values (Id-name id) (Id-bind id)))))
   
   (define def-lst (hash-values all-defs))

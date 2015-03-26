@@ -41,14 +41,14 @@ Defines a Racket module language for Magnolisp.
  if when unless 
  values void)
 
-(require "modbeg.rkt")
-(provide (rename-out [module-begin #%module-begin]))
-
 (require (for-syntax racket/base))
 (provide (for-syntax (all-from-out racket/base)))
 
+(require "core.rkt")
+(provide (all-from-out "core.rkt"))
+
+(require "modbeg.rkt")
+(provide (rename-out [module-begin #%module-begin]))
+
 (require "surface.rkt")
 (provide (all-from-out "surface.rkt"))
-
-(require "prelude.rkt")
-(provide (all-from-out "prelude.rkt"))

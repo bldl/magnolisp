@@ -80,8 +80,8 @@ Module loading.
 
 ;; [r-mp resolve-module-path-result?] is the path as used for loading
 ;; the module. [def-lst (listof Def?)] is the set of ASTs, as loaded
-;; from the submodule; a non-Magnolisp module simply gets a null value
-;; for its 'def-lst', since it contains no Magnolisp syntax.
+;; from the submodule (a non-Magnolisp module simply gets a null value
+;; for its 'def-lst', since it contains no Magnolisp syntax).
 ;; [bind->binding hash?] contains binding information for Magnolisp
 ;; identifiers appearing in the module. [ep? boolean?] indicates
 ;; whether the module is an entry point one.

@@ -1,14 +1,15 @@
-#lang magnolisp/2014
+#lang magnolisp
+(require (only-in racket/base not =))
 
-(typedef int (#:annos foreign))
+(typedef int #:: (foreign))
 
 (function (holds? x)
-  (#:annos (type (fn int Bool)) foreign)
+  #:: ((type (-> int Bool)) foreign)
   (not (= x 0)))
 
 (function (f x)
-  (#:annos export (type (fn int int)))
-  (do
+  #:: (export (type (-> int int)))
+  (begin-return
     (if (holds? x)
         (if (if #t #f #t)
             (return 7)

@@ -6,9 +6,7 @@ A library of built-in types and functions in Magnolisp.
 
 |#
 
-(require "surface.rkt")
+(require "core.rkt" "surface.rkt")
 
-(provide Bool Void)
-
-(typedef Bool #:: ([foreign bool]))
-(typedef Void #:: ([foreign void]))
+(declare #:type Bool #:: ([foreign bool]))
+(declare #:type Void #:: ([foreign void]))
