@@ -83,8 +83,9 @@ Module loading.
 ;; from the submodule (a non-Magnolisp module simply gets a null value
 ;; for its 'def-lst', since it contains no Magnolisp syntax).
 ;; [bind->binding hash?] contains binding information for Magnolisp
-;; identifiers appearing in the module. [ep? boolean?] indicates
-;; whether the module is an entry point one.
+;; identifiers appearing in the module (reflecting the module from
+;; which each binding originates, not any re-exports). [ep? boolean?]
+;; indicates whether the module is an entry point one.
 (concrete-struct* Mod
                   (r-mp bind->binding def-lst ep?)
                   #:transparent)
@@ -92,6 +93,13 @@ Module loading.
 ;;; 
 ;;; loading
 ;;; 
+
+(define (make-sub-mp mp name)
+  (match mp
+    [(list 'submod outer sub ..1)
+     `(submod ,outer ,@sub ,name)]
+    [_
+     `(submod ,mp ,name)]))
 
 ;; Loads the specified module. It is an error if the module path does
 ;; not specify an existing module. The `ep?` value does not affect
@@ -107,12 +115,6 @@ Module loading.
                     (error 'Mod-load
                            "no such module: ~s (~a)" mp r-mp)))
   
-  (define (make-sub-mp mp name)
-    (match mp
-      ((list 'submod outer sub ..1)
-       `(submod ,outer ,@sub ,name))
-      (_
-       `(submod ,mp ,name))))
   (define sub-mp (make-sub-mp r-mp 'magnolisp-cxx))
 
   (define def-lst #f)

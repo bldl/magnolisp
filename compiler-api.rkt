@@ -242,6 +242,9 @@ optimization.
 
 (define* compilation-state? St?)
 
+;; Merges the definitions of the specified modules `mods`, which is a
+;; (hash/c rr-mp Mod). Returns the definitions for the whole program
+;; as (values all-defs eps-in-prog rr-mp-sym->bind).
 (define-with-contract
   (-> hash? (values hash? (set/c symbol? #:cmp 'eq) hash?))
   (merge-defs mods)
@@ -249,13 +252,22 @@ optimization.
   (define eps-in-prog (mutable-seteq)) ;; of bind
   (define all-defs (make-hasheq)) ;; bind -> Def
   (define next-r #hasheq())
+
+  ;; Maps each binding's original binding site to that binding's
+  ;; whole-program `bind` value (as assigned here).
   (define x-binds (make-hash)) ;; (cons/c rr-mp sym) -> bind
-  (for ([(rr-mp mod) mods])
+
+  ;; Maps each global binding's original Magnolisp declaration site to
+  ;; that binding's whole-program `bind` value (as assigned here).
+  (define rr-mp-sym->bind (make-hash)) ;; (cons/c rr-mp sym) -> bind
+  
+  (for ([(rr-mp/mgl mod) mods])
     (define def-lst (Mod-def-lst mod))
-    ;;(pretty-print `(before-merge-of ,rr-mp : ,(map Def-id def-lst)))
+    ;;(pretty-print `(before-merge-of ,rr-mp/mgl : ,(map Def-id def-lst)))
     (define bind->binding (Mod-bind->binding mod))
-    ;;(pretty-print `(,rr-mp ,(Mod-r-mp mod) bind->binding ,bind->binding))
+    ;;(pretty-print `(,rr-mp/mgl ,(Mod-r-mp mod) bind->binding ,bind->binding))
     (define m->p-bind (make-hasheq)) ;; local bind -> global bind
+    
     (define (rw-id id)
       (define m-bind (Id-bind id))
       (define info (hash-ref bind->binding m-bind))
@@ -263,15 +275,16 @@ optimization.
        [(list? info)
         (define r-mp (first info))
         (define sym (second info))
-        (define rr-mp (r-mp->rr-mp r-mp))
+        (define rr-mp/bind (r-mp->rr-mp r-mp))
         (define p-bind (hash-ref m->p-bind m-bind #f))
         (unless p-bind
-          (define mp-and-sym (cons rr-mp sym))
+          (define mp-and-sym (cons rr-mp/bind sym))
           (set! p-bind (hash-ref x-binds mp-and-sym #f))
           (unless p-bind
             (set!-values (next-r p-bind) (next-gensym1 next-r sym))
             (hash-set! x-binds mp-and-sym p-bind))
           (hash-set! m->p-bind m-bind p-bind))
+        (hash-set! rr-mp-sym->bind (cons rr-mp/mgl sym) p-bind) 
         (set-Id-bind id p-bind)]
        [(or (eq? 'lexical info) (not info))
         (define p-bind (hash-ref m->p-bind m-bind #f))
@@ -279,20 +292,25 @@ optimization.
           (set!-values (next-r p-bind) (next-gensym1 next-r (Id-name id)))
           (hash-set! m->p-bind m-bind p-bind))
         (set-Id-bind id p-bind)]))
+    
     (define n-def-lst
       (for/list ([def def-lst])
         (define n-def (ast-rw-Ids rw-id def))
-        (hash-set! all-defs (Id-bind (Def-id n-def)) n-def)
+        (define bind (Id-bind (Def-id n-def)))
+        (hash-set! all-defs bind n-def)
         n-def))
-    ;;(pretty-print `(,rr-mp x-binds ,x-binds m->p-bind ,m->p-bind))
+    ;;(pretty-print `(,rr-mp/mgl x-binds ,x-binds m->p-bind ,m->p-bind))
+    
     (when (Mod-ep? mod)
       (for ([def n-def-lst]
             #:when (ast-anno-maybe def 'export))
         (define bind (Id-bind (Def-id def)))
         (set-add! eps-in-prog bind)))
-    (void)) ;; end (for ([(rr-mp mod) mods])
+    
+    (void)) ;; end (for ([(rr-mp/mgl mod) mods])
+  
   ;;(pretty-print `(after-merge ,(map Def-id (hash-values all-defs))))
-  (values all-defs eps-in-prog x-binds))
+  (values all-defs eps-in-prog rr-mp-sym->bind))
 
 ;; Returns a list of all Id-bind's appearing within a Def.
 (define-with-contract
@@ -412,14 +430,7 @@ optimization.
 
 (require "type-infer.rkt")
 
-;; Compiles a program consisting of all the entry points in the
-;; specified modules, and all dependencies thereof. All of the
-;; 'ep-mp-lst' module paths should be either absolute ones, or '(file
-;; ...)' paths relative to the working directory, unless
-;; 'rel-to-path-v' is specified for relative path resolution.
-(define* (compile-modules
-          #:relative-to [rel-to-path-v #f]
-          . ep-mp-lst)
+(define (load-program ep-mp-lst rel-to-path-v)
   ;; resolved-module-path? is eq? comparable
   (define mods (make-hasheq)) ;; rr-mp -> Mod
   
@@ -468,8 +479,19 @@ optimization.
   ;; Load prelude if not already loaded. It may be a dependency during
   ;; compilation even if no Racket identifier references it.
   (load #f prelude-mp #f)
-  
-  ;;(writeln `(eps-in-prog ,eps-in-prog))
+
+  mods)
+
+;; Compiles a program consisting of all the entry points in the
+;; specified modules, and all dependencies thereof. All of the
+;; 'ep-mp-lst' module paths should be either absolute ones, or '(file
+;; ...)' paths relative to the working directory, unless
+;; 'rel-to-path-v' is specified for relative path resolution.
+(define* (compile-modules
+          #:relative-to [rel-to-path-v #f]
+          . ep-mp-lst)
+  (define mods ;; rr-mp -> Mod
+    (load-program ep-mp-lst rel-to-path-v))
   ;;(writeln `(loaded mods ,(hash-keys mods)))
   ;;(pretty-print `(loaded modules ,mods)) (exit)
   ;;(displayln 'ast-after-marshaling) (for ([(x mod) mods]) (for ([def (Mod-def-lst mod)]) (ast-dump-loc-info def)))
@@ -478,6 +500,7 @@ optimization.
   ;;(pretty-print mods) (exit)
   (define-values (all-defs eps-in-prog rr-mp-sym->bind)
     (merge-defs mods))
+  ;;(writeln `(eps-in-prog ,eps-in-prog))
   ;;(pretty-print (list all-defs eps-in-prog rr-mp-sym->bind)) (exit)
   
   (define prelude-bind->bind

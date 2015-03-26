@@ -64,6 +64,7 @@ same variables at the same phase level).
       (set!-values (next-r bind) (next-gensym1 next-r (syntax-e id)))
       (dict-set! id->bind id bind))
     (define b (identifier-binding id 0))
+    ;;(writeln b)
     (define bi
       (if (not (list? b))
           b

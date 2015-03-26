@@ -28,14 +28,15 @@ Magnolisp for-syntax.
 
 (provide (except-out (all-from-out racket/base) #%module-begin))
 
-(require "modbeg.rkt")
-(provide (rename-out [module-begin #%module-begin]))
-
 (require (for-syntax racket/base))
 (provide (for-syntax (all-from-out racket/base)))
+
+(require "core.rkt")
+(provide (all-from-out "core.rkt"))
+
+(require "modbeg.rkt")
+(provide (rename-out [module-begin #%module-begin]))
 
 (require "surface-2014.rkt")
 (provide (all-from-out "surface-2014.rkt"))
 
-(require "prelude.rkt")
-(provide (all-from-out "prelude.rkt"))
