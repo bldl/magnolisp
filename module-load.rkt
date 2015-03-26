@@ -117,37 +117,30 @@ Module loading.
   
   (define sub-mp (make-sub-mp r-mp 'magnolisp-cxx))
 
-  (define def-lst #f)
+  (define has-submod?
+    (may-fail (dynamic-require sub-mp #f) #t))
 
-  ;; Using 'may-fail' here as there may be no submodule.
-  (define bind->binding
-    (may-fail
-     (dynamic-require
-      sub-mp 'bind->binding
-      (thunk #f))))
-
-  (when bind->binding
-    (define original-r-mp
-      (dynamic-require
-       sub-mp 'r-mp
-       (thunk
-        (error 'Mod-load
-               "missing symbol 'r-mp for Magnolisp module ~s" mp))))
-
-    (when (and original-r-mp (not (equal? r-mp original-r-mp)))
-      (error 'Mod-load
-             "~a (~s): ~s != ~s (used != recorded)"
-             "resolved module path mismatch"
-             mp r-mp original-r-mp))
-
-    (set! def-lst
-          (dynamic-require
-           sub-mp 'def-lst
-           (thunk
-            (error 'Mod-load
-                   "missing symbol 'def-lst for Magnolisp module ~a" mp)))))
+  (define (load-field sym compulsory?)
+    (dynamic-require 
+     sub-mp sym
+     (thunk
+      (and 
+       compulsory?
+       (error 'Mod-load
+              "missing symbol ~s for Magnolisp module ~s" sym mp)))))
   
-  (Mod r-mp
-    (or bind->binding #hasheq())
-    (or def-lst null)
-    ep?))
+  (cond
+    ((not has-submod?)
+     (Mod r-mp #hasheq() null ep?))
+    (else
+     (define original-r-mp (load-field 'r-mp #f))
+     (when (and original-r-mp (not (equal? r-mp original-r-mp)))
+       (error 'Mod-load
+              "~a (~s): ~s != ~s (used != recorded)"
+              "resolved module path mismatch"
+              mp r-mp original-r-mp))
+
+     (define bind->binding (load-field 'bind->binding #t))
+     (define def-lst (load-field 'def-lst #t))
+       
+     (Mod r-mp bind->binding def-lst ep?))))
