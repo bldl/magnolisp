@@ -244,7 +244,7 @@ optimization.
 
 ;; Merges the definitions of the specified modules `mods`, which is a
 ;; (hash/c rr-mp Mod). Returns the definitions for the whole program
-;; as (values all-defs eps-in-prog rr-mp-sym->bind).
+;; as (values all-defs eps-in-prog prelude-sym->bind).
 (define-with-contract
   (-> hash? (values hash? (set/c symbol? #:cmp 'eq) hash?))
   (merge-defs mods)
@@ -257,9 +257,10 @@ optimization.
   ;; whole-program `bind` value (as assigned here).
   (define x-binds (make-hash)) ;; (cons/c rr-mp sym) -> bind
 
-  ;; Maps each global binding's original Magnolisp declaration site to
-  ;; that binding's whole-program `bind` value (as assigned here).
-  (define rr-mp-sym->bind (make-hash)) ;; (cons/c rr-mp sym) -> bind
+  ;; Maps each global prelude binding's original Magnolisp declaration
+  ;; site to that binding's whole-program `bind` value (as assigned
+  ;; here).
+  (define prelude-sym->bind (make-hasheq)) ;; sym -> bind
   
   (for ([(rr-mp/mgl mod) mods])
     (define def-lst (Mod-def-lst mod))
@@ -284,7 +285,8 @@ optimization.
             (set!-values (next-r p-bind) (next-gensym1 next-r sym))
             (hash-set! x-binds mp-and-sym p-bind))
           (hash-set! m->p-bind m-bind p-bind))
-        (hash-set! rr-mp-sym->bind (cons rr-mp/mgl sym) p-bind) 
+        (when (Mod-prelude? mod)
+          (hash-set! prelude-sym->bind sym p-bind))
         (set-Id-bind id p-bind)]
        [(or (eq? 'lexical info) (not info))
         (define p-bind (hash-ref m->p-bind m-bind #f))
@@ -310,7 +312,7 @@ optimization.
     (void)) ;; end (for ([(rr-mp/mgl mod) mods])
   
   ;;(pretty-print `(after-merge ,(map Def-id (hash-values all-defs))))
-  (values all-defs eps-in-prog rr-mp-sym->bind))
+  (values all-defs eps-in-prog prelude-sym->bind))
 
 ;; Returns a list of all Id-bind's appearing within a Def.
 (define-with-contract
@@ -366,26 +368,15 @@ optimization.
 ;;; prelude
 ;;; 
 
-(define prelude-mp 'magnolisp/prelude)
-
 ;; Builds a map of bind values in loaded prelude to the fixed bind
 ;; values of definitions that are special to the compiler. The map
 ;; makes it possible to switch the definitions over to said known
-;; values.
-(define (build-prelude-bind->bind rr-mp-sym->bind the-sym->bind)
-  (define prelude-rr-mp
-    (let* ([r-mp (resolve-module-path prelude-mp #f)]
-           [rr-mp (r-mp->rr-mp r-mp)])
-      rr-mp))
-  
+;; values. Not all the compiler-known symbols are required to appear
+;; in the prelude libraries.
+(define (build-prelude-bind->bind prelude-sym->bind the-sym->bind)
   (for/hasheq ([(sym the-bind) the-sym->bind])
     (define prelude-bind 
-      (hash-ref rr-mp-sym->bind 
-                (cons prelude-rr-mp sym)
-                (thunk
-                 (error 'compile-modules
-                        "'~a' does not define '~a': ~s"
-                        prelude-mp sym prelude-rr-mp))))
+      (or (hash-ref prelude-sym->bind sym #f) (gensym "dummy")))
     (assert (not (eq? prelude-bind the-bind)))
     (values prelude-bind the-bind)))
 
@@ -434,10 +425,12 @@ optimization.
   ;; resolved-module-path? is eq? comparable
   (define mods (make-hasheq)) ;; rr-mp -> Mod
 
+  (struct Dep (ep? prelude? mp rel) #:transparent)
+  
   ;; Dependencies queued for loading
-  (define dep-q null) ;; (listof (list/c mp rel-to-path-v))
+  (define dep-q null) ;; (listof Dep?)
 
-  (define (load ep? mp rel-to-path-v)
+  (define (load ep? prelude? mp rel-to-path-v)
     ;;(writeln `(load mp ,mp))
     (define r-mp (resolve-module-path/primitive mp rel-to-path-v))
     ;;(writeln `(load r-mp ,r-mp))
@@ -445,19 +438,20 @@ optimization.
     ;;(writeln `(load rr-mp ,rr-mp))
     ;;(writeln `(load entry: ,ep? mp: ,mp rel: ,rel-to-path-v r-mp: ,r-mp rr-mp: ,rr-mp))
     (define mod (hash-ref mods rr-mp #f))
+    
     (unless mod ;; not yet loaded
       ;;(writeln (list 'loading-submod-of r-mp mp))
-      (set! mod (Mod-load r-mp mp ep?))
+      (set! mod (Mod-load r-mp mp))
       ;;(writeln `(LOADED ,rr-mp ,r-mp ,mp ,mod))
 
       (define def-lst (Mod-def-lst mod))
 
-      ;; Queue all runtime libraries for loading. They may be a
+      ;; Queue all runtime libraries for loading. They may be
       ;; dependencies during compilation even if they are not for
       ;; Racket VM execution.
       (set! dep-q (append
                    (for/list ((mp (Mod-prelude-lst mod)))
-                     (list mp r-mp))
+                     (Dep #f #t mp r-mp))
                    dep-q))
       
       ;; Build a list of dependencies for this module from the
@@ -467,22 +461,31 @@ optimization.
             #:when (list? info))
         (define dep-r-mp (first info))
         (define dep-mp (r-mp->mp dep-r-mp))
-        (set! dep-q (cons (list dep-mp r-mp) dep-q)))
+        (set! dep-q (cons (Dep #f #f dep-mp r-mp) dep-q)))
 
-      (hash-set! mods rr-mp mod)))
+      (hash-set! mods rr-mp mod))
+
+    (when ep?
+      (define h (Mod-attrs mod))
+      (hash-set! h 'ep? #t))
+    (when prelude?
+      (define h (Mod-attrs mod))
+      (hash-set! h 'prelude? #t))
+    
+    mod)
 
   ;; Load all the "entry" modules.
   (for ([mp ep-mp-lst])
-    (load #t mp rel-to-path-v))
+    (load #t #f mp rel-to-path-v))
 
   ;; Keep loading dependencies until all loaded.
   (let loop ()
     (unless (null? dep-q)
-      (define mp-lst dep-q)
+      (define lst dep-q)
       (set! dep-q null)
-      (for ([mp-and-rel mp-lst])
-        ;;(writeln mp-and-rel)
-        (apply load #f mp-and-rel))
+      (for ([dep lst])
+        (match-define (Dep ep? prelude? mp rel) dep)
+        (load ep? prelude? mp rel))
       (loop)))
 
   mods)
@@ -503,14 +506,14 @@ optimization.
   
   (set! mods (mods-rm-AnnoExpr mods))
   ;;(pretty-print mods) (exit)
-  (define-values (all-defs eps-in-prog rr-mp-sym->bind)
+  (define-values (all-defs eps-in-prog prelude-sym->bind)
     (merge-defs mods))
   ;;(writeln `(eps-in-prog ,eps-in-prog))
   ;;(pretty-print (list all-defs eps-in-prog rr-mp-sym->bind)) (exit)
   
   (define prelude-bind->bind
     (build-prelude-bind->bind 
-     rr-mp-sym->bind
+     prelude-sym->bind
      (for/hasheq ([id builtin-type-id-lst])
        (values (Id-name id) (Id-bind id)))))
   

@@ -84,13 +84,20 @@ Module loading.
 ;; for its 'def-lst', since it contains no Magnolisp syntax).
 ;; [bind->binding hash?] contains binding information for Magnolisp
 ;; identifiers appearing in the module (reflecting the module from
-;; which each binding originates, not any re-exports). [ep? boolean?]
-;; indicates whether the module is an entry point one. The
+;; which each binding originates, not any re-exports). The
 ;; `prelude-lst` field is a list of module paths specifying the
-;; runtime libraries required by the module.
+;; runtime libraries required by the module. The `attrs` field
+;; contains a mutable hasheq of attributes, with currently supported
+;; keys being `ep?` and `prelude?`.
 (concrete-struct* 
- Mod (r-mp bind->binding def-lst ep? prelude-lst)
+ Mod (r-mp bind->binding def-lst prelude-lst attrs)
  #:transparent)
+
+(define* (Mod-ep? mod)
+  (hash-ref (Mod-attrs mod) 'ep? #f))
+
+(define* (Mod-prelude? mod)
+  (hash-ref (Mod-attrs mod) 'prelude? #f))
 
 ;;; 
 ;;; loading
@@ -104,11 +111,10 @@ Module loading.
      `(submod ,mp ,name)]))
 
 ;; Loads the specified module. It is an error if the module path does
-;; not specify an existing module. The `ep?` value does not affect
-;; loading, but is merely stored in the returned module object.
+;; not specify an existing module.
 (define-with-contract*
-  (-> resolve-module-path-result? module-path? boolean? Mod?)
-  (Mod-load r-mp mp ep?)
+  (-> resolve-module-path-result? module-path? Mod?)
+  (Mod-load r-mp mp)
   
   ;; Visit the module to determine if it even exists, and is a valid
   ;; module. This must succeed.
@@ -132,9 +138,9 @@ Module loading.
               "missing symbol ~s for Magnolisp module ~s" sym mp)))))
   
   (cond
-    ((not has-submod?)
-     (Mod r-mp #hasheq() null ep? null))
-    (else
+    [(not has-submod?)
+     (Mod r-mp #hasheq() null null (make-hasheq))]
+    [else
      (define original-r-mp (load-field 'r-mp #f))
      (when (and original-r-mp (not (equal? r-mp original-r-mp)))
        (error 'Mod-load
@@ -148,5 +154,5 @@ Module loading.
      (Mod r-mp 
           bind->binding 
           def-lst 
-          ep?
-          (load-field 'prelude-lst #t)))))
+          (load-field 'prelude-lst #t)
+          (make-hasheq))]))
