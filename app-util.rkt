@@ -7,7 +7,7 @@ compiler.
 
 |#
 
-(require "racket-5-compat.rkt" "util.rkt"
+(require "util.rkt" "util/racket-5-compat.rkt"
          racket/contract racket/dict racket/function
          racket/list racket/pretty
          syntax/id-table syntax/stx)
