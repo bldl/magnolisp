@@ -5,9 +5,10 @@
                      @; a trick to get only the original exports
 		     (combine-in
 		       (only-meta-in 0 magnolisp/main)
+		       magnolisp/core
 		       magnolisp/surface
 		       magnolisp/prelude)
-	             magnolisp/compiler-api magnolisp/core
+	             magnolisp/compiler-api
 		     ))
 
 @(define the-eval (make-base-eval))
@@ -275,30 +276,52 @@ For example:
        x))
    (three))}
 
-@section{Standard Library}
+@section{Runtime Library}
 
 @defmodule[magnolisp/prelude]
 
-A boolean expression is simply an expression of type @racket[Bool], which is one of the two predefined types in Magnolisp. The other one is @racket[Void], which is Magnolisp's unit type (whose values carry no information).
+The Magnolisp language includes nothing that would qualify as a standard
+library, but it does include a small number of predefined names. Most notably,
+the compiler expects expressions of type @racket[Bool] and @racket[Void] in
+certain contexts, and it also recognizes their identifiers. While the C++
+translation semantics of these types are @emph{not} built into the compiler,
+such semantics @emph{are} predefined by the language. More specifically, the
+@racketmodname[magnolisp] language uses the @racketmodname[magnolisp/prelude]
+module as its ``runtime library,'' one that specifies the C++ runtime names to
+which these known types correspond. The @racketmodname[magnolisp/prelude]
+module only contains such compile-time information, and no Racket bindings are
+exported from it.
 
-The @racket[Bool] and @racket[Void] types are defined by the @racketmodname[magnolisp/prelude] module, which serves as the runtime library of Magnolisp. The @racketmodname[magnolisp/prelude] names are bound for phase level 0 in the @racketmodname[magnolisp] language.
+@defthing[#:kind "type" #:link-target? #f Bool any/c]{
+A predefined type. The corresponding C++ type is @racketidfont{bool}, and the corresponding C++ constant values are @racketidfont{true} and @racketidfont{false}, respectively.}
 
-@defthing[#:kind "type" Bool any/c]{
-A predefined type. The literals of this type are @racket[#t] and @racket[#f]. All conditional expressions in Magnolisp are of this type. The corresponding C++ type is @racketidfont{bool}, and the corresponding C++ constant values are @racketidfont{true} and @racketidfont{false}, respectively.}
+@defthing[#:kind "type" #:link-target? #f Void any/c]{
+A predefined type. Such values may not actually exist at C++ run time. The corresponding C++ type is @racketidfont{void}.}
 
-@defthing[#:kind "type" Void any/c]{
-A predefined type. There are no literals for @racket[Void] values, but the Magnolisp core form @racket[(void _expr _...)] evaluates such a value, at least conceptually. Such values may not actually exist at C++ run time. The corresponding C++ type is @racketidfont{void}.}
-
-@section{Magnolisp Core Syntax}
+@section{Core Magnolisp}
 
 @defmodule[magnolisp/core]
 
+There are a small number of Magnolisp-specific names that are treated specially by the Magnolisp compiler. These are bound in the @racketmodname[magnolisp/core] module, and exported for phase level 0 by the @racketmodname[magnolisp] language.
+
+@subsection{Magnolisp Built-Ins}
+
+A boolean expression is simply an expression of type @racket[Bool], which is one of the two predefined types in Magnolisp. The other one is @racket[Void], which is Magnolisp's unit type (whose values carry no information).
+
+@defthing[#:kind "type" Bool any/c]{
+A predefined type. The literals of this type are @racket[#t] and @racket[#f] (which are also the only typed literals in the language). All conditional expressions in Magnolisp are of type @racket[Bool].}
+
+@defthing[#:kind "type" Void any/c]{
+A predefined type. There are no literals for @racket[Void] values, but the Magnolisp core form @racket[(void _expr _...)] evaluates such a value, at least conceptually.}
+
+@subsection{Magnolisp Core Syntax}
+
 Magnolisp core syntax is encoded primarily in terms of Racket's core forms. Magnolisp core forms that have no Racket counterpart, however, are encoded in terms of the @racket[#%magnolisp] variable, which is treated specially by the Magnolisp compiler. The @racket[#%magnolisp] binding is exported from the @racketmodname[magnolisp/core] module.
 
-It is possible to define multiple different surface syntaxes for Magnolisp, and these can be defined as libraries similar to the @racketmodname[magnolisp/surface] syntax definition used by the @racketmodname[magnolisp] language. All Magnolisp language variants must, however, refer to the same core bindings (i.e., as exported from @racketmodname[racket/base] and @racketmodname[magnolisp/core]) and (as applicable) to the same standard library built-ins (i.e., those in @racketmodname[magnolisp/prelude]), as no other bindings are treated specially by the Magnolisp compiler.
+It is possible to define multiple different surface syntaxes for Magnolisp, and these can be defined as libraries similar to the @racketmodname[magnolisp/surface] syntax definition used by the @racketmodname[magnolisp] language. All Magnolisp language variants must, however, refer to the same core bindings (i.e., as exported from @racketmodname[racket/base] and @racketmodname[magnolisp/core]), as no other bindings are treated specially by the Magnolisp compiler.
 
 @defthing[#:kind "binding" #%magnolisp any/c]{
-A value binding whose identifier is used to uniquely identify some Magnolisp core syntactic forms. It always appears in the application position of a Racket @racket[#%plain-app] core form. The value of the variable does not matter when compiling as Magnolisp, as it is never used. To prevent evaluation as Racket, all the syntactic constructs exported by @racketmodname[magnolisp] surround @racket[#%magnolisp] applications with a ``short-circuiting'' Racket expression.}
+A value binding whose identifier is used to uniquely identify some Magnolisp core syntactic forms. It always appears in the applied-procedure position of a Racket @racket[#%plain-app] core form. The value of the variable does not matter when compiling as Magnolisp, as it is never used. To prevent evaluation as Racket, all the syntactic constructs exported by @racketmodname[magnolisp] surround @racket[#%magnolisp] applications with a ``short-circuiting'' Racket expression.}
 
 @subsection{Fully Expanded Programs}
 
