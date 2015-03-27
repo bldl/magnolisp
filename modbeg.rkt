@@ -54,7 +54,7 @@ same variables at the same phase level).
   ;;(pretty-print (map (lambda (def) (cons def (ast-anno-maybe def 'export))) (dict-values defs)))
   ;;(displayln 'ast-before-marshaling) (for (((id def) (in-dict defs))) (ast-dump-loc-info def))
 
-  (define id->bind (make-free-id-table #:phase 0))
+  (define id->bind (make-free-id-table))
   (define bind->binding (make-hasheq))
   (define next-r #hasheq())
 

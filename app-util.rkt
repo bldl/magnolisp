@@ -63,8 +63,8 @@ compiler.
      d
      (lambda (k v)
        (cond
-        ((bound-identifier=? k id-stx 0) `(bound ,(syntax-e k)))
-        ((free-identifier=? k id-stx 0 0) `(free ,(syntax-e k)))
+        ((bound-identifier=? k id-stx) `(bound ,(syntax-e k)))
+        ((free-identifier=? k id-stx) `(free ,(syntax-e k)))
         (else #f)))))))
 
 ;; E.g.
@@ -75,7 +75,7 @@ compiler.
 ;; See also: identifier-binding-symbol
 (define* (syntax->datum/free-id stx)
   (define n 0)
-  (define h (make-free-id-table #:phase 0))
+  (define h (make-free-id-table))
   (define (f x)
     (cond
      ((null? x)

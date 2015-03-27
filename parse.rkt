@@ -120,7 +120,7 @@
   (-> syntax? immutable-id-table?)
   (parse-defs-from-module modbeg-stx)
 
-  (define defs-in-mod (make-immutable-free-id-table #:phase 0))
+  (define defs-in-mod (make-immutable-free-id-table))
 
   (define (get-def-in-mod id)
     (dict-ref defs-in-mod id #f))
