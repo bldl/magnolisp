@@ -298,7 +298,12 @@ optimization.
     (define n-def-lst
       (for/list ([def def-lst])
         (define n-def (ast-rw-Ids rw-id def))
-        (define bind (Id-bind (Def-id n-def)))
+        (define id (Def-id n-def))
+        (define bind (Id-bind id))
+        (when (hash-has-key? all-defs bind)
+          (error 'merge-defs
+                 "redefinition for `~a`: ~s" 
+                 (Id-name id) n-def))
         (hash-set! all-defs bind n-def)
         n-def))
     ;;(pretty-print `(,rr-mp/mgl x-binds ,x-binds m->p-bind ,m->p-bind))
