@@ -16,7 +16,8 @@ same variables at the same phase level).
 
 |#
 
-(provide module-begin)
+(provide module-begin
+         (for-syntax make-module-begin))
 
 (require (for-syntax
           racket/base racket/dict racket/list racket/pretty
@@ -25,7 +26,8 @@ same variables at the same phase level).
           "ast-magnolisp.rkt" "ast-serialize.rkt"
           "parse.rkt" "util.rkt"))
 
-(define-for-syntax (make-definfo-submodule orig-mb-id modbeg-stx)
+(define-for-syntax (make-definfo-submodule 
+                    orig-mb-id modbeg-stx prelude-stx)
   (define orig-r-mp
     (let ((src (syntax-source orig-mb-id)))
       (and src
@@ -95,19 +97,22 @@ same variables at the same phase level).
       (define r-mp #,(syntactifiable-mkstx orig-r-mp))
       (define bind->binding #,(syntactifiable-mkstx bind->binding))
       (define def-lst #,(syntactifiable-mkstx def-lst))
-      (define prelude-lst '(magnolisp/prelude))
+      (define prelude-lst #,prelude-stx)
       (provide r-mp bind->binding def-lst prelude-lst)))
 
-(define-syntax (module-begin stx)
+(define-for-syntax (make-module-begin 
+                    stx 
+                    #:prelude [prelude-stx #''(magnolisp/prelude)])
   (syntax-case stx ()
-    ((orig-mb . bodies)
+    [(orig-mb . bodies)
      (let ()
        (define ast (local-expand
                     #`(#%module-begin . bodies)
                     'module-begin null))
        ;;(pretty-print (syntax->datum/loc ast))
        ;;(pretty-print (syntax->datum/loc ast #:stx->datum stx->datum/source))
-       (define sm-stx (make-definfo-submodule #'orig-mb ast))
+       (define sm-stx 
+         (make-definfo-submodule #'orig-mb ast prelude-stx))
        (with-syntax ([(mb . bodies) ast]
                      [sm sm-stx])
          (let ([mb-stx #'(mb sm . bodies)])
@@ -117,4 +122,7 @@ same variables at the same phase level).
            ;;(pretty-print (syntax->datum/binding ast))
            ;;(pretty-print (syntax->datum/binding sm-stx #:conv-id id->datum/phase))
            ;;(pretty-print (syntax->datum/binding sm-stx #:pred (lambda (x) (memq x '(equal? r.equal?)))))
-           mb-stx))))))
+           mb-stx)))]))
+
+(define-syntax (module-begin stx)
+  (make-module-begin stx))
