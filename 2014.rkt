@@ -24,7 +24,7 @@ Magnolisp for-syntax.
                    (t)))
   ;; Import readtable. Note that it needs to be in the `reader`
   ;; submodule scope, not the outer one.
-  (require magnolisp/reader-ext-2014))
+  (require magnolisp/2014/reader-ext))
 
 (provide (except-out (all-from-out racket/base) #%module-begin))
 
@@ -37,6 +37,5 @@ Magnolisp for-syntax.
 (require "modbeg.rkt")
 (provide (rename-out [module-begin #%module-begin]))
 
-(require "surface-2014.rkt")
-(provide (all-from-out "surface-2014.rkt"))
-
+(require "2014/surface.rkt")
+(provide (all-from-out "2014/surface.rkt"))

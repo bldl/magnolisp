@@ -4,10 +4,12 @@
 
 |#
 
-(require "core.rkt" "util.rkt"
-         racket/stxparam
-         (for-syntax "app-util.rkt" "util.rkt"
-                     racket/base racket/syntax syntax/parse)) 
+(require (relative-in 
+          magnolisp
+          "core.rkt" "util.rkt"
+          racket/stxparam
+          (for-syntax "app-util.rkt" "util.rkt"
+                      racket/base racket/syntax syntax/parse)))
 
 ;; Function type expression.
 (define-syntax-rule* (fn at ... rt)

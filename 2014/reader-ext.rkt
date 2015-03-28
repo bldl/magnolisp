@@ -138,7 +138,7 @@ T), where 'T' can be any type expression.
 ;;; 
 
 (module* main #f
-  (require "util.rkt")
+  (require "../util.rkt")
   (with-magnolisp-readtable
    (for ((s (list
              "^T"
