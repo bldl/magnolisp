@@ -451,7 +451,9 @@ optimization.
       ;; Racket VM execution.
       (set! dep-q (append
                    (for/list ((mp (Mod-prelude-lst mod)))
-                     (Dep #f #t mp r-mp))
+                     (define dep (Dep #f #t mp r-mp))
+                     ;;(writeln `(queuing prelude ,dep))
+                     dep)
                    dep-q))
       
       ;; Build a list of dependencies for this module from the
@@ -461,7 +463,9 @@ optimization.
             #:when (list? info))
         (define dep-r-mp (first info))
         (define dep-mp (r-mp->mp dep-r-mp))
-        (set! dep-q (cons (Dep #f #f dep-mp r-mp) dep-q)))
+        (define dep (Dep #f #f dep-mp r-mp))
+        ;;(writeln `(queuing dependency ,dep))
+        (set! dep-q (cons dep dep-q)))
 
       (hash-set! mods rr-mp mod))
 
