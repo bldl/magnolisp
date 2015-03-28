@@ -19,7 +19,8 @@ same variables at the same phase level).
 (provide module-begin
          (for-syntax make-module-begin))
 
-(require (for-syntax
+(require "core.rkt"
+         (for-syntax
           racket/base racket/dict racket/list racket/pretty
           syntax/id-table syntax/modresolve syntax/quote
           "app-util.rkt" 
@@ -90,6 +91,12 @@ same variables at the same phase level).
     (for/list ([(id def) (in-dict defs)])
       (ast-rw-Ids rw-id def)))
 
+  (define core-syms (make-hasheq)) ;; sym -> local bind
+  (for ((id (list #'Bool #'Void)))
+    (define bind (dict-ref id->bind id #f))
+    (when bind
+      (hash-set! core-syms (syntax-e id) bind))) 
+
   ;;(writeln (list (current-module-declare-source) (current-module-declare-name)))
   
   #`(module magnolisp-cxx racket/base
@@ -98,7 +105,8 @@ same variables at the same phase level).
       (define bind->binding #,(syntactifiable-mkstx bind->binding))
       (define def-lst #,(syntactifiable-mkstx def-lst))
       (define prelude-lst #,prelude-stx)
-      (provide r-mp bind->binding def-lst prelude-lst)))
+      (define core->bind #,(syntactifiable-mkstx core-syms))
+      (provide r-mp bind->binding def-lst prelude-lst core->bind)))
 
 (define-for-syntax (make-module-begin 
                     stx 

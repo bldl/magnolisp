@@ -257,10 +257,13 @@ optimization.
   ;; whole-program `bind` value (as assigned here).
   (define x-binds (make-hash)) ;; (cons/c rr-mp sym) -> bind
 
-  ;; Maps each global prelude binding's original Magnolisp declaration
-  ;; site to that binding's whole-program `bind` value (as assigned
-  ;; here).
-  (define prelude-sym->bind (make-hasheq)) ;; sym -> bind
+  ;; Maps each appearing core binding's whole-program `bind` value (as
+  ;; assigned here) to its IR bind value. The map makes it possible to
+  ;; switch the definitions over to said known IR bind values. Not all
+  ;; the compiler-known names are required to be declared in prelude
+  ;; modules, except if they are actually used, and code is to be
+  ;; generated for such uses.
+  (define prelude-bind->bind (make-hasheq)) ;; bind -> sym
   
   (for ([(rr-mp/mgl mod) mods])
     (define def-lst (Mod-def-lst mod))
@@ -285,8 +288,6 @@ optimization.
             (set!-values (next-r p-bind) (next-gensym1 next-r sym))
             (hash-set! x-binds mp-and-sym p-bind))
           (hash-set! m->p-bind m-bind p-bind))
-        (when (Mod-prelude? mod)
-          (hash-set! prelude-sym->bind sym p-bind))
         (set-Id-bind id p-bind)]
        [(or (eq? 'lexical info) (not info))
         (define p-bind (hash-ref m->p-bind m-bind #f))
@@ -307,6 +308,10 @@ optimization.
         (hash-set! all-defs bind n-def)
         n-def))
     ;;(pretty-print `(,rr-mp/mgl x-binds ,x-binds m->p-bind ,m->p-bind))
+
+    (for ([(sym m-bind) (Mod-core->bind mod)])
+      (define p-bind (hash-ref m->p-bind m-bind))
+      (hash-set! prelude-bind->bind p-bind sym))
     
     (when (Mod-ep? mod)
       (for ([def n-def-lst]
@@ -317,7 +322,7 @@ optimization.
     (void)) ;; end (for ([(rr-mp/mgl mod) mods])
   
   ;;(pretty-print `(after-merge ,(map Def-id (hash-values all-defs))))
-  (values all-defs eps-in-prog prelude-sym->bind))
+  (values all-defs eps-in-prog prelude-bind->bind))
 
 ;; Returns a list of all Id-bind's appearing within a Def.
 (define-with-contract
@@ -373,18 +378,6 @@ optimization.
 ;;; prelude
 ;;; 
 
-;; Builds a map of bind values in loaded prelude to the fixed bind
-;; values of definitions that are special to the compiler. The map
-;; makes it possible to switch the definitions over to said known
-;; values. Not all the compiler-known symbols are required to appear
-;; in the prelude libraries.
-(define (build-prelude-bind->bind prelude-sym->bind the-sym->bind)
-  (for/hasheq ([(sym the-bind) the-sym->bind])
-    (define prelude-bind 
-      (or (hash-ref prelude-sym->bind sym #f) (gensym "dummy")))
-    (assert (not (eq? prelude-bind the-bind)))
-    (values prelude-bind the-bind)))
-
 ;; Sets identifier references that matter to the compiler, but which
 ;; Racket will not have resolved, so that they can be accounted for
 ;; during whole-program optimization. The type names of literals are
@@ -400,18 +393,18 @@ optimization.
          (_ ast)))))
   (rw ast))
 
-;; Applies the identifier mappings specified by `bind->builtin`, which
-;; maps bind values to bind values. Modifies mutable set `eps-in-prog`
-;; in place. Returns a modified copy of `def-lst`.
-(define (switch-ids-for-builtins! def-lst eps-in-prog bind->builtin)
-  (for ([(k v) bind->builtin])
+;; Applies the identifier mappings specified by `prelude-bind->bind`,
+;; which maps bind values to bind values. Modifies mutable set
+;; `eps-in-prog` in place. Returns a modified copy of `def-lst`.
+(define (switch-ids-for-builtins! def-lst eps-in-prog prelude-bind->bind)
+  (for ([(k v) prelude-bind->bind])
     (when (set-member? eps-in-prog k)
       (set-remove! eps-in-prog k)
       (set-add! eps-in-prog v)))
 
   (define (rw-id id)
     (define bind (Id-bind id))
-    (define v (hash-ref bind->builtin bind #f))
+    (define v (hash-ref prelude-bind->bind bind #f))
     (if (not v)
         id
         (set-Id-bind id v)))
@@ -515,16 +508,10 @@ optimization.
   
   (set! mods (mods-rm-AnnoExpr mods))
   ;;(pretty-print mods) (exit)
-  (define-values (all-defs eps-in-prog prelude-sym->bind)
+  (define-values (all-defs eps-in-prog prelude-bind->bind)
     (merge-defs mods))
   ;;(writeln `(eps-in-prog ,eps-in-prog))
   ;;(pretty-print (list all-defs eps-in-prog rr-mp-sym->bind)) (exit)
-  
-  (define prelude-bind->bind
-    (build-prelude-bind->bind 
-     prelude-sym->bind
-     (for/hasheq ([id builtin-type-id-lst])
-       (values (Id-name id) (Id-bind id)))))
   
   (define def-lst (hash-values all-defs))
   

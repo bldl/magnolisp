@@ -86,11 +86,12 @@ Module loading.
 ;; identifiers appearing in the module (reflecting the module from
 ;; which each binding originates, not any re-exports). The
 ;; `prelude-lst` field is a list of module paths specifying the
-;; runtime libraries required by the module. The `attrs` field
-;; contains a mutable hasheq of attributes, with currently supported
-;; keys being `ep?` and `prelude?`.
+;; runtime libraries required by the module. [core->bind hash?] maps
+;; built-in symbols to local bind values. The `attrs` field contains a
+;; mutable hasheq of attributes, with currently supported keys being
+;; `ep?` and `prelude?`.
 (concrete-struct* 
- Mod (r-mp bind->binding def-lst prelude-lst attrs)
+ Mod (r-mp bind->binding def-lst prelude-lst core->bind attrs)
  #:transparent)
 
 (define* (Mod-ep? mod)
@@ -139,7 +140,7 @@ Module loading.
   
   (cond
     [(not has-submod?)
-     (Mod r-mp #hasheq() null null (make-hasheq))]
+     (Mod r-mp #hasheq() null null #hasheq() (make-hasheq))]
     [else
      (define original-r-mp (load-field 'r-mp #f))
      (when (and original-r-mp (not (equal? r-mp original-r-mp)))
@@ -155,4 +156,5 @@ Module loading.
           bind->binding 
           def-lst 
           (load-field 'prelude-lst #t)
+          (load-field 'core->bind #t)
           (make-hasheq))]))
