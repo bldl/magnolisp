@@ -8,7 +8,7 @@
   (provide module-begin/2014)
   (require "../modbeg.rkt" (for-syntax racket/base))
   (define-syntax (module-begin/2014 stx)
-    (make-module-begin stx #:prelude #''(magnolisp/2014/prelude))))
+    (make-module-begin stx #:prelude-path #''(magnolisp/2014/prelude))))
 
 (require (submod "." modbeg))
 

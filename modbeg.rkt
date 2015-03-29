@@ -28,7 +28,7 @@ same variables at the same phase level).
           "parse.rkt" "util.rkt"))
 
 (define-for-syntax (make-definfo-submodule 
-                    orig-mb-id modbeg-stx prelude-stx)
+                    orig-mb-id modbeg-stx prelude-stx prelude-ids)
   (define orig-r-mp
     (let ((src (syntax-source orig-mb-id)))
       (and src
@@ -92,7 +92,7 @@ same variables at the same phase level).
       (ast-rw-Ids rw-id def)))
 
   (define core-syms (make-hasheq)) ;; sym -> local bind
-  (for ((id (list #'Bool #'Void)))
+  (for ([id prelude-ids])
     (define bind (dict-ref id->bind id #f))
     (when bind
       (hash-set! core-syms (syntax-e id) bind))) 
@@ -110,7 +110,8 @@ same variables at the same phase level).
 
 (define-for-syntax (make-module-begin 
                     stx 
-                    #:prelude [prelude-stx #''(magnolisp/prelude)])
+                    #:prelude-path [prelude-stx #''(magnolisp/prelude)]
+                    #:prelude-ids [prelude-ids (list #'Bool #'Void)])
   (syntax-case stx ()
     [(orig-mb . bodies)
      (let ()
@@ -120,7 +121,7 @@ same variables at the same phase level).
        ;;(pretty-print (syntax->datum/loc ast))
        ;;(pretty-print (syntax->datum/loc ast #:stx->datum stx->datum/source))
        (define sm-stx 
-         (make-definfo-submodule #'orig-mb ast prelude-stx))
+         (make-definfo-submodule #'orig-mb ast prelude-stx prelude-ids))
        (with-syntax ([(mb . bodies) ast]
                      [sm sm-stx])
          (let ([mb-stx #'(mb sm . bodies)])
