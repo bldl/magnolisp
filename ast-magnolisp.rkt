@@ -142,6 +142,14 @@ Assumptions for AST node types:
    (else ast)))
 
 (define-with-contract*
+  (-> Ast? string?)
+  (ast-~a ast)
+  (let ((stx (ast-stx ast)))
+    (if stx
+        (format "~a" (syntax->datum stx))
+        (format "~s" ast))))
+
+(define-with-contract*
   (-> (or/c syntax? Ast?) (or/c symbol? #f))
   (form-get-name/ast x)
   (cond

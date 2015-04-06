@@ -151,65 +151,65 @@
 ;;; constraint solver
 ;;; 
 
-;; Simplifies type 't' using any applicable substitions in 'h', which
-;; maps VarT symbols to type expressions. Substitutions are applied
-;; recursively. As a side effect, may update 'h' for purposes for
-;; memoization. Returns the simplified type. Note that 'eq?' may be
-;; used to determine if any simplification took place.
+;; Simplifies type `t` using any applicable substitutions in `h`,
+;; which maps (unique) `VarT` symbols to type expressions.
+;; Substitutions are applied recursively. As a side effect, may update
+;; `h` for purposes of memoization, to replace more complex type
+;; expressions with simpler ones. Returns the simplified version of
+;; type `t`. The `eq?` operation may be used to determine if any
+;; simplification took place. `VarT` nodes will still remain in `t` if
+;; not all the appearing type variables had assignments in `h`.
 (define-with-contract
   (-> hash? Type? Type?)
   (subst! h t)
+  ;;(writeln `(subst! ,h ,t))
   
-  ;; 'ix' of last successful lookup.
-  (define last-ix 0)
-  
-  (define (lookup sym ix)
-    (define ast (hash-ref h sym #f))
-    (and ast
-         (begin
-           (set! last-ix ix)
-           ast)))
+  (define (lookup sym)
+    (hash-ref h sym #f))
 
-  (define (memoize ix sym ast)
-    (when (< ix last-ix)
-      ;;(writeln `(memoize ,sym = ,ast))
-      (hash-set! h sym ast))
-    ast)
-  
-  (define (f ix ast)
+  (define (memoize! sym ast)
+    (hash-set! h sym ast))
+
+  (let loop ([vars (seteq)] [ast t])
+    ;;(writeln `(loop ,vars ,ast))
     (match ast
-     ((VarT _ sym)
-      (define n-ast (lookup sym ix))
-      (cond
-       ((not n-ast) ast)
-       (else
-        (memoize ix sym (f (+ ix 1) n-ast)))))
-     ((? NameT?)
-      ast)
-     ((FunT a ats rt)
-      (define n-ats (map (curry subst! h) ats))
-      (define n-rt (subst! h rt))
-      (if (and (eq? rt n-rt) (andmap eq? ats n-ats))
-          ast
-          (FunT a n-ats n-rt)))
-     ((PhiT a t u)
-      (define n-t (subst! h t))
-      (define n-u (subst! h u))
-      (if (and (eq? t n-t) (eq? u n-u))
-          ast
-          (PhiT a n-t n-u)))
-     ((ParamT a bt ats)
-      (define n-bt (subst! h bt))
-      (define n-ats (map (curry subst! h) ats))
-      (if (and (eq? bt n-bt) (andmap eq? ats n-ats))
-          ast
-          (ParamT a n-bt n-ats)))
-     (else
-      (raise-argument-error
-       'f "(or/c FunT? NameT? ParamT? PhiT? VarT?)"
-       1 ix ast))))
-
-  (f 0 t))
+      [(VarT _ sym)
+       (define h-ast (lookup sym))
+       (cond
+         ((not h-ast) ast)
+         (else
+          (when (set-member? vars sym)
+            (error 'subst! "recursive type ~a: ~s ≡ ~s"
+                   (ast-~a t) ast h-ast))
+          (define n-ast (loop (set-add vars sym) h-ast))
+          (unless (eq? ast n-ast)
+            (memoize! sym n-ast))
+          n-ast))]
+      [(? NameT?)
+       ast]
+      [(FunT a ats rt)
+       (define n-ats (map (curry loop vars) ats))
+       (define n-rt (loop vars rt))
+       (if (and (eq? rt n-rt) (andmap eq? ats n-ats))
+           ast
+           (FunT a n-ats n-rt))]
+      [(PhiT a t u)
+       (define n-t (loop vars t))
+       (define n-u (loop vars u))
+       (if (and (eq? t n-t) (eq? u n-u))
+           ast
+           (PhiT a n-t n-u))]
+      [(ParamT a bt ats)
+       (define n-bt (loop vars bt))
+       (define n-ats (map (curry loop vars) ats))
+       (if (and (eq? bt n-bt) (andmap eq? ats n-ats))
+           ast
+           (ParamT a n-bt n-ats))]
+      [else
+       (error
+        'subst!
+        "expected (or/c FunT? NameT? ParamT? PhiT? VarT?): ~s"
+        ast)])))
 
 (define (unify-with-PhiT? x)
   (or (NameT? x)
