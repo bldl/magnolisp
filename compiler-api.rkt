@@ -18,6 +18,7 @@ optimization.
 |#
 
 (require "app-util.rkt" "ast-magnolisp.rkt" "ast-util.rkt"
+         "backend-magnolisp-print.rkt"
          "compiler-rewrites.rkt" "parse.rkt" "strategy.rkt"
          "util.rkt" "util/struct.rkt"
          syntax/moddep)
@@ -541,6 +542,7 @@ optimization.
   ;;(pretty-print def-lst)
   (set! all-defs (build-defs-table def-lst))
   ;;(pretty-print all-defs) (exit)
+  ;;(displayln (pp-mgl (filter Defun? (hash-values all-defs)))) (exit)
   (set! all-defs (defs-type-infer all-defs))
   ;;(pretty-print all-defs) (exit)
   (set! all-defs (defs-map/bind ast-rm-dead-constants all-defs))
