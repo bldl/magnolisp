@@ -802,15 +802,22 @@ C++ back end.
          (values (hash-set bind->val lv-bind this-num) ast)]
         [(IfStat a c t e)
          (define n-c (rw-discard bind->val c))
-         (define-values (t-st n-t) (rw bind->val t))
-         (if (not n-t)
-             (values bind->val #f)
-             (let ()
+         (cond
+           [(not n-c)
+            (values bind->val #f)]
+           [else
+            (define-values (t-st n-t) (rw bind->val t))
+            (cond 
+              [(not n-t)
+               (values bind->val #f)]
+              [else
                (define-values (e-st n-e) (rw bind->val e))
-               (if (not n-e)
-                   (values bind->val #f)
-                   (values (merge t-st e-st)
-                           (IfStat a n-c n-t n-e)))))]
+               (cond
+                 [(not n-e)
+                  (values bind->val #f)]
+                 [else
+                  (values (merge t-st e-st)
+                          (IfStat a n-c n-t n-e))])])])]
         [(Var a (? (lambda (id) (ast-identifier=? id tgt-id)) id))
          (define this-bind (Id-bind id))
          (define this-num (hash-ref bind->val this-bind))
