@@ -323,6 +323,23 @@
 ;;; API
 ;;; 
 
+;; Augments type expression `t` with the type facts available in `h`.
+;; Intended for more informative reporting of type errors.
+(define (type-concretely h t)
+  (let loop ([ast t])
+    (match ast
+      [(VarT _ sym)
+       (if-let n-ast (hash-ref h sym #f)
+         (loop n-ast)
+         ast)]
+      [(FunT a rt ats)
+       (FunT a (loop rt) (map loop ats))]
+      [(ParamT a t ps)
+       (ParamT a (loop t) (map loop ps))]
+      [(PhiT a t u)
+       (PhiT a (loop t) (loop u))]
+      [_ ast])))
+
 ;; Takes a definition table containing just the program, and
 ;; checks/infers its types. 'defs' itself is used as the type
 ;; environment. The input may contain AnyT values, long as their
@@ -553,6 +570,7 @@
        ;; The type of the ApplyExpr expression must unify with the
        ;; return type of the function.
        (define t (FunT-rt f-t))
+       ;;(writeln (type-concretely var-h t))
        (expr-unify! ast t))
 
       ((Literal _ dat)
@@ -576,7 +594,8 @@
                   (Id-name the-Bool-id))
           ast c
           #:fields (list (list "actual type"
-                               (ast-displayable/datum c-t)))))
+                               (ast-displayable/datum 
+                                (type-concretely var-h c-t))))))
        (define t-t (ti-expr t))
        (define e-t (ti-expr e))
        (define discarded? (get-result-discarded ast))
