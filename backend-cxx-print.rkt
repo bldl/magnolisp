@@ -104,7 +104,7 @@
     ((IfExpr _ [format-expr . produces . test]
              [format-expr . produces . conseq]
              [format-expr . produces . alt])
-     (list "(" test " ? " conseq " : " alt ")"))
+     `("(" ,test (in (gr " ?" sp ,conseq " :" sp ,alt ")"))))
     ((Var _ var) (symbol->string var))
     ((Literal _ (? number? n))
      (number->string n))
