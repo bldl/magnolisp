@@ -542,7 +542,7 @@ optimization.
   ;;(pretty-print def-lst)
   (set! all-defs (build-defs-table def-lst))
   ;;(pretty-print all-defs) (exit)
-  ;;(displayln (pp-mgl (filter Defun? (hash-values all-defs)))) (exit)
+  ;;(pp-mgl (filter Defun? (hash-values all-defs))) (newline) (exit)
   (set! all-defs (defs-type-infer all-defs))
   ;;(pretty-print all-defs) (exit)
   (set! all-defs (defs-map/bind ast-rm-dead-constants all-defs))
@@ -612,14 +612,22 @@ optimization.
      "file basename of non-zero length, without exotic characters"
      basename))
 
+  (when-let entry (assq 'mgl backends)
+    (match entry
+      [(list _ (list (? symbol? opts) ...))
+       (define ast-lst (hash-values (St-defs st)))
+       (define mgl-file (build-path outdir 
+                                    (string-append basename ".ir.rkt")))
+       (generate-mgl-file ast-lst out mgl-file banner?)]))
+       
   (when-let entry (assq 'cxx backends)
     (match entry
-      ((list _ (list (? symbol? kinds) ...))
+      [(list _ (list (? symbol? kinds) ...))
        (unless (null? kinds)
          (set! kinds (remove-duplicates kinds eq?))
          (define defs (St-defs st))
          (define path-stem (build-path outdir basename))
-         (generate-cxx-file kinds defs path-stem out banner?)))))
+         (generate-cxx-file kinds defs path-stem out banner?))]))
 
   (when-let entry (assq 'build backends)
     (match entry

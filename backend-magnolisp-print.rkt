@@ -10,8 +10,8 @@ source code.
 (require "ast-magnolisp.rkt" "backend-util.rkt" 
          (rename-in "pp-yield.rkt" [pp pp-y])
          "util.rkt"
-         racket/format racket/list racket/match 
-         racket/port racket/pretty)
+         racket/contract racket/format racket/list 
+         racket/match racket/port racket/pretty)
 
 (define (pp-id id) ;; Id? -> spec
   (symbol->string (Id-name id)))
@@ -46,7 +46,15 @@ source code.
      `("(" (in (gr ,(pp-expr f)
                    ,(for/list ((e as))
                       `(sp ,(pp-expr e))))) ")"))
+
+    ((LetLocalEc _ k es)
+     `("(let/local-ec " (in (gr ,(pp-expr k)
+                                ,(for/list ((e es))
+                                   `(sp ,(pp-expr e))))) ")"))
     
+    ((AppLocalEc _ k e)
+     `("(app/local-ec " (in (gr ,(pp-expr k) sp ,(pp-expr e))) ")"))
+
     (else
      (~s ast))))
 
@@ -56,27 +64,49 @@ source code.
      (pp-id id))
     
     ((Defun a id t ps b)
-     (list "(define" 'sp
-           "(" (add-between 
-                (cons (pp-id id)
-                      (map pp-def ps))
-                'sp) ")"
-                (and (not (NoBody? b)) 
-                     `(in (br ,(pp-expr b))))
-                ")"))
+     `("(define" sp
+       "(" ,(add-between 
+             (cons (pp-id id)
+                   (map pp-def ps))
+             'sp) ")"
+       ,(and (not (NoBody? b)) 
+             `(in (br ,(pp-expr b))))
+       ")"))
     
     ((DefVar _ id t v)
      `("(define " ,(pp-id id) " " ,(pp-expr v) ")"))
+
+    ((ForeignTypeDecl _ id _)
+     `("(define #:type " ,(pp-id id) ")"))
     
     (else
      (~s ast))))
 
-(define* (pp-mgl ast-lst)
+(define* (pp-mgl ast-lst #:yield [yield display])
   (define spec
     (add-between (map pp-def ast-lst) '(br br)))
   ;;(pretty-print spec)
+  (pp-y #:yield yield spec))
+
+(define* (pp-mgl-to-string ast-lst)
   (call-with-output-string
    (lambda (out)
      (define (yield s)
        (display s out))
-     (pp-y #:yield yield spec))))
+     (pp-mgl ast-lst #:yield yield))))
+
+(define-with-contract*
+  (-> (listof Def?) (or/c #f output-port?) path-string? boolean? void?)
+  (generate-mgl-file ast-lst out path banner?)
+
+  (define filename (path-basename-as-string path))
+
+  (write-generated-output
+   path out
+   (lambda ()
+    (when banner?
+      (display-banner ";;" filename))
+    (pp-mgl ast-lst)
+    (newline)))
+
+  (void))

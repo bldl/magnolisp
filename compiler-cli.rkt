@@ -22,6 +22,7 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
     (define stdout? #f)
     (define banner? #f)
     (define cxx? #f)
+    (define mgl? #f)
     (define tools null)
     (define supported-tools '(c gnu-make qmake ruby))
 
@@ -39,6 +40,8 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
         (current-directory (expand-user-path dirname)))
        (("--cxx" "-c") "generate C++ implementation"
         (set! cxx? #t))
+       (("--mgl") "generate IR dump as Magnolisp"
+        (set! mgl? #t))
        (("--outdir" "-o") dirname "output directory"
         (set! out-dir (path->directory-path (adjust-path dirname))))
        (("--stdout" "-s") "output to stdout"
@@ -65,7 +68,8 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
       (define st (apply compile-files fn-lst))
       (generate-files st
                       (filter identity
-                       (list (and cxx? '(cxx (cc hh)))
+                       (list (and mgl? '(mgl ()))
+                             (and cxx? '(cxx (cc hh)))
                              (and (pair? tools) `(build ,tools))))
                       #:outdir (or out-dir (current-directory))
                       #:basename out-basename
