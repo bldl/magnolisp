@@ -218,16 +218,7 @@ C++ back end.
     (let-values (((r ast) (rw r ast)))
       ast))
 
-  (define rw-type-refs
-    (topdown
-     (lambda (ast)
-       (match ast
-         ((ForeignNameT a id)
-          (NameT a (syntax-e id)))
-         (_ ast)))))
-
   (set! ast-lst (map (fix rw-drop r) ast-lst))
-  (set! ast-lst (map rw-type-refs ast-lst))
   ;;(writeln ast-lst)
   ast-lst)
 

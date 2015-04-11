@@ -3,9 +3,8 @@
 #|
 |#
 
-(require "util.rkt"
-         (for-syntax racket/base
-                     "syntax-quote-extras.rkt"))
+(require "../util.rkt"
+         (for-syntax racket/base "syntax-quote-extras.rkt"))
 
 (define-syntax* (quote-syntax/keep-properties stx)
   (syntax-case stx ()

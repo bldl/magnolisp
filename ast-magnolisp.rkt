@@ -285,7 +285,7 @@ Assumptions for AST node types:
 (define-ast* KontT (Ast Type)
   ((no-term annos)) #:singleton (#hasheq()))
 
-;; 'id' is an ID
+;; 'id' is an `Id` object
 (define-ast* NameT (Ast Type)
   ((no-term annos) (no-term id)))
 
@@ -297,7 +297,7 @@ Assumptions for AST node types:
 (define-ast* FunT (Ast Type) 
   ((no-term annos) (list-of-term ats) (just-term rt)))
 
-;; 'id' is an identifier
+;; 'id' is a Racket identifier
 (define-ast* ForeignNameT (Ast Type) 
   ((no-term annos) (no-term id)))
 

@@ -114,7 +114,8 @@
      (string->narrow-cxx-string-literal s))
     ((Literal _ (? symbol? sym))
      `("mgl_SYMBOL(" ,(string->narrow-cxx-string-literal (symbol->string sym)) ")"))
-    ((ApplyExpr _ f [format-args . produces . args])
+    ((ApplyExpr a f [format-args . produces . args])
+     ;;(writeln a)
      (list (format-expr f) "(" `(in (gr ,args)) ")"))
     ((AssignExpr _ [format-expr . produces . x] [format-expr . produces . v])
      (list "(" x " = " v ")"))
@@ -156,6 +157,8 @@
   (match t
     ((NameT _ (? symbol? s))
      (symbol->string s))
+    ((ForeignNameT _ (? identifier? s))
+     (symbol->string (syntax-e s)))
     ((ConstT _ t)
      (list (format-type t) " const"))
     ((RefT _ t)
