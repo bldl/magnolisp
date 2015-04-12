@@ -467,7 +467,8 @@
            ;; No first-class functions in Magnolisp.
            (raise-syntax-error #f "expected identifier"
                                stx #'p-expr))
-         (syntaxed stx ApplyExpr
+         (ApplyExpr
+          (hasheq 'stx stx 'uid (gensym 'apply))
           f-ast
           (map
            parse-expr

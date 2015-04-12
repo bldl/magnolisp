@@ -257,7 +257,13 @@ Assumptions for AST node types:
   (-> procedure? hash? hash?)
   (defs-map/bind rw defs)
   (for/hasheq ([(bind def) (in-dict defs)])
-   (values bind (rw def))))
+    (values bind (rw def))))
+
+(define-with-contract*
+  (-> procedure? hash? any/c)
+  (defs-for-each/bind rw defs)
+  (for ([(bind def) (in-dict defs)])
+    (rw def)))
 
 ;;; 
 ;;; type expressions

@@ -187,83 +187,153 @@
        (all-rw-term rw ast)))))
 
 ;;; 
-;;; ExistsT removal
+;;; existential types
 ;;; 
 
 ;; The `t-expr` argument must be a full type expression. This is
 ;; required so that all the type variables associated with any ExistsT
 ;; within `t-expr` get processed here.
-(define* (type-expr-rm-ExistsT t-expr)
+(define-with-contract*
+  (-> Type? (values hash? Type?))
+  (type-expr-rm-ExistsT t-expr)
+  
   (define bind->sym (make-hasheq))
-    
-  (let loop ((ast t-expr))
-    (match ast
-      ((NameT a (Id _ _ bind))
-       ;;(writeln `(,ast when ,bind->sym))
-       (define sym (hash-ref bind->sym bind #f))
-       (if sym
-           (VarT a sym)
-           ast))
-      ((ExistsT _ ns t)
-       (for ((n ns))
-         (match-define (NameT _ (Id _ name bind)) n)
-         (assert (not (hash-has-key? bind->sym bind)))
-         (hash-set! bind->sym bind (gensym name)))
-       ;;(writeln bind->sym)
-       (loop t))
-      (_
-       (all-rw-term loop ast)))))
+
+  (define n-ast
+    (let loop ((ast t-expr))
+      (match ast
+        ((NameT a (Id _ _ bind))
+         ;;(writeln `(,ast when ,bind->sym))
+         (define sym (hash-ref bind->sym bind #f))
+         (if sym
+             (VarT a sym)
+             ast))
+        ((ExistsT _ ns t)
+         (for ((n ns))
+           (match-define (NameT _ (Id _ name bind)) n)
+           (assert (not (hash-has-key? bind->sym bind)))
+           (hash-set! bind->sym bind (gensym name)))
+         ;;(writeln bind->sym)
+         (loop t))
+        (_
+         (all-rw-term loop ast)))))
+
+  (values bind->sym n-ast))
 
 (define* (ast-rm-ExistsT def)
   (define (f dummy t-expr)
-    (type-expr-rm-ExistsT t-expr))
+    (define-values (bind->sym n-ast)
+      (type-expr-rm-ExistsT t-expr))
+    n-ast)
   (ast-map-type-expr f def))
 
 ;;; 
-;;; ForAllT removal
+;;; universal types
 ;;; 
+
+;; Whether the type expression `in-t` is a function type whose return
+;; type contains universal types not appearing in formal argument
+;; types.
+(define-with-contract*
+  (-> Type? boolean?)
+  (type-expr-return-type-overloaded? in-t)
+  
+  (define univ-binds (mutable-seteq))
+
+  (define (univ-bind? bind)
+    (set-member? univ-binds bind))
+  
+  (define r-binds (mutable-seteq))
+  (define a-binds (mutable-seteq))
+
+  (define (r-visit ast)
+    (match ast
+      [(NameT _ (Id _ _ (? univ-bind? bind)))
+       (set-add! r-binds bind)]
+      [(ForAllT _ ns t)
+       (for ([n ns])
+         (match-define (NameT _ (Id _ _ bind)) n)
+         (set-add! univ-binds bind))
+       (r-visit t)]
+      [_
+       (all-rw-term r-visit ast)]))
+  
+  (define (a-visit ast)
+    (match ast
+      [(NameT _ (Id _ _ (? univ-bind? bind)))
+       (set-add! a-binds bind)]
+      [_
+       (all-rw-term a-visit ast)]))
+
+  (define (top-visit ast)
+    (match ast
+      [(FunT _ ats rt)
+       (unless (set-empty? univ-binds)
+         (r-visit rt)
+         (for-each a-visit ats))]
+      [(ForAllT _ ns t)
+       (for ([n ns])
+         (match-define (NameT _ (Id _ _ bind)) n)
+         (set-add! univ-binds bind))
+       (top-visit t)]
+      [(ExistsT _ _ t)
+       (top-visit t)]
+      [_
+       (void)]))
+
+  (top-visit in-t)
+  (set-subtract! r-binds a-binds)
+  (not (set-empty? r-binds)))
 
 ;; Rewrites the `in-t` type expression to remove ForAllT quantifiers.
 ;; Also returns a list of appearing universal types, preserving their
 ;; order.
-(define* (type-expr-rm-ForAllT/def in-t)
+(define-with-contract*
+  (-> Type? (values (listof NameT?) Type?))
+  (type-expr-rm-ForAllT/def in-t)
+  
   (define univ-names '())
   (define univ-binds (mutable-seteq))
   
   (define (univ-bind? bind)
     (set-member? univ-binds bind))
 
-  (define (annos-flag a)
+  (define (flag-type-param a)
     (hash-set a 'type-param #t))
   
   (define n-t
-    (let loop ((ast in-t))
+    (let loop ([ast in-t])
       (match ast
-        ((NameT a (and (Id _ _ (? univ-bind?)) id))
-         (NameT (annos-flag a) id))
-        ((ForAllT _ ns t)
-         (for ((n ns))
+        [(NameT a (and (Id _ _ (? univ-bind?)) id))
+         (NameT (flag-type-param a) id)]
+        [(ForAllT _ ns t)
+         (for ([n ns])
            (match-define (NameT a (and (Id _ _ bind) id)) n)
            (set-add! univ-binds bind)
-           (set! univ-names (cons (NameT (annos-flag a) id) univ-names)))
-         (loop t))
-        (_
-         (all-rw-term loop ast)))))
+           (set! univ-names (cons (NameT (flag-type-param a) id) univ-names)))
+         (loop t)]
+        [_
+         (all-rw-term loop ast)])))
   
   (values (reverse univ-names) n-t))
 
 ;; Replaces all universal types in `in-t` with specific types, which
 ;; in practice will be fresh `VarT` nodes. The appearing `ForAllT`
-;; quantifiers are removed.
-(define* (type-expr-rm-ForAllT/use in-t)
+;; quantifiers are removed. Also returns a NameT `bind` value -> VarT
+;; symbol mapping, which can be used to relate the original universal
+;; types to their instantiations.
+(define-with-contract*
+  (-> Type? (values hash? Type?))
+  (type-expr-rm-ForAllT/use in-t)
+  
   (define rw
     (topdown
      (lambda (ast)
        (match ast
-         ((ForAllT a ns t)
-          (ExistsT a ns t))
-         (_ ast)))))
-  
+         [(ForAllT a ns t)
+          (ExistsT a ns t)]
+         [_ ast]))))
+
   (type-expr-rm-ExistsT (rw in-t)))
 
 ;;; 

@@ -21,15 +21,6 @@
 (define (lookup-type-from-defs defs x)
   (def-get-type (lookup-def-from-defs defs x)))
 
-(define (lookup-use-type-from-defs defs x)
-  (define def (lookup-def-from-defs defs x))
-  (match def
-    ((Defun (? (lambda (a) (hash-has-key? a 'type-params)) as) id t ps b)
-     (define g-t (hash-ref as 'generic-type))
-     (type-expr-rm-ForAllT/use g-t))
-    (_
-     (def-get-type def))))
-
 (define (type=? x y)
   (cond
    ((VarT? x) #t)
@@ -54,14 +45,74 @@
          (andmap type=? x-ats y-ats)))
    (else #f)))
 
-(define (variable-type? t)
-  (let/ec k
-    ((topdown-visit
-      (lambda (ast)
-        (when (VarT? ast)
-          (k #t))))
-     t)
-    #f))
+;; Augments type expression `t` with the type facts available in `h`.
+;; Intended for more informative reporting of type errors.
+(define (type-concretely h t)
+  (let loop ([ast t])
+    (match ast
+      [(VarT _ sym)
+       (if-let n-ast (hash-ref h sym #f)
+         (loop n-ast)
+         ast)]
+      [(FunT a rt ats)
+       (FunT a (loop rt) (map loop ats))]
+      [(ParamT a t ps)
+       (ParamT a (loop t) (map loop ps))]
+      [(PhiT a t u)
+       (PhiT a (loop t) (loop u))]
+      [_ ast])))
+
+;;; 
+;;; generics specialization
+;;; 
+
+;; The `param-syms` field is the list of VarT syms corresponding to
+;; the particular instantiation of the relevant universal type
+;; parameters.
+(struct ApplyInfo (param-syms) #:transparent)
+
+(define-with-contract
+  (-> hash? Var? (values (or/c #f ApplyInfo?) Type?))
+  (lookup-use-type-from-defs defs x)
+  
+  (define def (lookup-def-from-defs defs x))
+  (match def
+    [(Defun (? (lambda (a) (hash-has-key? a 'univ-type-params)) as) _ _ _ _)
+     (define g-t (hash-ref as 'generic-type))
+     (define-values (bind->sym n-def)
+       (type-expr-rm-ForAllT/use g-t))
+     (define info
+       (and (hash-ref as 'return-type-overloaded? #f)
+            (let* ((ns (hash-ref as 'univ-type-params))
+                   (syms (for/list ((n ns))
+                           (define id (NameT-id n))
+                           (define bind (Id-bind id))
+                           (hash-ref bind->sym bind))))
+              (ApplyInfo syms))))
+     (values info n-def)]
+    [_
+     (values #f (def-get-type def))]))
+
+(define (defs-add-type<> var-h apply-h defs)
+  (define rw-type<>
+    (topdown
+     (lambda (ast)
+       (match ast
+         [(ApplyExpr (and (app (lambda (a) 
+                                 (define uid (hash-ref a 'uid))
+                                 (hash-ref apply-h uid #f))
+                               (? identity info))
+                          annos) f args)
+          (define syms (ApplyInfo-param-syms info))
+          (define params
+            (for/list ((sym syms))
+              (define var (annoless VarT sym))
+              (type-rm-VarT var-h var var)))
+          (define n-annos
+            (hash-set annos 'type<> params))
+          (ApplyExpr n-annos f args)]
+         [_ ast]))))
+  (defs-map/bind rw-type<> defs))
 
 ;;; 
 ;;; init with fresh type variables
@@ -323,23 +374,6 @@
 ;;; API
 ;;; 
 
-;; Augments type expression `t` with the type facts available in `h`.
-;; Intended for more informative reporting of type errors.
-(define (type-concretely h t)
-  (let loop ([ast t])
-    (match ast
-      [(VarT _ sym)
-       (if-let n-ast (hash-ref h sym #f)
-         (loop n-ast)
-         ast)]
-      [(FunT a rt ats)
-       (FunT a (loop rt) (map loop ats))]
-      [(ParamT a t ps)
-       (ParamT a (loop t) (map loop ps))]
-      [(PhiT a t u)
-       (PhiT a (loop t) (loop u))]
-      [_ ast])))
-
 ;; Takes a definition table containing just the program, and
 ;; checks/infers its types. 'defs' itself is used as the type
 ;; environment. The input may contain AnyT values, long as their
@@ -358,6 +392,10 @@
   (define (lookup-use x) 
     (lookup-use-type-from-defs defs x))
 
+  ;; ApplyExpr `uid`s as keys, ApplyInfo objects as values. Only
+  ;; contains entries for return type overloaded calls.
+  (define apply-h (make-hasheq))
+  
   ;; A mutable fact database of sorts, with VarT symbols as keys, and
   ;; (possibly incomplete) type expressions as values.
   (define var-h (make-hasheq))
@@ -525,12 +563,15 @@
           ast))
        (expr-unify! ast t))
 
-      ((ApplyExpr _ f as)
+      ((ApplyExpr a f as)
        ;; We bypass invoking (ti-expr f) here, as we only want to
        ;; allow FunT typed expressions in this context. We must still
        ;; be sure to set up a constraint for the expression 'f', lest
        ;; its type be left unresolved.
-       (define f-t (lookup-use f))
+       (define-values (info f-t) (lookup-use f))
+       (when info
+         (hash-set! apply-h (hash-ref a 'uid) info))
+       ;;(writeln (list f bind->sym))
        (expr-unify! f f-t)
 
        ;; We have done prior work to ensure that a function
@@ -642,11 +683,7 @@
         'ti-expr "supported ExprLike?" ast))))
 
   (set! defs (defs-add-VarT defs))
-  ;;(defs-dump defs '(type))
-
-  (for ([(id def) (in-dict defs)])
-    (ti-def def))
-
+  (defs-for-each/bind ti-def defs)
   (set! defs (defs-map/bind (fix ast-rm-VarT var-h) defs))
-  
+  (set! defs (defs-add-type<> var-h apply-h defs))
   defs)

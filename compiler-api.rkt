@@ -199,7 +199,9 @@ optimization.
             (set! a1 (hash-set a1 'generic-type t))
             (define-values (u-lst u-t)
               (type-expr-rm-ForAllT/def t))
-            (set! a1 (hash-set a1 'type-params u-lst))
+            (set! a1 (hash-set a1 'univ-type-params u-lst))
+            (when (type-expr-return-type-overloaded? t)
+              (set! a1 (hash-set a1 'return-type-overloaded? #t)))
             (set! t u-t))
           (Defun a1 n t p n-b)]
          [_ ast]))))

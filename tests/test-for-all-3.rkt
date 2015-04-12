@@ -30,4 +30,5 @@
     (set! maybe-y (just y)))
   (when (nothing? maybe-y)
     (set! maybe-x (just 7)))
+  (set! maybe-x (nothing))
   (just-get maybe-y))

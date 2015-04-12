@@ -428,7 +428,7 @@ C++ back end.
 (define (types-to-cxx defs-t def-lst)
   (define (annos-type-param? as)
     (hash-ref as 'type-param #f))
-  
+
   (define (type->cxx ast)
     (match ast
       [(NameT a id)
@@ -465,6 +465,9 @@ C++ back end.
           (DefVar a id (type->cxx t) v)]
          [(DeclVar a id t)
           (DeclVar a id (type->cxx t))]
+         [(ApplyExpr (and a (app (lambda (a) (hash-ref a 'type<> #f))
+                                 (? identity ts))) f args)
+          (ApplyExpr (hash-set a 'type<> (map type->cxx ts)) f args)]
          [_ ast]))))
   
   (map rw-def def-lst))
