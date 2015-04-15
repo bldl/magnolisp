@@ -56,31 +56,32 @@ Utilities useful for implementing compiler back ends.
   ;; (open-input-string s))) and then compare to file input.
   (on-fail #t (not (equal? (file-read file) s))))
 
-(define* (write-changed-file file s)
-  (when (file-changed? file s)
-    (call-with-output-file*
-     file
-     (lambda (out)
-       (display s out))
-     #:exists 'truncate/replace)
-    (displayln file)))
+(define (write-file-unconditionally file s)
+  (display-to-file s file #:exists 'truncate/replace))
 
-(define* (capture-output f)
+(define (write-changed-file file s)
+  (when (file-changed? file s)
+    (write-file-unconditionally file s)))
+
+(define* dont-touch-generated-file? (make-parameter #f))
+
+(define (write-generated-file file s)
+  ((if (dont-touch-generated-file?)
+       write-changed-file
+       write-file-unconditionally)
+   file s))
+
+(define (capture-output f)
   (let ((output (open-output-string)))
     (parameterize ((current-output-port output))
       (f))
     (get-output-string output)))
 
-(define-syntax capture
-  (syntax-rules ()
-    ((_ body ...)
-     (capture-output (lambda () body ...)))))
-
 (define* (write-generated-output path out writer)
   (if out
       (parameterize ((current-output-port out))
         (writer))
-      (write-changed-file
+      (write-generated-file
        path
        (capture-output writer))))
 

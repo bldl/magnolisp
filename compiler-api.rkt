@@ -23,15 +23,15 @@ optimization.
          "util.rkt" "util/struct.rkt"
          syntax/moddep)
 
-;;; 
+;;;
 ;;; AnnoExpr removal
-;;; 
+;;;
 
 (define (Anno->values ast)
   (cond
    ((TypeAnno? ast) (values 'type (TypeAnno-t ast)))
    ((GenericAnno? ast) (values (GenericAnno-kind ast) (GenericAnno-datum ast)))
-   (else (raise-argument-error 
+   (else (raise-argument-error
           'Anno->values
           "supported Anno object" ast))))
 
@@ -42,12 +42,12 @@ optimization.
 (define (Def-process-annos ast)
   (define ann-h (Ast-annos ast))
   (define id (Def-id ast))
-  
+
   (define (put! n v)
     (set! ann-h (hash-set ann-h n v)))
 
   (put! 'top #t)
-  
+
   ;;(pretty-print ann-h)
   (define foreign (hash-ref ann-h 'foreign #f))
   (define export (hash-ref ann-h 'export #f))
@@ -70,13 +70,13 @@ optimization.
                      "unexpected 'foreign anno ~s" foreign)))))
        (set! ast (ForeignTypeDecl a id foreign)))]
     [_ (void)])
-  
+
   (when (and foreign export)
     (raise-language-error/ast
      (format "definition ~a marked both as 'export' and 'foreign'"
              (ast-displayable/datum id))
      ast))
-  
+
   (set-Ast-annos ast ann-h))
 
 ;; Removes `AnnoExpr` nodes by incorporating their information into
@@ -84,7 +84,7 @@ optimization.
 (define-with-contract
   (-> Def? Def?)
   (Def-rm-AnnoExpr def)
-  
+
   (define rw-merge
     (topdown
      (repeat
@@ -99,7 +99,7 @@ optimization.
     ;; Use separate hashes to preserve conflicting keys, and to thus
     ;; allow `merge-annos` to decide how to deal with conflicts.
     (apply merge-annos h (map Anno->hash ast-lst)))
-  
+
   (define rw-incorporate
     (topdown
      (repeat
@@ -117,19 +117,19 @@ optimization.
            ;;(writeln `(bare AnnoExpr seen ,ast))
            (modify-ast-annos e (lambda (h) (merge-into-hash h as)))]
           [_ #f])))))
-  
+
   (rw-incorporate (rw-merge def)))
 
 (define (mods-rm-AnnoExpr mods)
   (for/hasheq ([(rr-mp mod) mods])
-    (define def-lst 
+    (define def-lst
       (for/list ([def (Mod-def-lst mod)])
         (Def-process-annos (Def-rm-AnnoExpr def))))
     (values rr-mp (struct-copy Mod mod [def-lst def-lst]))))
 
-;;; 
+;;;
 ;;; Begin0 translation
-;;; 
+;;;
 
 (define ast-rm-Begin0
   (bottomup
@@ -171,7 +171,7 @@ optimization.
   (let/ec k
     ((topdown-visit
       (lambda (x)
-        (when (p? x) 
+        (when (p? x)
           (k #t))))
      ast)
     #f))
@@ -179,7 +179,7 @@ optimization.
 (define-with-contract
   (-> Def? Def?)
   (de-racketize ast)
-  
+
   (define rw
     (topdown
      (lambda (ast)
@@ -205,12 +205,12 @@ optimization.
             (set! t u-t))
           (Defun a1 n t p n-b)]
          [_ ast]))))
-  
+
   (rw ast))
 
-;;; 
+;;;
 ;;; IfExpr and IfStat
-;;; 
+;;;
 
 (define (defs-optimize-if defs)
   (define ((make-lit-pred lit) ast)
@@ -218,7 +218,7 @@ optimization.
 
   (define TRUE? (make-lit-pred #t))
   (define FALSE? (make-lit-pred #f))
-  
+
   (define rw
     (bottomup
      (lambda (ast)
@@ -232,9 +232,9 @@ optimization.
 
   (map rw defs))
 
-;;; 
+;;;
 ;;; program contents resolution
-;;; 
+;;;
 
 (require "module-load.rkt")
 
@@ -251,7 +251,7 @@ optimization.
 (define-with-contract
   (-> hash? (values hash? (set/c symbol? #:cmp 'eq) hash?))
   (merge-defs mods)
-  
+
   (define eps-in-prog (mutable-seteq)) ;; of bind
   (define all-defs (make-hasheq)) ;; bind -> Def
   (define next-r #hasheq())
@@ -267,14 +267,14 @@ optimization.
   ;; modules, except if they are actually used, and code is to be
   ;; generated for such uses.
   (define prelude-bind->bind (make-hasheq)) ;; bind -> sym
-  
+
   (for ([(rr-mp/mgl mod) mods])
     (define def-lst (Mod-def-lst mod))
     ;;(pretty-print `(before-merge-of ,rr-mp/mgl : ,(map Def-id def-lst)))
     (define bind->binding (Mod-bind->binding mod))
     ;;(pretty-print `(,rr-mp/mgl ,(Mod-r-mp mod) bind->binding ,bind->binding))
     (define m->p-bind (make-hasheq)) ;; local bind -> global bind
-    
+
     (define (rw-id id)
       (define m-bind (Id-bind id))
       (define info (hash-ref bind->binding m-bind))
@@ -298,7 +298,7 @@ optimization.
           (set!-values (next-r p-bind) (next-gensym1 next-r (Id-name id)))
           (hash-set! m->p-bind m-bind p-bind))
         (set-Id-bind id p-bind)]))
-    
+
     (define n-def-lst
       (for/list ([def def-lst])
         (define n-def (ast-rw-Ids rw-id def))
@@ -306,7 +306,7 @@ optimization.
         (define bind (Id-bind id))
         (when (hash-has-key? all-defs bind)
           (error 'merge-defs
-                 "redefinition for `~a`: ~s" 
+                 "redefinition for `~a`: ~s"
                  (Id-name id) n-def))
         (hash-set! all-defs bind n-def)
         n-def))
@@ -315,15 +315,15 @@ optimization.
     (for ([(sym m-bind) (Mod-core->bind mod)])
       (define p-bind (hash-ref m->p-bind m-bind))
       (hash-set! prelude-bind->bind p-bind sym))
-    
+
     (when (Mod-ep? mod)
       (for ([def n-def-lst]
             #:when (ast-anno-maybe def 'export))
         (define bind (Id-bind (Def-id def)))
         (set-add! eps-in-prog bind)))
-    
+
     (void)) ;; end (for ([(rr-mp/mgl mod) mods])
-  
+
   ;;(pretty-print `(after-merge ,(map Def-id (hash-values all-defs))))
   (values all-defs eps-in-prog prelude-bind->bind))
 
@@ -331,7 +331,7 @@ optimization.
 (define-with-contract
   (-> Def? (listof symbol?))
   (def-all-used-id-binds def)
-  
+
   (define binds (mutable-seteq)) ;; (set/c bind)
 
   (define rw
@@ -344,7 +344,7 @@ optimization.
        (when (Expr? ast)
          (when-let t (Expr-type ast)
            (rw t))))))
-  
+
   (rw def)
   (set->list binds))
 
@@ -377,9 +377,9 @@ optimization.
   ;;(pretty-print `(ORIGINAL-DEFS ,(dict-count globals) ,(dict-keys globals) RETAINED-DEFS ,(length processed-defs) ,(map (compose Id-bind Def-id) processed-defs)))
   processed-defs)
 
-;;; 
+;;;
 ;;; prelude
-;;; 
+;;;
 
 ;; Sets identifier references that matter to the compiler, but which
 ;; Racket will not have resolved, so that they can be accounted for
@@ -411,12 +411,12 @@ optimization.
     (if (not v)
         id
         (set-Id-bind id v)))
-  
+
   (define rw (curry ast-rw-Ids rw-id))
 
   (map rw def-lst))
 
-;;; 
+;;;
 ;;; compilation
 ;;;
 
@@ -427,7 +427,7 @@ optimization.
   (define mods (make-hasheq)) ;; rr-mp -> Mod
 
   (struct Dep (ep? prelude? mp rel) #:transparent)
-  
+
   ;; Dependencies queued for loading
   (define dep-q null) ;; (listof Dep?)
 
@@ -439,7 +439,7 @@ optimization.
     ;;(writeln `(load rr-mp ,rr-mp))
     ;;(writeln `(load entry: ,ep? mp: ,mp rel: ,rel-to-path-v r-mp: ,r-mp rr-mp: ,rr-mp))
     (define mod (hash-ref mods rr-mp #f))
-    
+
     (unless mod ;; not yet loaded
       ;;(writeln (list 'loading-submod-of r-mp mp))
       (set! mod (Mod-load r-mp mp))
@@ -456,7 +456,7 @@ optimization.
                      ;;(writeln `(queuing prelude ,dep))
                      dep)
                    dep-q))
-      
+
       ;; Build a list of dependencies for this module from the
       ;; bind->binding table. Stored as (list dep-r-mp rel-r-mp) per
       ;; entry.
@@ -476,7 +476,7 @@ optimization.
     (when prelude?
       (define h (Mod-attrs mod))
       (hash-set! h 'prelude? #t))
-    
+
     mod)
 
   ;; Load all the "entry" modules.
@@ -508,16 +508,16 @@ optimization.
   ;;(writeln `(loaded mods ,(hash-keys mods)))
   ;;(pretty-print `(loaded modules ,mods)) (exit)
   ;;(displayln 'ast-after-marshaling) (for ([(x mod) mods]) (for ([def (Mod-def-lst mod)]) (ast-dump-loc-info def)))
-  
+
   (set! mods (mods-rm-AnnoExpr mods))
   ;;(pretty-print mods) (exit)
   (define-values (all-defs eps-in-prog prelude-bind->bind)
     (merge-defs mods))
   ;;(writeln `(eps-in-prog ,eps-in-prog))
   ;;(pretty-print (list all-defs eps-in-prog rr-mp-sym->bind)) (exit)
-  
+
   (define def-lst (hash-values all-defs))
-  
+
   (set! def-lst
         (switch-ids-for-builtins! def-lst eps-in-prog
                                   prelude-bind->bind))
@@ -550,9 +550,9 @@ optimization.
   (set! all-defs (defs-map/bind ast-rm-dead-constants all-defs))
   ;;(pretty-print all-defs) (exit)
   ;;(pretty-print (dict-values all-defs)) (exit)
-  
+
   ;;(pretty-print (map ast->sexp (dict-values all-defs)))
-  
+
   (St all-defs eps-in-prog))
 
 ;; Compiles the modules defined in the specified files. Returns a
@@ -568,16 +568,16 @@ optimization.
      fn-lst))
   (apply compile-modules mp-lst))
 
-;;; 
+;;;
 ;;; private APIs
-;;; 
+;;;
 
 (define-with-contract*
   (-> St? (or/c #f syntax?))
   (get-expected-anno-value st)
-  
+
   (define defs (St-defs st))
-  
+
   (let/ec k
     (for (((id def) (in-dict defs)))
       (define v (ast-anno-maybe def 'expected))
@@ -585,12 +585,13 @@ optimization.
         (k v)))
     #f))
 
-;;; 
+;;;
 ;;; code generation
-;;; 
+;;;
 
 (require "backend-build-main.rkt")
 (require "backend-cxx-main.rkt")
+(require "backend-util.rkt")
 
 (define (string-file-id? s)
   (regexp-match? #rx"^[a-zA-Z0-9_][a-zA-Z0-9_-]*$" s))
@@ -600,12 +601,14 @@ optimization.
        (#:outdir path-string?
         #:basename string?
         #:out (or/c #f output-port?)
+        #:dont-touch boolean?
         #:banner boolean?)
        void?)
   (generate-files st backends
                   #:outdir [outdir (current-directory)]
                   #:basename [basename "output"]
                   #:out [out (current-output-port)]
+                  #:dont-touch [dont-touch? #f]
                   #:banner [banner? #t])
 
   (unless (string-file-id? basename)
@@ -614,41 +617,41 @@ optimization.
      "file basename of non-zero length, without exotic characters"
      basename))
 
-  (when-let entry (assq 'mgl backends)
-    (match entry
-      [(list _ (list (? symbol? opts) ...))
-       (define ast-lst (hash-values (St-defs st)))
-       (define mgl-file (build-path outdir 
-                                    (string-append basename ".ir.rkt")))
-       (generate-mgl-file ast-lst out mgl-file banner?)]))
-       
-  (when-let entry (assq 'cxx backends)
-    (match entry
-      [(list _ (list (? symbol? kinds) ...))
-       (unless (null? kinds)
-         (set! kinds (remove-duplicates kinds eq?))
-         (define defs (St-defs st))
-         (define path-stem (build-path outdir basename))
-         (generate-cxx-file kinds defs path-stem out banner?))]))
+  (parameterize ([dont-touch-generated-file? dont-touch?])
+    (when-let entry (assq 'mgl backends)
+      (match entry
+        [(list _ (list (? symbol? opts) ...))
+         (define ast-lst (hash-values (St-defs st)))
+         (define mgl-file (build-path outdir
+                                      (string-append basename ".ir.rkt")))
+         (generate-mgl-file ast-lst out mgl-file banner?)]))
 
-  (when-let entry (assq 'build backends)
-    (match entry
-      ((list _ (list (? symbol? kinds) ...))
-       (unless (null? kinds)
-         (set! kinds (remove-duplicates kinds eq?))
-         (define defs (St-defs st))
-         (define opts-stx (defs-collect-build-annos defs))
-         (define opts-lst (parse-analyze-build-annos opts-stx))
-         (define path-stem (build-path outdir (string-append basename "_build")))
-         ;;(pretty-print opts-lst)
-         (for ((kind kinds))
-           (generate-build-file kind opts-lst path-stem out banner?))))))
-  
-  (void))
+    (when-let entry (assq 'cxx backends)
+      (match entry
+        [(list _ (list (? symbol? kinds) ...))
+         (unless (null? kinds)
+           (set! kinds (remove-duplicates kinds eq?))
+           (define defs (St-defs st))
+           (define path-stem (build-path outdir basename))
+           (generate-cxx-file kinds defs path-stem out banner?))]))
 
-;;; 
+    (when-let entry (assq 'build backends)
+      (match entry
+        ((list _ (list (? symbol? kinds) ...))
+         (unless (null? kinds)
+           (set! kinds (remove-duplicates kinds eq?))
+           (define defs (St-defs st))
+           (define opts-stx (defs-collect-build-annos defs))
+           (define opts-lst (parse-analyze-build-annos opts-stx))
+           (define path-stem (build-path outdir (string-append basename "_build")))
+           (for ([kind kinds])
+             (generate-build-file kind opts-lst path-stem out banner?))))))
+
+    (void)))
+
+;;;
 ;;; testing
-;;; 
+;;;
 
 (module* test #f
   (define st (compile-files "tests/test-simple-1.rkt"))
