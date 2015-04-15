@@ -684,6 +684,7 @@
 
   (set! defs (defs-add-VarT defs))
   (defs-for-each/bind ti-def defs)
-  (set! defs (defs-map/bind (fix ast-rm-VarT var-h) defs))
-  (set! defs (defs-add-type<> var-h apply-h defs))
+  (set! defs (defs-map/bind (curry ast-rm-VarT var-h) defs))
+  (unless (hash-empty? apply-h)
+    (set! defs (defs-add-type<> var-h apply-h defs)))
   defs)
