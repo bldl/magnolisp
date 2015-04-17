@@ -468,6 +468,8 @@ C++ back end.
          [(ApplyExpr (and a (app (lambda (a) (hash-ref a 'type<> #f))
                                  (? identity ts))) f args)
           (ApplyExpr (hash-set a 'type<> (map type->cxx ts)) f args)]
+         [(Literal a dat)
+          (Literal (hash-update a 'type type->cxx) dat)]
          [_ ast]))))
   
   (map rw-def def-lst))

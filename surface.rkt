@@ -13,6 +13,9 @@ language.
                      racket/base racket/syntax 
                      syntax/parse)) 
 
+;; Aliases.
+(provide (rename-out [exists ∃] [for-all ∀]))
+
 ;; Function type expression.
 (define-syntax-rule* (-> at ... rt)
   (CORE 'fn at ... rt))
@@ -49,9 +52,14 @@ language.
     [(_ name:id)
      #'(CORE 'anno 'foreign #'name)]))
 
+(define-syntax* (literal stx)
+  (syntax-case stx ()
+    [(_ ...)
+     #`(CORE 'anno 'literal (quote-syntax #,stx))]))
+
 (define-syntax* (build stx)
   (syntax-case stx ()
-    [(_ x ...)
+    [(_ ...)
      #`(CORE 'anno 'build (quote-syntax #,stx))]))
 
 (define-syntax* (expected stx)

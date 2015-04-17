@@ -636,6 +636,30 @@
     [else #f])))
 
 ;;; 
+;;; type-specific literal formatting
+;;;
+
+(define* (defs-set-formats-to-Literals defs)
+  (define rw
+    (topdown
+     (lambda (ast)
+       (match ast
+         [(Literal (and (app (lambda (h) (hash-ref h 'type))
+                             (? NameT? t-ref)) a) dat)
+          (define bind (Id-bind (NameT-id t-ref)))
+          (define t-def (hash-ref defs bind #f))
+          (unless t-def
+            (raise-language-error/ast
+             "reference to undefined type" ast t-ref))
+          (define lit (ast-anno-maybe t-def 'literal))
+          (if lit
+              (Literal (hash-set a 'literal lit) dat)
+              ast)]
+         [_ ast]))))
+  
+  (defs-map/bind rw defs))
+
+;;; 
 ;;; AST dumping
 ;;;
 

@@ -3,7 +3,7 @@
 #|
 |#
 
-(require "ast-magnolisp.rkt" "backend-util.rkt" 
+(require "app-util.rkt" "ast-magnolisp.rkt" "backend-util.rkt" 
          (rename-in "pp-yield.rkt" [pp pp-y]) "util.rkt")
 
 (define (pp . ds)
@@ -99,6 +99,37 @@
      (list expr ";"))
     (else (ew-error 'format-stat "could not format" else))))
 
+(define (format-custom-literal anno-e typename dat)
+  (match-define (list-rest 'literal pp-lst)
+    (syntax->datum anno-e))
+  
+  (for/list ([pp pp-lst])
+    (match pp
+      [(? string? s) 
+       s]
+      [(list fmt obj)
+       (define f
+         (match fmt
+           ['display ~a]
+           ['write ~s]
+           ['print ~v]
+           ['cxx-str (compose string->narrow-cxx-string-literal ~a)]
+           [_ (raise-language-error
+               #f "illegal literal formatting style directive"
+               anno-e fmt)]))
+       (define v
+         (match obj
+           ['datum dat]
+           ['type-id typename]
+           [(? string?) obj]
+           [_ (raise-language-error
+               #f "illegal literal formatting object specifier"
+               anno-e obj)]))
+       (f v)]
+      [_ (raise-language-error
+          #f "illegal literal formatting item"
+          anno-e pp)])))
+
 (define (format-expr expr)
   (match expr
     ((IfExpr _ [format-expr . produces . test]
@@ -106,6 +137,10 @@
              [format-expr . produces . alt])
      `("(" ,test (in (gr " ?" sp ,conseq " :" sp ,alt ")"))))
     ((Var _ var) (symbol->string var))
+    ((Literal (app (lambda (h) (hash-ref h 'literal #f)) anno-e) dat)
+     #:when anno-e
+     (match-define (ForeignNameT _ tn-stx) (Expr-type expr))
+     (format-custom-literal anno-e (syntax-e tn-stx) dat))
     ((Literal _ (? number? n))
      (number->string n))
     ((Literal _ (? boolean? b))

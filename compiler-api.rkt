@@ -550,6 +550,7 @@ optimization.
   (set! all-defs (defs-map/bind ast-rm-dead-constants all-defs))
   ;;(pretty-print all-defs) (exit)
   ;;(pretty-print (dict-values all-defs)) (exit)
+  (set! all-defs (defs-set-formats-to-Literals all-defs))
 
   ;;(pretty-print (map ast->sexp (dict-values all-defs)))
 
