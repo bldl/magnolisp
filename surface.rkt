@@ -113,7 +113,16 @@ language.
     [(_ #:type t:id as:maybe-annos)
      #'(define t 
          (let-annotate as.bs 
-             (abstract-type)))]))
+             (abstract-type)))]
+    [(_ #:function f:id as:maybe-annos)
+     (with-syntax ([body 
+                    (syntax-property
+                     #'(#%plain-lambda _ (void))
+                     'for-target 'racket)])
+       #'(define f
+           (let-annotate as.bs 
+               body)))]
+    ))
 
 ;; DEPRECATED
 (define-syntax* (function stx)
@@ -135,6 +144,7 @@ language.
          (let-annotate as.bs 
              v))]))
 
+;; DEPRECATED
 (define-syntax* (typedef stx)
   (syntax-parse stx
     [(_ t:id as:maybe-annos)

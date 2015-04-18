@@ -1,6 +1,7 @@
 #lang scribble/manual
 @(require scribble/eval "manual-util.rkt"
 	  (for-label syntax/modresolve
+	  	     (only-in racket/base add1 sub1 + - * /)
 	             (prefix-in r. (only-in racket/base define))
                      @; a trick to get only the original exports
 		     (combine-in
@@ -62,7 +63,7 @@ For example:
   (define #:type int #:: (foreign))
   (define #:type long #:: ([foreign my_cxx_long])))
 
-The second form declares a variable with the name @racket[id], and the (initial) value given by @racket[expr]. A @racket[type] annotation may be included to specify the Magnolisp type of the variable.
+The second form defines a variable with the name @racket[id], and the (initial) value given by @racket[expr]. A @racket[type] annotation may be included to specify the Magnolisp type of the variable.
 
 For example:
 @(interaction #:eval the-eval
@@ -91,7 +92,16 @@ For example:
   (define (seven) #:: (foreign [type (-> int)])
     (begin-racket 1 2 3 4 5 6 7)))
 
-Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in multiple different type contexts within a single program.}
+Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in multiple different type contexts within a single program.
+
+The second @racket[define] form may also be used to declare a function (even a top-level one), provided that the ``variable initializer'' @racket[_expr] is a lambda expression. Alternatively, if the declaration is for a @racket[foreign] function, then @racket[_expr] is ignored as Magnolisp, and may be anything (but typically something suitable for ``simulating'' the foreign behavior).
+
+For example:
+@(interaction #:eval the-eval
+  (let ()
+    (define two #:: ([type (-> int)]) (#%plain-lambda () 2))
+    (define mul #:: (foreign [type (-> int int int)]) *)
+    (mul (two) (two))))}
 
 @defform[(typedef id maybe-annos)]{
 @deprecated[#:what "form" @racket[define]]{}

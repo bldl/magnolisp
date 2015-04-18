@@ -176,34 +176,57 @@ optimization.
      ast)
     #f))
 
+;; The `ast` argument is only used for error reporting. The `f?`
+;; flag indicates whether the function is foreign. Any original
+;; annotations for the binding should be in `annos`. The `Param`eter
+;; list `ps` and function `body` are optional for foreign functions.
+(define (mk-Defun ast f? annos n t ps body)
+  (when f?
+    (unless ps
+      (define ft 
+        (or (type-expr-FunT-type t)
+            (raise-argument-error 'mk-Defun "function type expression" t)))
+      (define ats (FunT-ats ft))
+      (set! ps (for/list ([at ats])
+                 (define id (fresh-ast-identifier 'arg))
+                 (annoless Param id the-AnyT))))
+    (set! body the-NoBody))
+
+  (when (topdown-has-matching? ForAllT? t)
+    (unless f?
+      (raise-language-error/ast
+       "non-`foreign` function has generic type"
+       ast t))
+    (set! annos (hash-set annos 'generic-type t))
+    (define-values (u-lst u-t)
+      (type-expr-rm-ForAllT/def t))
+    (set! annos (hash-set annos 'univ-type-params u-lst))
+    (when (type-expr-return-type-overloaded? t)
+      (set! annos (hash-set annos 'return-type-overloaded? #t)))
+    (set! t u-t))
+
+  (define n-ast 
+    (Defun annos n t ps body))
+  ;;(writeln n-ast)
+  n-ast)
+  
+;; Turns variable definitions into function definitions as
+;; appropriate.
 (define-with-contract
   (-> Def? Def?)
   (de-racketize ast)
+
+  (define (foreign? annos)
+    (and (hash-ref annos 'foreign #f) #t))
 
   (define rw
     (topdown
      (lambda (ast)
        (match ast
-         [(DefVar a1 n t (Lambda a2 p b))
-          ;; Retain annos from the binding, which has any information
-          ;; associated with the binding. It should also have the
-          ;; declaration syntax corresponding to the function
-          ;; definition.
-          (define foreign? (and (hash-ref a1 'foreign #f) #t))
-          (define n-b (if foreign? the-NoBody b))
-          (when (topdown-has-matching? ForAllT? t)
-            (unless foreign?
-              (raise-language-error/ast
-               "non-`foreign` function has generic type"
-               ast t))
-            (set! a1 (hash-set a1 'generic-type t))
-            (define-values (u-lst u-t)
-              (type-expr-rm-ForAllT/def t))
-            (set! a1 (hash-set a1 'univ-type-params u-lst))
-            (when (type-expr-return-type-overloaded? t)
-              (set! a1 (hash-set a1 'return-type-overloaded? #t)))
-            (set! t u-t))
-          (Defun a1 n t p n-b)]
+         [(DefVar a n t (Lambda _ ps body))
+          (mk-Defun ast (foreign? a) a n t ps body)]
+         [(DefVar (? foreign? a) n (? type-expr-FunT-type t) _)
+          (mk-Defun ast #t a n t #f #f)]
          [_ ast]))))
 
   (rw ast))

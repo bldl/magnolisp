@@ -149,23 +149,6 @@
     ((? ForeignTypeDecl?)
      def)))
 
-;; Returns #f for nodes that have no type, and for nodes of type Stat.
-(define* (ast-get-nonfixed-type ast)
-  (cond 
-   [(Def? ast)
-    (def-get-type ast)]
-   [(Expr? ast)
-    (Expr-type ast)]
-   [else
-    #f]))
-
-(define* (ast-set-nonfixed-type ast t)
-  (cond-or-fail
-   [(Def? ast)
-    (def-set-type ast t)]
-   [(Expr? ast)
-    (set-Expr-type ast t)]))
-
 ;; Applies `f` to each type expression in `ast`, once, in an
 ;; unspecified order (skips nodes that have no type, or whose type
 ;; cannot be modified). Also passes typed node to `f`, as information
@@ -185,6 +168,22 @@
        (Expr-copy (all-rw-term rw ast) (f ast t)))
       (_
        (all-rw-term rw ast)))))
+
+;; If the type expression `ast` specifies a function type, returns its
+;; function type without any enclosing type parameter declarations.
+(define-with-contract*
+  (-> Type? (or/c FunT? #f))
+  (type-expr-FunT-type ast)
+
+  (cond
+    ((FunT? ast)
+     ast)
+    ((ForAllT? ast)
+     (type-expr-FunT-type (ForAllT-t ast)))
+    ((ExistsT? ast)
+     (type-expr-FunT-type (ExistsT-t ast)))
+    (else
+     #f)))
 
 ;;; 
 ;;; existential types

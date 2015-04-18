@@ -394,9 +394,9 @@
       ((#%expression e)
        (parse-expr #'e))
 
-      ((#%plain-lambda formals . exprs)
+      ((#%plain-lambda (par ...) . exprs)
        (let ()
-         (define par-id-lst (syntax->list #'formals))
+         (define par-id-lst (syntax->list #'(par ...)))
          (define e-stx-lst (syntax->list #'exprs))
          (define par-ast-lst
            (map (lambda (id)
