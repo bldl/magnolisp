@@ -72,7 +72,7 @@ website : rm-dist html-manual pdf-manual pkg website-local
 	chmod -R a+rX $(DIST_HOME)
 
 test :
-	raco test --direct --run-if-absent tests/run-*.rkt
+	raco test --jobs 2 --run-if-absent tests/run-*.rkt
 
 gh-homepage :
 	( cd gh-pages && git clean -d -f && git rm --ignore-unmatch -rf . )

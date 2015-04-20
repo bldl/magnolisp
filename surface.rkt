@@ -34,6 +34,10 @@ language.
 (define-syntax-rule* (<> t u ...)
   (CORE 'parameterized t u ...))
 
+;; Inferred type.
+(define-syntax-rule* (auto)
+  (CORE 'auto))
+
 ;; Type annotation.
 (define-syntax-rule* (type t)
   (CORE 'anno 'type t))
@@ -114,14 +118,16 @@ language.
      #'(define t 
          (let-annotate as.bs 
              (abstract-type)))]
-    [(_ #:function f:id as:maybe-annos)
-     (with-syntax ([body 
-                    (syntax-property
-                     #'(#%plain-lambda _ (void))
-                     'for-target 'racket)])
+    [(_ (f:id p:id ...) as:maybe-annos #:function f-e:expr)
+     (with-syntax ([f-arity-t
+                    #`(-> #,@(map 
+                              (lambda _ #'(auto)) 
+                              (syntax->list #'(p ...)))
+                          (auto))])
        #'(define f
-           (let-annotate as.bs 
-               body)))]
+           (let-annotate ([type f-arity-t])
+             (let-annotate as.bs ;; any `type` here overrides above
+                 (begin-racket f-e)))))]
     ))
 
 ;; DEPRECATED

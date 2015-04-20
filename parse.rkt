@@ -79,6 +79,9 @@
          (define p-stx-lst (syntax->list #'(p ...)))
          (define p-ast-lst (map loop p-stx-lst))
          (syntaxed stx ParamT t-ast p-ast-lst))]
+      [(if _ (#%plain-app #%magnolisp (quote f)) _)
+       (eq? 'auto (syntax-e #'f))
+       the-AnyT]
       [_
        (raise-language-error
         #f "illegal type expression"
