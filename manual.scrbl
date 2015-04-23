@@ -51,12 +51,13 @@ The surface syntax of Magnolisp consists of a collection of Magnolisp-specific f
 
 In Magnolisp, it is possible to @racket[define] functions, types, and variables; of these, variable definitions are not allowed at the top level.
 
-As Magnolisp has almost no standard library, it is ultimately necessary to define primitive types and functions (flagged as @racket[foreign]) in order to be able to compile programs that do anything useful. For this reason there is also a @racket[primitives] convenience form for declaring multiple @racket[foreign] types and/or functions at once.
+As Magnolisp has almost no standard library, it is ultimately necessary to define primitive types and functions (flagged as @racket[foreign]) in order to be able to compile programs that do anything useful. For this reason there is also a @racket[primitives] convenience form for defining multiple @racket[foreign] types and/or functions at once.
 
 @defform*[((define #:type id maybe-annos)
            (define id maybe-annos expr)
-	   (define (id arg ...) maybe-annos expr ...))]{
-The first form declares a type. Presently only foreign types may be declared, and @racket[id] gives the corresponding Magnolisp name. The @racket[foreign] annotation should always be provided.
+	   (define (id arg ...) maybe-annos expr ...)
+	   (define (id arg ...) maybe-annos #:function expr))]{
+The first form defines a type. Presently only foreign types may be defined, and @racket[id] gives the corresponding Magnolisp name. The @racket[foreign] annotation should always be provided.
 
 For example:
 @(racketblock+eval #:eval the-eval
@@ -71,7 +72,7 @@ For example:
     (define x #:: ([type int]) 5)
     (add1 x)))
 
-The third form declares a function. The (optional) body of a function is a sequence of expressions, which (if present) must produce a single value.
+The third form defines a function. The (optional) body of a function is a sequence of expressions, which (if present) must produce a single value.
 
 Unlike in Racket, no tail-call elimination may be assumed even when a recursive function application appears in @emph{tail position}.
 
@@ -94,34 +95,46 @@ For example:
 
 Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in multiple different type contexts within a single program.
 
-The second @racket[define] form may also be used to declare a function (even a top-level one), provided that the ``variable initializer'' @racket[_expr] is a lambda expression. Alternatively, if the declaration is for a @racket[foreign] function, then @racket[_expr] is ignored as Magnolisp, and may be anything (but typically something suitable for ``simulating'' the foreign behavior).
+The second @racket[define] form may also be used to define a function (even a top-level one), provided that the ``variable initializer'' @racket[_expr] is a lambda expression. Alternatively, if the annotations indicate that the definition is for a @racket[foreign] function (whose @racket[type] is explicitly given as a function type), then @racket[id] is also taken to bind a function. For @racket[foreign] function definitions of this form, any @racket[_expr] is ignored as Magnolisp, and may be anything (but typically something suitable for ``simulating'' the foreign behavior).
 
 For example:
 @(interaction #:eval the-eval
   (let ()
     (define two #:: ([type (-> int)]) (#%plain-lambda () 2))
     (define mul #:: (foreign [type (-> int int int)]) *)
-    (mul (two) (two))))}
+    (mul (two) (two))))
+
+The fourth @racket[define] form (with the @racket[#:function] keyword) may likewise be used to define a function such that its Racket implementation is given as an @racket[expr]ession. The arity of the function value that the expression yields must match the number of declared @racket[arg]uments. When this form is used, it is not necessary to give the type of the function, provided that the type can be inferred from context.}
+
+@defform*[((declare #:type id maybe-annos)
+           (declare (id arg ...) maybe-annos))]{
+Forms used to declare C++ translation information for types or functions, not to implement them, or to bind the identifier @racket[id]. The binding must already exist.
+
+The first form states that @racket[id] is a type, probably providing annotations for it (declaring types as @racket[foreign] is presently compulsory).
+
+The second form states that @racket[id] is a function, possibly providing annotations for it. The arguments @racket[arg ...] only serve to specify the arity of the function.
+
+The key difference between @racket[define] and @racket[declare] is that the former binds the identifier, and thus at the same time necessarily specifies any Racket implementation, while the latter does not. That is: @Racket-racket[define] can be used to give a Racket implementation for something; Magnolisp's @racket[define] can be used to give both a Racket implementation (possibly a ``non-implementation'') as well as C++ translation information for something; whereas @racket[declare] only gives the C++ translation information for something.}
 
 @defform[(typedef id maybe-annos)]{
 @deprecated[#:what "form" @racket[define]]{}
-Declares a type.}
+Defines a type.}
 
 @defform/subs[(function (id arg ...) maybe-annos maybe-body)
               ([maybe-body code:blank expr])]{
 @deprecated[#:what "form" @racket[define]]{}
-Declares a function.}
+Defines a function.}
 
 @defform[(var id maybe-annos expr)]{
 @deprecated[#:what "form" @racket[define]]{}
-Declares a local variable.}
+Defines a local variable.}
 
 @defform/subs[#:literals (::)
-(primitives declaration ...)
-  ([declaration
+(primitives definition ...)
+  ([definition
     [#:type id]
     [#:function (id arg ...) :: fn-type-expr]])]{
-Declares the specified types and functions as @racket[foreign] primitives, whose C++ name is assumed to be the same as the Magnolisp name. Any declared functions will have no Racket implementation.}
+Defines the specified types and functions as @racket[foreign] primitives, whose C++ name is assumed to be the same as the Magnolisp name. Any defined functions will have no Racket implementation (or rather, they will have an implementation that does nothing).}
 
 @subsection{Annotations}
 
@@ -165,7 +178,7 @@ An annotation that specifies the Magnolisp type of a function, variable, or expr
              [fmt-expr (fmt-insn fmt-obj)]
 	     [fmt-insn display write print cxx-str]
 	     [fmt-obj datum type-id str])]{
-An annotation for type declarations, specifying how to format literal datums of that type. The specification is given as a sequence of elements, which are either string literals or simple formatting expressions. Each @racket[fmt-expr] is translated into a string, and the resulting strings are then concatenated, in order, to get the C++ string encoding for a each literal @racket[datum] of the concerned type. Thus, exact same datums of different types can translate differently.
+An annotation for type definitions, specifying how to format literal datums of that type. The specification is given as a sequence of elements, which are either string literals or simple formatting expressions. Each @racket[fmt-expr] is translated into a string, and the resulting strings are then concatenated, in order, to get the C++ string encoding for a each literal @racket[datum] of the concerned type. Thus, exact same datums of different types can translate differently.
 
 @specsubform[str]{
 A string literal.}
@@ -191,7 +204,7 @@ Substituted with the C++ name of the literal's type.}}
 [type-expr type-id fn-type-expr]
 [fn-type-expr (-> type-expr ... type-expr)]]
 
-Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined types in Magnolisp are @racket[Void] and @racket[Bool], and any others must be declared using @racket[define] (or @racket[typedef]).
+Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined types in Magnolisp are @racket[Void] and @racket[Bool], and any others must be defined using @racket[define] (or @racket[typedef]).
 
 @defform[(-> type-expr ... type-expr)]{
 A function type expression, containing type expressions the function's arguments and its return value, in that order. A Magnolisp function always returns a single value.}
@@ -202,7 +215,7 @@ Like Racket (and unlike C++), the Magnolisp language makes no distinction betwee
 
 Magnolisp borrows a number of constructs from Racket (or Scheme). For example, there is a conditional form @racket[(if _test-expr _then-expr _else-expr)], as well as the derived forms @racket[(when _test-expr _then-expr ...+)] and @racket[(unless _test-expr _then-expr ...+)]. The @racket[_test-expr] conditional expression must always be of type @racket[Bool], and whether it holds depends on the ``truthiness'' of its value, as interpreted in C++ or Racket (as applicable). The branches of an @racket[if] must generally be of the same type, except where the result of the @racket[if] form is discarded. The @racket[when] and @racket[unless] can generally only appear in such result-discarding contexts, as they have an implicit ``else'' branch of type @racket[Void].
 
-A @racket[(begin _body _...)] form, in Magnolisp, signifies a sequence of expressions, itself constituting an expression. Similarly to Racket, to allow declarations to appear within an expression sequence, @racket[(let () _body _...)] should be used instead.
+A @racket[(begin _body _...)] form, in Magnolisp, signifies a sequence of expressions, itself constituting an expression. Similarly to Racket, to allow definitions to appear within an expression sequence, @racket[(let () _body _...)] should be used instead.
 
 The @racket[(let ([_id _expr] _...) _body ...+)], @racket[(let* ([_id _expr] _...) _body ...+)], and @racket[(letrec ([_id _expr] _...) _body ...+)] forms are also available in Magnolisp, but the named variant of @racket[let] is not supported.
 
@@ -212,7 +225,7 @@ The left-hand side expression @racket[_id] must be a reference to a bound variab
 
 In Magnolisp, @racket[(void _expr _...)] is an expression with no useful result (the result is of the unit type @racket[Void]). Any arguments to @racket[void] are evaluated as usual, but they are not used. The @racket[(values)] form signifies ``nothing,'' and has no result; hence it is an error for @racket[(values)] to appear in a position where the context expects a result. In result expecting contexts, the former may only appear in a 1-value context, and the latter in a 0-value context (there are few in Magnolisp).
 
-The @racket[define] declaration forms may appear in a Racket @emph{internal-definition context} (and not Racket @emph{expression context}). The same is true of @racket[define-values] forms that conform to the restricted syntax supported by the Magnolisp compiler.
+The @racket[define] forms may appear in a Racket @emph{internal-definition context} (and not Racket @emph{expression context}). The same is true of @racket[define-values] forms that conform to the restricted syntax supported by the Magnolisp compiler.
 
 @defform[(cast type-expr expr)]{
 Annotates expression @racket[expr] with the type given by @racket[type-expr]. A @racket[cast] is commonly used to specify the type of a literal, which by themselves are generally untyped in Magnolisp. While the literal @racket["foo"] is treated as a @racket[string?] value by Racket, the Magnolisp compiler will expect to determine the literal expression's Magnolisp type based on annotations. The @racket[cast] form allows one to ``cast'' an expression to a specific type for the compiler.
