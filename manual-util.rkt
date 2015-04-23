@@ -1,4 +1,4 @@
-#lang racket
+#lang at-exp racket
 
 #|
 
@@ -79,3 +79,21 @@ Utilities for authoring manual.scrbl.
 (define-syntax-rule*
   (harnessed form)
   (racket (#,racket-if #,(ign-nt Racket-expr) form #,(ign-nt Racket-expr))))
+
+;;; 
+;;; Racket syntax
+;;; 
+
+(module Racket-m racket
+  (require scribble/manual (for-label racket/base))
+  (provide racket/Racket)
+  (define-syntax (racket/Racket stx)
+    (syntax-case stx ()
+      [(_ datum)
+       #`(racket #,(datum->syntax #'here (syntax->datum #'datum)))])))
+
+(require (submod "." Racket-m))
+(provide racket/Racket)
+
+(define-syntax-rule* (Racket-racket datum)
+  @elem{Racket's @racket/Racket[datum]})

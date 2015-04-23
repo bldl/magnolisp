@@ -159,6 +159,31 @@ An annotation that marks a function definition as ``public''. That is, the funct
 @defform[(type type-expr)]{
 An annotation that specifies the Magnolisp type of a function, variable, or expression.}
 
+@defform[#:literals (display write print cxx-str datum type-id)
+  (literal fmt-elem ...)
+  #:grammar ([fmt-elem str fmt-expr]
+             [fmt-expr (fmt-insn fmt-obj)]
+	     [fmt-insn display write print cxx-str]
+	     [fmt-obj datum type-id str])]{
+An annotation for type declarations, specifying how to format literal datums of that type. The specification is given as a sequence of elements, which are either string literals or simple formatting expressions. Each @racket[fmt-expr] is translated into a string, and the resulting strings are then concatenated, in order, to get the C++ string encoding for a each literal @racket[datum] of the concerned type. Thus, exact same datums of different types can translate differently.
+
+@specsubform[str]{
+A string literal.}
+
+@specsubform[#:literals (display) display]{
+Use @Racket-racket[display] to format the object.}
+@specsubform[#:literals (write) write]{
+Use @Racket-racket[write] to format the object.}
+@specsubform[#:literals (print) print]{
+Use @Racket-racket[print] to format the object.}
+@specsubform[#:literals (cxx-str) cxx-str]{
+Format the object as a ``regular'' C++ string literal, after coercing it into a string. Only non-control ASCII characters are allowed in the string.}
+
+@specsubform[#:literals (datum) datum]{
+Substituted with the datum of the literal.}
+@specsubform[#:literals (type-id) type-id]{
+Substituted with the C++ name of the literal's type.}}
+
 @subsection[#:tag "type-expressions"]{Type Expressions}
 
 @racketgrammar*[
