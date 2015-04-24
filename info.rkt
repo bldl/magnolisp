@@ -3,8 +3,7 @@
 (define name "Magnolisp")
 (define blurb
   '("A toy programming language."))
-(define scribblings '(("manual.scrbl" ())))
-(define category '(experimental))
+(define scribblings '(("manual.scrbl")))
 (define racket-launcher-libraries '("compiler-cli.rkt"))
 (define racket-launcher-names '("mglc"))
 (define compile-omit-paths '("dist" "etc" "failing" "gh-pages" "retired" "tests"))

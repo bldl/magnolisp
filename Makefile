@@ -1,5 +1,8 @@
-VERSION := 
-PROJ_NAME := magnolisp$(and $(VERSION),-$(VERSION))
+PKGNAME := magnolisp
+VERSION :=
+DISTSUFFIX := $(and $(VERSION),-$(VERSION))
+DISTNAME := $(PKGNAME)$(DISTSUFFIX)
+DISTHOME := $(PWD)/dist
 
 default : setup
 
@@ -18,58 +21,46 @@ custom-install-bin :
 clean :
 	find -name compiled -type d -print0 | xargs -0 --no-run-if-empty rm -r
 
+# locally avoid remote http://download.racket-lang.org/..../local-redirect/ links by regenerating manual with different settings
 setup :
 	raco setup magnolisp
+	$(MAKE) api-doc
 
 # takes a long time
 clean-with-raco :
 	raco setup --clean magnolisp
 
-bin :
-	raco setup --no-zo --no-docs --no-foreign-libs --no-info-domain --no-pkg-deps magnolisp
-
-bytecode :
-	raco setup --no-launcher --no-docs --no-foreign-libs --no-info-domain --no-pkg-deps magnolisp
-
 api-doc :
-	-rm -r doc
 	mkdir -p doc/manual
 	scribble ++xref-in setup/xref load-collections-xref --html --dest doc/manual --dest-name index.html manual.scrbl
 
-# creates a slightly different directory structure
-api-doc-with-raco :
-	-rm -r doc
-	raco setup --no-zo --no-launcher --no-install --no-post-install magnolisp
-
-DIST_HOME := $(PWD)/dist
-
 rm-dist :
-	-rm -r $(DIST_HOME)
+	-rm -r $(DISTHOME)
 
 pdf-manual :
-	mkdir -p $(DIST_HOME)
-	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --pdf --dest $(DIST_HOME) --dest-name manual.pdf manual.scrbl
+	mkdir -p $(DISTHOME)
+	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --pdf --dest $(DISTHOME) --dest-name manual.pdf manual.scrbl
 
 html-manual :
-	-rm -r $(DIST_HOME)/manual
-	mkdir -p $(DIST_HOME)/manual
-	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --html --dest $(DIST_HOME)/manual --dest-name index.html manual.scrbl
+	-rm -r $(DISTHOME)/manual
+	mkdir -p $(DISTHOME)/manual
+	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --html --dest $(DISTHOME)/manual --dest-name index.html manual.scrbl
 
 MIRROR_DIR := /tmp/raco-tmp/magnolisp
 
 # this indirection ensures that we only get what we would have in a Git repo
 # (using 'git archive' would be more straightforward, but for future proofing)
 pkg :
-	-mkdir $(DIST_HOME)
+	-mkdir $(DISTHOME)
 	-rm -r $(MIRROR_DIR)
 	mkdir -p $(MIRROR_DIR)
 	cp -ai ./ $(MIRROR_DIR)/
-	( cd $(MIRROR_DIR) && git clean -dxff && rm -rf $(MIRROR_DIR)/.git && raco pkg create --format tgz --dest $(DIST_HOME) --from-dir $(MIRROR_DIR) )
+	( cd $(MIRROR_DIR) && git clean -dxff && rm -rf $(MIRROR_DIR)/.git && raco pkg create --format tgz --dest $(DISTHOME) --from-dir $(MIRROR_DIR) )
 
 website-local :
 
 website : rm-dist html-manual pdf-manual pkg website-local
-	chmod -R a+rX $(DIST_HOME)
+	chmod -R a+rX $(DISTHOME)
 
 test :
 	raco test --jobs 2 --run-if-absent tests/run-*.rkt
