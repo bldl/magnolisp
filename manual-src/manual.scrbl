@@ -1,5 +1,5 @@
 #lang scribble/manual
-@(require scribble/eval "manual-util.rkt"
+@(require scribble/eval "util.rkt"
 	  (for-label syntax/modresolve
 	  	     (only-in racket/base add1 sub1 + - * /)
 	             (prefix-in r. (only-in racket/base define))

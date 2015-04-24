@@ -6,15 +6,7 @@ Utilities for authoring manual.scrbl.
 
 |#
 
-(require "util.rkt" scribble/manual)
-
-(begin ;; trick from Racket docs
-  (define-syntax-rule (bind id-2 id-3)
-    (begin
-      (require (for-label racket/base))
-      (define* id-2 (racket #%module-begin))
-      (define* id-3 (racket if))))
-  (bind racket-module-begin racket-if))
+(require "../util.rkt" scribble/manual)
 
 (define* (warning . str)
   (list "(" (italic "Warning: ") str ")"))
@@ -97,3 +89,6 @@ Utilities for authoring manual.scrbl.
 
 (define-syntax-rule* (Racket-racket datum)
   @elem{Racket's @racket/Racket[datum]})
+
+(define* racket-if (racket/Racket if))
+(define* racket-module-begin (racket/Racket #%module-begin))
