@@ -23,12 +23,12 @@ clean :
 
 # locally avoid remote http://download.racket-lang.org/..../local-redirect/ links by regenerating manual with different settings
 setup :
-	raco setup magnolisp
+	raco setup $(PKGNAME)
 	$(MAKE) api-doc
 
 # takes a long time
 clean-with-raco :
-	raco setup --clean magnolisp
+	raco setup --clean $(PKGNAME)
 
 api-doc :
 	mkdir -p doc/manual

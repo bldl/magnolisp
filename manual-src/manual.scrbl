@@ -80,7 +80,7 @@ Where the function is declared as @racket[foreign], the Magnolisp compiler will 
 
 A function with the @racket[export] flag in its annotations indicates that the function is part of the public API of a program that includes the containing module. When a function is used merely as a dependency (i.e., its containing module was not specified as being a part of the program), any @racket[export] flag is ignored.
 
-When a function includes a @racket[type] annotation, the type expression must be of the form @racket[_fn-type-expr] (see @secref{type-expressions}).
+When a function includes a @racket[type] annotation, the type expression must specify a function type (see @secref{type-expressions}).
 
 For example:
 @(racketblock+eval #:eval the-eval
@@ -133,7 +133,7 @@ Defines a local variable.}
 (primitives definition ...)
   ([definition
     [#:type id]
-    [#:function (id arg ...) :: fn-type-expr]])]{
+    [#:function (id arg ...) :: type-expr]])]{
 Defines the specified types and functions as @racket[foreign] primitives, whose C++ name is assumed to be the same as the Magnolisp name. Any defined functions will have no Racket implementation (or rather, they will have an implementation that does nothing).}
 
 @subsection{Annotations}
@@ -200,14 +200,28 @@ Substituted with the C++ name of the literal's type.}}
 @subsection[#:tag "type-expressions"]{Type Expressions}
 
 @racketgrammar*[
-#:literals (->)
-[type-expr type-id fn-type-expr]
-[fn-type-expr (-> type-expr ... type-expr)]]
+#:literals (-> <> auto)
+[type-expr type-id
+           (-> type-expr ... type-expr)
+           (<> type-expr type-expr ...)
+	   (auto)]]
 
-Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined types in Magnolisp are @racket[Void] and @racket[Bool], and any others must be defined using @racket[define] (or @racket[typedef]).
+Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined types in Magnolisp are @racket[Void] and @racket[Bool], and any others must be defined using @racket[define #:type] or some other type-binding form.
 
 @defform[(-> type-expr ... type-expr)]{
 A function type expression, containing type expressions the function's arguments and its return value, in that order. A Magnolisp function always returns a single value.}
+
+@defform[(<> type-expr type-expr ...)]{
+A parametric type expression, containing type expressions for the type's base type and its type parameters, in that order. Type parameters translate as template parameters in C++.
+
+For example:
+@(racketblock+eval #:eval the-eval
+  (define #:type stack #:: (foreign))
+  (define (stack-id x) #:: ([type (-> (<> stack int) (auto))])
+    x) (code:comment @#,elem{the C++ type of this @racket[x] use will be @racketid[stack<int>]}))}
+
+@defform[(auto)]{
+A type expression that conveys no information about the thing being typed, indicating that it is expected for the type to be inferable based on the contexts of use of the thing.}
 
 @subsection{Value Expressions}
 

@@ -4,4 +4,5 @@
 *.swp
 .DS_Store
 *.org_archive
+compiled/
 retired/
