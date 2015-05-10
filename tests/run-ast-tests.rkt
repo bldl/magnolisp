@@ -3,7 +3,7 @@
 #|
 |#
 
-(require magnolisp/ast-util magnolisp/ast-view
+(require magnolisp/ast-repr magnolisp/ast-view
          racket/generic rackunit)
 
 (define-view A ([#:field a]))

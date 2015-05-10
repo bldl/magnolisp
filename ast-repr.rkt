@@ -2,6 +2,8 @@
 
 #|
 
+AST representation.
+
 Assumptions for AST node types:
 
 - each type must be defined as #:transparent
