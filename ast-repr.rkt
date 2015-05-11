@@ -63,11 +63,6 @@ Assumptions for AST node types:
 ;;; gen:strategic
 ;;; 
 
-;; Note that ordering is delicate here. Any identifiers must be
-;; defined before their values are accessed, regardless of phase
-;; level. Forward references to module-level variables (without
-;; access) are fine.
-
 (define-for-syntax (make-all-visit-term nn-stx f-stx-lst)
   (define nn-sym (syntax-e nn-stx))
   #`(define (all-visit-term s ast)
@@ -89,16 +84,17 @@ Assumptions for AST node types:
           f-stx-lst)
       (void)))
 
-(define-for-syntax (get-relevant-fields f-stx-lst)
+;; Takes a list of field specifications `f-stx-lst`.
+(define-for-syntax (parse-relevant-fields f-stx-lst)
   (filter-map
    (lambda (f-stx)
      (syntax-case f-stx (no-term just-term list-of-term)
        [(no-term fn-pat)
         #f]
        [(just-term fn-pat)
-        (list 'just #'fn-pat (generate-temporary (syntax-e #'fn-pat)))]
+        (list 'just #'fn-pat (generate-temporary #'fn-pat))]
        [(list-of-term fn-pat)
-        (list 'list #'fn-pat (generate-temporary (syntax-e #'fn-pat)))]))
+        (list 'list #'fn-pat (generate-temporary #'fn-pat))]))
    f-stx-lst))
 
 (define-for-syntax (make-r-f-struct-copy type-id obj-id r-f-lst)
@@ -110,35 +106,59 @@ Assumptions for AST node types:
                                    #'[fld tmp]))])
     #'(struct-copy type obj set-fld ...)))
 
-;; E.g. output
+;; E.g. output:
 ;; (define (all-rw-term s ast)
-;;   (let-and var (s (Define-var ast))
-;;            body (all-rw-list s (Define-body ast))
-;;            (struct-copy Define ast (var var) (body body))))
+;;   (let ((old-var (Define-var ast))
+;;         (old-body (Define-body ast)))
+;;     (let-and
+;;       var (s old-var)
+;;       body (all-rw-list s old-body)
+;;       (if (and (eq? old-var var) (eq? old-body body))
+;;           ast
+;;           (struct-copy Define ast (var var) (body body))))))
 (define-for-syntax (make-all-rw-term nn-stx f-stx-lst)
   (define nn-sym (syntax-e nn-stx))
-  (define r-f-lst (get-relevant-fields f-stx-lst))
-  #`(define (all-rw-term s ast)
-      (let-and
-       #,@(apply
-           append
-           (map
-            (lambda (fld)
-              (let* ((kind (first fld))
-                     (fn-stx (second fld))
-                     (tmp-stx (third fld))
-                     (fn-sym (syntax-e fn-stx))
-                     (get-stx (format-id nn-stx "~a-~a"
-                                         nn-sym fn-sym)))
-                (list
-                 tmp-stx
-                 (cond
-                  ((eq? kind 'just)
-                   #`(s (#,get-stx ast)))
-                  ((eq? kind 'list)
-                   #`(all-rw-list s (#,get-stx ast)))))))
-            r-f-lst))
-       #,(make-r-f-struct-copy nn-stx #'ast r-f-lst))))
+  (define r-f-lst ;; (list/c kind id new-tmp old-tmp)
+    (for/list ((fld (parse-relevant-fields f-stx-lst)))
+      (define f-id (second fld))
+      (append fld (list (generate-temporary f-id)))))
+  (define ast-id (generate-temporary 'ast))
+  (with-syntax* ([s (generate-temporary 's)]
+                 [ast ast-id]
+                 [(bind-old ...)
+                  (for/list ([fld r-f-lst])
+                    (define fn-sym (syntax-e (second fld)))
+                    (with-syntax ([old (fourth fld)]
+                                  [get (format-id nn-stx "~a-~a"
+                                                  nn-sym fn-sym)])
+                      #'[old (get ast)]))]
+                 [(bind-new ...)
+                  (apply
+                   append
+                   (for/list ([fld r-f-lst])
+                     (define kind (first fld))
+                     (define new-id (third fld))
+                     (list
+                      new-id
+                      (with-syntax ([old (fourth fld)])
+                        (cond
+                          [(eq? kind 'just)
+                           #'(s old)]
+                          [(eq? kind 'list)
+                           #'(all-rw-list s old)])))))]
+                 [(eq-cmp ...)
+                  (for/list ([fld r-f-lst])
+                    (with-syntax ([new (third fld)]
+                                  [old (fourth fld)])
+                      #'(eq? old new)))]
+                 [copy (make-r-f-struct-copy nn-stx ast-id r-f-lst)])
+    #'(define (all-rw-term s ast)
+        (let (bind-old ...)
+          (let-and
+            bind-new ...
+            (if (and eq-cmp ...)
+                ast
+                copy))))))
 
 ;; E.g., '((#'lv . 1) (#'rv . 2))
 (define-for-syntax (to-term-fields-with-ix f-stx-lst)
@@ -163,7 +183,7 @@ Assumptions for AST node types:
         (list (unsafe-struct*-ref ast ix) ...))))
      
 (define-for-syntax (make-set-term-fields type-id f-stx-lst)
-  (define r-f-lst (get-relevant-fields f-stx-lst))
+  (define r-f-lst (parse-relevant-fields f-stx-lst))
   (with-syntax ([type type-id]
                 [(tmp ...) (for/list ([fld r-f-lst])
                              (third fld))]

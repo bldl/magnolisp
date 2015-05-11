@@ -17,24 +17,31 @@
 
 (define* (some-rw-term s strategic)
   (define o-lst (get-term-fields strategic))
+  (define changed? #f)
   (define some? #f)
   (define n-lst 
-    (for/list ((fv o-lst))
-      (define nv (if (list? fv)
-                     (some-rw-list s fv)
-                     (s fv)))
-      (if nv
-          (begin
-            (set! some? #t)
-            nv)
-          fv)))
-  (and some? (set-term-fields strategic n-lst)))
+    (for/list ([fv o-lst])
+      (let ([nv (if (list? fv)
+                    (some-rw-list s fv)
+                    (s fv))])
+        (if nv
+            (begin
+              (unless (eq? fv nv)
+                (set! changed? #t))
+              (set! some? #t)
+              nv)
+            fv))))
+  (and some?
+       (if changed?
+           (set-term-fields strategic n-lst)
+           strategic)))
 
 (define* (one-rw-term s strategic)
   (define o-lst (get-term-fields strategic))
+  (define changed? #f)
   (define one? #f)
   (define n-lst 
-    (for/list ((fv o-lst))
+    (for/list ([fv o-lst])
       (if one? 
           fv
           (let ()
@@ -43,10 +50,15 @@
                            (s fv)))
             (if nv
                 (begin
+                  (unless (eq? fv nv)
+                    (set! changed? #t))
                   (set! one? #t)
                   nv)
                 fv)))))
-  (and one? (set-term-fields strategic n-lst)))
+  (and one?
+       (if changed?
+           (set-term-fields strategic n-lst)
+           strategic)))
 
 ;;; 
 ;;; Stateful term access operators.

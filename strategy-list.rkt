@@ -20,19 +20,9 @@
   (for-each s lst))
 
 ;; Like `map`, except that: does not accept multiple list arguments;
-;; and if `s` returns #f, then stops mapping and returns #f.
-(define* (all-rw-list s lst)
-  (let next ((res-lst '())
-             (lst lst))
-    (if (null? lst)
-        (reverse res-lst)
-        (let ((res (s (car lst))))
-          (and res
-               (next (cons res res-lst) (cdr lst)))))))
-
-;; Like `all-rw-list/neq`, but returns unmodified `in-lst` if `s` does
-;; returns each element unmodified.
-(define* (all-rw-list/eq s in-lst)
+;; and if `s` returns #f, then stops mapping and returns #f. Returns
+;; unmodified `in-lst` if `s` returns each element unmodified.
+(define* (all-rw-list s in-lst)
   (define changed? #f)
   (let next ((res-lst '())
              (lst in-lst))
@@ -50,16 +40,10 @@
 
 ;; Like `map`, except that: does not accept multiple list arguments;
 ;; does not change elements for which `s` returns #f; and if `s`
-;; returns #f for all elements, then returns #f.
+;; returns #f for all elements, then returns #f. Returns unmodified
+;; `lst` if `s` does not change any elements (i.e., `eq?`uivalence
+;; holds).
 (define* (some-rw-list s lst)
-  (define some? #f)
-  (define res (map (lambda (x)
-                     (define y (s x))
-                     (if y (begin (set! some? #t) y) x))
-                   lst))
-  (and some? res))
-
-(define* (some-rw-list/eq s lst)
   (define changed? #f)
   (define some? #f)
   (define res (map (lambda (x)
@@ -77,20 +61,9 @@
 ;; Like `map`, but stops transforming elements in `lst` as soon as `s`
 ;; has produced a true value for an element. Does not change elements
 ;; for which `s` returns #f. If `s` returns #f for all elements, the
-;; overall result will also be #f.
-(define* (one-rw-list s lst)
-  (let next ((res-lst '())
-             (lst lst))
-    (if (null? lst)
-        #f
-        (let* ((x (car lst))
-               (xs (cdr lst))
-               (res (s x)))
-          (if res
-              (append (reverse res-lst) (cons res xs))
-              (next (cons x res-lst) xs))))))
-
-(define* (one-rw-list/eq s in-lst)
+;; overall result will also be #f. Returns unmodified `lst` if `s`
+;; does not change any elements.
+(define* (one-rw-list s in-lst)
   (let next ((res-lst '())
              (lst in-lst))
     (if (null? lst)
