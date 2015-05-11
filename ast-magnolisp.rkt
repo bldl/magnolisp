@@ -11,8 +11,8 @@ Assumptions for AST node types:
 
 |#
 
-(require "ast-repr.rkt" "ast-view.rkt"
-         "app-util.rkt" "strategy.rkt"
+(require "app-util.rkt" "ast-repr.rkt" "ast-view.rkt"
+         "strategy-term.rkt"
          "util.rkt" "util/struct.rkt"
          racket/contract racket/dict racket/function racket/match
          syntax/id-table

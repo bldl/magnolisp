@@ -19,7 +19,8 @@ optimization.
 
 (require "app-util.rkt" "ast-magnolisp.rkt" "ast-repr.rkt"
          "backend-magnolisp-print.rkt"
-         "compiler-rewrites.rkt" "parse.rkt" "strategy.rkt"
+         "compiler-rewrites.rkt" "parse.rkt"
+         "strategy.rkt" "strategy-term.rkt"
          "util.rkt" "util/struct.rkt"
          syntax/moddep)
 

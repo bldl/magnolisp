@@ -6,9 +6,8 @@ C++ back end.
 
 |#
 
-(require "ast-magnolisp.rkt"
-         "backend-util.rkt"
-         "compiler-rewrites.rkt" "app-util.rkt" "strategy.rkt"
+(require "app-util.rkt" "ast-magnolisp.rkt" "backend-util.rkt"
+         "compiler-rewrites.rkt" "strategy.rkt" "strategy-term.rkt"
          "util.rkt" "util/case.rkt"
          racket/syntax syntax/id-table)
 

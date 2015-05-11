@@ -13,7 +13,8 @@ Assumptions for AST node types:
 
 |#
 
-(require "ast-serialize.rkt" "ast-view.rkt" "strategy.rkt"
+(require "ast-serialize.rkt" "ast-view.rkt"
+         "strategy.rkt" "strategy-list.rkt"
          "util.rkt" "util/struct.rkt"
          racket/generic racket/unsafe/ops unstable/struct
          (for-syntax racket/base racket/function racket/list
@@ -352,7 +353,7 @@ Assumptions for AST node types:
 ;;; 
 
 (module* test #f
-  (require racket rackunit)
+  (require racket rackunit "strategy-term.rkt")
 
   (define-view Ast (#:fields annos))
 
