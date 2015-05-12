@@ -47,7 +47,7 @@ Meta-Compilation of Language Abstractions (2006).
 (require "util.rkt" racket/generic)
 
 ;;; 
-;;; Subterm access interface.
+;;; Subterm access operations.
 ;;; 
 
 (define-generics* strategic
@@ -63,8 +63,13 @@ Meta-Compilation of Language Abstractions (2006).
 (define* (fail-rw x) #f)
 (define* (id-rw x) x)
 
+(define* current-visit-all (make-parameter term-visit-all))
+(define* current-rewrite-all (make-parameter term-rewrite-all))
+(define* current-rewrite-some (make-parameter #f))
+(define* current-rewrite-one (make-parameter #f))
+
 ;;; 
-;;; Helpers.
+;;; Strategy combinators.
 ;;; 
 
 (define-syntax-rule*
