@@ -45,6 +45,12 @@
 ;;; Primitive traversal operators for lists.
 ;;; 
 
+(define-syntax-rule
+  (define-strategy-combinator* n f)
+  (define* (n s)
+    (lambda (ast)
+      (f s ast))))
+
 ;; These subterm traversals may be invoked for immediate "local"
 ;; traversals within terms containing list data. We could later
 ;; provide operations for vectors, boxes, and immutable hash tables,

@@ -156,12 +156,138 @@ Meta-Compilation of Language Abstractions (2006).
 (define* current-rewrite-some (make-parameter term-rewrite-some))
 (define* current-rewrite-one (make-parameter term-rewrite-one))
 
+(define-syntax-rule
+  (define-strategy-combinator* n f-expr)
+  (define* (n s)
+    (let ([f f-expr])
+      (lambda (ast)
+        (f s ast)))))
+
+(define-strategy-combinator* all-visitor (current-visit-all))
+(define-strategy-combinator* all-rewriter (current-rewrite-all))
+(define-strategy-combinator* some-rewriter (current-rewrite-some))
+(define-strategy-combinator* one-rewriter (current-rewrite-one))
+
+;; DEPRECATED
+(provide (rename-out [all-visitor all-visit]
+                     [all-rewriter all]
+                     [some-rewriter some]
+                     [one-rewriter one]))
+
 ;;; 
 ;;; Strategy combinators.
 ;;; 
 
-(define-syntax-rule*
-  (define-strategy-combinator* n f)
-  (define* (n s)
-    (lambda (ast)
-      (f s ast))))
+;; Note quite the Stratego 'rec', but close, and handles the common
+;; case. 'impl' is (-> ast (or/c ast #f)), and has both 's' and itself
+;; (as 'again') in scope.
+(define-syntax-rule* (rec again s impl)
+  (lambda (s)
+    (letrec ([again impl])
+      again)))
+
+;; Note that (and e ...) defines left-to-right evaluation order, and
+;; also that (and) == #t.
+(define-syntax-rule* (seq s ...)
+  (lambda (ast)
+    (and (begin (set! ast (s ast))
+                ast) ...
+         ast)))
+
+;; Note that (or e ...) defines left-to-right evaluation order, and
+;; also that (or) == #f.
+(define-syntax* alt
+  (syntax-rules ()
+    ((_ s ...)
+     (lambda (ast)
+       (or (s ast) ...)))))
+
+;; Combines visit actions in a way that 'compose' would not.
+(define-syntax-rule* (seq-visit s ...)
+  (lambda (ast)
+    (s ast) ...
+    (void)))
+
+(struct Break () #:transparent)
+(struct BreakWith (v) #:transparent)
+
+(define-syntax* break
+  (syntax-rules ()
+    ((_ v)
+     (BreakWith v))
+    ((_)
+     (Break))))
+
+;; A sequence that may be interrupted without failing by invoking `break`.
+(define-syntax-rule* (seq-break s ...)
+  (lambda (ast)
+    (let/ec k 
+      (and (begin (set! ast (s ast))
+                  (when (BreakWith? ast)
+                    (k (BreakWith-v ast)))
+                  ast) ...
+           ast))))
+
+(define-syntax-rule* (seq-visit-break s ...)
+  (lambda (ast)
+    (and (not (Break? (s ast))) ...)
+    (void)))
+
+(define* (try s)
+  (alt s id-rw))
+
+(define* repeat
+  (rec again s
+       (try (seq s again))))
+
+;; Tries a rewrite but restores original term on success.
+(define* (where s)
+  (lambda (ast)
+    (and (s ast) ast)))
+
+;; ((seq (where number?) (must (lambda (x) 2))) 1)   ;=> 2
+;; ((seq (where number?) (must (lambda (x) #f))) 1)  ;=> error
+(define-syntax* must
+  (syntax-rules ()
+    [(_ s)
+     (must s "strategy did not apply" (quote s))]
+    [(_ s msg v ...)
+     (lambda (ast)
+       (or (s ast)
+           (error msg v ...)))]))
+
+;;; 
+;;; Tree traversal strategy combinators. 
+;;; 
+
+(define* topdown
+  (rec again s
+       (seq s (all-rewriter again))))
+
+(define* topdown-visit
+  (rec again s
+       (seq-visit s (all-visitor again))))
+
+(define* topdown-break
+  (rec again s
+       (seq-break s (all-rewriter again))))
+
+(define* topdown-visit-break
+  (rec again s
+       (seq-visit-break s (all-visitor again))))
+
+(define* bottomup
+  (rec again s
+       (seq (all-rewriter again) s)))
+
+(define* bottomup-visit
+  (rec again s
+       (seq-visit (all-visitor again) s)))
+
+(define* outermost
+  (rec again s
+       (topdown (try (seq s again)))))
+
+(define* innermost
+  (rec again s
+       (bottomup (try (seq s again)))))
