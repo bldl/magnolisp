@@ -165,9 +165,9 @@
        (Defun a id (f ast t) (map rw ps) (rw b)))
       ((Expr t)
        #:when t
-       (Expr-copy (all-rw-term rw ast) (f ast t)))
+       (Expr-copy (term-rewrite-all rw ast) (f ast t)))
       (_
-       (all-rw-term rw ast)))))
+       (term-rewrite-all rw ast)))))
 
 ;; If the type expression `ast` specifies a function type, returns its
 ;; function type without any enclosing type parameter declarations.
@@ -215,7 +215,7 @@
          ;;(writeln bind->sym)
          (loop t))
         (_
-         (all-rw-term loop ast)))))
+         (term-rewrite-all loop ast)))))
 
   (values bind->sym n-ast))
 
@@ -255,14 +255,14 @@
          (set-add! univ-binds bind))
        (r-visit t)]
       [_
-       (all-rw-term r-visit ast)]))
+       (term-rewrite-all r-visit ast)]))
   
   (define (a-visit ast)
     (match ast
       [(NameT _ (Id _ _ (? univ-bind? bind)))
        (set-add! a-binds bind)]
       [_
-       (all-rw-term a-visit ast)]))
+       (term-rewrite-all a-visit ast)]))
 
   (define (top-visit ast)
     (match ast
@@ -312,7 +312,7 @@
            (set! univ-names (cons (NameT (flag-type-param a) id) univ-names)))
          (loop t)]
         [_
-         (all-rw-term loop ast)])))
+         (term-rewrite-all loop ast)])))
   
   (values (reverse univ-names) n-t))
 
@@ -381,7 +381,7 @@
       [(or (? Var?) (? Literal?) (? RacketExpr?))
        (set-result-discarded ast d?)]
       [(or (? ApplyExpr?) (? AssignStat?))
-       (define n-ast (all-rw-term rw-expr-used ast))
+       (define n-ast (term-rewrite-all rw-expr-used ast))
        (set-result-discarded n-ast d?)]
       [(IfExpr a c t e)
        (define n-ast (IfExpr a (rw-expr-used c)
@@ -411,7 +411,7 @@
   (define (rw-any ast)
     (if (ExprLike? ast)
         (rw-expr-used ast)
-        (all-rw-term rw-any ast)))
+        (term-rewrite-all rw-any ast)))
 
   (rw-any ast))
 
@@ -599,7 +599,7 @@
       (define-values (target n-ast) (rw ast))
       n-ast)
      (else
-      (all-rw-term rw-any-LetLocalEc ast))))
+      (term-rewrite-all rw-any-LetLocalEc ast))))
           
   (ast-splice-SeqExpr (rw-any-LetLocalEc in-ast)))
 

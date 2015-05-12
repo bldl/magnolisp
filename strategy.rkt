@@ -51,9 +51,9 @@ Meta-Compilation of Language Abstractions (2006).
 ;;; 
 
 (define-generics* strategic
-  (all-visit-term s strategic)
-  (all-rw-term s strategic)
-  (get-term-fields strategic)
+  (term-visit-all s strategic)
+  (term-rewrite-all s strategic)
+  (term-fields strategic)
   (set-term-fields strategic lst))
 
 ;;; 

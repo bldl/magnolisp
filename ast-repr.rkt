@@ -63,9 +63,9 @@ Assumptions for AST node types:
 ;;; gen:strategic
 ;;; 
 
-(define-for-syntax (make-all-visit-term nn-stx f-stx-lst)
+(define-for-syntax (make-term-visit-all nn-stx f-stx-lst)
   (define nn-sym (syntax-e nn-stx))
-  #`(define (all-visit-term s ast)
+  #`(define (term-visit-all s ast)
       #,@(map
           (lambda (f-stx)
             (syntax-case f-stx (no-term just-term list-of-term)
@@ -107,16 +107,16 @@ Assumptions for AST node types:
     #'(struct-copy type obj set-fld ...)))
 
 ;; E.g. output:
-;; (define (all-rw-term s ast)
+;; (define (term-rewrite-all s ast)
 ;;   (let ((old-var (Define-var ast))
 ;;         (old-body (Define-body ast)))
 ;;     (let-and
 ;;       var (s old-var)
-;;       body (all-rw-list s old-body)
+;;       body (list-rewrite-all s old-body)
 ;;       (if (and (eq? old-var var) (eq? old-body body))
 ;;           ast
 ;;           (struct-copy Define ast (var var) (body body))))))
-(define-for-syntax (make-all-rw-term nn-stx f-stx-lst)
+(define-for-syntax (make-term-rewrite-all nn-stx f-stx-lst)
   (define nn-sym (syntax-e nn-stx))
   (define r-f-lst ;; (list/c kind id new-tmp old-tmp)
     (for/list ((fld (parse-relevant-fields f-stx-lst)))
@@ -145,14 +145,14 @@ Assumptions for AST node types:
                           [(eq? kind 'just)
                            #'(s old)]
                           [(eq? kind 'list)
-                           #'(all-rw-list s old)])))))]
+                           #'(list-rewrite-all s old)])))))]
                  [(eq-cmp ...)
                   (for/list ([fld r-f-lst])
                     (with-syntax ([new (third fld)]
                                   [old (fourth fld)])
                       #'(eq? old new)))]
                  [copy (make-r-f-struct-copy nn-stx ast-id r-f-lst)])
-    #'(define (all-rw-term s ast)
+    #'(define (term-rewrite-all s ast)
         (let (bind-old ...)
           (let-and
             bind-new ...
@@ -176,10 +176,10 @@ Assumptions for AST node types:
           #'fn-pat]))
      (cons n i))))
 
-(define-for-syntax (make-get-term-fields f-stx-lst)
+(define-for-syntax (make-term-fields f-stx-lst)
   (define lst (to-term-fields-with-ix f-stx-lst))
   (with-syntax ([(ix ...) (map cdr lst)])
-    #'(define (get-term-fields ast)
+    #'(define (term-fields ast)
         (list (unsafe-struct*-ref ast ix) ...))))
      
 (define-for-syntax (make-set-term-fields type-id f-stx-lst)
@@ -196,9 +196,9 @@ Assumptions for AST node types:
           (struct-copy type ast set-fld ...)))))
 
 (define-for-syntax (make-strategic nn-stx f-stx-lst)
-  `(,(make-all-visit-term nn-stx f-stx-lst)
-    ,(make-all-rw-term nn-stx f-stx-lst)
-    ,(make-get-term-fields f-stx-lst)
+  `(,(make-term-visit-all nn-stx f-stx-lst)
+    ,(make-term-rewrite-all nn-stx f-stx-lst)
+    ,(make-term-fields f-stx-lst)
     ,(make-set-term-fields nn-stx f-stx-lst)))
 
 ;;; 
@@ -395,10 +395,10 @@ Assumptions for AST node types:
   (check-true (match empty [(Ast (? hash?)) #t] [_ #f]))
   (check-true (match empty [(Ast (? hash? h)) (hash-empty? h)] [_ #f]))
 
-  (check-equal? (get-term-fields the-Singleton) '())
-  (check-equal? (get-term-fields empty) '())
-  (check-eqv? 1 (length (get-term-fields (Some (hasheq 'x 5) empty))))
-  (check-eqv? 2 (length (get-term-fields object)))
+  (check-equal? (term-fields the-Singleton) '())
+  (check-equal? (term-fields empty) '())
+  (check-eqv? 1 (length (term-fields (Some (hasheq 'x 5) empty))))
+  (check-eqv? 2 (length (term-fields object)))
   
   (define rw-Singleton->Empty
      (lambda (ast)
@@ -501,7 +501,7 @@ Assumptions for AST node types:
     (check-equal? '(1 2 3) (collect-nums t)))
 
   (let ((t (Tree (list (Tree (list (Atom 1) (Atom 2))) (Atom 3)))))
-    (let ((lst (get-term-fields t)))
+    (let ((lst (term-fields t)))
       (check-equal? t (set-term-fields t lst))
       (check-equal? t (set-term-fields (Tree null) lst))))
   (let ((t (Tree (list (Atom 1) (Atom 2)))))
@@ -509,7 +509,7 @@ Assumptions for AST node types:
       (match ast
         ((Atom x) (Atom (add1 x)))
         (_ ast)))
-    (define lst (get-term-fields t))
+    (define lst (term-fields t))
     (define inc-lst (for/list ((f lst))
                       (map inc f)))
     (check-equal? (set-term-fields t inc-lst)

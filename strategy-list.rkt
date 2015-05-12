@@ -16,13 +16,13 @@
 
 ;; Like `for-each`, except that does not accept multiple list
 ;; arguments.
-(define* (all-visit-list s lst)
+(define* (list-visit-all s lst)
   (for-each s lst))
 
 ;; Like `map`, except that: does not accept multiple list arguments;
 ;; and if `s` returns #f, then stops mapping and returns #f. Returns
 ;; unmodified `in-lst` if `s` returns each element unmodified.
-(define* (all-rw-list s in-lst)
+(define* (list-rewrite-all s in-lst)
   (define changed? #f)
   (let next ((res-lst '())
              (lst in-lst))
@@ -43,7 +43,7 @@
 ;; returns #f for all elements, then returns #f. Returns unmodified
 ;; `lst` if `s` does not change any elements (i.e., `eq?`uivalence
 ;; holds).
-(define* (some-rw-list s lst)
+(define* (list-rewrite-some s lst)
   (define changed? #f)
   (define some? #f)
   (define res (map (lambda (x)
@@ -63,7 +63,7 @@
 ;; for which `s` returns #f. If `s` returns #f for all elements, the
 ;; overall result will also be #f. Returns unmodified `lst` if `s`
 ;; does not change any elements.
-(define* (one-rw-list s in-lst)
+(define* (list-rewrite-one s in-lst)
   (let next ((res-lst '())
              (lst in-lst))
     (if (null? lst)
@@ -89,7 +89,7 @@
 (module+ test
   (require rackunit))
 
-(define-strategy-combinator* one/list one-rw-list)
+(define-strategy-combinator* one/list list-rewrite-one)
 
 (module+ test
   (check-equal?
@@ -99,7 +99,7 @@
     ((one/list number?) '(x 2 y 4)))
    '(#f #f (x #t y 4))))
 
-(define-strategy-combinator* some/list some-rw-list)
+(define-strategy-combinator* some/list list-rewrite-some)
 
 (module+ test
   (check-equal?
@@ -110,7 +110,7 @@
    '(#f #f (x #t y #t))))
 
 ;; This is an `all` for lists, where elements are "subterms".
-(define-strategy-combinator* all/list all-rw-list)
+(define-strategy-combinator* all/list list-rewrite-all)
 
 (module+ test
   (check-equal?
@@ -120,7 +120,7 @@
     ((all/list number?) '(x 2 y 4)))
    '(() (#t #t #t) #f)))
 
-(define-strategy-combinator* all-visit/list all-visit-list)
+(define-strategy-combinator* all-visit/list list-visit-all)
 
 (module+ test
   (check-equal?

@@ -205,7 +205,7 @@ C++ back end.
   ;; Rewrites subterms of 'ast', updating 'r' in the process.
   (define (rw-all r ast)
     (let ((ast
-           (all-rw-term
+           (term-rewrite-all
             (lambda (ast)
               (let-values (((sub-r ast) (rw r ast)))
                 (set! r sub-r)
@@ -371,7 +371,7 @@ C++ back end.
       [(or (? Var?) (? Literal?))
        ast]
       [(or (? ApplyExpr?) (? IfExpr?))
-       (all-rw-term to-expr ast)]
+       (term-rewrite-all to-expr ast)]
       [(SeqExpr a es)
        (define t (Expr-type ast))
        (define void-t? (equal? t the-Void-type))
@@ -394,13 +394,13 @@ C++ back end.
        ;; Discarding result due to statement context.
        (annoless SeqStat '())]
       [(? ApplyExpr?)
-       (annoless ExprStat (all-rw-term to-expr ast))]
+       (annoless ExprStat (term-rewrite-all to-expr ast))]
       [(or (? AssignStat?) (? ReturnStat?))
-       (all-rw-term to-expr ast)]
+       (term-rewrite-all to-expr ast)]
       [(DefVar a id t b)
        (DefVar a id t (to-expr b))]
       [(? SeqStat?)
-       (all-rw-term to-stat ast)]
+       (term-rewrite-all to-stat ast)]
       [(SeqExpr a es)
        ;; Due to the statement context, the result of the expression
        ;; can be discarded.
@@ -856,7 +856,7 @@ C++ back end.
       n-ast)
     
     (define (rw-all bind->val ast)
-      (stateful-all-rw-term rw bind->val ast))
+      (term-rewrite-all/stateful rw bind->val ast))
     
     (let-values ([(dummy ast) (rw #hasheq() def)])
       ;;(pretty-print ast)

@@ -9,20 +9,20 @@
 ;;; Abstract term access operations.
 ;;;
 
-(define* (for-each-term-field f strategic)
-  (for-each f (get-term-fields strategic)))
+(define* (term-for-each f strategic)
+  (for-each f (term-fields strategic)))
 
-(define* (map-term-field f strategic)
-  (set-term-fields strategic (map f (get-term-fields strategic))))
+(define* (term-map f strategic)
+  (set-term-fields strategic (map f (term-fields strategic))))
 
-(define* (some-rw-term s strategic)
-  (define o-lst (get-term-fields strategic))
+(define* (term-rewrite-some s strategic)
+  (define o-lst (term-fields strategic))
   (define changed? #f)
   (define some? #f)
   (define n-lst 
     (for/list ([fv o-lst])
       (let ([nv (if (list? fv)
-                    (some-rw-list s fv)
+                    (list-rewrite-some s fv)
                     (s fv))])
         (if nv
             (begin
@@ -36,8 +36,8 @@
            (set-term-fields strategic n-lst)
            strategic)))
 
-(define* (one-rw-term s strategic)
-  (define o-lst (get-term-fields strategic))
+(define* (term-rewrite-one s strategic)
+  (define o-lst (term-fields strategic))
   (define changed? #f)
   (define one? #f)
   (define n-lst 
@@ -46,7 +46,7 @@
           fv
           (let ()
             (define nv (if (list? fv)
-                           (one-rw-list s fv)
+                           (list-rewrite-one s fv)
                            (s fv)))
             (if nv
                 (begin
@@ -67,9 +67,9 @@
 ;; Rewrites subterms of `ast` with strategy `f`, threading through
 ;; state `st` in the process. The function `f` must take and return an
 ;; extra state value, whose initial value is `st`.
-(define* (stateful-all-rw-term f st ast)
+(define* (term-rewrite-all/stateful f st ast)
   (let ([ast
-         (all-rw-term
+         (term-rewrite-all
           (lambda (ast)
             (let-values ([(sub-st ast) (f st ast)])
               (set! st sub-st)
@@ -81,10 +81,10 @@
 ;;; Primitive traversal operators.
 ;;; 
 
-(define-strategy-combinator* all-visit all-visit-term)
-(define-strategy-combinator* all all-rw-term)
-(define-strategy-combinator* some some-rw-term)
-(define-strategy-combinator* one one-rw-term)
+(define-strategy-combinator* all-visit term-visit-all)
+(define-strategy-combinator* all term-rewrite-all)
+(define-strategy-combinator* some term-rewrite-some)
+(define-strategy-combinator* one term-rewrite-one)
 
 ;;; 
 ;;; Strategy combinators.
@@ -208,12 +208,12 @@
   (require rackunit)
   (struct List (lst)
           #:methods gen:strategic
-          [(define (all-visit-term s strategic)
-             (all-visit-list s (List-lst strategic)))
-           (define (all-rw-term s strategic)
-             (define r (all-rw-list s (List-lst strategic)))
+          [(define (term-visit-all s strategic)
+             (list-visit-all s (List-lst strategic)))
+           (define (term-rewrite-all s strategic)
+             (define r (list-rewrite-all s (List-lst strategic)))
              (and r (List r)))
-           (define (get-term-fields strategic)
+           (define (term-fields strategic)
              (list (List-lst strategic)))
            (define (set-term-fields strategic lst)
              (apply List lst))])
