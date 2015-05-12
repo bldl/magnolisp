@@ -127,6 +127,12 @@
     (require n ...)
     (provide (all-from-out n ...))))
 
+(define-syntax-rule*
+  (require*-only-in (mod n ...) ...)
+  (begin
+    (require (only-in mod n ...) ...)
+    (provide (combine-out n ...) ...)))
+
 (define-syntax* (define-generics* stx)
   (define-splicing-syntax-class opts
     (pattern

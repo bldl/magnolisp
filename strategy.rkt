@@ -56,6 +56,94 @@ Meta-Compilation of Language Abstractions (2006).
   (term-fields strategic)
   (set-term-fields strategic lst))
 
+;; Like `map`, except that: does not accept multiple list arguments;
+;; does not change elements for which `s` returns #f; and if `s`
+;; returns #f for all elements, then returns #f. Returns unmodified
+;; `lst` if `s` does not change any elements (i.e., `eq?`uivalence
+;; holds).
+(define (list-rewrite-some s lst)
+  (define changed? #f)
+  (define some? #f)
+  (define res (map (lambda (x)
+                     (define y (s x))
+                     (if y
+                         (begin
+                           (unless (eq? x y)
+                             (set! changed? #t))
+                           (set! some? #t)
+                           y)
+                         x))
+                   lst))
+  (and some? (if changed? res lst)))
+
+;; Like `map`, but stops transforming elements in `lst` as soon as `s`
+;; has produced a true value for an element. Does not change elements
+;; for which `s` returns #f. If `s` returns #f for all elements, the
+;; overall result will also be #f. Returns unmodified `lst` if `s`
+;; does not change any elements.
+(define (list-rewrite-one s in-lst)
+  (let next ((res-lst '())
+             (lst in-lst))
+    (if (null? lst)
+        #f
+        (let* ((x (car lst))
+               (xs (cdr lst))
+               (res (s x)))
+          (if res
+              (if (eq? x res)
+                  in-lst
+                  (append (reverse res-lst) (cons res xs)))
+              (next (cons x res-lst) xs))))))
+
+(define (term-rewrite-some s strategic)
+  (define o-lst (term-fields strategic))
+  (define changed? #f)
+  (define some? #f)
+  (define n-lst 
+    (for/list ([fv o-lst])
+      (let ([nv (if (list? fv)
+                    (list-rewrite-some s fv)
+                    (s fv))])
+        (if nv
+            (begin
+              (unless (eq? fv nv)
+                (set! changed? #t))
+              (set! some? #t)
+              nv)
+            fv))))
+  (and some?
+       (if changed?
+           (set-term-fields strategic n-lst)
+           strategic)))
+
+(define (term-rewrite-one s strategic)
+  (define o-lst (term-fields strategic))
+  (define changed? #f)
+  (define one? #f)
+  (define n-lst 
+    (for/list ([fv o-lst])
+      (if one? 
+          fv
+          (let ()
+            (define nv (if (list? fv)
+                           (list-rewrite-one s fv)
+                           (s fv)))
+            (if nv
+                (begin
+                  (unless (eq? fv nv)
+                    (set! changed? #t))
+                  (set! one? #t)
+                  nv)
+                fv)))))
+  (and one?
+       (if changed?
+           (set-term-fields strategic n-lst)
+           strategic)))
+
+(module* private #f
+  (provide list-rewrite-some list-rewrite-one
+           term-rewrite-some term-rewrite-one))
+
 ;;; 
 ;;; Primitive traversal operators.
 ;;; 
@@ -65,8 +153,8 @@ Meta-Compilation of Language Abstractions (2006).
 
 (define* current-visit-all (make-parameter term-visit-all))
 (define* current-rewrite-all (make-parameter term-rewrite-all))
-(define* current-rewrite-some (make-parameter #f))
-(define* current-rewrite-one (make-parameter #f))
+(define* current-rewrite-some (make-parameter term-rewrite-some))
+(define* current-rewrite-one (make-parameter term-rewrite-one))
 
 ;;; 
 ;;; Strategy combinators.

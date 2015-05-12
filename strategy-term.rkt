@@ -15,50 +15,8 @@
 (define* (term-map f strategic)
   (set-term-fields strategic (map f (term-fields strategic))))
 
-(define* (term-rewrite-some s strategic)
-  (define o-lst (term-fields strategic))
-  (define changed? #f)
-  (define some? #f)
-  (define n-lst 
-    (for/list ([fv o-lst])
-      (let ([nv (if (list? fv)
-                    (list-rewrite-some s fv)
-                    (s fv))])
-        (if nv
-            (begin
-              (unless (eq? fv nv)
-                (set! changed? #t))
-              (set! some? #t)
-              nv)
-            fv))))
-  (and some?
-       (if changed?
-           (set-term-fields strategic n-lst)
-           strategic)))
-
-(define* (term-rewrite-one s strategic)
-  (define o-lst (term-fields strategic))
-  (define changed? #f)
-  (define one? #f)
-  (define n-lst 
-    (for/list ([fv o-lst])
-      (if one? 
-          fv
-          (let ()
-            (define nv (if (list? fv)
-                           (list-rewrite-one s fv)
-                           (s fv)))
-            (if nv
-                (begin
-                  (unless (eq? fv nv)
-                    (set! changed? #t))
-                  (set! one? #t)
-                  nv)
-                fv)))))
-  (and one?
-       (if changed?
-           (set-term-fields strategic n-lst)
-           strategic)))
+(require*-only-in [(submod "strategy.rkt" private)
+                   term-rewrite-some term-rewrite-one])
 
 ;;; 
 ;;; Stateful term access operators.
