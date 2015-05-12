@@ -14,91 +14,85 @@
 ;; operations may be useful in implementing gen:strategic operations
 ;; for user-defined types.
 
-;; Like `for-each`, except that does not accept multiple list
-;; arguments.
-(define* (list-visit-all s lst)
-  (for-each s lst))
-
-;; Like `map`, except that: does not accept multiple list arguments;
-;; and if `s` returns #f, then stops mapping and returns #f. Returns
-;; unmodified `in-lst` if `s` returns each element unmodified.
-(define* (list-rewrite-all s in-lst)
-  (define changed? #f)
-  (let next ((res-lst '())
-             (lst in-lst))
-    (if (null? lst)
-        (if changed?
-            (reverse res-lst)
-            in-lst)
-        (let* ((x (car lst))
-               (res (s x)))
-          (and res
-               (let ()
-                 (unless (eq? x res)
-                   (set! changed? #t))
-                 (next (cons res res-lst) (cdr lst))))))))
-
 (require*-only-in [(submod "strategy.rkt" private)
+                   list-visit-all list-rewrite-all
                    list-rewrite-some list-rewrite-one])
 
-;;; 
-;;; Primitive traversal operators for lists.
-;;; 
+(define* strategic-list-accessors
+  (make-strategic-data-accessors
+   (lambda (obj) obj) (lambda (obj lst) lst)
+   #:visit-all list-visit-all
+   #:rewrite-all list-rewrite-all
+   #:rewrite-some list-rewrite-some
+   #:rewrite-one list-rewrite-one))
 
-(define-syntax-rule
-  (define-strategy-combinator* n f)
-  (define* (n s)
-    (lambda (ast)
-      (f s ast))))
-
-;; These subterm traversals may be invoked for immediate "local"
-;; traversals within terms containing list data. We could later
-;; provide operations for vectors, boxes, and immutable hash tables,
-;; for instance.
+;;; 
+;;; Primitive strategies.
+;;; 
 
 (module+ test
   (require rackunit))
 
-(define-strategy-combinator* one/list list-rewrite-one)
-
-(module+ test
-  (check-equal?
-   (list
-    ((one/list number?) '())
-    ((one/list number?) '(x y z))
-    ((one/list number?) '(x 2 y 4)))
-   '(#f #f (x #t y 4))))
-
-(define-strategy-combinator* some/list list-rewrite-some)
-
-(module+ test
-  (check-equal?
-   (list
-    ((some/list number?) '())
-    ((some/list number?) '(x y z))
-    ((some/list number?) '(x 2 y 4)))
-   '(#f #f (x #t y #t))))
-
-;; This is an `all` for lists, where elements are "subterms".
-(define-strategy-combinator* all/list list-rewrite-all)
-
-(module+ test
-  (check-equal?
-   (list
-    ((all/list number?) '())
-    ((all/list number?) '(1 2 3))
-    ((all/list number?) '(x 2 y 4)))
-   '(() (#t #t #t) #f)))
-
-(define-strategy-combinator* all-visit/list list-visit-all)
+(define-strategy-combinator* list-all-visitor list-visit-all)
 
 (module+ test
   (check-equal?
    '(#f #f #t)
    (let ()
      (define lst null)
-     ((all-visit/list
+     ((list-all-visitor
        (lambda (x)
          (set! lst (cons x lst))))
       '(#t #f #f))
      lst)))
+
+;; This is an `all` for lists, where elements are "subterms".
+(define-strategy-combinator* list-all-rewriter list-rewrite-all)
+
+(module+ test
+  (check-equal?
+   (list
+    ((list-all-rewriter number?) '())
+    ((list-all-rewriter number?) '(1 2 3))
+    ((list-all-rewriter number?) '(x 2 y 4)))
+   '(() (#t #t #t) #f)))
+
+(define-strategy-combinator* list-some-rewriter list-rewrite-some)
+
+(module+ test
+  (check-equal?
+   (list
+    ((list-some-rewriter number?) '())
+    ((list-some-rewriter number?) '(x y z))
+    ((list-some-rewriter number?) '(x 2 y 4)))
+   '(#f #f (x #t y #t))))
+
+(define-strategy-combinator* list-one-rewriter list-rewrite-one)
+
+(module+ test
+  (check-equal?
+   (list
+    ((list-one-rewriter number?) '())
+    ((list-one-rewriter number?) '(x y z))
+    ((list-one-rewriter number?) '(x 2 y 4)))
+   '(#f #f (x #t y 4))))
+
+;;; 
+;;; Strategy combinators.
+;;; 
+
+(module+ test
+  (let ()
+    (define rw
+      (with-strategic-data-accessors
+        strategic-list-accessors
+        (topdown
+         (lambda (v)
+           (cond
+             [(number? v) (add1 v)]
+             [else v])))))
+    (define (test lst expect)
+      (check-equal? (rw lst) expect))
+    (for ([lst-expect (list
+                       (list '() '()))])
+      (apply test lst-expect))))

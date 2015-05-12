@@ -47,14 +47,32 @@ Meta-Compilation of Language Abstractions (2006).
 (require "util.rkt" racket/generic)
 
 ;;; 
-;;; Subterm access operations.
+;;; List element access operations.
 ;;; 
 
-(define-generics* strategic
-  (term-visit-all s strategic)
-  (term-rewrite-all s strategic)
-  (term-fields strategic)
-  (set-term-fields strategic lst))
+;; Like `for-each`, except that does not accept multiple list
+;; arguments.
+(define (list-visit-all s lst)
+  (for-each s lst))
+
+;; Like `map`, except that: does not accept multiple list arguments;
+;; and if `s` returns #f, then stops mapping and returns #f. Returns
+;; unmodified `in-lst` if `s` returns each element unmodified.
+(define (list-rewrite-all s in-lst)
+  (define changed? #f)
+  (let next ((res-lst '())
+             (lst in-lst))
+    (if (null? lst)
+        (if changed?
+            (reverse res-lst)
+            in-lst)
+        (let* ((x (car lst))
+               (res (s x)))
+          (and res
+               (let ()
+                 (unless (eq? x res)
+                   (set! changed? #t))
+                 (next (cons res res-lst) (cdr lst))))))))
 
 ;; Like `map`, except that: does not accept multiple list arguments;
 ;; does not change elements for which `s` returns #f; and if `s`
@@ -94,6 +112,16 @@ Meta-Compilation of Language Abstractions (2006).
                   in-lst
                   (append (reverse res-lst) (cons res xs)))
               (next (cons x res-lst) xs))))))
+
+;;; 
+;;; Subterm access operations.
+;;; 
+
+(define-generics* strategic
+  (term-visit-all s strategic)
+  (term-rewrite-all s strategic)
+  (term-fields strategic)
+  (set-term-fields strategic lst))
 
 (define (term-rewrite-some s strategic)
   (define o-lst (term-fields strategic))
@@ -140,47 +168,87 @@ Meta-Compilation of Language Abstractions (2006).
            (set-term-fields strategic n-lst)
            strategic)))
 
-(module* private #f
-  (provide list-rewrite-some list-rewrite-one
-           term-rewrite-some term-rewrite-one))
-
 ;;; 
-;;; Primitive traversal operators.
+;;; Primitive strategies.
 ;;; 
 
 (define* (fail-rw x) #f)
 (define* (id-rw x) x)
 
-(define* current-visit-all (make-parameter term-visit-all))
-(define* current-rewrite-all (make-parameter term-rewrite-all))
-(define* current-rewrite-some (make-parameter term-rewrite-some))
-(define* current-rewrite-one (make-parameter term-rewrite-one))
+(module* private #f
+  (provide list-visit-all list-rewrite-all
+           list-rewrite-some list-rewrite-one
+           term-rewrite-some term-rewrite-one))
 
-(define-syntax-rule
+(define ((make-strategic-default-visit-all get) s obj)
+  (list-visit-all s (get obj)))
+
+(define ((make-strategic-default-rewrite list-rw get set) s obj)
+  (define o-lst (get obj))
+  (define n-lst (list-rw s o-lst))
+  (and n-lst (if (eq? o-lst n-lst) obj (set obj n-lst))))
+
+(define* (make-strategic-data-accessors
+          get set
+          #:visit-all [vall #f]
+          #:rewrite-all [rall #f]
+          #:rewrite-some [rsome #f]
+          #:rewrite-one [rone #f])
+  (hasheq 'fields get
+          'set-fields set
+          'visit-all (or vall (make-strategic-default-visit-all get))
+          'rewrite-all (or rall (make-strategic-default-rewrite
+                                 list-rewrite-all get set))
+          'rewrite-some (or rsome (make-strategic-default-rewrite
+                                   list-rewrite-some get set))
+          'rewrite-one (or rone (make-strategic-default-rewrite
+                                 list-rewrite-one get set))))
+
+(define* strategic-term-accessors
+  (make-strategic-data-accessors
+   term-fields set-term-fields
+   #:visit-all term-visit-all
+   #:rewrite-all term-rewrite-all
+   #:rewrite-some term-rewrite-some
+   #:rewrite-one term-rewrite-one))
+
+(define* current-strategic-data-accessors
+  (make-parameter strategic-term-accessors))
+
+(define-syntax-rule* (with-strategic-data-accessors acc e ...)
+  (parameterize ([current-strategic-data-accessors acc])
+    e ...))
+
+(define* (get-current-strategic-data-accessor name)
+  (define h (current-strategic-data-accessors))
+  (unless h
+    (error 'get-current-strategic-data-accessor
+           "no accessors configured"))
+  (hash-ref h name))
+
+(define-syntax-rule*
   (define-strategy-combinator* n f-expr)
   (define* (n s)
     (let ([f f-expr])
       (lambda (ast)
         (f s ast)))))
 
-(define-strategy-combinator* all-visitor (current-visit-all))
-(define-strategy-combinator* all-rewriter (current-rewrite-all))
-(define-strategy-combinator* some-rewriter (current-rewrite-some))
-(define-strategy-combinator* one-rewriter (current-rewrite-one))
-
-;; DEPRECATED
-(provide (rename-out [all-visitor all-visit]
-                     [all-rewriter all]
-                     [some-rewriter some]
-                     [one-rewriter one]))
+(define-strategy-combinator* all-visitor
+  (get-current-strategic-data-accessor 'visit-all))
+(define-strategy-combinator* all-rewriter
+  (get-current-strategic-data-accessor 'rewrite-all))
+(define-strategy-combinator* some-rewriter
+  (get-current-strategic-data-accessor 'rewrite-some))
+(define-strategy-combinator* one-rewriter
+  (get-current-strategic-data-accessor 'rewrite-one))
 
 ;;; 
 ;;; Strategy combinators.
 ;;; 
 
-;; Note quite the Stratego 'rec', but close, and handles the common
-;; case. 'impl' is (-> ast (or/c ast #f)), and has both 's' and itself
-;; (as 'again') in scope.
+;; Note quite the Stratego `rec`, but close, and handles the common
+;; case. `impl` is (-> ast (or/c ast #f)), and has both `s` and itself
+;; (as `again`) in scope.
 (define-syntax-rule* (rec again s impl)
   (lambda (s)
     (letrec ([again impl])
@@ -202,7 +270,7 @@ Meta-Compilation of Language Abstractions (2006).
      (lambda (ast)
        (or (s ast) ...)))))
 
-;; Combines visit actions in a way that 'compose' would not.
+;; Combines visit actions in a way that `compose` would not.
 (define-syntax-rule* (seq-visit s ...)
   (lambda (ast)
     (s ast) ...

@@ -54,9 +54,24 @@
   (let ((x 0))
     (define (s ast) (set! x (add1 x)))
     (define (br ast) (break))
-    ((all-visit s) lst)
+    ((all-visitor s) lst)
     (check-eqv? x 3)
-    ((seq-visit-break (all-visit s) (all-visit s)) lst)
+    ((seq-visit-break (all-visitor s) (all-visitor s)) lst)
     (check-eqv? x 9)
-    ((seq-visit-break (all-visit s) br (all-visit s)) lst)
+    ((seq-visit-break (all-visitor s) br (all-visitor s)) lst)
     (check-eqv? x 12)))
+
+;;; 
+;;; Strategies.
+;;; 
+
+(define-strategy-combinator* term-all-visitor term-visit-all)
+(define-strategy-combinator* term-all-rewriter term-rewrite-all)
+(define-strategy-combinator* term-some-rewriter term-rewrite-some)
+(define-strategy-combinator* term-one-rewriter term-rewrite-one)
+
+;; DEPRECATED
+(provide (rename-out [term-all-visitor all-visit]
+                     [term-all-rewriter all]
+                     [term-some-rewriter some]
+                     [term-one-rewriter one]))
