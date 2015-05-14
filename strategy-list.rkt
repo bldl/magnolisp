@@ -14,10 +14,6 @@
 ;; operations may be useful in implementing gen:strategic operations
 ;; for user-defined types.
 
-(require*-only-in [(submod "strategy.rkt" private)
-                   list-visit-all list-rewrite-all
-                   list-rewrite-some list-rewrite-one])
-
 (define* strategic-list-accessors
   (make-strategic-data-accessors
    (lambda (obj) obj) (lambda (obj lst) lst)
@@ -33,7 +29,7 @@
 (module+ test
   (require rackunit))
 
-(define-strategy-combinator* list-all-visitor list-visit-all)
+(define-specific-data-strategy* list-all-visitor list-visit-all)
 
 (module+ test
   (check-equal?
@@ -47,7 +43,7 @@
      lst)))
 
 ;; This is an `all` for lists, where elements are "subterms".
-(define-strategy-combinator* list-all-rewriter list-rewrite-all)
+(define-specific-data-strategy* list-all-rewriter list-rewrite-all)
 
 (module+ test
   (check-equal?
@@ -57,7 +53,7 @@
     ((list-all-rewriter number?) '(x 2 y 4)))
    '(() (#t #t #t) #f)))
 
-(define-strategy-combinator* list-some-rewriter list-rewrite-some)
+(define-specific-data-strategy* list-some-rewriter list-rewrite-some)
 
 (module+ test
   (check-equal?
@@ -67,7 +63,7 @@
     ((list-some-rewriter number?) '(x 2 y 4)))
    '(#f #f (x #t y #t))))
 
-(define-strategy-combinator* list-one-rewriter list-rewrite-one)
+(define-specific-data-strategy* list-one-rewriter list-rewrite-one)
 
 (module+ test
   (check-equal?
@@ -77,6 +73,17 @@
     ((list-one-rewriter number?) '(x 2 y 4)))
    '(#f #f (x #t y 4))))
 
+(module+ test
+  (let ()
+    (define rw
+      (with-strategic-data-accessors
+        strategic-list-accessors
+        (all-rewriter
+         (lambda (v)
+           (add1 v)))))
+    (define lst '(1 2 3))
+    (check-equal? (map add1 lst) (rw lst))))
+
 ;;; 
 ;;; Strategy combinators.
 ;;; 
@@ -84,15 +91,20 @@
 (module+ test
   (let ()
     (define rw
-      (with-strategic-data-accessors
-        strategic-list-accessors
-        (topdown
-         (lambda (v)
-           (cond
-             [(number? v) (add1 v)]
-             [else v])))))
+      (topdown-rewriter
+       (lambda (v)
+         (cond
+           [(number? v) (add1 v)]
+           [else v]))
+       #:rewrite-all (lambda (f ast)
+                       (if (list? ast)
+                           (list-rewrite-all f ast)
+                           ast))))
+
     (define (test lst expect)
       (check-equal? (rw lst) expect))
+    
     (for ([lst-expect (list
-                       (list '() '()))])
+                       '(() ())
+                       '((1) (2)))])
       (apply test lst-expect))))

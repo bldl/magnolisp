@@ -2,49 +2,15 @@
 
 #|
 
-This is a basic Stratego-inspired term rewriting library for
-Racket. http://strategoxt.org/
-
-The primitive traversal operators (one, some, all) and strategy
-combinators (e.g., topdown, bottomup) together implement the notion of
-generic traversal strategies.
-
-Everything here apart from failure values and `one`, `some`, and `all`
-operators are generic, and some of those are also implemented in terms
-of interfaces.
-
-We have some additions here, such as `must` to function as a sort of
-an assertion. If a `must` succeed strategy fails it is an error, and
-not merely a reason to backtrack.
-
-We have `visit` variants of applicable strategies. A visit does not
-rewrite, and is hence more efficient, as terms do not need to be
-reconstructed. No return values are checked during a visit, as a visit
-is only done for its side effects. This also means that a lot of the
-rewriting combinators simply do not make sense. Consider `try` or
-`alt`, for example. Calling `rec` is semantically valid as `rec` is
-not specific to rewriting.
-
-Using topdown-visit is not suitable when wanting to prune subtrees,
-but we have no topdown-visit-prune. (Note that pruning makes no sense
-for bottom-up traversals.) We can simply instead choose the subtrees
-we do want to visit, for now, by using lower-level operations.
-Breaking is easy for visits (but not for rewrites), as one can just
-record an escape continuation for the visit. If required, it can be
-recorded in a dynamically scoped variable.
-
-Mutable, closed over variables may be used to hold dynamic rules in
-the sense of Stratego. Something like the dynamic rule scope construct
-in turn can be achieved through the use of parameters. See Bravenboer
-et al: Program Transformation with Scoped Dynamic Rewrite Rules (2005).
-
-For related discussion on Scheme-based implementation of generic
-traversal strategies, see Chapter 5 of Pankaj Surana's dissertation
-Meta-Compilation of Language Abstractions (2006).
+This is a basic Stratego-inspired term rewriting library for Racket.
+This module defines generic and commonly used functionality. The
+auxiliary modules "strategy-*.rkt" define additional
+data-type-specific operations.
 
 |#
 
-(require "util.rkt" racket/generic)
+(require "util.rkt" racket/generic
+         (for-syntax racket/base syntax/parse))
 
 ;;; 
 ;;; List element access operations.
@@ -52,13 +18,13 @@ Meta-Compilation of Language Abstractions (2006).
 
 ;; Like `for-each`, except that does not accept multiple list
 ;; arguments.
-(define (list-visit-all s lst)
+(define* (list-visit-all s lst)
   (for-each s lst))
 
 ;; Like `map`, except that: does not accept multiple list arguments;
 ;; and if `s` returns #f, then stops mapping and returns #f. Returns
 ;; unmodified `in-lst` if `s` returns each element unmodified.
-(define (list-rewrite-all s in-lst)
+(define* (list-rewrite-all s in-lst)
   (define changed? #f)
   (let next ((res-lst '())
              (lst in-lst))
@@ -79,7 +45,7 @@ Meta-Compilation of Language Abstractions (2006).
 ;; returns #f for all elements, then returns #f. Returns unmodified
 ;; `lst` if `s` does not change any elements (i.e., `eq?`uivalence
 ;; holds).
-(define (list-rewrite-some s lst)
+(define* (list-rewrite-some s lst)
   (define changed? #f)
   (define some? #f)
   (define res (map (lambda (x)
@@ -99,7 +65,7 @@ Meta-Compilation of Language Abstractions (2006).
 ;; for which `s` returns #f. If `s` returns #f for all elements, the
 ;; overall result will also be #f. Returns unmodified `lst` if `s`
 ;; does not change any elements.
-(define (list-rewrite-one s in-lst)
+(define* (list-rewrite-one s in-lst)
   (let next ((res-lst '())
              (lst in-lst))
     (if (null? lst)
@@ -123,7 +89,7 @@ Meta-Compilation of Language Abstractions (2006).
   (term-fields strategic)
   (set-term-fields strategic lst))
 
-(define (term-rewrite-some s strategic)
+(define* (term-rewrite-some s strategic)
   (define o-lst (term-fields strategic))
   (define changed? #f)
   (define some? #f)
@@ -144,7 +110,7 @@ Meta-Compilation of Language Abstractions (2006).
            (set-term-fields strategic n-lst)
            strategic)))
 
-(define (term-rewrite-one s strategic)
+(define* (term-rewrite-one s strategic)
   (define o-lst (term-fields strategic))
   (define changed? #f)
   (define one? #f)
@@ -169,21 +135,13 @@ Meta-Compilation of Language Abstractions (2006).
            strategic)))
 
 ;;; 
-;;; Primitive strategies.
+;;; Default sub-object access operations.
 ;;; 
 
-(define* (fail-rw x) #f)
-(define* (id-rw x) x)
-
-(module* private #f
-  (provide list-visit-all list-rewrite-all
-           list-rewrite-some list-rewrite-one
-           term-rewrite-some term-rewrite-one))
-
-(define ((make-strategic-default-visit-all get) s obj)
+(define ((make-derived-visit-all get) s obj)
   (list-visit-all s (get obj)))
 
-(define ((make-strategic-default-rewrite list-rw get set) s obj)
+(define ((make-derived-rewrite list-rw get set) s obj)
   (define o-lst (get obj))
   (define n-lst (list-rw s o-lst))
   (and n-lst (if (eq? o-lst n-lst) obj (set obj n-lst))))
@@ -196,12 +154,12 @@ Meta-Compilation of Language Abstractions (2006).
           #:rewrite-one [rone #f])
   (hasheq 'fields get
           'set-fields set
-          'visit-all (or vall (make-strategic-default-visit-all get))
-          'rewrite-all (or rall (make-strategic-default-rewrite
+          'visit-all (or vall (make-derived-visit-all get))
+          'rewrite-all (or rall (make-derived-rewrite
                                  list-rewrite-all get set))
-          'rewrite-some (or rsome (make-strategic-default-rewrite
+          'rewrite-some (or rsome (make-derived-rewrite
                                    list-rewrite-some get set))
-          'rewrite-one (or rone (make-strategic-default-rewrite
+          'rewrite-one (or rone (make-derived-rewrite
                                  list-rewrite-one get set))))
 
 (define* strategic-term-accessors
@@ -219,143 +177,107 @@ Meta-Compilation of Language Abstractions (2006).
   (parameterize ([current-strategic-data-accessors acc])
     e ...))
 
-(define* (get-current-strategic-data-accessor name)
-  (define h (current-strategic-data-accessors))
-  (unless h
-    (error 'get-current-strategic-data-accessor
-           "no accessors configured"))
-  (hash-ref h name))
+(define (default-accessor name)
+  (hash-ref (current-strategic-data-accessors) name))
 
+;;; 
+;;; Strategy definition forms.
+;;; 
+
+;; For defining strategies with overridable accessors (given as
+;; keyword arguments).
+(define-syntax (define-strategy*/accessor stx)
+  (syntax-parse stx
+    [(_ (n:id s:id kw:id ...) b:expr ...)
+     (with-syntax ([(kw-spec ...)
+                    (apply
+                     append
+                     (for/list ([id (syntax->list #'(kw ...))])
+                       (list (string->keyword (symbol->string (syntax-e id)))
+                             #`[#,id (default-accessor '#,id)])))])
+       #'(define* (n s kw-spec ...)
+           b ...))]))
+
+;; For defining generic strategies that apply `s` on the
+;; sub-components of the object, using the object accessor `f`, which
+;; may be supplied as a keyword argument (otherwise the default is
+;; used).
+(define-syntax-rule (define-abstract-data-strategy* n f)
+  (define-strategy*/accessor (n s f)
+    (lambda (ast)
+      (f s ast))))
+
+;; For defining data type specific strategies, using an accessor as
+;; given by `f-expr`.
 (define-syntax-rule*
-  (define-strategy-combinator* n f-expr)
+  (define-specific-data-strategy* n f-expr)
   (define* (n s)
     (let ([f f-expr])
       (lambda (ast)
         (f s ast)))))
 
-(define-strategy-combinator* all-visitor
-  (get-current-strategic-data-accessor 'visit-all))
-(define-strategy-combinator* all-rewriter
-  (get-current-strategic-data-accessor 'rewrite-all))
-(define-strategy-combinator* some-rewriter
-  (get-current-strategic-data-accessor 'rewrite-some))
-(define-strategy-combinator* one-rewriter
-  (get-current-strategic-data-accessor 'rewrite-one))
-
 ;;; 
-;;; Strategy combinators.
+;;; Strategies.
 ;;; 
 
-;; Note quite the Stratego `rec`, but close, and handles the common
-;; case. `impl` is (-> ast (or/c ast #f)), and has both `s` and itself
-;; (as `again`) in scope.
-(define-syntax-rule* (rec again s impl)
-  (lambda (s)
-    (letrec ([again impl])
-      again)))
+(define* (fail-rw x) #f)
+(define* (id-rw x) x)
 
-;; Note that (and e ...) defines left-to-right evaluation order, and
-;; also that (and) == #t.
-(define-syntax-rule* (seq s ...)
-  (lambda (ast)
-    (and (begin (set! ast (s ast))
-                ast) ...
-         ast)))
+(define-abstract-data-strategy* all-visitor visit-all)
+(define-abstract-data-strategy* all-rewriter rewrite-all)
+(define-abstract-data-strategy* some-rewriter rewrite-some)
+(define-abstract-data-strategy* one-rewriter rewrite-one)
 
-;; Note that (or e ...) defines left-to-right evaluation order, and
-;; also that (or) == #f.
-(define-syntax* alt
+(define-syntax-rule* (rec-lambda loop (arg ...) e ...)
+  (lambda (arg ...)
+    (let loop ([arg arg] ...)
+      e ...)))
+
+(define* (repeat-rewriter s)
+  (rec-lambda loop (ast)
+    (define r (s ast))
+    (if r (loop r) ast)))
+
+(define-syntax* and-rewrite
   (syntax-rules ()
-    ((_ s ...)
-     (lambda (ast)
-       (or (s ast) ...)))))
+    [(_ ast) ast]
+    [(_ ast s . rest)
+     (let ([ast (s ast)])
+       (and ast (and-rewrite ast . rest)))]))
 
-;; Combines visit actions in a way that `compose` would not.
-(define-syntax-rule* (seq-visit s ...)
-  (lambda (ast)
-    (s ast) ...
+(define-syntax-rule* (or-rewrite ast s ...)
+  (or (s ast) ...))
+
+(define-strategy*/accessor (topdown-visitor s visit-all)
+  (rec-lambda loop (ast)
+    (s ast)
+    (visit-all loop ast)
     (void)))
 
-(struct Break () #:transparent)
-(struct BreakWith (v) #:transparent)
-
-(define-syntax* break
-  (syntax-rules ()
-    ((_ v)
-     (BreakWith v))
-    ((_)
-     (Break))))
-
-;; A sequence that may be interrupted without failing by invoking `break`.
-(define-syntax-rule* (seq-break s ...)
-  (lambda (ast)
-    (let/ec k 
-      (and (begin (set! ast (s ast))
-                  (when (BreakWith? ast)
-                    (k (BreakWith-v ast)))
-                  ast) ...
-           ast))))
-
-(define-syntax-rule* (seq-visit-break s ...)
-  (lambda (ast)
-    (and (not (Break? (s ast))) ...)
+(define-strategy*/accessor (bottomup-visitor s visit-all)
+  (rec-lambda loop (ast)
+    (visit-all loop ast)
+    (s ast)
     (void)))
 
-(define* (try s)
-  (alt s id-rw))
+(define-strategy*/accessor (topdown-rewriter s rewrite-all)
+  (rec-lambda loop (ast)
+    (define r (s ast))
+    (and r (rewrite-all loop r))))
 
-(define* repeat
-  (rec again s
-       (try (seq s again))))
+(define-strategy*/accessor (bottomup-rewriter s rewrite-all)
+  (rec-lambda loop (ast)
+    (define r (rewrite-all loop ast))
+    (and r (s r))))
 
-;; Tries a rewrite but restores original term on success.
-(define* (where s)
-  (lambda (ast)
-    (and (s ast) ast)))
+(define-strategy*/accessor (downup-rewriter s rewrite-all)
+  (rec-lambda loop (ast)
+    (and-rewrite ast s (fix rewrite-all loop) s)))
 
-;; ((seq (where number?) (must (lambda (x) 2))) 1)   ;=> 2
-;; ((seq (where number?) (must (lambda (x) #f))) 1)  ;=> error
-(define-syntax* must
-  (syntax-rules ()
-    [(_ s)
-     (must s "strategy did not apply" (quote s))]
-    [(_ s msg v ...)
-     (lambda (ast)
-       (or (s ast)
-           (error msg v ...)))]))
+(define-strategy*/accessor (alltd-rewriter s rewrite-all)
+  (rec-lambda loop (ast)
+    (or-rewrite ast s (fix rewrite-all loop))))
 
-;;; 
-;;; Tree traversal strategy combinators. 
-;;; 
-
-(define* topdown
-  (rec again s
-       (seq s (all-rewriter again))))
-
-(define* topdown-visit
-  (rec again s
-       (seq-visit s (all-visitor again))))
-
-(define* topdown-break
-  (rec again s
-       (seq-break s (all-rewriter again))))
-
-(define* topdown-visit-break
-  (rec again s
-       (seq-visit-break s (all-visitor again))))
-
-(define* bottomup
-  (rec again s
-       (seq (all-rewriter again) s)))
-
-(define* bottomup-visit
-  (rec again s
-       (seq-visit (all-visitor again) s)))
-
-(define* outermost
-  (rec again s
-       (topdown (try (seq s again)))))
-
-(define* innermost
-  (rec again s
-       (bottomup (try (seq s again)))))
+(define-strategy*/accessor (oncetd-rewriter s rewrite-one)
+  (rec-lambda loop (ast)
+    (or-rewrite ast s (fix rewrite-one loop))))
