@@ -124,7 +124,7 @@ Module loading.
                     (error 'Mod-load
                            "no such module: ~s (~a)" mp r-mp)))
   
-  (define sub-mp (make-sub-mp r-mp 'magnolisp-cxx))
+  (define sub-mp (make-sub-mp r-mp 'magnolisp-s2s))
 
   (define has-submod?
     (may-fail (dynamic-require sub-mp #f) #t))

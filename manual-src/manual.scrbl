@@ -585,7 +585,7 @@ Note that some of the example programs are written in Magnolisp language variant
 A Git repository of the Magnolisp source code can be found at:
 @nested[#:style 'inset]{@url{https://github.com/bldl/magnolisp}}
 
-Racket version 6 is required to run the software. It may well be installable directly off GitHub with the command:
+Racket version 6 is required to run the software, which may well be installable directly off GitHub with the command:
 
 @commandline{raco pkg install git://github.com/bldl/magnolisp}
 
