@@ -294,6 +294,10 @@ For example:
 @defform[(app/local-ec k expr)]{
 An expression that causes a jump to a surrounding continuation labeled by @racket[k], with the continuation yielding the value given by expression @racket[expr]. It is possible to jump beyond other, intermediate @racket[let/local-ec] (or @racket[begin-return]) blocks, but jumping outside the surrounding function body is not possible.}
 
+@defform[(do expr ...+)]{
+@deprecated[#:what "form" @racket[begin-return]]{}
+An alias for @racket[begin-return].}
+
 @defform[(if-target name then-expr else-expr)]{
 A compile-time conditional expression that depends on the intended execution target. Currently the only meaningful target language @racket[name] is @racketidfont{cxx}, which stands for C++. When code is being compiled for a target matching @racket[name], only @racket[then-expr] will be included in generated executable code; otherwise it is @racket[else-expr] that will be subject to evaluation in the target environment.
 
