@@ -220,9 +220,6 @@ data-type-specific operations.
 ;;; Strategies.
 ;;; 
 
-(define* (fail-rw x) #f)
-(define* (id-rw x) x)
-
 (define-abstract-data-strategy* all-visitor visit-all)
 (define-abstract-data-strategy* all-rewriter rewrite-all)
 (define-abstract-data-strategy* some-rewriter rewrite-some)
@@ -233,12 +230,29 @@ data-type-specific operations.
     (let loop ([arg arg] ...)
       e ...)))
 
-(define* (repeat-rewriter s)
-  (rec-lambda loop (ast)
+;; Tries a rewrite, restoring original term on failure.
+(define* (try-rewriter s)
+  (lambda (ast)
+    (define r (s ast))
+    (or r ast)))
+
+;; Tries a rewrite, but restores original term on success.
+(define* (where-rewriter s)
+  (lambda (ast)
+    (and (s ast) ast)))
+
+;; Applies a rewrite rule `s` on `ast` for as long as it succeeds.
+(define* (rewrite-repeat s ast)
+  (let loop ([ast ast])
     (define r (s ast))
     (if r (loop r) ast)))
 
+(define* ((repeat-rewriter s) ast)
+  (rewrite-repeat s ast))
+
 (define-syntax* and-rewrite
+  ;; Note that (and e ...) defines left-to-right evaluation order, and
+  ;; also that (and) == #t.
   (syntax-rules ()
     [(_ ast) ast]
     [(_ ast s . rest)
@@ -246,6 +260,8 @@ data-type-specific operations.
        (and ast (and-rewrite ast . rest)))]))
 
 (define-syntax-rule* (or-rewrite ast s ...)
+  ;; Note that (or e ...) defines left-to-right evaluation order, and
+  ;; also that (or) == #f.
   (or (s ast) ...))
 
 (define-strategy*/accessor (topdown-visitor s visit-all)
@@ -281,3 +297,36 @@ data-type-specific operations.
 (define-strategy*/accessor (oncetd-rewriter s rewrite-one)
   (rec-lambda loop (ast)
     (or-rewrite ast s (fix rewrite-one loop))))
+
+;; Traverses top-down, applying `s` on each node for as many time as
+;; it succeeds, keeping the latest successful rewrite result.
+(define-strategy*/accessor (outermost-rewriter s rewrite-all)
+  (rec-lambda loop (ast)
+    (let ((ast (rewrite-repeat s ast)))
+      (rewrite-all loop ast))))
+    
+(define-strategy*/accessor (innermost-rewriter s rewrite-all)
+  (rec-lambda loop (ast)
+    (let ((ast (rewrite-all loop ast)))
+      (rewrite-repeat s ast))))
+
+;; DEPRECATED
+(define* (fail-rw x) #f)
+(define* (id-rw x) x)
+
+;; DEPRECATED
+(provide (rename-out
+          [repeat-rewriter repeat]
+          [try-rewriter try]
+          [where-rewriter where]
+          [all-visitor all-visit]
+          [all-rewriter all]
+          [some-rewriter some]
+          [one-rewriter one]
+          [topdown-visitor topdown-visit]
+          [bottomup-visitor bottomup-visit]
+          [topdown-rewriter topdown]
+          [bottomup-rewriter bottomup]
+          [outermost-rewriter outermost]
+          [innermost-rewriter innermost]
+          ))

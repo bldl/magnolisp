@@ -67,45 +67,9 @@
 (define-specific-data-strategy* term-some-rewriter term-rewrite-some)
 (define-specific-data-strategy* term-one-rewriter term-rewrite-one)
 
-;; DEPRECATED
-(provide (rename-out [term-all-visitor all-visit]
-                     [term-all-rewriter all]
-                     [term-some-rewriter some]
-                     [term-one-rewriter one]))
-
 ;;; 
-;;; Strategy combinators.
+;;; Breakable strategies.
 ;;; 
-
-;; Note quite the Stratego `rec`, but close, and handles the common
-;; case. `impl` is (-> ast (or/c ast #f)), and has both `s` and itself
-;; (as `again`) in scope.
-(define-syntax-rule* (rec again s impl)
-  (lambda (s)
-    (letrec ([again impl])
-      again)))
-
-;; Note that (and e ...) defines left-to-right evaluation order, and
-;; also that (and) == #t.
-(define-syntax-rule* (seq s ...)
-  (lambda (ast)
-    (and (begin (set! ast (s ast))
-                ast) ...
-         ast)))
-
-;; Note that (or e ...) defines left-to-right evaluation order, and
-;; also that (or) == #f.
-(define-syntax* alt
-  (syntax-rules ()
-    ((_ s ...)
-     (lambda (ast)
-       (or (s ast) ...)))))
-
-;; Combines visit actions in a way that `compose` would not.
-(define-syntax-rule* (seq-visit s ...)
-  (lambda (ast)
-    (s ast) ...
-    (void)))
 
 (struct Break () #:transparent)
 (struct BreakWith (v) #:transparent)
@@ -132,61 +96,18 @@
     (and (not (Break? (s ast))) ...)
     (void)))
 
-(define* (try s)
-  (alt s id-rw))
-
-(define* repeat
-  (rec again s
-       (try (seq s again))))
-
-;; Tries a rewrite but restores original term on success.
-(define* (where s)
-  (lambda (ast)
-    (and (s ast) ast)))
-
-;; ((seq (where number?) (must (lambda (x) 2))) 1)   ;=> 2
-;; ((seq (where number?) (must (lambda (x) #f))) 1)  ;=> error
-(define-syntax* must
-  (syntax-rules ()
-    [(_ s)
-     (must s "strategy did not apply" (quote s))]
-    [(_ s msg v ...)
-     (lambda (ast)
-       (or (s ast)
-           (error msg v ...)))]))
-
-;;; 
-;;; Tree traversal strategy combinators. 
-;;; 
-
-(define* topdown
-  (rec again s
-       (seq s (all-rewriter again))))
-
-(define* topdown-visit
-  (rec again s
-       (seq-visit s (all-visitor again))))
+;; Not quite the Stratego `rec`, but close, and handles the common
+;; case. `impl` is (-> ast (or/c ast #f)), and has both `s` and itself
+;; (as `again`) in scope.
+(define-syntax-rule (rec again s impl)
+  (lambda (s)
+    (letrec ([again impl])
+      again)))
 
 (define* topdown-break
   (rec again s
-       (seq-break s (all-rewriter again))))
+       (seq-break s (all again))))
 
 (define* topdown-visit-break
   (rec again s
-       (seq-visit-break s (all-visitor again))))
-
-(define* bottomup
-  (rec again s
-       (seq (all-rewriter again) s)))
-
-(define* bottomup-visit
-  (rec again s
-       (seq-visit (all-visitor again) s)))
-
-(define* outermost
-  (rec again s
-       (topdown (try (seq s again)))))
-
-(define* innermost
-  (rec again s
-       (bottomup (try (seq s again)))))
+       (seq-visit-break s (all again))))
