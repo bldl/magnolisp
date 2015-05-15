@@ -205,12 +205,6 @@ Assumptions for AST node types:
 ;;; gen:syntactifiable
 ;;; 
 
-(define-for-syntax (make-syntactifiable/singleton singleton-id)
-  (list
-   (with-syntax ((the-name singleton-id))
-     #'(define (syntactifiable-mkstx x)
-         #'the-name))))
-
 (define-for-syntax (make-syntactifiable conc-id fld-id-lst)
   (define obj-id (generate-temporary 'obj))
   (define super-id (generate-temporary 'mkstx))
@@ -261,8 +255,6 @@ Assumptions for AST node types:
 ;;; equal? implementation
 ;;; 
 
-;; For singletons, these are unnecessary, as mere eq? comparison will
-;; do, and the default implementation provides that.
 (define-for-syntax (make-equal+hash n-stx fld-id-lst)
   (define getter-lst
     (for/list ([fld fld-id-lst]
@@ -319,48 +311,39 @@ Assumptions for AST node types:
      (define fld-id-lst (syntax->list #'(fld ...)))
      (define struct-def
        (quasisyntax
-        (#,(if provide?
-               (if singleton? #'singleton-struct* #'concrete-struct*)
-               (if singleton? #'singleton-struct #'struct))
+        (#,(if provide? #'concrete-struct* #'struct)
          name
-         #,@(if singleton?
-                (with-syntax ((the-name singleton-id))
-                  (list #'(the-name arg ...)))
-                null)
          (fld ...)
          #:methods gen:custom-write
          [(define write-proc #,(if (attribute writer)
                                    #'writer
                                    (make-ast-write conc-id fld-id-lst)))]
-         #,@(if singleton?
-                null
-                (list 
-                 #'#:methods #'gen:equal+hash
-                 (with-syntax ([(m ...) 
-                                (make-equal+hash conc-id fld-id-lst)])
-                   #'[m ...])))
+         #,@(list 
+             #'#:methods #'gen:equal+hash
+             (with-syntax ([(m ...) 
+                            (make-equal+hash conc-id fld-id-lst)])
+               #'[m ...]))
          #:methods gen:syntactifiable
-         (#,@(if singleton?
-                 (make-syntactifiable/singleton singleton-id)
-                 (make-syntactifiable conc-id fld-id-lst)))
+         (#,@(make-syntactifiable conc-id fld-id-lst))
          #:methods gen:strategic (#,@(make-strategic
                                       conc-id
                                       (syntax->list #'((t fld) ...))))
          #,@(apply append
                    (for/list ([view-spec (attribute view.spec)])
-                     (generate-view-methods conc-id
-                                            view-spec
-                                            singleton?)))
+                     (generate-view-methods conc-id view-spec)))
          #:transparent
          #,@(if (attribute opt)
                 (syntax->list #'(opt ...))
                 null))))
      ;;(pretty-print (syntax->datum struct-def))
-     (if singleton?
-         struct-def
-         #`(begin
-             #,struct-def
-             #,@(make-extra-accessors conc-id fld-id-lst provide?)))]))
+     #`(begin
+         #,struct-def
+         #,@(make-extra-accessors conc-id fld-id-lst provide?)
+         #,@(if singleton?
+                (with-syntax ((the-name singleton-id)
+                              (def (if provide? #'define* #'define)))
+                  (list #'(def the-name (name arg ...))))
+                null))]))
 
 (define-syntax* (define-ast stx)
   (make-define-ast stx #f))

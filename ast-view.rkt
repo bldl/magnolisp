@@ -201,7 +201,7 @@ E.g.,
 ;; resulting list of syntax objects is intended to be spliced into a
 ;; (struct ...) declaration. E.g., (generate-view-methods #'C (list
 ;; #'V '() #f)) -> (list #'#:methods #'gen:V (...)).
-(define-for-syntax* (generate-view-methods conc-id view-spec [singleton? #f])
+(define-for-syntax* (generate-view-methods conc-id view-spec)
   (define view-id (car view-spec))
   (define fld-override-lst (cadr view-spec))
   (define copy-lambda-stx (caddr view-spec))
@@ -261,14 +261,9 @@ E.g.,
             ([v-setter-id setter-id]
              [v-setter-expr
               (or set-stx
-                  (with-syntax
-                      ([fld fld-id])
-                    (if singleton?
-                        #'(lambda (view fld)
-                            (error 'v-setter-id 
-                                   "cannot copy a singleton (~a)" 'conc))
-                        #'(lambda (view fld)
-                            (struct-copy conc view [fld fld])))))])
+                  (with-syntax ([fld fld-id])
+                    #'(lambda (view fld)
+                        (struct-copy conc view [fld fld]))))])
           #'(define v-setter-id v-setter-expr)))
       
       (list getter-impl setter-impl))
@@ -277,36 +272,27 @@ E.g.,
       (with-syntax ([v-copy (format-id view-id "~a-copy" view-name)])
         (cond
          [copy-lambda-stx
-          (when singleton?
-            (error 'generate-view-methods
-                   "copy function specified for view ~a of singleton ~a"
-                   view-name conc-name))
           (with-syntax ([copy-impl copy-lambda-stx])
             #'(define v-copy copy-impl))]
          [else
           (with-syntax ([(fld ...) fld-id-lst])
-            (cond
-             [singleton?
-              #'(define (v-copy view fld ...)
-                  (error 'v-copy "cannot copy a singleton (~a)" 'conc))]
-             [else
-              (define-values (set-info-lst copy-info-lst)
-                (partition (lambda (x) (caddr x)) fld-info-lst))
-              #`(define (v-copy view fld ...)
-                  #,@(if (null? copy-info-lst)
-                         null
-                         (with-syntax ([(c-fld ...) 
-                                        (map car copy-info-lst)])
-                           (list 
-                            #'(set! view
-                                    (struct-copy conc view 
-                                                 [c-fld c-fld] ...)))))
-                  #,@(for/list ([info set-info-lst])
-                       (define fld-id (car info))
-                       (with-syntax ([s-fld fld-id]
-                                     [set (mk-setter-id (syntax-e fld-id))])
-                         #'(set! view (set view s-fld))))
-                  view)]))])))
+            (define-values (set-info-lst copy-info-lst)
+              (partition (lambda (x) (caddr x)) fld-info-lst))
+            #`(define (v-copy view fld ...)
+                #,@(if (null? copy-info-lst)
+                       null
+                       (with-syntax ([(c-fld ...) 
+                                      (map car copy-info-lst)])
+                         (list 
+                          #'(set! view
+                                  (struct-copy conc view 
+                                               [c-fld c-fld] ...)))))
+                #,@(for/list ([info set-info-lst])
+                     (define fld-id (car info))
+                     (with-syntax ([s-fld fld-id]
+                                   [set (mk-setter-id (syntax-e fld-id))])
+                       #'(set! view (set view s-fld))))
+                view))])))
     
     (define method-impl-lst
       (cons

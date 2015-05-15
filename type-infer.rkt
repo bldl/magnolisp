@@ -125,8 +125,8 @@
   (topdown
    (lambda (t)
      (cond
-      ((AnyT? t) (fresh-VarT))
-      (else t)))))
+      [(AnyT? t) (fresh-VarT)]
+      [else t]))))
 
 (define (type-add-VarT t)
   (cond
@@ -176,9 +176,9 @@
             (map
              (lambda (p t)
                (match p
-                 ((Param a n o-t)
+                 [(Param a n o-t)
                   (assert (AnyT? o-t))
-                  (Param a n t))))
+                  (Param a n t)]))
              ps (FunT-ats n-t)))
           (Defun a id n-t n-ps b))
          ((DefVar a id t v)

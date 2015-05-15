@@ -136,11 +136,11 @@ optimization.
   (bottomup
    (lambda (ast)
      (match ast
-       ((Begin0 a (list e bs ..1))
+       [(Begin0 a (list e bs ..1))
         (define id (fresh-ast-identifier 'begin0))
         (define dv (annoless DefVar id the-AnyT e))
-        (LetExpr a dv (append bs (list (annoless Var id)))))
-       (_ ast)))))
+        (LetExpr a dv (append bs (list (annoless Var id))))]
+       [_ ast]))))
 
 ;;;
 ;;; de-Racketization
