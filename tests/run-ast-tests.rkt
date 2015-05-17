@@ -14,9 +14,9 @@
 
 (define-view C ([#:access c get-c set-c]))
 
-(define-ast HasA (A C) ([no-term a]))
-(define-ast HasAB (A AB) ([no-term a] [no-term b]))
-(define-ast HasBA (A AB) ([no-term b] [no-term a]))
+(define-ast HasA (A C) ([#:none a]))
+(define-ast HasAB (A AB) ([#:none a] [#:none b]))
+(define-ast HasBA (A AB) ([#:none b] [#:none a]))
 
 (check-eqv? 7 (C-c (HasA 7)))
 
@@ -38,7 +38,7 @@
 
 (define-view D ([#:field a] [#:access d get-d set-d]))
 
-(define-ast Weird (A AB D) ([no-term a] [no-term b])
+(define-ast Weird (A AB D) ([#:none a] [#:none b])
   #:struct-options
   (#:methods gen:D-impl 
              [(define (get-d D-impl)
@@ -59,7 +59,7 @@
 (define (set-type ast t)
   (set-Ast-annos ast (hash-set (Ast-annos ast) 'type t)))
 (define-view Expr ([#:access type get-type set-type]))
-(define-ast Lit (Ast Expr) ([no-term annos] [no-term dat]))
+(define-ast Lit (Ast Expr) ([#:none annos] [#:none dat]))
 
 (check-eq? 'int (Expr-type (Lit #hasheq((type . int)) 5)))
 
@@ -73,7 +73,7 @@
                 (define (set-Num-num x v) v)
                 (define (Num-copy x v) v)])))
 
-(define-ast HasNum (Num) ([no-term num]))
+(define-ast HasNum (Num) ([#:none num]))
 
 (check-false (Num? "string"))
 (check-true (Num? 5))
@@ -91,14 +91,14 @@
 (define-view HasX (#:fields x))
 (define-ast FunnyCopy ([HasX (#:copy (lambda (fc x)
                                        (FunnyCopy 5)))])
-  ([no-term x]))
+  ([#:none x]))
 (check-eqv? 5 (HasX-x (HasX-copy (FunnyCopy 1) 7)))
 
-(define-ast FunnyOverride ([HasX ([#:field x])]) ([no-term x]))
+(define-ast FunnyOverride ([HasX ([#:field x])]) ([#:none x]))
 (check-eqv? 6 (HasX-x (FunnyOverride 6)))
 
 (define-ast SevenX ([HasX ([#:access x (lambda (obj) 7) (lambda (obj x) obj)])])
-  ([no-term x]))
+  ([#:none x]))
 (check-eqv? 7 (HasX-x (set-HasX-x (SevenX 9) 8)))
 
 (define (AC-getter obj)
@@ -106,5 +106,5 @@
 (define (AC-setter obj b)
   (struct-copy AC obj [c b]))
 (define-ast AC (A [AB ([#:access b AC-getter AC-setter])])
-  ([no-term a] [no-term c]))
+  ([#:none a] [#:none c]))
 (check-match (A-copy (AB-copy (AC 1 2) 4 5) 6) (AC 6 5))

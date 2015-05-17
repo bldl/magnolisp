@@ -68,15 +68,15 @@ Assumptions for AST node types:
   #`(define (term-visit-all s ast)
       #,@(map
           (lambda (f-stx)
-            (syntax-case f-stx (no-term just-term list-of-term)
-              ((no-term fn-pat)
+            (syntax-case f-stx ()
+              ((#:none fn-pat)
                #'(begin))
-              ((just-term fn-pat)
+              ((#:just fn-pat)
                (let* ((fn-sym (syntax-e #'fn-pat))
                       (get-stx (format-id nn-stx "~a-~a"
                                           nn-sym fn-sym)))
                  #`(s (#,get-stx ast))))
-              ((list-of-term fn-pat)
+              ((#:many fn-pat)
                (let* ((fn-sym (syntax-e #'fn-pat))
                       (get-stx (format-id nn-stx "~a-~a"
                                           nn-sym fn-sym)))
@@ -88,12 +88,12 @@ Assumptions for AST node types:
 (define-for-syntax (parse-relevant-fields f-stx-lst)
   (filter-map
    (lambda (f-stx)
-     (syntax-case f-stx (no-term just-term list-of-term)
-       [(no-term fn-pat)
+     (syntax-case f-stx ()
+       [(#:none fn-pat)
         #f]
-       [(just-term fn-pat)
+       [(#:just fn-pat)
         (list 'just #'fn-pat (generate-temporary #'fn-pat))]
-       [(list-of-term fn-pat)
+       [(#:many fn-pat)
         (list 'list #'fn-pat (generate-temporary #'fn-pat))]))
    f-stx-lst))
 
@@ -167,12 +167,12 @@ Assumptions for AST node types:
    (for/list ([f-stx f-stx-lst]
               [i (in-naturals)])
      (define n 
-       (syntax-case f-stx (no-term just-term list-of-term)
-         [(no-term fn-pat)
+       (syntax-case f-stx ()
+         [(#:none fn-pat)
           #f]
-         [(just-term fn-pat)
+         [(#:just fn-pat)
           #'fn-pat]
-         [(list-of-term fn-pat)
+         [(#:many fn-pat)
           #'fn-pat]))
      (cons n i))))
 
@@ -286,9 +286,7 @@ Assumptions for AST node types:
 
 (define-for-syntax (make-define-ast stx provide?)
   (define-syntax-class ft
-    (pattern (~or (~datum no-term)
-                  (~datum just-term)
-                  (~datum list-of-term))))
+    (pattern (~or #:none #:just #:many)))
   
   (define-syntax-class vw
     #:attributes (spec)
@@ -360,11 +358,11 @@ Assumptions for AST node types:
 
   (define-view Ast (#:fields annos))
 
-  (define-ast Singleton (Ast) ((no-term annos)) #:singleton (#hasheq()))
-  (define-ast Empty (Ast) ([no-term annos]))
-  (define-ast Some (Ast) ((no-term annos) (just-term thing)))
-  (define-ast Object (Ast) ((no-term annos) (just-term one) 
-                            (list-of-term many)))
+  (define-ast Singleton (Ast) ((#:none annos)) #:singleton (#hasheq()))
+  (define-ast Empty (Ast) ([#:none annos]))
+  (define-ast Some (Ast) ((#:none annos) (#:just thing)))
+  (define-ast Object (Ast) ((#:none annos) (#:just one) 
+                            (#:many many)))
 
   (define empty (Empty #hasheq()))
   (define object (Object #hasheq() the-Singleton (list the-Singleton empty)))
@@ -436,8 +434,8 @@ Assumptions for AST node types:
         ;;(writeln `(UNMARSHALED ANNOS ,annos))
         (void))))
   
-  (define-ast Tree () ([list-of-term lst]))
-  (define-ast Atom () ([no-term v]))
+  (define-ast Tree () ([#:many lst]))
+  (define-ast Atom () ([#:none v]))
   (let ((t (Tree (list (Atom 1) (Atom 2))))
         (x 0))
     (define (s ast) (when (Atom? ast) (set! x (+ x (Atom-v ast)))))
