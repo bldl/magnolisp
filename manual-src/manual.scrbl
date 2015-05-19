@@ -7,6 +7,7 @@
 		     (combine-in
 		       (only-meta-in 0 magnolisp/main)
 		       magnolisp/core
+		       magnolisp/modbeg
 		       magnolisp/surface
 		       magnolisp/prelude)
 	             magnolisp/compiler-api
@@ -373,7 +374,7 @@ A predefined type. Such values may not actually exist at C++ run time. The corre
 
 There are a small number of Magnolisp-specific names that are treated specially by the Magnolisp compiler. These are bound in the @racketmodname[magnolisp/core] module, and exported for phase level 0 by the @racketmodname[magnolisp] language.
 
-@subsection{Magnolisp Built-Ins}
+@subsection[#:tag "built-ins"]{Magnolisp Built-Ins}
 
 A boolean expression is simply an expression of type @racket[Bool], which is one of the two predefined types in Magnolisp. The other one is @racket[Void], which is Magnolisp's unit type (whose values carry no information).
 
@@ -383,7 +384,7 @@ A predefined type. The literals of this type are @racket[#t] and @racket[#f] (wh
 @defthing[#:kind "type" Void any/c]{
 A predefined type. There are no literals for @racket[Void] values, but the Magnolisp core form @racket[(void _expr _...)] evaluates such a value, at least conceptually.}
 
-@subsection{Magnolisp Core Syntax}
+@subsection[#:tag "core-syntax"]{Magnolisp Core Syntax}
 
 Magnolisp core syntax is encoded primarily in terms of Racket's core forms. Magnolisp core forms that have no Racket counterpart, however, are encoded in terms of the @racket[#%magnolisp] variable, which is treated specially by the Magnolisp compiler. The @racket[#%magnolisp] binding is exported from the @racketmodname[magnolisp/core] module.
 
@@ -530,6 +531,32 @@ Programs written in Magnolisp can be evaluated in the usual Racket way, provided
 It is also possible to launch a Magnolisp REPL, by issuing the command:
 
 @commandline{racket -I magnolisp}
+
+@section{Magnolisp-Based Languages}
+
+@defmodule[magnolisp/modbeg]
+
+It is possible to implement languages other than Magnolisp that are translatable into C++ using Magnolisp's compiler. To enable this, the language's implementation must conform to the following requirements:
+@itemlist[
+
+@item{The macros of the language must target Magnolisp's @seclink["core-syntax"]{core syntax}.}
+
+@item{It follows that the language must refer to Magnolisp's @seclink["built-ins"]{built-in types}, since certain core forms expect said types.}
+
+@item{The language must export Magnolisp's @racketid[#%module-begin] macro, or its own variant thereof, one that prepares all the information that the Magnolisp compiler expects.}
+
+@item{Where it is not the @racketmodname[magnolisp/prelude] module that specifies C++ mappings for the language's built-ins and primitives, the name of said module (or modules) must be communicated to the compiler via the language's own @a-module-begin macro.}
+
+]
+
+@defform[(module-begin form ...)]{
+An implementation of Magnolisp's @racketid[#%module-begin].}
+
+@defproc[(make-module-begin
+          [stx syntax?]
+          [#:prelude-path prelude-stx syntax? #''(magnolisp/prelude)])
+	 syntax?]{
+A helper function for implementing Magnolisp-compiler-compatible @a-module-begin macros. The @racket[stx] argument should be syntax for the @racketid[(#%module-begin form ...)] macro invocation. The @racket[prelude-stx] argument may be used to specify syntax for a list of module paths that should be loaded by the compiler, so that the compiler will know how to translate runtime support names into C++.}
 
 @section{Compiler API}
 

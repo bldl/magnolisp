@@ -72,6 +72,8 @@ Utilities for authoring manual.scrbl.
   (harnessed form)
   (racket (#,racket-if #,(ign-nt Racket-expr) form #,(ign-nt Racket-expr))))
 
+(define* a-module-begin @racketidfont{#%module-begin})
+
 ;;; 
 ;;; Racket syntax
 ;;; 
