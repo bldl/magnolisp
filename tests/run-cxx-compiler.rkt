@@ -17,10 +17,17 @@ executable, and then comparing actual output against expected output.
 
 (define (query-clang-version exe)
   (let-and s (exe-std-output/maybe (list exe "--version"))
-    (let ((re #px"^clang[[:space:]]+version[[:space:]]+([[:digit:]]+)[.]([[:digit:]]+)[.]([[:digit:]]+)[[:space:]]+"))
-      (let-and m (regexp-match re s)
-        (map string->number (take (cdr m) 3))))))
-    
+    (cond
+      [(let ((re #px"^clang[[:space:]]+version[[:space:]]+([[:digit:]]+)[.]([[:digit:]]+)[.]([[:digit:]]+)[[:space:]]+"))
+         (regexp-match re s))
+       => (lambda (m)
+            (map string->number (take (cdr m) 3)))]
+      [(let ((re #px"clang[[:space:]]+version[[:space:]]+([[:digit:]]+)[.]([[:digit:]]+)-"))
+         (regexp-match re s))
+       => (lambda (m)
+            (map string->number (take (cdr m) 2)))]
+      [else #f])))
+
 (define-syntax (this-source stx)
   (quasisyntax/loc stx (unsyntax (syntax-source stx))))
 
@@ -88,36 +95,38 @@ executable, and then comparing actual output against expected output.
       dat))
 
   (values actual expected))
-  
+
 (define (compile-and-run-mgl-files [list-files
                                     (thunk (directory-list mgl-file-dir))])
   (define cc-fun ;; (-> path-string? (-> output-port? any/c) void?)
     (let-and exe (find-executable-path "clang")
       (let-and ver (query-clang-version exe)
-        (and (not (datum<? ver '(3 5 0)))
-             (lambda (a.out generate)
-               (let ((cmd `(,exe "-x" "c++" "-std=c++14" 
-                            "-o" ,a.out "-lstdc++" "-")))
-                 (exe-consume-input cmd generate #:detail 'stderr)))))))
+        (let ([std (if (datum<? ver '(3 5 0))
+                       "-std=c++11"
+                       "-std=c++14")])
+          (lambda (a.out generate)
+            (let ([cmd `(,exe "-x" "c++" ,std
+                              "-o" ,a.out "-lstdc++" "-")])
+              (exe-consume-input cmd generate #:detail 'stderr)))))))
   
   ;; Run no tests without a suitable compiler.
   (when cc-fun
-    (for ((bn (list-files))
+    (for ([bn (list-files)]
           #:when (regexp-match-exact? #rx"test-run-.*[.]rkt" bn))
       (define fn (build-path mgl-file-dir bn))
-      (with-handlers ((exn:fail?
+      (with-handlers ([exn:fail?
                        (lambda (e)
                          (fail 
                           (format 
                            "run-via-C++ test: failed with ~s for ~a"
-                           e bn)))))
-        (let-values (((actual expected)
-                      (compile-and-run-one-mgl-file cc-fun fn)))
+                           e bn)))])
+        (let-values ([(actual expected)
+                      (compile-and-run-one-mgl-file cc-fun fn)])
           (check-equal? 
            actual expected
            (format "run-via-C++ test: un`expected` output for ~a" bn)))))))
 
-;;(parameterize ((show-cxx-code? #f)) (compile-and-run-mgl-files (thunk '("test-run-sum-3.rkt"))))
+;;(parameterize ((show-cxx-code? #t)) (compile-and-run-mgl-files (thunk '("test-run-sum-3.rkt"))))
 
 (module* test #f
   (compile-and-run-mgl-files))
