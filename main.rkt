@@ -29,7 +29,7 @@ Defines a Racket module language for Magnolisp.
  quote quasiquote unquote
  
  ;; expressions
- #%top #%expression #%datum 
+ #%top #%expression #%datum #%top-interaction
  #%plain-app (rename-out [#%plain-app #%app])
  begin begin0
  let let* letrec 

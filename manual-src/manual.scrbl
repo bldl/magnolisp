@@ -527,6 +527,10 @@ A restricted form of escape continuation invocation, flagged with the syntax pro
 
 Programs written in Magnolisp can be evaluated in the usual Racket way, provided that the @(hash-lang) signature specifies the language as @racketmodname[magnolisp]. Any module top-level phase level 0 expressions are evaluated, and the results are printed (as for Racket's @racket-module-begin).
 
+It is also possible to launch a Magnolisp REPL, by issuing the command:
+
+@commandline{racket -I magnolisp}
+
 @section{Compiler API}
 
 @defmodule[magnolisp/compiler-api]
