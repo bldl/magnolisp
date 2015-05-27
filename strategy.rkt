@@ -10,7 +10,7 @@ data-type-specific operations.
 |#
 
 (require "util.rkt" racket/generic
-         (for-syntax racket/base syntax/parse))
+         (for-syntax racket/base racket/syntax syntax/parse))
 
 ;;; 
 ;;; List element access operations.
@@ -89,8 +89,33 @@ data-type-specific operations.
   (term-fields strategic)
   (set-term-fields strategic lst))
 
-(define* (term-rewrite-some s strategic)
-  (define o-lst (term-fields strategic))
+(define* ((accessors->term-visit-all get) s ast)
+  (for ((fv (get ast)))
+    (if (list? fv)
+        (for-each s fv)
+        (s fv))))
+
+(define* ((accessors->term-rewrite-all get set) s ast)
+  (define changed? #f)
+  (let loop ([res null] [lst (get ast)])
+    (if (null? lst)
+        (if changed?
+            (set ast (reverse res))
+            ast)
+        (let ()
+          (define o-elem (car lst))
+          (define n-elem
+            (if (list? o-elem)
+                (list-rewrite-all s o-elem)
+                (s o-elem)))
+          (and n-elem
+               (begin
+                 (unless (eq? o-elem n-elem)
+                   (set! changed? #t))
+                 (loop (cons n-elem res) (cdr lst))))))))
+
+(define* ((accessors->term-rewrite-some get set) s ast)
+  (define o-lst (get ast))
   (define changed? #f)
   (define some? #f)
   (define n-lst 
@@ -107,11 +132,14 @@ data-type-specific operations.
             fv))))
   (and some?
        (if changed?
-           (set-term-fields strategic n-lst)
-           strategic)))
+           (set ast n-lst)
+           ast)))
 
-(define* (term-rewrite-one s strategic)
-  (define o-lst (term-fields strategic))
+(define* term-rewrite-some
+  (accessors->term-rewrite-some term-fields set-term-fields))
+
+(define* ((accessors->term-rewrite-one get set) s ast)
+  (define o-lst (get ast))
   (define changed? #f)
   (define one? #f)
   (define n-lst 
@@ -131,8 +159,64 @@ data-type-specific operations.
                 fv)))))
   (and one?
        (if changed?
-           (set-term-fields strategic n-lst)
-           strategic)))
+           (set ast n-lst)
+           ast)))
+
+(define* term-rewrite-one
+  (accessors->term-rewrite-one term-fields set-term-fields))
+
+;;; 
+;;; Sub-object accessor combinators.
+;;;
+
+;; Returns a function that applies `s` to all sub-objects of `ast`, in
+;; the sense of all the visit functions of `visit-lst`.
+(define* ((combined-visit-all . visit-lst) s ast)
+  (for ((visit visit-lst))
+    (visit s ast)))
+
+;; Returns a function that rewrites all the sub-objects of `ast` using
+;; the rewrite rule `s`. The subobjects are all those that are
+;; specified by the rewrite functions of `rewrite-lst`, and `s` must
+;; successfully apply to all of them.
+(define* ((combined-rewrite-all . rewrite-lst) s ast)
+  (let loop ([ast ast] [rewrite-lst rewrite-lst])
+    (if (null? rewrite-lst)
+        ast
+        (let ()
+          (define rewrite (car rewrite-lst))
+          (define n-ast (rewrite s ast))
+          (and n-ast
+               (loop n-ast (cdr rewrite-lst)))))))
+
+;; Like `combined-rewrite-all`, but `s` only needs to apply to some of
+;; the sub-objects, although an attempt is made to apply it to all of
+;; them.
+(define* ((combined-rewrite-some . rewrite-lst) s ast)
+  (define some? #f)
+  (let loop ([ast ast] [rewrite-lst rewrite-lst])
+    (if (null? rewrite-lst)
+        (and some? ast)
+        (let ()
+          (define rewrite (car rewrite-lst))
+          (define n-ast (rewrite s ast))
+          (loop (if n-ast
+                    (begin (set! some? #t) n-ast)
+                    ast)
+                (cdr rewrite-lst))))))
+
+;; Like `combined-rewrite-all`, but `s` only needs to apply to one of
+;; the sub-objects, and once it does, it is applied to no further
+;; sub-objects. This means that not all of the functions of
+;; `rewrite-lst` may get applied.
+(define* ((combined-rewrite-one . rewrite-lst) s ast)
+  (let loop ([ast ast] [rewrite-lst rewrite-lst])
+    (if (null? rewrite-lst)
+        #f
+        (let ()
+          (define rewrite (car rewrite-lst))
+          (define n-ast (rewrite s ast))
+          (or n-ast (loop ast (cdr rewrite-lst)))))))
 
 ;;; 
 ;;; Default sub-object access operations.

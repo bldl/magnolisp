@@ -3,7 +3,7 @@
 #|
 |#
 
-(require magnolisp/ast-repr magnolisp/ast-view
+(require magnolisp/ast-repr magnolisp/ast-view magnolisp/strategy
          racket/generic rackunit)
 
 (define-view A ([#:field a]))
@@ -108,3 +108,160 @@
 (define-ast AC (A [AB ([#:access b AC-getter AC-setter])])
   ([#:none a] [#:none c]))
 (check-match (A-copy (AB-copy (AC 1 2) 4 5) 6) (AC 6 5))
+
+;;; 
+;;; view-based traversals
+;;; 
+
+;; An empty view.
+(let ()
+  (define-view V () #:support-traversals)
+  (define-ast A (V) ())
+  (let ((ast (A)))
+    (check-equal? (V-term-fields ast) '())
+    (let ((x (set-V-term-fields ast '())))
+      (check-equal? ast x))))
+
+;; A view without sub-terms.
+(let ()
+  (define-view V ([#:field #:none v]) #:support-traversals)
+  (define-ast A (V) ([#:none v] [#:many e]))
+  (check-equal? (V-term-fields (A 7 '())) '())
+  (let ((ast (A 7 '())))
+    (define x (set-V-term-fields ast '()))
+    (check-equal? ast x)))
+
+;; A view with one sub-term field.
+(let ()
+  (define-view V ([#:field #:just v]) #:support-traversals)
+  (define-ast A (V) ([#:just v] [#:many e]))
+  (let ((ast (A 7 (list (A 10 '()))))) ;; not actually storing a term
+    (check-equal? (V-term-fields ast) '(7))
+    (define x (set-V-term-fields ast '(8)))
+    (check-equal? x (set-A-v ast 8))
+    (check-true (V=? x (set-A-v ast 8)))))
+  
+;; A view with many sub-terms in a field.
+(let ()
+  (define-view V ([#:field #:many e]) #:support-traversals)
+  (define-ast A (V) ([#:just v] [#:many e]))
+  (let ((ast (A 7 (list 8 9))))
+    (check-equal? (V-term-fields ast) '((8 9)))
+    (define x (set-V-term-fields ast '((9 10))))
+    (check-equal? x (set-A-e ast '(9 10)))
+    (check-equal? (A-v x) (A-v ast))))
+
+;; A view with an #:access term field.
+(let ()
+  (define (get-b x) (V-a x))
+  (define (set-b x b) (set-V-a x b))
+  (define-view V ([#:field #:none a]
+                  [#:access #:just b get-b set-b]) #:support-traversals)
+  (define-ast A (V) ([#:none a] [#:none c]))
+  (define-ast Nil () ())
+  (define nil (Nil))
+  (define sub (A nil 7))
+  (define ast (A sub 8))
+  (check-eq? (A-a ast) (V-b ast))
+  (check-equal? (V-term-fields ast) (list sub))
+  (define ast0 (set-V-term-fields ast (list nil)))
+  (check-eq? nil (V-a ast0))
+  (check-eq? nil (V-b ast0))
+  (check-eq? nil (A-a ast0))
+  (void))
+
+;; A view with multiple #:field term fields.
+(let ()
+  (define-view V ([#:field #:just a]
+                  [#:field #:just b]
+                  [#:field #:many c]) #:support-traversals)
+  (define-view W () #:support-traversals)
+  (define-ast Nil () ())
+  (define nil (Nil))
+  (define-ast A (V W) ([#:just a] [#:just d]
+                       [#:many c] [#:just b]))
+  (define ast (A nil nil null nil))
+  (check-true (null? (W-term-fields ast)))
+  (check-equal? (V-term-fields ast) `(,nil ,nil ()))
+  (define ast2 (set-V-term-fields ast (list ast ast (list ast ast))))
+  (check-true (= (length (A-c ast2)) 2))
+  (check-eq? (V-a ast2) (car (V-c ast2)))
+  (let ((lst (V-term-fields ast2)))
+    (check-equal? ast2 (set-V-term-fields ast lst)))
+  (void))
+
+;; A view with a mixture of term fields.
+(let ()
+  (define (get-b x) (A-b x))
+  (define (set-b x v) (set-A-b x v))
+  (define-view V ([#:field #:just a]
+                  [#:access #:many b get-b set-b]
+                  [#:field #:many c]) #:support-traversals)
+  (define-ast A (V) ([#:just a] [#:many b] [#:many c]))
+  (define-ast Nil () ())
+  (define nil (Nil))
+  (define ast0 (A nil null null))
+  (check-equal? (V-term-fields ast0) `(,nil () ()))
+  (define ast1 (set-V-term-fields ast0 (list ast0 (list nil) (list ast0))))
+  (let* ((ast2 (set-V-a ast1 ast0))
+         (ast2 (set-V-b ast2 (list nil)))
+         (ast2 (set-V-c ast2 (list ast0))))
+    (check-equal? ast2 ast1))
+  (let* ((ast2 (set-A-a ast1 ast0))
+         (ast2 (set-A-b ast2 (list nil)))
+         (ast2 (set-A-c ast2 (list ast0))))
+    (check-equal? ast2 ast1))
+  (void))
+
+;; View-based traversal.
+(let ()
+  (define-view V ([#:field #:many c]) #:support-traversals)
+  (define-ast A (V) ([#:none a] [#:many b] [#:many c]))
+  (define (f ast)
+    (set-A-a ast (add1 (A-a ast))))
+  (define ast0 (A 0 null null))
+  (define ast1 (A 0 (list ast0) (list ast0)))
+  (define ast7 (A 7 null null))
+  (define ast77 (A 7 null (list ast7)))
+  (define ast2 (A 7 (list ast0 ast1) (list ast7 ast77)))
+  (define V-all (view->term-rewrite-all V))
+  (let ((rw (topdown-rewriter f #:rewrite-all V-all))
+        (bad? #f))
+    (define (chk ast)
+      (define a (A-a ast))
+      (unless (or (= a 0) (= a 8))
+        (set! bad? #t)))
+    ((topdown-visitor chk) (rw ast2))
+    (check-false bad?)))
+
+;; View-based + concrete traversal.
+(let ()
+  (define (get-ans ast) (A-ans ast))
+  (define (set-ans ast lst) (set-A-ans ast lst))
+  (define-view V ([#:access #:many ans get-ans set-ans])
+    #:support-traversals)
+  (define-ast A (V) ([#:none ans] [#:none val] [#:many lst]))
+  (define V-all (view->term-rewrite-all V))
+  (define both-all (combined-rewrite-all V-all term-rewrite-all))
+  (define V-visit (view->term-rewrite-all V))
+  (define both-visit (combined-visit-all V-visit term-visit-all))
+  (define (count ast)
+    (define n 0)
+    (define (inc x)
+      (set! n (+ n (A-val x))))
+    ((topdown-visitor inc #:visit-all both-all) ast)
+    n)
+  (define (f ast) (set-A-val ast (add1 (A-val ast))))
+  (define ast0 (A null 0 null))
+  (check-eqv? 0 (count ast0))
+  (define ast1 (A (list ast0) 1 (list ast0)))
+  (check-eqv? 1 (count ast1))
+  (define ast1c ((topdown-rewriter f #:rewrite-all term-rewrite-all) ast1))
+  (check-eqv? 3 (count ast1c))
+  (define ast1v ((topdown-rewriter f #:rewrite-all V-all) ast1))
+  (check-eqv? 3 (count ast1v))
+  (define ast1b ((topdown-rewriter f #:rewrite-all both-all) ast1))
+  (check-eqv? 4 (count ast1b))
+  (define ast2 (A (list ast1) 1 (list ast0)))
+  (define ast2b ((topdown-rewriter f #:rewrite-all both-all) ast2))
+  (check-eqv? 7 (count ast2b)))

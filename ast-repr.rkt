@@ -285,9 +285,9 @@ Assumptions for AST node types:
 ;;; 
 
 (define-for-syntax (make-define-ast stx provide?)
-  (define-syntax-class ft
+  (define-syntax-class term-qty
     (pattern (~or #:none #:just #:many)))
-  
+
   (define-syntax-class vw
     #:attributes (spec)
     (pattern v-id:id
@@ -298,7 +298,7 @@ Assumptions for AST node types:
                                (attribute v-spec.copy))))
   
   (syntax-parse stx
-    [(_ name:id (view:vw ...) ((t:ft fld:id) ...)
+    [(_ name:id (view:vw ...) ((t:term-qty fld:id) ...)
         (~optional (~seq #:singleton (arg:expr ...)))
         (~optional (~seq #:custom-write writer:expr))
         (~optional (~seq #:struct-options (opt ...))))
@@ -307,6 +307,12 @@ Assumptions for AST node types:
        (and singleton? (format-id stx "the-~a" (syntax-e #'name))))
      (define conc-id #'name)
      (define fld-id-lst (syntax->list #'(fld ...)))
+     (define (mk-qty-h)
+       (define qty-stx-lst (syntax->list #'(t ...)))
+       (for/hasheq ((x qty-stx-lst) (id fld-id-lst))
+         (values (syntax-e id)
+                 (syntax-parse x [q:term-qty-num
+                                  (attribute q.num)]))))
      (define struct-def
        (quasisyntax
         (#,(if provide? #'concrete-struct* #'struct)
@@ -326,9 +332,14 @@ Assumptions for AST node types:
          #:methods gen:strategic (#,@(make-strategic
                                       conc-id
                                       (syntax->list #'((t fld) ...))))
-         #,@(apply append
-                   (for/list ([view-spec (attribute view.spec)])
-                     (generate-view-methods conc-id view-spec)))
+         #,@(let ((view-spec-lst (attribute view.spec)))
+              (if (null? view-spec-lst)
+                  null
+                  (let ((qty-h (mk-qty-h)))
+                    (apply
+                     append
+                     (for/list ([view-spec view-spec-lst])
+                       (generate-view-methods conc-id view-spec qty-h))))))
          #:transparent
          #,@(if (attribute opt)
                 (syntax->list #'(opt ...))
@@ -348,6 +359,25 @@ Assumptions for AST node types:
 
 (define-syntax* (define-ast* stx)
   (make-define-ast stx #t))
+
+;;; 
+;;; view-based traversals
+;;; 
+
+(define-syntax-rule* (view->term-visit-all name)
+  (accessors->term-visit-all (view-term-fields-getter name)))
+
+(define-syntax-rule* (view->term-rewrite-all name)
+  (accessors->term-rewrite-all (view-term-fields-getter name)
+                               (view-term-fields-setter name)))
+
+(define-syntax-rule* (view->term-rewrite-some name)
+  (accessors->term-rewrite-some (view-term-fields-getter name)
+                                (view-term-fields-setter name)))
+
+(define-syntax-rule* (view->term-rewrite-one name)
+  (accessors->term-rewrite-one (view-term-fields-getter name)
+                               (view-term-fields-setter name)))
 
 ;;; 
 ;;; testing
