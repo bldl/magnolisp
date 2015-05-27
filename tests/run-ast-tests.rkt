@@ -213,6 +213,25 @@
     (check-equal? ast2 ast1))
   (void))
 
+;; A view with more than one term field, and also a non-term one.
+(let ()
+  (define-view V ([#:field #:none a]
+                  [#:field #:just b]
+                  [#:field #:many c]) #:support-traversals)
+  (define-ast A (V) ([#:none a] [#:just b] [#:many c]))
+  (define-ast Nil () ())
+  (define nil (Nil))
+  (define ast0 (A 'a nil null))
+  (check-equal? (V-term-fields ast0) `(,nil ()))
+  (define ast1 (set-V-term-fields ast0 (list ast0 (list ast0))))
+  (let* ((ast2 ast0)
+         (ast2 (set-V-a ast2 'b))
+         (ast2 (set-V-b ast2 nil)) 
+         (ast2 (set-V-c ast2 null))
+         (ast3 (set-A-a ast0 'b)))
+    (check-equal? ast2 ast3))
+  (void))
+
 ;; View-based traversal.
 (let ()
   (define-view V ([#:field #:many c]) #:support-traversals)

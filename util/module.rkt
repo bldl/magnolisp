@@ -90,6 +90,19 @@
     (define the-nm (ctor e ...))
     (provide (except-out (struct-out nm) ctor) the-nm)))
 
+(define-syntax-rule
+  (sub-dd def-abs def-conc (abs-name abs-fld ...)
+          ([conc-name conc-fld ...] ...) opt ...)
+  (begin
+    (def-abs abs-name (abs-fld ...) opt ...)
+    (begin
+      (def-conc conc-name abs-name (conc-fld ...) opt ...)
+      ...)))
+(define-syntax-rule* (define-datatype rest ...)
+  (sub-dd abstract-struct concrete-struct rest ...))
+(define-syntax-rule* (define-datatype* rest ...)
+  (sub-dd abstract-struct* concrete-struct* rest ...))
+
 (define-syntax-rule*
   (define-match-expander* id rest ...)
   (begin

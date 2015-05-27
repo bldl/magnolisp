@@ -31,9 +31,10 @@ E.g.,
 
 |#
 
-(require "util.rkt" racket/generic racket/match
+(require racket/generic racket/match "util.rkt"
          (for-syntax racket/base racket/list racket/match
-                     racket/pretty racket/syntax syntax/parse))
+                     racket/pretty racket/syntax syntax/parse
+                     "util/module.rkt"))
 
 ;;; 
 ;;; view-based comparison
@@ -157,7 +158,7 @@ E.g.,
                                           (format-id view-id
                                                      "~a-~a" view-name
                                                      (syntax-e
-                                                      (ViewFld-id)))])
+                                                      (ViewFld-id fld)))])
                            #'(define v (get obj))))]
                         [(v ...) v-id-lst]
                         [copy (format-id view-id "~a-copy" view-name)])
@@ -183,7 +184,7 @@ E.g.,
 ;;; 
 
 (begin-for-syntax
-  (define-syntax-class term-qty-num
+  (define-syntax-class* term-qty-num
     #:attributes (num)
     (pattern #:none #:attr num 0)
     (pattern #:just #:attr num 1)
@@ -194,28 +195,32 @@ E.g.,
     (pattern (~optional qty:term-qty-num)
              #:attr num (attribute qty.num)))
 
-  (struct ViewFld (id get set qty) #:transparent)
+  ;; The `qty` field value is optional, and may be #f.
+  (define-datatype* (ViewFld id qty)
+    ([FieldViewFld] [AccessViewFld get set]) #:transparent)
 
   (define (ViewFld->syntax fld)
-    (define (q x)
-      (if x #`#'#,x #'#f))
-    (match-define (ViewFld id get set qty) fld)
-    #`(ViewFld #'#,id #,(q get) #,(q set) #,qty))
+    (match fld
+      [(FieldViewFld id qty)
+       #`(FieldViewFld #'#,id #,qty)]
+      [(AccessViewFld id qty get set)
+       #`(AccessViewFld #'#,id #,qty #'#,get #'#,set)]))
   
   (define-syntax-class vfld
     #:description "view field specification"
     #:attributes (spec)
     [pattern (#:field qty:tqty? fld:id) 
-             #:attr spec (ViewFld #'fld #f #f (attribute qty.num))]
+             #:attr spec (FieldViewFld #'fld (attribute qty.num))]
     [pattern (#:access qty:tqty? fld:id get:expr set:expr)
-             #:attr spec (ViewFld #'fld #'get #'set (attribute qty.num))])
+             #:attr spec (AccessViewFld #'fld (attribute qty.num)
+                                        #'get #'set)])
 
   (define-splicing-syntax-class vflds
     #:description "view fields specification"
     #:attributes (spec-lst) ;; (listof ViewFld)
     [pattern (~seq #:fields fld:id ...)
              #:attr spec-lst (map
-                              (lambda (id) (ViewFld id #f #f #f))
+                              (lambda (id) (FieldViewFld id #f))
                               (syntax->list #'(fld ...)))]
     [pattern (~seq fld:vfld ...)
              #:attr spec-lst (attribute fld.spec)])
@@ -226,13 +231,11 @@ E.g.,
     [pattern (flds:vflds)
              #:attr fspec-lst (attribute flds.spec-lst)])
   
-  (define-syntax-class vspec-with-copy
+  (define-syntax-class* vspec-with-copy
     #:description "view implementation specification"
     #:attributes (fspec-lst copy) ;; (listof ViewFld) and syntax
     [pattern (flds:vflds (~optional (~seq #:copy copy:expr)))
-             #:attr fspec-lst (attribute flds.spec-lst)])
-  
-  (provide term-qty-num (struct-out ViewFld) vspec-with-copy))
+             #:attr fspec-lst (attribute flds.spec-lst)]))
 
 (define-for-syntax (make-define-view def-gen-id def-stx-id 
                                      def-pat-id def-fun-id stx)
@@ -334,7 +337,7 @@ E.g.,
     (void))
 
   (for ([fld fld-info-lst])
-    (when (and (not (ViewFld-get fld)) (not (ViewFld-set fld)))
+    (when (FieldViewFld? fld)
       (define name (syntax-e (ViewFld-id fld)))
       (define c-qty (hash-ref conc-qty-h name #f))
       (when c-qty
@@ -352,8 +355,15 @@ E.g.,
   
   (with-syntax ([view view-id]
                 [conc conc-id])
+    ;; Returns (list/c syntax? syntax?) for getter and setter definitions.
     (define (make-accessor-impls fld-info)
-      (match-define (ViewFld fld-id get-stx set-stx _) fld-info)
+      (match-define (ViewFld fld-id _) fld-info)
+      (define-values (get-stx set-stx)
+        (if (AccessViewFld? fld-info)
+            (values (AccessViewFld-get fld-info)
+                    (AccessViewFld-set fld-info))
+            (values #f #f)))
+      
       (define fld-name (syntax-e fld-id))
       
       (define (mk-default-get)
@@ -394,7 +404,7 @@ E.g.,
             ;; `struct-copy` the latter, whereas the former must be
             ;; set as specified.
             (define-values (set-info-lst copy-info-lst)
-              (partition ViewFld-set fld-info-lst))
+              (partition AccessViewFld? fld-info-lst))
             #`(define (v-copy view fld ...)
                 #,@(if (null? copy-info-lst)
                        null
