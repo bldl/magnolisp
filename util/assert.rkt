@@ -2,18 +2,41 @@
 
 #|
 
-A variant of 'case'.
-
 |#
 
-(require "module.rkt")
+(provide raise-assertion-error assert
+         cond-or-fail case-or-fail)
 
-(define-syntax* case-eq
+(define (raise-assertion-error src fmt . v)
+  (apply error src (string-append "assertion failed: " fmt) v))
+
+(define-syntax-rule (assert e)
+  (unless e
+    (raise-assertion-error 'assert "~s" (quote e))))
+
+(define-syntax cond-or-fail
   (syntax-rules (else)
-    ((_ e (a b ...) ... (else c ...))
-     (cond ((eq? e (quote a)) (begin b ...)) ... (else c ...)))
-    ((_ e (a b ...) ...)
-     (cond ((eq? e (quote a)) (begin b ...)) ...))))
+    [(_ clause ... (else body ...))
+     (cond clause ... (else body ...))]
+    [(_ clause ...)
+     (cond
+      clause ...
+      (else
+       (raise-assertion-error
+        'cond-or-fail "no matching `cond` clause")))]))
+
+(define-syntax case-or-fail
+  (syntax-rules (else)
+    [(_ val-expr clause ... (else body ...))
+     (case val-expr clause ... (else body ...))]
+    [(_ val-expr clause ...)
+     (let ([v val-expr])
+       (case v
+         clause ...
+         (else
+          (raise-assertion-error
+           'case-or-fail 
+           "no matching `case` clause for ~s" v))))]))
 
 #|
 

@@ -17,8 +17,9 @@ Assumptions for AST node types:
          "strategy.rkt" "strategy-list.rkt"
          "util.rkt" "util/struct.rkt"
          racket/generic racket/unsafe/ops unstable/struct
-         (for-syntax racket/base racket/function racket/list
-                     ;;racket/pretty 
+         (for-syntax "util/assert.rkt"
+                     racket/base racket/function racket/list
+                     racket/pretty 
                      racket/syntax syntax/parse)
          (for-template racket/base "ast-serialize.rkt"))
 
@@ -63,143 +64,127 @@ Assumptions for AST node types:
 ;;; gen:strategic
 ;;; 
 
-(define-for-syntax (make-term-visit-all nn-stx f-stx-lst)
-  (define nn-sym (syntax-e nn-stx))
-  #`(define (term-visit-all s ast)
-      #,@(map
-          (lambda (f-stx)
-            (syntax-case f-stx ()
-              ((#:none fn-pat)
-               #'(begin))
-              ((#:just fn-pat)
-               (let* ((fn-sym (syntax-e #'fn-pat))
-                      (get-stx (format-id nn-stx "~a-~a"
-                                          nn-sym fn-sym)))
-                 #`(s (#,get-stx ast))))
-              ((#:many fn-pat)
-               (let* ((fn-sym (syntax-e #'fn-pat))
-                      (get-stx (format-id nn-stx "~a-~a"
-                                          nn-sym fn-sym)))
-                 #`(for-each s (#,get-stx ast))))))
-          f-stx-lst)
-      (void)))
+(begin-for-syntax
+  (struct ConcFld (id qty ix) #:transparent)
 
-;; Takes a list of field specifications `f-stx-lst`.
-(define-for-syntax (parse-relevant-fields f-stx-lst)
-  (filter-map
-   (lambda (f-stx)
-     (syntax-case f-stx ()
-       [(#:none fn-pat)
-        #f]
-       [(#:just fn-pat)
-        (list 'just #'fn-pat (generate-temporary #'fn-pat))]
-       [(#:many fn-pat)
-        (list 'list #'fn-pat (generate-temporary #'fn-pat))]))
-   f-stx-lst))
+  (define (term-ConcFld? fld)
+    (not (eq? (ConcFld-qty fld) 'none)))
 
-(define-for-syntax (make-r-f-struct-copy type-id obj-id r-f-lst)
-  (with-syntax ([type type-id]
-                [obj obj-id]
-                [(set-fld ...) (for/list ([fld r-f-lst])
-                                 (with-syntax ([fld (second fld)]
-                                               [tmp (third fld)])
-                                   #'[fld tmp]))])
-    #'(struct-copy type obj set-fld ...)))
+  (define (make-term-visit-all nn-stx f-spec-lst)
+    (define nn-sym (syntax-e nn-stx))
+    #`(define (term-visit-all s ast)
+        #,@(for/list ([fld f-spec-lst])
+             (define fn-sym (syntax-e (ConcFld-id fld)))
+             (with-syntax ([get (format-id nn-stx "~a-~a" nn-sym fn-sym)])
+               (case-or-fail (ConcFld-qty fld)
+                 [(none)
+                  #'(begin)]
+                 [(just maybe)
+                  #'(s (get ast))]
+                 [(many)
+                  #'(for-each s (get ast))])))
+        (void)))
 
-;; E.g. output:
-;; (define (term-rewrite-all s ast)
-;;   (let ((old-var (Define-var ast))
-;;         (old-body (Define-body ast)))
-;;     (let-and
-;;       var (s old-var)
-;;       body (list-rewrite-all s old-body)
-;;       (if (and (eq? old-var var) (eq? old-body body))
-;;           ast
-;;           (struct-copy Define ast (var var) (body body))))))
-(define-for-syntax (make-term-rewrite-all nn-stx f-stx-lst)
-  (define nn-sym (syntax-e nn-stx))
-  (define r-f-lst ;; (list/c kind id new-tmp old-tmp)
-    (for/list ((fld (parse-relevant-fields f-stx-lst)))
-      (define f-id (second fld))
-      (append fld (list (generate-temporary f-id)))))
-  (define ast-id (generate-temporary 'ast))
-  (with-syntax* ([s (generate-temporary 's)]
-                 [ast ast-id]
-                 [(bind-old ...)
-                  (for/list ([fld r-f-lst])
-                    (define fn-sym (syntax-e (second fld)))
-                    (with-syntax ([old (fourth fld)]
-                                  [get (format-id nn-stx "~a-~a"
-                                                  nn-sym fn-sym)])
-                      #'[old (get ast)]))]
-                 [(bind-new ...)
-                  (apply
-                   append
-                   (for/list ([fld r-f-lst])
-                     (define kind (first fld))
-                     (define new-id (third fld))
-                     (list
-                      new-id
-                      (with-syntax ([old (fourth fld)])
-                        (cond
-                          [(eq? kind 'just)
-                           #'(s old)]
-                          [(eq? kind 'list)
-                           #'(list-rewrite-all s old)])))))]
-                 [(eq-cmp ...)
-                  (for/list ([fld r-f-lst])
-                    (with-syntax ([new (third fld)]
-                                  [old (fourth fld)])
-                      #'(eq? old new)))]
-                 [copy (make-r-f-struct-copy nn-stx ast-id r-f-lst)])
-    #'(define (term-rewrite-all s ast)
-        (let (bind-old ...)
-          (let-and
-            bind-new ...
-            (if (and eq-cmp ...)
-                ast
-                copy))))))
+  (define (make-r-f-struct-copy type-id obj-id r-f-lst)
+    (with-syntax ([type type-id]
+                  [obj obj-id]
+                  [(set-fld ...) (for/list ([fld r-f-lst])
+                                   (with-syntax ([fld (second fld)]
+                                                 [tmp (third fld)])
+                                     #'[fld tmp]))])
+      #'(struct-copy type obj set-fld ...)))
 
-;; E.g., '((#'lv . 1) (#'rv . 2))
-(define-for-syntax (to-term-fields-with-ix f-stx-lst)
-  (filter
-   car
-   (for/list ([f-stx f-stx-lst]
-              [i (in-naturals)])
-     (define n 
-       (syntax-case f-stx ()
-         [(#:none fn-pat)
-          #f]
-         [(#:just fn-pat)
-          #'fn-pat]
-         [(#:many fn-pat)
-          #'fn-pat]))
-     (cons n i))))
+  ;; E.g. output:
+  ;; (define (term-rewrite-all s ast)
+  ;;   (let ((old-var (Define-var ast))
+  ;;         (old-body (Define-body ast)))
+  ;;     (let-and
+  ;;       var (s old-var)
+  ;;       body (list-rewrite-all s old-body)
+  ;;       (if (and (eq? old-var var) (eq? old-body body))
+  ;;           ast
+  ;;           (struct-copy Define ast (var var) (body body))))))
+  (define (make-term-rewrite-all nn-stx f-spec-lst)
+    (define nn-sym (syntax-e nn-stx))
 
-(define-for-syntax (make-term-fields f-stx-lst)
-  (define lst (to-term-fields-with-ix f-stx-lst))
-  (with-syntax ([(ix ...) (map cdr lst)])
-    #'(define (term-fields ast)
-        (list (unsafe-struct*-ref ast ix) ...))))
+    (define r-f-lst ;; (list/c kind id new-tmp old-tmp)
+      (for/list ([fld f-spec-lst]
+                 #:when (term-ConcFld? fld))
+        (define id (ConcFld-id fld))
+        (define new-tmp (generate-temporary id))
+        (define old-tmp (generate-temporary id))
+        (list (ConcFld-qty fld) id new-tmp old-tmp)))
+    
+    (define ast-id (generate-temporary 'ast))
+    (with-syntax* ([s (generate-temporary 's)]
+                   [ast ast-id]
+                   [(bind-old ...)
+                    (for/list ([fld r-f-lst])
+                      (define fn-sym (syntax-e (second fld)))
+                      (with-syntax ([old (fourth fld)]
+                                    [get (format-id nn-stx "~a-~a"
+                                                    nn-sym fn-sym)])
+                        #'[old (get ast)]))]
+                   [(bind-new ...)
+                    (apply
+                     append
+                     (for/list ([fld r-f-lst])
+                       (define kind (first fld))
+                       (define new-id (third fld))
+                       (list
+                        new-id
+                        (with-syntax ([old (fourth fld)])
+                          (case-or-fail kind
+                                        [(just maybe)
+                                         #'(s old)]
+                                        [(many)
+                                         #'(list-rewrite-all s old)])))))]
+                   [(eq-cmp ...)
+                    (for/list ([fld r-f-lst])
+                      (with-syntax ([new (third fld)]
+                                    [old (fourth fld)])
+                        #'(eq? old new)))]
+                   [copy (make-r-f-struct-copy nn-stx ast-id r-f-lst)])
+      #'(define (term-rewrite-all s ast)
+          (let (bind-old ...)
+            (let-and
+                bind-new ...
+              (if (and eq-cmp ...)
+                  ast
+                  copy))))))
+
+  (define (make-term-fields f-spec-lst)
+    (define lst
+      (filter term-ConcFld? f-spec-lst))
+    (if (null? lst)
+        #'(define (term-fields ast) null)
+        (with-syntax ([(ix ...) (map ConcFld-ix lst)])
+          #'(define (term-fields ast)
+              (list (unsafe-struct*-ref ast ix) ...)))))
      
-(define-for-syntax (make-set-term-fields type-id f-stx-lst)
-  (define r-f-lst (parse-relevant-fields f-stx-lst))
-  (with-syntax ([type type-id]
-                [(tmp ...) (for/list ([fld r-f-lst])
-                             (third fld))]
-                [(set-fld ...) (for/list ([fld r-f-lst])
-                                 (with-syntax ([fld (second fld)]
-                                               [tmp (third fld)])
-                                   #'[fld tmp]))])
-    #'(define (set-term-fields ast lst)
-        (let-values ([(tmp ...) (apply values lst)])
-          (struct-copy type ast set-fld ...)))))
+  (define (make-set-term-fields type-id f-spec-lst)
+    (define r-f-lst
+      (for/list ([fld f-spec-lst]
+                 #:when (term-ConcFld? fld))
+        (define id (ConcFld-id fld))
+        (list id (generate-temporary id))))
+    (if (null? r-f-lst)
+        #'(define (set-term-fields ast lst) ast)
+        (with-syntax ([type type-id]
+                      [(tmp ...) (map second r-f-lst)]
+                      [(set-fld ...) (for/list ([fld r-f-lst])
+                                       (with-syntax ([fld (first fld)]
+                                                     [tmp (second fld)])
+                                         #'[fld tmp]))])
+          #'(define (set-term-fields ast lst)
+              (let-values ([(tmp ...) (apply values lst)])
+                (struct-copy type ast set-fld ...))))))
 
-(define-for-syntax (make-strategic nn-stx f-stx-lst)
-  `(,(make-term-visit-all nn-stx f-stx-lst)
-    ,(make-term-rewrite-all nn-stx f-stx-lst)
-    ,(make-term-fields f-stx-lst)
-    ,(make-set-term-fields nn-stx f-stx-lst)))
+  (define (make-strategic nn-stx f-spec-lst)
+    `(,(make-term-visit-all nn-stx f-spec-lst)
+      ,(make-term-rewrite-all nn-stx f-spec-lst)
+      ,(make-term-fields f-spec-lst)
+      ,(make-set-term-fields nn-stx f-spec-lst))))
 
 ;;; 
 ;;; gen:syntactifiable
@@ -285,10 +270,8 @@ Assumptions for AST node types:
 ;;; 
 
 (define-for-syntax (make-define-ast stx provide?)
-  (define-syntax-class term-qty
-    (pattern (~or #:none #:just #:many)))
-
   (define-syntax-class vw
+    #:description "AST node view specification"
     #:attributes (spec)
     (pattern v-id:id
              #:attr spec (list #'v-id null #f))
@@ -296,63 +279,71 @@ Assumptions for AST node types:
              #:attr spec (list #'v-id 
                                (attribute v-spec.fspec-lst)
                                (attribute v-spec.copy))))
-  
-  (syntax-parse stx
-    [(_ name:id (view:vw ...) ((t:term-qty fld:id) ...)
-        (~optional (~seq #:singleton (arg:expr ...)))
-        (~optional (~seq #:custom-write writer:expr))
-        (~optional (~seq #:struct-options (opt ...))))
-     (define singleton? (attribute arg))
-     (define singleton-id
-       (and singleton? (format-id stx "the-~a" (syntax-e #'name))))
-     (define conc-id #'name)
-     (define fld-id-lst (syntax->list #'(fld ...)))
-     (define (mk-qty-h)
-       (define qty-stx-lst (syntax->list #'(t ...)))
-       (for/hasheq ((x qty-stx-lst) (id fld-id-lst))
-         (values (syntax-e id)
-                 (syntax-parse x [q:term-qty-num
-                                  (attribute q.num)]))))
-     (define struct-def
-       (quasisyntax
-        (#,(if provide? #'concrete-struct* #'struct)
-         name
-         (fld ...)
-         #:methods gen:custom-write
-         [(define write-proc #,(if (attribute writer)
-                                   #'writer
-                                   (make-ast-write conc-id fld-id-lst)))]
-         #,@(list 
-             #'#:methods #'gen:equal+hash
-             (with-syntax ([(m ...) 
-                            (make-equal+hash conc-id fld-id-lst)])
-               #'[m ...]))
-         #:methods gen:syntactifiable
-         (#,@(make-syntactifiable conc-id fld-id-lst))
-         #:methods gen:strategic (#,@(make-strategic
-                                      conc-id
-                                      (syntax->list #'((t fld) ...))))
-         #,@(let ((view-spec-lst (attribute view.spec)))
-              (if (null? view-spec-lst)
-                  null
-                  (let ((qty-h (mk-qty-h)))
-                    (apply
-                     append
-                     (for/list ([view-spec view-spec-lst])
-                       (generate-view-methods conc-id view-spec qty-h))))))
-         #:transparent
-         #,@(if (attribute opt)
-                (syntax->list #'(opt ...))
-                null))))
-     ;;(pretty-print (syntax->datum struct-def))
-     #`(begin
-         #,struct-def
-         #,@(make-extra-accessors conc-id fld-id-lst provide?)
-         #,@(if singleton?
-                (with-syntax ((the-name singleton-id)
-                              (def (if provide? #'define* #'define)))
-                  (list #'(def the-name (name arg ...))))
-                null))]))
+
+  (define-syntax-class fspec
+    #:description "AST node field specification"
+    #:attributes (spec)
+    (pattern [t:term-qty fld:id]
+             #:attr spec (list #'fld (attribute t.qty))))
+
+  (define def-stx
+    (syntax-parse stx
+      [(_ name:id (view:vw ...) (fld:fspec ...)
+          (~optional (~seq #:singleton (arg:expr ...)))
+          (~optional (~seq #:custom-write writer:expr))
+          (~optional (~seq #:struct-options (opt ...))))
+       (define singleton? (attribute arg))
+       (define singleton-id
+         (and singleton? (format-id stx "the-~a" (syntax-e #'name))))
+       (define conc-id #'name)
+       (define fld-lst
+         (for/list ([elem (attribute fld.spec)]
+                    [ix (in-naturals)])
+           (ConcFld (first elem) (second elem) ix)))
+       ;;(pretty-print fld-lst)
+       (define fld-id-lst (map ConcFld-id fld-lst))
+       (define (mk-qty-h)
+         (for/hasheq ([fld fld-lst])
+           (values (syntax-e (ConcFld-id fld)) (ConcFld-qty fld))))
+       (define struct-def
+         (quasisyntax
+          (#,(if provide? #'concrete-struct* #'struct)
+            name
+            (#,@fld-id-lst)
+            #:methods gen:custom-write
+            [(define write-proc #,(if (attribute writer)
+                                      #'writer
+                                      (make-ast-write conc-id fld-id-lst)))]
+            #,@(list 
+                #'#:methods #'gen:equal+hash
+                (with-syntax ([(m ...) 
+                               (make-equal+hash conc-id fld-id-lst)])
+                  #'[m ...]))
+            #:methods gen:syntactifiable
+            (#,@(make-syntactifiable conc-id fld-id-lst))
+            #:methods gen:strategic (#,@(make-strategic conc-id fld-lst))
+            #,@(let ((view-spec-lst (attribute view.spec)))
+                 (if (null? view-spec-lst)
+                     null
+                     (let ((qty-h (mk-qty-h)))
+                       (apply
+                        append
+                        (for/list ([view-spec view-spec-lst])
+                          (generate-view-methods conc-id view-spec qty-h))))))
+            #:transparent
+            #,@(if (attribute opt)
+                   (syntax->list #'(opt ...))
+                   null))))
+       #`(begin
+           #,struct-def
+           #,@(make-extra-accessors conc-id fld-id-lst provide?)
+           #,@(if singleton?
+                  (with-syntax ((the-name singleton-id)
+                                (def (if provide? #'define* #'define)))
+                    (list #'(def the-name (name arg ...))))
+                  null))]))
+  ;;(pretty-print (syntax->datum def-stx))
+  def-stx)
 
 (define-syntax* (define-ast stx)
   (make-define-ast stx #f))
@@ -378,182 +369,3 @@ Assumptions for AST node types:
 (define-syntax-rule* (view->term-rewrite-one name)
   (accessors->term-rewrite-one (view-term-fields-getter name)
                                (view-term-fields-setter name)))
-
-;;; 
-;;; testing
-;;; 
-
-(module* test #f
-  (require racket rackunit "strategy-term.rkt")
-
-  (define-view Ast (#:fields annos))
-
-  (define-ast Singleton (Ast) ((#:none annos)) #:singleton (#hasheq()))
-  (define-ast Empty (Ast) ([#:none annos]))
-  (define-ast Some (Ast) ((#:none annos) (#:just thing)))
-  (define-ast Object (Ast) ((#:none annos) (#:just one) 
-                            (#:many many)))
-
-  (define empty (Empty #hasheq()))
-  (define object (Object #hasheq() the-Singleton (list the-Singleton empty)))
-
-  (check-equal? the-Singleton the-Singleton)
-  (check-equal? empty empty)
-  (check-equal? empty (Empty (hasheq 'x 5)))
-  (check-not-equal? (Some #hasheq() empty) (Some #hasheq() the-Singleton))
-  (check-true (Ast=? (Empty (hasheq 'x 5)) (Some (hasheq 'x 5) empty)))
-  (check-false (Ast=? (Empty (hasheq 'x 5)) (Some (hasheq 'x 7) empty)))
-  (check-true (match empty [(Ast (? hash?)) #t] [_ #f]))
-  (check-true (match empty [(Ast (? hash? h)) (hash-empty? h)] [_ #f]))
-
-  (check-equal? (term-fields the-Singleton) '())
-  (check-equal? (term-fields empty) '())
-  (check-eqv? 1 (length (term-fields (Some (hasheq 'x 5) empty))))
-  (check-eqv? 2 (length (term-fields object)))
-  
-  (define rw-Singleton->Empty
-     (lambda (ast)
-       (match ast
-         [(? Singleton?) empty]
-         [else #f])))
-  
-  (define some-Singleton->Empty
-    (some rw-Singleton->Empty))
-  
-  (define one-Singleton->Empty
-    (one rw-Singleton->Empty))
-
-  (define (count-Singleton ast)
-    (define c 0)
-    ((topdown-visit (lambda (ast)
-                      (when (Singleton? ast)
-                        (set! c (add1 c))))) 
-     ast)
-    c)
-  
-  (check-false (some-Singleton->Empty empty))
-  (check-not-false (some-Singleton->Empty object))
-  (check-false (one-Singleton->Empty empty))
-  (check-not-false (one-Singleton->Empty object))
-
-  (let ((ast (one-Singleton->Empty 
-              (Object #hasheq() 
-                      empty 
-                      (list empty the-Singleton the-Singleton)))))
-    (check-eqv? 1 (count-Singleton ast)))
-  
-  (for ([dat (list the-Singleton
-                   `(,the-Singleton)
-                   `(1 ,the-Singleton 3)
-                   (Empty #hasheq())
-                   object
-                   (box object)
-                   (hasheq 'empty empty 'singleton the-Singleton)
-                   (Empty (hasheq 'stx #'(Empty #hasheq())))
-                   (Empty (hasheq 'origin (list #'foo #'bar)))
-                   )])
-    ;;(writeln `(ORIGINAL VALUE ,dat))
-    (define stx (syntactifiable-mkstx dat))
-    ;;(writeln stx)
-    ;;(writeln `(MARSHALLED SYNTAX ,(syntax->datum stx)))
-    (define val (eval-syntax stx))
-    ;;(writeln `(UNMARSHALED VALUE ,val))
-    (when (Ast? val)
-      (define annos (Ast-annos val))
-      (unless (hash-empty? annos)
-        ;;(writeln `(UNMARSHALED ANNOS ,annos))
-        (void))))
-  
-  (define-ast Tree () ([#:many lst]))
-  (define-ast Atom () ([#:none v]))
-  (let ((t (Tree (list (Atom 1) (Atom 2))))
-        (x 0))
-    (define (s ast) (when (Atom? ast) (set! x (+ x (Atom-v ast)))))
-    (define (br ast) (break))
-    ((topdown-visit s) t)
-    (check-eqv? x 3)
-    (set! t (Tree (list (Tree (list (Atom 1) (Atom 2))) (Atom 3))))
-    (define (s2 ast) (when (Atom? ast) (set! x (+ x (Atom-v ast))) (break)))
-    ((topdown-visit-break s2) t)
-    (check-eqv? x 9)
-    (define (s3 ast) (cond ((Atom? ast) 
-                            (set! x (+ x (Atom-v ast))))
-                           ((Tree? ast)
-                            (break))))
-    ((topdown-visit-break s3) t)
-    (check-eqv? x 9))
-  (let ()
-    (define (sum t)
-      (define x 0)
-      (define (f ast)
-        (when (Atom? ast)
-          (set! x (+ x (Atom-v ast)))
-          (break)))
-      ((topdown-visit-break f) t)
-      x)
-    (define t (Tree (list (Tree (list (Atom 1) (Atom 2))) (Atom 3))))
-    (check-eqv? (sum t) 6)
-    (define (inc ast)
-      (match ast
-        ((Atom x) (break (Atom (add1 x))))
-        (_ ast)))
-    (set! t ((topdown-break inc) t))
-    (check-eqv? (sum t) 9))
-  (let ()
-    (define (collect-nums t)
-      (define lst '())
-      ((bottomup-visit
-        (lambda (ast)
-          (when (Atom? ast)
-            (set! lst (cons (Atom-v ast) lst))))) t)
-      (reverse lst))
-    (define t (Tree (list (Tree (list (Atom 1) (Atom 2))) (Atom 3))))
-    ;; note: not in reverse order as probably are in Stratego
-    (check-equal? '(1 2 3) (collect-nums t)))
-
-  (let ((t (Tree (list (Tree (list (Atom 1) (Atom 2))) (Atom 3)))))
-    (let ((lst (term-fields t)))
-      (check-equal? t (set-term-fields t lst))
-      (check-equal? t (set-term-fields (Tree null) lst))))
-  (let ((t (Tree (list (Atom 1) (Atom 2)))))
-    (define (inc ast)
-      (match ast
-        ((Atom x) (Atom (add1 x)))
-        (_ ast)))
-    (define lst (term-fields t))
-    (define inc-lst (for/list ((f lst))
-                      (map inc f)))
-    (check-equal? (set-term-fields t inc-lst)
-                  (Tree (list (Atom 2) (Atom 3)))))
-  
-  (let ((t1 (Tree (list (Atom 1) (Atom 2))))
-        (t2 (Tree (list (Atom 1) (Tree null))))
-        (t3 (Tree (list (Tree null) (Tree null)))))
-    (define (rw-Tree ast)
-      (and (Tree? ast) (Atom 555)))
-    (define (rw-Atom ast)
-      (and (Atom? ast) (Tree null)))
-    (check-not-false ((all rw-Atom) t1))
-    (check-false ((all rw-Atom) t2))
-    (check-false ((all rw-Atom) t3))
-    (check-false ((all rw-Tree) t1))
-    (check-false ((all rw-Tree) t2))
-    (check-not-false ((all rw-Tree) t3))
-    (check-not-false ((some rw-Atom) t1))
-    (check-not-false ((some rw-Atom) t2))
-    (check-false ((some rw-Atom) t3))
-    (check-false ((some rw-Tree) t1))
-    (check-not-false ((some rw-Tree) t2))
-    (check-not-false ((some rw-Tree) t3))
-    (check-not-false ((one rw-Atom) t1))
-    (check-not-false ((one rw-Atom) t2))
-    (check-false ((one rw-Atom) t3))
-    (check-false ((one rw-Tree) t1))
-    (check-not-false ((one rw-Tree) t2))
-    (check-not-false ((one rw-Tree) t3))
-    (check-not-false ((one rw-Atom) ((one rw-Atom) t1)))
-    (check-false ((one rw-Atom) ((one rw-Atom) t2)))
-    (check-false ((some rw-Atom) ((some rw-Atom) t1)))
-    (void))
-
-  (void))

@@ -5,6 +5,7 @@
 (require "util/module.rkt")
 (provide (all-from-out "util/module.rkt"))
 
+(require* "util/assert.rkt")
 (require* "util/print.rkt")
 (require* "util/let.rkt")
 
@@ -79,37 +80,6 @@
 
 (define* (symbolic-identifier=? a b)
   (eq? (syntax-e a) (syntax-e b)))
-
-(define* (raise-assertion-error src fmt . v)
-  (apply error src (string-append "assertion failed: " fmt) v))
-
-(define-syntax-rule* (assert e)
-  (unless e
-    (raise-assertion-error 'assert "~s" (quote e))))
-
-(define-syntax* cond-or-fail
-  (syntax-rules (else)
-    [(_ clause ... (else body ...))
-     (cond clause ... (else body ...))]
-    [(_ clause ...)
-     (cond
-      clause ...
-      (else
-       (raise-assertion-error
-        'cond-or-fail "no matching 'cond' clause")))]))
-
-(define-syntax* case-or-fail
-  (syntax-rules (else)
-    [(_ val-expr clause ... (else body ...))
-     (case val-expr clause ... (else body ...))]
-    [(_ val-expr clause ...)
-     (let ((v val-expr))
-       (case v
-         clause ...
-         (else
-          (raise-assertion-error
-           'case-or-fail 
-           "no matching 'case' clause for ~s" v))))]))
 
 (define* (hash-merge! h . others)
   (for ((other others))

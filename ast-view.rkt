@@ -107,12 +107,12 @@ E.g.,
   (for ((fld fld-spec-lst))
     (unless (ViewFld-qty fld)
       (error 'define-view
-             "no `#:none`/`#:just`/`#:many` specified for ~a's field ~a"
+             "no quantity specified for ~a's field ~a"
              view-name (syntax-e (ViewFld-id fld)))))
 
   (define term-fld-lst
     (for/list ([fld fld-spec-lst]
-               #:when (> (ViewFld-qty fld) 0))
+               #:when (term-ViewFld? fld))
       fld))
   (define term-fld-count (length term-fld-lst))
               
@@ -147,12 +147,12 @@ E.g.,
           (with-syntax ([(t-v ...)
                          (for/list ([fld fld-spec-lst]
                                     [v-id v-id-lst]
-                                    #:when (> (ViewFld-qty fld) 0))
+                                    #:when (term-ViewFld? fld))
                            v-id)]
                         [(def-nt-v ...)
                          (for/list ([fld fld-spec-lst]
                                     [v-id v-id-lst]
-                                    #:unless (> (ViewFld-qty fld) 0))
+                                    #:unless (term-ViewFld? fld))
                            (with-syntax ([v v-id]
                                          [get
                                           (format-id view-id
@@ -184,35 +184,39 @@ E.g.,
 ;;; 
 
 (begin-for-syntax
-  (define-syntax-class* term-qty-num
-    #:attributes (num)
-    (pattern #:none #:attr num 0)
-    (pattern #:just #:attr num 1)
-    (pattern #:many #:attr num +inf.0))
+  (define-syntax-class* term-qty
+    #:attributes (qty)
+    (pattern #:none #:attr qty 'none)
+    (pattern #:maybe #:attr qty 'maybe)
+    (pattern #:just #:attr qty 'just)
+    (pattern #:many #:attr qty 'many))
 
   (define-splicing-syntax-class tqty?
-    #:attributes (num)
-    (pattern (~optional qty:term-qty-num)
-             #:attr num (attribute qty.num)))
+    #:attributes (qty)
+    (pattern (~optional tq:term-qty)
+             #:attr qty (attribute tq.qty)))
 
   ;; The `qty` field value is optional, and may be #f.
   (define-datatype* (ViewFld id qty)
     ([FieldViewFld] [AccessViewFld get set]) #:transparent)
 
+  (define (term-ViewFld? fld)
+    (not (eq? (ViewFld-qty fld) 'none)))
+  
   (define (ViewFld->syntax fld)
     (match fld
       [(FieldViewFld id qty)
-       #`(FieldViewFld #'#,id #,qty)]
+       #`(FieldViewFld #'#,id '#,qty)]
       [(AccessViewFld id qty get set)
-       #`(AccessViewFld #'#,id #,qty #'#,get #'#,set)]))
+       #`(AccessViewFld #'#,id '#,qty #'#,get #'#,set)]))
   
   (define-syntax-class vfld
     #:description "view field specification"
     #:attributes (spec)
-    [pattern (#:field qty:tqty? fld:id) 
-             #:attr spec (FieldViewFld #'fld (attribute qty.num))]
-    [pattern (#:access qty:tqty? fld:id get:expr set:expr)
-             #:attr spec (AccessViewFld #'fld (attribute qty.num)
+    [pattern (#:field tq:tqty? fld:id) 
+             #:attr spec (FieldViewFld #'fld (attribute tq.qty))]
+    [pattern (#:access tq:tqty? fld:id get:expr set:expr)
+             #:attr spec (AccessViewFld #'fld (attribute tq.qty)
                                         #'get #'set)])
 
   (define-splicing-syntax-class vflds
@@ -342,7 +346,7 @@ E.g.,
       (define c-qty (hash-ref conc-qty-h name #f))
       (when c-qty
         (define v-qty (ViewFld-qty fld))
-        (when (and v-qty (not (= c-qty v-qty)))
+        (when (and v-qty (not (eq? c-qty v-qty)))
           (error 'generate-view-methods
                  "quantities differ for field `~a`: ~a"
                  name
