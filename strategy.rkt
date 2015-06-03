@@ -90,29 +90,32 @@ data-type-specific operations.
   (set-term-fields strategic lst))
 
 (define* ((accessors->term-visit-all get) s ast)
-  (for ((fv (get ast)))
-    (if (list? fv)
-        (for-each s fv)
-        (s fv))))
+  (for ([fv (get ast)])
+    (cond
+      [(list? fv) (for-each s fv)]
+      [fv (s fv)]))
+  (void))
 
 (define* ((accessors->term-rewrite-all get set) s ast)
   (define changed? #f)
-  (let loop ([res null] [lst (get ast)])
+  (let loop ([res null]
+             [lst (get ast)])
     (if (null? lst)
         (if changed?
             (set ast (reverse res))
             ast)
-        (let ()
-          (define o-elem (car lst))
-          (define n-elem
-            (if (list? o-elem)
-                (list-rewrite-all s o-elem)
-                (s o-elem)))
-          (and n-elem
-               (begin
-                 (unless (eq? o-elem n-elem)
-                   (set! changed? #t))
-                 (loop (cons n-elem res) (cdr lst))))))))
+        (let ([o-elem (car lst)])
+          (if (not o-elem)
+              (loop (cons #f res) (cdr lst))
+              (let ([n-elem
+                     (if (list? o-elem)
+                         (list-rewrite-all s o-elem)
+                         (s o-elem))])
+                (and n-elem
+                     (begin
+                       (unless (eq? o-elem n-elem)
+                         (set! changed? #t))
+                       (loop (cons n-elem res) (cdr lst))))))))))
 
 (define* ((accessors->term-rewrite-some get set) s ast)
   (define o-lst (get ast))
@@ -120,9 +123,11 @@ data-type-specific operations.
   (define some? #f)
   (define n-lst 
     (for/list ([fv o-lst])
-      (let ([nv (if (list? fv)
-                    (list-rewrite-some s fv)
-                    (s fv))])
+      (let ([nv
+             (cond
+               [(list? fv) (list-rewrite-some s fv)]
+               [fv (s fv)]
+               [else #f])])
         (if nv
             (begin
               (unless (eq? fv nv)
@@ -139,28 +144,22 @@ data-type-specific operations.
   (accessors->term-rewrite-some term-fields set-term-fields))
 
 (define* ((accessors->term-rewrite-one get set) s ast)
-  (define o-lst (get ast))
-  (define changed? #f)
-  (define one? #f)
-  (define n-lst 
-    (for/list ([fv o-lst])
-      (if one? 
-          fv
-          (let ()
-            (define nv (if (list? fv)
-                           (list-rewrite-one s fv)
-                           (s fv)))
-            (if nv
-                (begin
-                  (unless (eq? fv nv)
-                    (set! changed? #t))
-                  (set! one? #t)
-                  nv)
-                fv)))))
-  (and one?
-       (if changed?
-           (set ast n-lst)
-           ast)))
+  (let loop ([res null]
+             [lst (get ast)])
+    (if (null? lst)
+        #f
+        (let ([fv (car lst)])
+          (if (not fv)
+              (loop (cons fv res) (cdr lst))
+              (let ([nv
+                     (if (list? fv)
+                         (list-rewrite-one s fv)
+                         (s fv))])
+                (if nv
+                    (if (eq? fv nv)
+                        ast
+                        (set ast (append (reverse res) (list nv) (cdr lst))))
+                    (loop (cons fv res) (cdr lst)))))))))
 
 (define* term-rewrite-one
   (accessors->term-rewrite-one term-fields set-term-fields))

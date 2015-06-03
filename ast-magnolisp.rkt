@@ -46,7 +46,7 @@ Assumptions for AST node types:
 
 (define-Ast-anno-accessors type get-type set-type)
 
-(define-view* Expr ([#:access #:just type get-type set-type])
+(define-view* Expr ([#:access #:maybe type get-type set-type])
   #:support-traversals)
 
 ;; Either an Expr or a Stat, without any ad-hoc members.

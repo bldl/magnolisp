@@ -14,7 +14,7 @@ Assumptions for AST node types:
 |#
 
 (require "ast-serialize.rkt" "ast-view.rkt"
-         "strategy.rkt" "strategy-list.rkt"
+         "strategy.rkt"
          "util.rkt" "util/struct.rkt"
          racket/generic racket/unsafe/ops unstable/struct
          (for-syntax "util/assert.rkt"
@@ -64,6 +64,20 @@ Assumptions for AST node types:
 ;;; gen:strategic
 ;;; 
 
+(define-syntax let-rewrite-all
+  (syntax-rules ()
+    [(_ s #:just new old . rest)
+     (let ([new (s old)])
+       (and new (let-rewrite-all s . rest)))]
+    [(_ s #:many new old . rest)
+     (let ([new (list-rewrite-all s old)])
+       (and new (let-rewrite-all s . rest)))]
+    [(_ s #:maybe new old . rest)
+     (let ([new (and old (s old))])
+       (and (or new (not old))
+            (let-rewrite-all s . rest)))]
+    [(_ s e) e]))
+
 (begin-for-syntax
   (struct ConcFld (id qty ix) #:transparent)
 
@@ -79,19 +93,23 @@ Assumptions for AST node types:
                (case-or-fail (ConcFld-qty fld)
                  [(none)
                   #'(begin)]
-                 [(just maybe)
+                 [(just)
                   #'(s (get ast))]
                  [(many)
-                  #'(for-each s (get ast))])))
+                  #'(for-each s (get ast))]
+                 [(maybe)
+                  #'(let ([tmp (get ast)])
+                      (and tmp (s tmp)))])))
         (void)))
 
   (define (make-r-f-struct-copy type-id obj-id r-f-lst)
     (with-syntax ([type type-id]
                   [obj obj-id]
-                  [(set-fld ...) (for/list ([fld r-f-lst])
-                                   (with-syntax ([fld (second fld)]
-                                                 [tmp (third fld)])
-                                     #'[fld tmp]))])
+                  [(set-fld ...)
+                   (for/list ([fld r-f-lst])
+                     (with-syntax ([fld (second fld)]
+                                   [tmp (third fld)])
+                       #'[fld tmp]))])
       #'(struct-copy type obj set-fld ...)))
 
   ;; E.g. output:
@@ -129,29 +147,32 @@ Assumptions for AST node types:
                     (apply
                      append
                      (for/list ([fld r-f-lst])
-                       (define kind (first fld))
+                       (define kind-kw
+                         (case-or-fail (first fld)
+                          [(just) #'#:just]
+                          [(many) #'#:many]
+                          [(maybe) #'#:maybe]))
                        (define new-id (third fld))
-                       (list
-                        new-id
-                        (with-syntax ([old (fourth fld)])
-                          (case-or-fail kind
-                                        [(just maybe)
-                                         #'(s old)]
-                                        [(many)
-                                         #'(list-rewrite-all s old)])))))]
+                       (define old-id (fourth fld))
+                       (list kind-kw new-id old-id)))]
                    [(eq-cmp ...)
                     (for/list ([fld r-f-lst])
+                      (define kind (first fld))
                       (with-syntax ([new (third fld)]
                                     [old (fourth fld)])
-                        #'(eq? old new)))]
+                        (case kind
+                          [(maybe)
+                           #'(or (not old) (eq? old new))]
+                          [else
+                           #'(eq? old new)])))]
                    [copy (make-r-f-struct-copy nn-stx ast-id r-f-lst)])
       #'(define (term-rewrite-all s ast)
           (let (bind-old ...)
-            (let-and
-                bind-new ...
-              (if (and eq-cmp ...)
-                  ast
-                  copy))))))
+            (let-rewrite-all s
+             bind-new ...
+             (if (and eq-cmp ...)
+                 ast
+                 copy))))))
 
   (define (make-term-fields f-spec-lst)
     (define lst
