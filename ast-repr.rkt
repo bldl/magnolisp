@@ -88,17 +88,17 @@ Assumptions for AST node types:
     (define nn-sym (syntax-e nn-stx))
     #`(define (term-visit-all s ast)
         #,@(for/list ([fld f-spec-lst])
-             (define fn-sym (syntax-e (ConcFld-id fld)))
-             (with-syntax ([get (format-id nn-stx "~a-~a" nn-sym fn-sym)])
+             (with-syntax ([get-expr
+                            #`(unsafe-struct*-ref ast #,(ConcFld-ix fld))])
                (case-or-fail (ConcFld-qty fld)
                  [(none)
                   #'(begin)]
                  [(just)
-                  #'(s (get ast))]
+                  #'(s get-expr)]
                  [(many)
-                  #'(for-each s (get ast))]
+                  #'(for-each s get-expr)]
                  [(maybe)
-                  #'(let ([tmp (get ast)])
+                  #'(let ([tmp get-expr])
                       (and tmp (s tmp)))])))
         (void)))
 
@@ -125,24 +125,25 @@ Assumptions for AST node types:
   (define (make-term-rewrite-all nn-stx f-spec-lst)
     (define nn-sym (syntax-e nn-stx))
 
-    (define r-f-lst ;; (list/c kind id new-tmp old-tmp)
+    (define r-f-lst ;; (list/c kind id new-tmp old-tmp ix)
       (for/list ([fld f-spec-lst]
                  #:when (term-ConcFld? fld))
         (define id (ConcFld-id fld))
         (define new-tmp (generate-temporary id))
         (define old-tmp (generate-temporary id))
-        (list (ConcFld-qty fld) id new-tmp old-tmp)))
+        (list (ConcFld-qty fld) id new-tmp old-tmp
+              (ConcFld-ix fld))))
     
     (define ast-id (generate-temporary 'ast))
     (with-syntax* ([s (generate-temporary 's)]
                    [ast ast-id]
                    [(bind-old ...)
                     (for/list ([fld r-f-lst])
-                      (define fn-sym (syntax-e (second fld)))
-                      (with-syntax ([old (fourth fld)]
-                                    [get (format-id nn-stx "~a-~a"
-                                                    nn-sym fn-sym)])
-                        #'[old (get ast)]))]
+                      (with-syntax
+                        ([old (fourth fld)]
+                         [get-expr
+                          #`(unsafe-struct*-ref ast #,(fifth fld))])
+                        #'[old get-expr]))]
                    [(bind-new ...)
                     (apply
                      append
@@ -323,9 +324,12 @@ Assumptions for AST node types:
            (ConcFld (first elem) (second elem) ix)))
        ;;(pretty-print fld-lst)
        (define fld-id-lst (map ConcFld-id fld-lst))
-       (define (mk-qty-h)
+       
+       (define (mk-conc-info-h)
          (for/hasheq ([fld fld-lst])
-           (values (syntax-e (ConcFld-id fld)) (ConcFld-qty fld))))
+           (values (syntax-e (ConcFld-id fld))
+                   (list (ConcFld-qty fld) (ConcFld-ix fld)))))
+       
        (define struct-def
          (quasisyntax
           (#,(if provide? #'concrete-struct* #'struct)
@@ -346,11 +350,11 @@ Assumptions for AST node types:
             #,@(let ((view-spec-lst (attribute view.spec)))
                  (if (null? view-spec-lst)
                      null
-                     (let ((qty-h (mk-qty-h)))
+                     (let ((h (mk-conc-info-h)))
                        (apply
                         append
                         (for/list ([view-spec view-spec-lst])
-                          (generate-view-methods conc-id view-spec qty-h))))))
+                          (generate-view-methods conc-id view-spec h))))))
             #:transparent
             #,@(if (attribute opt)
                    (syntax->list #'(opt ...))

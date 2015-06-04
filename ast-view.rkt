@@ -31,7 +31,7 @@ E.g.,
 
 |#
 
-(require racket/generic racket/match "util.rkt"
+(require racket/generic racket/match racket/unsafe/ops "util.rkt"
          (for-syntax racket/base racket/list racket/match
                      racket/pretty racket/syntax syntax/parse
                      "util/module.rkt"))
@@ -310,9 +310,9 @@ E.g.,
 ;; Generates syntax for specifying the implementation of the methods
 ;; of the specified view for the specified concrete struct type. The
 ;; resulting list of syntax objects is intended to be spliced into a
-;; (struct ...) declaration. E.g., (generate-view-methods #'C (list
-;; #'V '() #f #hasheq())) -> (list #'#:methods #'gen:V (...)).
-(define-for-syntax* (generate-view-methods conc-id view-spec conc-qty-h)
+;; (struct ....) declaration. E.g., (generate-view-methods #'C (list
+;; #'V '() #f) ....) -> (list #'#:methods #'gen:V #'(....)).
+(define-for-syntax* (generate-view-methods conc-id view-spec conc-info-h)
   (match-define (list view-id fld-override-lst copy-lambda-stx) view-spec)
   (define view-name (syntax-e view-id))
   (define conc-name (syntax-e conc-id))
@@ -343,8 +343,9 @@ E.g.,
   (for ([fld fld-info-lst])
     (when (FieldViewFld? fld)
       (define name (syntax-e (ViewFld-id fld)))
-      (define c-qty (hash-ref conc-qty-h name #f))
-      (when c-qty
+      (define c-info (hash-ref conc-info-h name #f))
+      (when c-info
+        (define c-qty (first c-info))
         (define v-qty (ViewFld-qty fld))
         (when (and v-qty (not (eq? c-qty v-qty)))
           (error 'generate-view-methods
@@ -371,9 +372,8 @@ E.g.,
       (define fld-name (syntax-e fld-id))
       
       (define (mk-default-get)
-        (with-syntax ([c-getter-id
-                       (format-id conc-id "~a-~a" conc-name fld-name)])
-          #'(lambda (view) (c-getter-id view))))
+        (define ix (second (hash-ref conc-info-h fld-name)))
+        #`(lambda (view) (unsafe-struct*-ref view #,ix)))
       
       (define getter-impl
         (with-syntax ([v-getter-id
