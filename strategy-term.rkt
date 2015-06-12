@@ -106,8 +106,8 @@
 
 (define* topdown-break
   (rec again s
-       (seq-break s (all again))))
+       (seq-break s (all-rewriter again))))
 
 (define* topdown-visit-break
   (rec again s
-       (seq-visit-break s (all again))))
+       (seq-visit-break s (all-rewriter again))))

@@ -4,7 +4,7 @@
 |#
 
 (require "app-util.rkt" "ast-magnolisp.rkt" "compiler-rewrites.rkt" 
-         "strategy.rkt" "strategy-term.rkt" "util.rkt")
+         "strategy.rkt" "strategy-stratego.rkt" "util.rkt")
 
 ;;; 
 ;;; utilities
@@ -334,7 +334,7 @@
 ;; type is being simplified; it is only used for error reporting.
 (define (type-rm-VarT var-h t ctx-ast)
   (define f
-    (innermost
+    (innermost-rewriter
      (lambda (ast)
        (match ast
         [(? VarT?)

@@ -5,7 +5,7 @@
 |#
 
 (require "app-util.rkt" "ast-magnolisp.rkt" "ast-view.rkt"
-         "strategy.rkt" "strategy-term.rkt" "util.rkt"
+         "strategy.rkt" "strategy-stratego.rkt" "util.rkt"
          syntax/id-table)
 
 ;;; 
@@ -29,7 +29,7 @@
 ;; signature is (-> table id Def? table).
 (define* (defs-table-update-locals/Id defs)
   (define f
-    (topdown-visit
+    (topdown-visitor
      (lambda (ast)
        (when (ast-local-def? ast)
          (define id (Def-id ast))
@@ -48,7 +48,7 @@
     (set! defs (put defs (Def-id def) def)))
   
   (define f
-    (topdown-visit
+    (topdown-visitor
      (lambda (ast)
        (when (Def? ast)
          (put! ast)))))
@@ -624,7 +624,7 @@
          #f])))))
        
 (define* ast-simplify-multi-innermost
-  (innermost
+  (innermost-rewriter
    (match-lambda
     [(LetLocalEc _ (Var _ k1) (list (AppLocalEc _ (Var _ k2) e)))
      #:when (ast-identifier=? k1 k2)
@@ -664,7 +664,7 @@
 
 (define* (ast->list ast (annos null))
   (define lst null)
-  ((topdown-visit
+  ((topdown-visitor
     (lambda (ast)
       (define h (Ast-annos ast))
       (set! lst

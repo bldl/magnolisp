@@ -2,10 +2,9 @@
 
 #|
 
-This is a basic Stratego-inspired term rewriting library for Racket.
-This module defines generic and commonly used functionality. The
-auxiliary modules "strategy-*.rkt" define additional
-data-type-specific operations.
+This is a basic term rewriting library for Racket. This module defines
+generic and commonly used functionality. The auxiliary
+modules "strategy-*.rkt" define additional operations.
 
 |#
 
@@ -89,14 +88,14 @@ data-type-specific operations.
   (term-fields strategic)
   (set-term-fields strategic lst))
 
-(define* ((accessors->term-visit-all get) s ast)
+(define* ((make-term-visit-all get) s ast)
   (for ([fv (get ast)])
     (cond
       [(list? fv) (for-each s fv)]
       [fv (s fv)]))
   (void))
 
-(define* ((accessors->term-rewrite-all get set) s ast)
+(define* ((make-term-rewrite-all get set) s ast)
   (define changed? #f)
   (let loop ([res null]
              [lst (get ast)])
@@ -117,7 +116,7 @@ data-type-specific operations.
                          (set! changed? #t))
                        (loop (cons n-elem res) (cdr lst))))))))))
 
-(define* ((accessors->term-rewrite-some get set) s ast)
+(define* ((make-term-rewrite-some get set) s ast)
   (define o-lst (get ast))
   (define changed? #f)
   (define some? #f)
@@ -141,9 +140,9 @@ data-type-specific operations.
            ast)))
 
 (define* term-rewrite-some
-  (accessors->term-rewrite-some term-fields set-term-fields))
+  (make-term-rewrite-some term-fields set-term-fields))
 
-(define* ((accessors->term-rewrite-one get set) s ast)
+(define* ((make-term-rewrite-one get set) s ast)
   (let loop ([res null]
              [lst (get ast)])
     (if (null? lst)
@@ -162,7 +161,7 @@ data-type-specific operations.
                     (loop (cons fv res) (cdr lst)))))))))
 
 (define* term-rewrite-one
-  (accessors->term-rewrite-one term-fields set-term-fields))
+  (make-term-rewrite-one term-fields set-term-fields))
 
 ;;; 
 ;;; Sub-object accessor combinators.
@@ -313,17 +312,6 @@ data-type-specific operations.
     (let loop ([arg arg] ...)
       e ...)))
 
-;; Tries a rewrite, restoring original term on failure.
-(define* (try-rewriter s)
-  (lambda (ast)
-    (define r (s ast))
-    (or r ast)))
-
-;; Tries a rewrite, but restores original term on success.
-(define* (where-rewriter s)
-  (lambda (ast)
-    (and (s ast) ast)))
-
 ;; Applies a rewrite rule `s` on `ast` for as long as it succeeds.
 (define* (rewrite-repeat s ast)
   (let loop ([ast ast])
@@ -369,18 +357,6 @@ data-type-specific operations.
     (define r (rewrite-all loop ast))
     (and r (s r))))
 
-(define-strategy*/accessor (downup-rewriter s rewrite-all)
-  (rec-lambda loop (ast)
-    (and-rewrite ast s (fix rewrite-all loop) s)))
-
-(define-strategy*/accessor (alltd-rewriter s rewrite-all)
-  (rec-lambda loop (ast)
-    (or-rewrite ast s (fix rewrite-all loop))))
-
-(define-strategy*/accessor (oncetd-rewriter s rewrite-one)
-  (rec-lambda loop (ast)
-    (or-rewrite ast s (fix rewrite-one loop))))
-
 ;; Traverses top-down, applying `s` on each node for as many time as
 ;; it succeeds, keeping the latest successful rewrite result.
 (define-strategy*/accessor (outermost-rewriter s rewrite-all)
@@ -392,24 +368,3 @@ data-type-specific operations.
   (rec-lambda loop (ast)
     (let ((ast (rewrite-all loop ast)))
       (rewrite-repeat s ast))))
-
-;; DEPRECATED
-(define* (fail-rw x) #f)
-(define* (id-rw x) x)
-
-;; DEPRECATED
-(provide (rename-out
-          [repeat-rewriter repeat]
-          [try-rewriter try]
-          [where-rewriter where]
-          [all-visitor all-visit]
-          [all-rewriter all]
-          [some-rewriter some]
-          [one-rewriter one]
-          [topdown-visitor topdown-visit]
-          [bottomup-visitor bottomup-visit]
-          [topdown-rewriter topdown]
-          [bottomup-rewriter bottomup]
-          [outermost-rewriter outermost]
-          [innermost-rewriter innermost]
-          ))

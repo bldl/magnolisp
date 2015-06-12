@@ -286,7 +286,7 @@ E.g.,
   
   (syntax-parse stx
     [(_ view:id flds:vspec
-        (~optional (~and #:support-traversals support-traversals))
+        (~optional (~and #:traversable support-traversals))
         (~optional (~seq #:generics-options (opt ...))))
      (generate #'view 
                (attribute flds.fspec-lst)

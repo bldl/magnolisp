@@ -78,13 +78,17 @@ Utilities for authoring manual.scrbl.
 ;;; Racket syntax
 ;;; 
 
-(module Racket-m racket
-  (require scribble/manual (for-label racket/base))
+(module Racket-m racket/base
+  (require scribble/manual
+           (for-syntax racket/base)
+           (for-label racket/base))
   (provide racket/Racket)
   (define-syntax (racket/Racket stx)
     (syntax-case stx ()
-      [(_ datum)
-       #`(racket #,(datum->syntax #'here (syntax->datum #'datum)))])))
+      [(_ datum ...)
+       #`(racket #,@(map
+                     (lambda (x) (datum->syntax #'here (syntax->datum x)))
+                     (syntax->list #'(datum ...))))])))
 
 (require (submod "." Racket-m))
 (provide racket/Racket)

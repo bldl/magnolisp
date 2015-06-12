@@ -7,7 +7,8 @@ C++ back end.
 |#
 
 (require "app-util.rkt" "ast-magnolisp.rkt" "backend-util.rkt"
-         "compiler-rewrites.rkt" "strategy.rkt" "strategy-term.rkt"
+         "compiler-rewrites.rkt" "strategy.rkt"
+         "strategy-stratego.rkt" "strategy-term.rkt"
          "util.rkt"
          racket/syntax syntax/id-table)
 
@@ -516,7 +517,7 @@ C++ back end.
 
 (define (ast-contains? p? ast)
   (let/ec k
-    ((topdown-visit
+    ((topdown-visitor
       (lambda (ast)
         (when (p? ast)
           (k #t)))) ast)
@@ -877,7 +878,7 @@ C++ back end.
 (define (fun-rm-unreferenced-var-decl def)
   (define refs (mutable-seteq))
   
-  ((topdown-visit
+  ((topdown-visitor
     (lambda (ast)
       (when (Var? ast)
         (define id (Var-id ast))
@@ -943,7 +944,7 @@ C++ back end.
     ;; The `targets` set is that of label `bind` values in `s` that
     ;; are Goto targets.
     (define targets (mutable-seteq))
-    ((topdown-visit
+    ((topdown-visitor
       (lambda (ast)
         (when (Goto? ast)
           (define id (Goto-id ast))

@@ -4,8 +4,10 @@
 |#
 
 (module* test #f
-  (require magnolisp/ast-repr magnolisp/ast-serialize magnolisp/ast-view
-           magnolisp/strategy magnolisp/strategy-term
+  (require (relative-in magnolisp
+                        "ast-repr.rkt" "ast-serialize.rkt" "ast-view.rkt"
+                        "strategy.rkt" "strategy-stratego.rkt"
+                        "strategy-term.rkt")
            rackunit)
 
   (define-view Ast (#:fields annos))
@@ -47,7 +49,7 @@
 
   (define (count-Singleton ast)
     (define c 0)
-    ((topdown-visit (lambda (ast)
+    ((topdown-visitor (lambda (ast)
                       (when (Singleton? ast)
                         (set! c (add1 c))))) 
      ast)
@@ -92,7 +94,7 @@
         (x 0))
     (define (s ast) (when (Atom? ast) (set! x (+ x (Atom-v ast)))))
     (define (br ast) (break))
-    ((topdown-visit s) t)
+    ((topdown-visitor s) t)
     (check-eqv? x 3)
     (set! t (Tree (list (Tree (list (Atom 1) (Atom 2))) (Atom 3))))
     (define (s2 ast) (when (Atom? ast) (set! x (+ x (Atom-v ast))) (break)))
@@ -124,7 +126,7 @@
   (let ()
     (define (collect-nums t)
       (define lst '())
-      ((bottomup-visit
+      ((bottomup-visitor
         (lambda (ast)
           (when (Atom? ast)
             (set! lst (cons (Atom-v ast) lst))))) t)

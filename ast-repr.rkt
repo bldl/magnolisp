@@ -49,7 +49,7 @@ Assumptions for AST node types:
 
 ;; Produces syntax for a node-type specific implementation of a
 ;; gen:custom-write style function.
-(define-for-syntax (make-ast-write n-stx fld-id-lst)
+(define-for-syntax (mkstx-ast-write n-stx fld-id-lst)
   (define getter-lst
     (for/list ([fld fld-id-lst]
                #:unless (eq? (syntax-e fld) 'annos))
@@ -84,7 +84,7 @@ Assumptions for AST node types:
   (define (term-ConcFld? fld)
     (not (eq? (ConcFld-qty fld) 'none)))
 
-  (define (make-term-visit-all nn-stx f-spec-lst)
+  (define (mkstx-term-visit-all nn-stx f-spec-lst)
     (define nn-sym (syntax-e nn-stx))
     #`(define (term-visit-all s ast)
         #,@(for/list ([fld f-spec-lst])
@@ -102,7 +102,7 @@ Assumptions for AST node types:
                       (and tmp (s tmp)))])))
         (void)))
 
-  (define (make-r-f-struct-copy type-id obj-id r-f-lst)
+  (define (mkstx-r-f-struct-copy type-id obj-id r-f-lst)
     (with-syntax ([type type-id]
                   [obj obj-id]
                   [(set-fld ...)
@@ -122,7 +122,7 @@ Assumptions for AST node types:
   ;;       (if (and (eq? old-var var) (eq? old-body body))
   ;;           ast
   ;;           (struct-copy Define ast (var var) (body body))))))
-  (define (make-term-rewrite-all nn-stx f-spec-lst)
+  (define (mkstx-term-rewrite-all nn-stx f-spec-lst)
     (define nn-sym (syntax-e nn-stx))
 
     (define r-f-lst ;; (list/c kind id new-tmp old-tmp ix)
@@ -166,7 +166,7 @@ Assumptions for AST node types:
                            #'(or (not old) (eq? old new))]
                           [else
                            #'(eq? old new)])))]
-                   [copy (make-r-f-struct-copy nn-stx ast-id r-f-lst)])
+                   [copy (mkstx-r-f-struct-copy nn-stx ast-id r-f-lst)])
       #'(define (term-rewrite-all s ast)
           (let (bind-old ...)
             (let-rewrite-all s
@@ -175,7 +175,7 @@ Assumptions for AST node types:
                  ast
                  copy))))))
 
-  (define (make-term-fields f-spec-lst)
+  (define (mkstx-term-fields f-spec-lst)
     (define lst
       (filter term-ConcFld? f-spec-lst))
     (if (null? lst)
@@ -184,7 +184,7 @@ Assumptions for AST node types:
           #'(define (term-fields ast)
               (list (unsafe-struct*-ref ast ix) ...)))))
      
-  (define (make-set-term-fields type-id f-spec-lst)
+  (define (mkstx-set-term-fields type-id f-spec-lst)
     (define r-f-lst
       (for/list ([fld f-spec-lst]
                  #:when (term-ConcFld? fld))
@@ -202,17 +202,17 @@ Assumptions for AST node types:
               (let-values ([(tmp ...) (apply values lst)])
                 (struct-copy type ast set-fld ...))))))
 
-  (define (make-strategic nn-stx f-spec-lst)
-    `(,(make-term-visit-all nn-stx f-spec-lst)
-      ,(make-term-rewrite-all nn-stx f-spec-lst)
-      ,(make-term-fields f-spec-lst)
-      ,(make-set-term-fields nn-stx f-spec-lst))))
+  (define (mkstx-strategic nn-stx f-spec-lst)
+    `(,(mkstx-term-visit-all nn-stx f-spec-lst)
+      ,(mkstx-term-rewrite-all nn-stx f-spec-lst)
+      ,(mkstx-term-fields f-spec-lst)
+      ,(mkstx-set-term-fields nn-stx f-spec-lst))))
 
 ;;; 
 ;;; gen:syntactifiable
 ;;; 
 
-(define-for-syntax (make-syntactifiable conc-id fld-id-lst)
+(define-for-syntax (mkstx-syntactifiable conc-id fld-id-lst)
   (define obj-id (generate-temporary 'obj))
   (define super-id (generate-temporary 'mkstx))
   (define get-id-lst (for/list ([fld-id fld-id-lst])
@@ -238,7 +238,7 @@ Assumptions for AST node types:
 ;;; 
 
 ;; Returns (listof syntax?).
-(define-for-syntax (make-extra-accessors conc-id fld-id-lst provide?)
+(define-for-syntax (mkstx-extra-accessors conc-id fld-id-lst provide?)
   (define conc-name (syntax-e conc-id))
   (with-syntax ([conc conc-id]
                 [def (if provide? #'define* #'define)])
@@ -248,7 +248,7 @@ Assumptions for AST node types:
          #'(def (c-copy obj fld ...)
              (conc fld ...))))
     
-    (define (make-setter-impl fld-id)
+    (define (mkstx-setter-impl fld-id)
       (define fld-name (syntax-e fld-id))
       (with-syntax ([c-setter-id
                      (format-id conc-id "set-~a-~a" conc-name fld-name)]
@@ -256,13 +256,13 @@ Assumptions for AST node types:
         #'(def (c-setter-id obj fld)
             (struct-copy conc obj [fld fld]))))
     
-    (cons copy-impl (map make-setter-impl fld-id-lst))))
+    (cons copy-impl (map mkstx-setter-impl fld-id-lst))))
 
 ;;; 
 ;;; equal? implementation
 ;;; 
 
-(define-for-syntax (make-equal+hash n-stx fld-id-lst)
+(define-for-syntax (mkstx-equal+hash n-stx fld-id-lst)
   (define getter-lst
     (for/list ([fld fld-id-lst]
                #:unless (eq? (syntax-e fld) 'annos))
@@ -291,7 +291,7 @@ Assumptions for AST node types:
 ;;; concrete AST node definition
 ;;; 
 
-(define-for-syntax (make-define-ast stx provide?)
+(define-for-syntax (mkstx-define-ast stx provide?)
   (define-syntax-class vw
     #:description "AST node view specification"
     #:attributes (spec)
@@ -338,15 +338,15 @@ Assumptions for AST node types:
             #:methods gen:custom-write
             [(define write-proc #,(if (attribute writer)
                                       #'writer
-                                      (make-ast-write conc-id fld-id-lst)))]
+                                      (mkstx-ast-write conc-id fld-id-lst)))]
             #,@(list 
                 #'#:methods #'gen:equal+hash
                 (with-syntax ([(m ...) 
-                               (make-equal+hash conc-id fld-id-lst)])
+                               (mkstx-equal+hash conc-id fld-id-lst)])
                   #'[m ...]))
             #:methods gen:syntactifiable
-            (#,@(make-syntactifiable conc-id fld-id-lst))
-            #:methods gen:strategic (#,@(make-strategic conc-id fld-lst))
+            (#,@(mkstx-syntactifiable conc-id fld-id-lst))
+            #:methods gen:strategic (#,@(mkstx-strategic conc-id fld-lst))
             #,@(let ((view-spec-lst (attribute view.spec)))
                  (if (null? view-spec-lst)
                      null
@@ -361,7 +361,7 @@ Assumptions for AST node types:
                    null))))
        #`(begin
            #,struct-def
-           #,@(make-extra-accessors conc-id fld-id-lst provide?)
+           #,@(mkstx-extra-accessors conc-id fld-id-lst provide?)
            #,@(if singleton?
                   (with-syntax ((the-name singleton-id)
                                 (def (if provide? #'define* #'define)))
@@ -371,26 +371,36 @@ Assumptions for AST node types:
   def-stx)
 
 (define-syntax* (define-ast stx)
-  (make-define-ast stx #f))
+  (mkstx-define-ast stx #f))
 
 (define-syntax* (define-ast* stx)
-  (make-define-ast stx #t))
+  (mkstx-define-ast stx #t))
 
 ;;; 
 ;;; view-based traversals
 ;;; 
 
-(define-syntax-rule* (view->term-visit-all name)
-  (accessors->term-visit-all (view-term-fields-getter name)))
+(define-syntax-rule* (make-view-term-visit-all name)
+  (make-term-visit-all (view-term-fields-getter name)))
 
-(define-syntax-rule* (view->term-rewrite-all name)
-  (accessors->term-rewrite-all (view-term-fields-getter name)
-                               (view-term-fields-setter name)))
+(define-syntax-rule* (make-view-term-rewrite-all name)
+  (make-term-rewrite-all (view-term-fields-getter name)
+                         (view-term-fields-setter name)))
 
-(define-syntax-rule* (view->term-rewrite-some name)
-  (accessors->term-rewrite-some (view-term-fields-getter name)
-                                (view-term-fields-setter name)))
+(define-syntax-rule* (make-view-term-rewrite-some name)
+  (make-term-rewrite-some (view-term-fields-getter name)
+                          (view-term-fields-setter name)))
 
-(define-syntax-rule* (view->term-rewrite-one name)
-  (accessors->term-rewrite-one (view-term-fields-getter name)
-                               (view-term-fields-setter name)))
+(define-syntax-rule* (make-view-term-rewrite-one name)
+  (make-term-rewrite-one (view-term-fields-getter name)
+                         (view-term-fields-setter name)))
+
+(define-syntax-rule (define-view-combinator* n getf)
+  (define-syntax-rule* (n vn)
+    (lambda (s)
+      (let ([f (getf vn)])
+        (lambda (ast) (f s ast))))))
+
+(define-view-combinator* make-view-all make-view-term-rewrite-all)
+(define-view-combinator* make-view-some make-view-term-rewrite-some)
+(define-view-combinator* make-view-one make-view-term-rewrite-one)

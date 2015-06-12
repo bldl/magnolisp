@@ -20,7 +20,7 @@ optimization.
 (require "app-util.rkt" "ast-magnolisp.rkt" "ast-repr.rkt"
          "backend-magnolisp-print.rkt"
          "compiler-rewrites.rkt" "parse.rkt"
-         "strategy.rkt" "strategy-term.rkt"
+         "strategy.rkt" "strategy-stratego.rkt"
          "util.rkt" "util/struct.rkt"
          syntax/moddep)
 
@@ -151,7 +151,7 @@ optimization.
   (defs-check-ApplyExpr-target def-lst)
   (define bind->def (build-defs-table def-lst))
   (for-each
-   (topdown-visit
+   (topdown-visitor
     (lambda (ast)
       (match ast
         ((ApplyExpr _ e _)
@@ -170,7 +170,7 @@ optimization.
 
 (define (topdown-has-matching? p? ast)
   (let/ec k
-    ((topdown-visit
+    ((topdown-visitor
       (lambda (x)
         (when (p? x)
           (k #t))))
@@ -359,7 +359,7 @@ optimization.
   (define binds (mutable-seteq)) ;; (set/c bind)
 
   (define rw
-    (topdown-visit
+    (topdown-visitor
      (lambda (ast)
        (define id (name-ref-id/maybe ast))
        (when id
