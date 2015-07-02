@@ -2,12 +2,16 @@
 
 (require racket/pretty "module.rkt")
 
-(define* println
+;; The `println` function was added to Racket itself "in version
+;; 6.1.1.8 of package base."
+(define*-if-unbound println
   (case-lambda
     ((datum) (begin (print datum) (newline)))
     ((datum out) (begin (print datum out) (newline out)))))
 
-(define* writeln
+;; The `writeln` function was added to Racket itself "in version
+;; 6.1.1.8 of package base."
+(define*-if-unbound writeln
   (case-lambda
     ((datum) (begin (write datum) (newline)))
     ((datum out) (begin (write datum out) (newline out)))))

@@ -57,6 +57,18 @@
     (define-values (n ...) vals)
     (provide n ...)))
 
+(define-syntax* (define*-if-unbound stx)
+  (syntax-case stx ()
+    [(_ . rest)
+     (begin
+       (define-values (id rhs)
+         (normalize-definition stx #'lambda #t #t))
+       (if (identifier-binding id)
+           #'(begin)
+           #`(begin
+               (define #,id #,rhs)
+               (provide #,id))))]))
+
 (define-syntax-rule*
   (concrete-struct nm rest ...)
   (struct nm rest ...))
