@@ -167,23 +167,19 @@
      "(void)0")
     (else (ew-error 'format-expr "could not format" else))))
 
-(require (only-in rnrs/base-6 string-for-each))
-
 (define (mangle-ident x)
   (let ((y ""))
     (define (push c)
       (set! y (string-append y c)))
-    (string-for-each
-     (lambda (c)
-       (case c
-         ((#\-) (push "$"))
-         ((#\$) (push "$$"))
-         ((#\.) (push "$_"))
-         ((#\$) (push "$$$"))
-         ((#\>) (push "$v"))
-         ((#\!) (push "$b"))
-         (else (push (string c)))))
-     x)
+    (for ((c (in-string x)))
+      (case c
+        ((#\-) (push "$"))
+        ((#\$) (push "$$"))
+        ((#\.) (push "$_"))
+        ((#\$) (push "$$$"))
+        ((#\>) (push "$v"))
+        ((#\!) (push "$b"))
+        (else (push (string c)))))
     y))
 
 (define (format-ident ident)
