@@ -31,6 +31,9 @@ setup :
 	raco setup $(PKGNAME)
 	$(MAKE) api-doc
 
+check-pkg-deps :
+	raco setup --check-pkg-deps $(PKGNAME)
+
 # takes a long time
 clean-with-raco :
 	raco setup --clean $(PKGNAME)
