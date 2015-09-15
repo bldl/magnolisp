@@ -33,8 +33,20 @@ E.g.,
 
 (require racket/generic racket/match racket/unsafe/ops "util.rkt"
          (for-syntax racket/base racket/list racket/match
-                     racket/pretty racket/syntax syntax/parse
+                     racket/pretty racket/syntax
+                     syntax/parse syntax/strip-context
                      "util/module.rkt"))
+
+;; A version of `struct-copy` that does not take field accessor
+;; lexical context from `field-id`s, but instead uses `type-id`.
+(define-syntax (struct-copy/type-ctx stx)
+  (syntax-parse stx
+    [(_ type-id obj [field-id e] ...)
+     (define ctx #'type-id)
+     (with-syntax ([(cn ...)
+                    (map (lambda (x) (replace-context ctx x))
+                         (syntax->list #'(field-id ...)))])
+       #'(struct-copy type-id obj [cn e] ...))]))
 
 ;;; 
 ;;; view-based comparison
@@ -390,7 +402,7 @@ E.g.,
               (or set-stx
                   (with-syntax ([fld fld-id])
                     #'(lambda (view fld)
-                        (struct-copy conc view [fld fld]))))])
+                        (struct-copy/type-ctx conc view [fld fld]))))])
           #'(define v-setter-id v-setter-expr)))
       
       (list getter-impl setter-impl))
@@ -416,8 +428,9 @@ E.g.,
                                       (map ViewFld-id copy-info-lst)])
                          (list 
                           #'(set! view
-                                  (struct-copy conc view 
-                                               [c-fld c-fld] ...)))))
+                                  (struct-copy/type-ctx
+                                   conc view 
+                                   [c-fld c-fld] ...)))))
                 #,@(for/list ([info set-info-lst])
                      (define fld-id (ViewFld-id info))
                      (with-syntax ([s-fld fld-id]
