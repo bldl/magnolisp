@@ -36,7 +36,7 @@ Defines a Racket module language for Magnolisp.
  let-values let*-values letrec-values 
  let-syntax let-syntaxes letrec-syntax letrec-syntaxes
  letrec-syntaxes+values
- set! 
+ set! set!-values
  #%plain-lambda (rename-out [#%plain-lambda lambda] [#%plain-lambda λ])
  if when unless 
  values void)
