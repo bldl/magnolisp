@@ -215,7 +215,7 @@ optimization.
 ;; appropriate.
 (define-with-contract
   (-> Def? Def?)
-  (de-racketize ast)
+  (def-make-Defuns ast)
 
   (define (foreign? annos)
     (and (hash-ref annos 'foreign #f) #t))
@@ -231,6 +231,29 @@ optimization.
          [_ ast]))))
 
   (rw ast))
+
+(define-with-contract
+  (-> (listof Def?) (listof Def?))
+  (defs-lift-typedefs def-lst)
+
+  (define t-defs (mutable-seteq))
+
+  (define rw-Defun
+    (bottomup
+     (lambda (ast)
+       (match ast
+         [(LetExpr a (and (DefVar _ _ _ (? ForeignTypeExpr? t)) dv) body)
+          (set-add! t-defs (Def-process-annos dv))
+          (SeqExpr a body)]
+         [_ ast]))))
+  
+  (define n-def-lst
+    (for/list ((ast def-lst))
+      (if (Defun? ast)
+          (rw-Defun ast)
+          ast)))
+  
+  (append (set->list t-defs) n-def-lst))
 
 ;;;
 ;;; IfExpr and IfStat
@@ -553,15 +576,16 @@ optimization.
   ;;(pretty-print def-lst)
   (set! def-lst (map ast-add-prelude-lit-types def-lst))
   ;;(pretty-print `(prelude-map ,prelude-bind->bind defs ,def-lst eps ,eps-in-prog)) (exit)
-  (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-trim-dead-constants def-lst))
   (set! def-lst (map ast-simplify-multi-innermost def-lst))
   ;;(pretty-print def-lst) (exit)
-  (set! def-lst (map de-racketize def-lst))
+  (set! def-lst (map def-make-Defuns def-lst))
   (defs-check-ApplyExpr-target def-lst)
-  (set! def-lst (map ast-normalize-LetLocalEc def-lst))
+  (set! def-lst (defs-lift-typedefs def-lst))
+  (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
   ;;(pretty-print def-lst) (exit)
+  (set! def-lst (map ast-normalize-LetLocalEc def-lst))
   (set! def-lst (map ast-update-ExprLike-result-annos def-lst))
   ;;(pretty-print def-lst) (exit)
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values all-defs))))
@@ -679,7 +703,7 @@ optimization.
 ;;;
 
 (module* test #f
-  (define st (compile-files "tests/test-simple-1.rkt"))
+  (define st (compile-files "tests/test-locals-3.rkt"))
   (generate-files st '(
                        ;;(build (gnu-make qmake c ruby))
                        (cxx (cc hh))

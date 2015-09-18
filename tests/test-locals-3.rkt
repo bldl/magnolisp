@@ -1,0 +1,42 @@
+#lang magnolisp
+
+(define (f x)
+  #:: (export)
+  (let ()
+    (typedef int #:: (foreign))
+    (cast int x)))
+
+(define (g)
+  #:: (export)
+  (let ()
+    (typedef int #:: (foreign))
+    (typedef long #:: (foreign))
+    (cast int 2)))
+
+(define (h)
+  #:: (export)
+  (let* ((Num (let-annotate ([foreign int])
+                (abstract-type)))
+         (x (cast Num 3)))
+    x))
+
+(define (i)
+  #:: (export)
+  (let ()
+    (typedef short #:: (foreign))
+    (let ()
+      (typedef int #:: (foreign))
+      (cast int 4))))
+
+(define (j)
+  #:: (export)
+  (define (f)
+    (typedef int #:: (foreign))
+    (cast int 5))
+  (f))
+
+(f 1)
+(g)
+(h)
+(i)
+(j)
