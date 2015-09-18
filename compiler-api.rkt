@@ -21,7 +21,7 @@ optimization.
          "backend-magnolisp-print.rkt"
          "compiler-rewrites.rkt" "parse.rkt"
          "strategy.rkt" "strategy-stratego.rkt"
-         "util.rkt" "util/struct.rkt"
+         "util.rkt" "util/field.rkt" "util/struct.rkt"
          syntax/moddep)
 
 ;;;
@@ -154,14 +154,14 @@ optimization.
    (topdown-visitor
     (lambda (ast)
       (match ast
-        ((ApplyExpr _ e _)
+        ((fields ApplyExpr [f e])
          (assert (Var? e))
          (define id (Var-id e))
          (define def (ast-identifier-lookup bind->def id))
          ;; Base namespace names may be unresolved. (For now.)
          (when def
-           (unless (matches? def (or (DefVar _ _ _ (? Lambda?))
-                                     (Defun _ _ _ _ _)))
+           (unless (matches? def (or (fields DefVar [body (? Lambda?)])
+                                     (fields Defun)))
              (raise-language-error/ast
               "application target does not name a function"
               ast e))))
@@ -242,7 +242,7 @@ optimization.
     (bottomup
      (lambda (ast)
        (match ast
-         [(LetExpr a (and (DefVar _ _ _ (? ForeignTypeExpr? t)) dv) body)
+         [(LetExpr a (fields DefVar dv [body (? ForeignTypeExpr?)]) body)
           (set-add! t-defs (Def-process-annos dv))
           (SeqExpr a body)]
          [_ ast]))))
