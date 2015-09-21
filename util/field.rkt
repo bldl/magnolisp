@@ -11,6 +11,8 @@ E.g.:
   (fields Expr e [type t])
   (fields AssignExpr [rv e] [lv (? Var?)])
 
+See also: `struct*`
+
 |#
 
 (require racket/match

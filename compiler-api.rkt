@@ -233,6 +233,34 @@ optimization.
   (rw ast))
 
 (define-with-contract
+  (-> Def? Def?)
+  (def-drop-dead-local-Defuns def)
+
+  (define refs (mutable-seteq)) ;; set of bind
+
+  ((topdown-visitor
+    (match-lambda
+      [(fields ApplyExpr [f e])
+       (assert (Var? e))
+       (define id (Var-id e))
+       (set-add! refs (Id-bind id))]
+      [_ (void)]))
+   def)
+
+  (define (unreferenced? id)
+    (not (set-member? refs (Id-bind id))))
+
+  (define rw
+    (bottomup
+     (lambda (ast)
+       (match ast
+         [(LetExpr a (fields Defun [id (? unreferenced?)]) body)
+          (SeqExpr a body)]
+         [_ ast]))))
+  
+  (rw def))
+
+(define-with-contract
   (-> (listof Def?) (listof Def?))
   (defs-lift-typedefs def-lst)
 
@@ -581,6 +609,7 @@ optimization.
   (set! def-lst (map ast-simplify-multi-innermost def-lst))
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (map def-make-Defuns def-lst))
+  (set! def-lst (map def-drop-dead-local-Defuns def-lst))
   (defs-check-ApplyExpr-target def-lst)
   (set! def-lst (defs-lift-typedefs def-lst))
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
