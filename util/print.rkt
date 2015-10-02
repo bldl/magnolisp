@@ -16,16 +16,19 @@
     ((datum) (begin (write datum) (newline)))
     ((datum out) (begin (write datum out) (newline out)))))
 
-(define* pretty-println
-  (case-lambda
-    ((datum) (begin (pretty-print datum) (newline)))
-    ((datum out) (begin (pretty-print datum out) (newline out)))))
+;; (define* pretty-println
+;;   (case-lambda
+;;     ((datum) (begin (pretty-print datum) (newline)))
+;;     ((datum out) (begin (pretty-print datum out) (newline out)))))
 
 (define* (printfln . args)
   (apply printf args) (newline))
 
 (define* (fprintfln out . args)
   (apply fprintf out args) (newline out))
+
+(module* export-always #f
+  (provide println writeln printfln fprintfln))
 
 #|
 

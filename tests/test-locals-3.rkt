@@ -55,6 +55,15 @@
     (still-used-f))
   (used-f))
 
+(define (m)
+  #:: (export)
+  (define (unused-f)
+    (define (used-by-unused-f)
+      (typedef char #:: (foreign))
+      (cast char 7))
+    (used-by-unused-f))
+  (inc 7))
+
 (f 1)
 (g)
 (h)
@@ -62,3 +71,4 @@
 (j)
 (k)
 (l)
+(m)

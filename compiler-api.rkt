@@ -251,12 +251,12 @@ optimization.
     (not (set-member? refs (Id-bind id))))
 
   (define rw
-    (bottomup
+    (alltd
      (lambda (ast)
        (match ast
          [(LetExpr a (fields Defun [id (? unreferenced?)]) body)
-          (SeqExpr a body)]
-         [_ ast]))))
+          (SeqExpr a (map rw body))]
+         [_ #f]))))
   
   (rw def))
 

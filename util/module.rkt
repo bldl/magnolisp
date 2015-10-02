@@ -69,6 +69,13 @@
                (define #,id #,rhs)
                (provide #,id))))]))
 
+(define-syntax* (require-if-unbound stx)
+  (syntax-case stx ()
+    [(_ id spec ...)
+     (if (identifier-binding #'id)
+         #'(begin)
+         #'(require spec ...))]))
+
 (define-syntax-rule*
   (concrete-struct nm rest ...)
   (struct nm rest ...))
