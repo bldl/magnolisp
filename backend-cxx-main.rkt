@@ -425,6 +425,18 @@ C++ back end.
   (let ((s (CxxDefun-s def)))
     (set-CxxDefun-s def (to-stat s))))
 
+(define-with-contract
+  (-> Def? (set/c symbol? #:cmp 'eq))
+  (def-assign-targets def)
+  (define targets (mutable-seteq))
+  ((topdown-visitor
+    (match-lambda
+      ((AssignStat _ (Var _ lv-id) _)
+       (set-add! targets (Id-bind lv-id)))
+      (_ (void))))
+   def)
+  targets)
+
 (define (types-to-cxx defs-t def-lst)
   (define (annos-type-param? as)
     (hash-ref as 'type-param #f))
@@ -451,26 +463,40 @@ C++ back end.
        (raise-argument-error
         'type->cxx "(or/c NameT? ParamT?)" ast)]))
   
-  (define rw-def
-    (topdown
-     (lambda (ast)
-       (match ast
-         [(? CxxDefun?)
-          (define t (CxxDefun-rtype ast))
-          (define rt (type->cxx (FunT-rt t)))
-          (struct-copy CxxDefun ast [rtype rt])]
-         [(Param a id t)
-          (Param a id (annoless RefT (annoless ConstT (type->cxx t))))]
-         [(DefVar a id t v)
-          (DefVar a id (type->cxx t) v)]
-         [(DeclVar a id t)
-          (DeclVar a id (type->cxx t))]
-         [(ApplyExpr (and a (app (lambda (a) (hash-ref a 'type<> #f))
-                                 (? identity ts))) f args)
-          (ApplyExpr (hash-set a 'type<> (map type->cxx ts)) f args)]
-         [(Literal a dat)
-          (Literal (hash-update a 'type type->cxx) dat)]
-         [_ ast]))))
+  (define (rw-def def)
+    (define non-const-bind-set
+      (def-assign-targets def))
+
+    (define (var-def-type->cxx id t)
+      (define non-const?
+        (set-member? non-const-bind-set (Id-bind id)))
+      (define cxx-t (type->cxx t))
+      (if non-const?
+          cxx-t
+          (annoless ConstT cxx-t)))
+    
+    (define rw
+      (topdown
+       (lambda (ast)
+         (match ast
+           [(? CxxDefun?)
+            (define t (CxxDefun-rtype ast))
+            (define rt (type->cxx (FunT-rt t)))
+            (struct-copy CxxDefun ast [rtype rt])]
+           [(Param a id t)
+            (Param a id (annoless RefT (annoless ConstT (type->cxx t))))]
+           [(DefVar a id t v)
+            (DefVar a id (var-def-type->cxx id t) v)]
+           [(DeclVar a id t)
+            (DeclVar a id (var-def-type->cxx id t))]
+           [(ApplyExpr (and a (app (lambda (a) (hash-ref a 'type<> #f))
+                                   (? identity ts))) f args)
+            (ApplyExpr (hash-set a 'type<> (map type->cxx ts)) f args)]
+           [(Literal a dat)
+            (Literal (hash-update a 'type type->cxx) dat)]
+           [_ ast]))))
+
+    (rw def))
   
   (map rw-def def-lst))
 
