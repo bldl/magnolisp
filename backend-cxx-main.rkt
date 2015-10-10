@@ -898,6 +898,65 @@ C++ back end.
    def))
 
 ;;; 
+;;; introduce variables for arguments
+;;; 
+
+;; For each assigned-to argument, introduces a (non-`const`) variable
+;; to which to assign to instead.
+(define-with-contract
+  (-> CxxDefun? CxxDefun?)
+  (fun-ensure-mutable-assigns def)
+
+  (define param-binds
+    (for/seteq ((par (CxxDefun-params def)))
+      (define id (Param-id par))
+      (Id-bind id)))
+
+  (unless (set-empty? param-binds)
+    (define targets (mutable-seteq))
+    ((topdown-visitor
+      (match-lambda
+        ((AssignStat _ (Var _ lv-id) _)
+         #:when (set-member? param-binds (Id-bind lv-id))
+         (set-add! targets (Id-bind lv-id)))
+        (_ (void))))
+     def)
+
+    (unless (set-empty? targets)
+      (define arg-lst
+        (for/list ((par (CxxDefun-params def))
+                   #:when (set-member? targets (Id-bind (Param-id par))))
+          (list par (another-ast-identifier (Param-id par)))))
+      (define arg-h
+        (for/hasheq ((arg arg-lst))
+          (define par (first arg))
+          (values (Id-bind (Param-id par)) (second arg))))
+      (define body (CxxDefun-s def))
+      (match-define (SeqStat a ss) body)
+      (define rw
+        (topdown
+         (match-lambda
+           ((Var a id)
+            #:when (set-member? targets (Id-bind id))
+            (Var a (hash-ref arg-h (Id-bind id))))
+           (ast ast))))
+      (define n-ss
+        (append (for/list ((arg arg-lst))
+                  (define par (first arg))
+                  (define t (Param-t par))
+                  (annoless DefVar
+                            (second arg)
+                            t
+                            (Var (hasheq 'type t) (Param-id par))))
+                (map rw ss)))
+      (define n-ast (SeqStat a n-ss))
+      (define n-def (set-CxxDefun-s def n-ast))
+      ;;(pretty-print n-def)
+      (set! def n-def)))
+  
+  def)
+
+;;; 
 ;;; removal of redundant jumps
 ;;; 
 
@@ -963,6 +1022,7 @@ C++ back end.
      s))
   
   (define (defun-optimize ast)
+    (set! ast (fun-ensure-mutable-assigns ast))
     (define s (CxxDefun-s ast))
     (set! s (stat-rm-goto-next s))
     (set! s (stat-rm-unused-labels s))
