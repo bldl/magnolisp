@@ -1,6 +1,7 @@
 #lang racket/base
 
-(require racket/dict racket/match (for-syntax racket/base))
+(require racket/dict racket/match
+         (for-syntax racket/base syntax/parse))
 
 (require "util/module.rkt")
 (provide (all-from-out "util/module.rkt"))
@@ -14,11 +15,17 @@
     ((_ fn arg ...)
      (lambda rest (apply fn arg ... rest)))))
 
+;; Like `compose1`, but in reverse order.
 (define* (compose1-> . fs)
   (apply compose1 (reverse fs)))
 
+;; Threads `v` through functions `fs`.
 (define* (thread1-> v . fs)
   ((apply compose1-> fs) v))
+
+;; A threading macro as suggested by Alex Knauth.
+(define-simple-macro* (let-> var:id expr:expr ...+)
+  (let* ([var expr] ...) var))
 
 ;; As in Carl Eastlund's Mischief.
 (define-syntax-rule* (values-of e)

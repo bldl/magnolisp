@@ -1,7 +1,7 @@
 #lang racket/base
 
 (require racket/contract racket/generic racket/match racket/stxparam
-         syntax/parse
+         syntax/parse syntax/parse/define
          (for-syntax racket/base racket/syntax
                      syntax/define syntax/parse))                     
 
@@ -44,6 +44,16 @@
      (begin
        (define-syntax-rule (name rest ...) body)
        (provide name)))))
+
+(define-syntax-rule*
+  (define-simple-macro*
+    (name . pattern) pattern-directive ...
+    template)
+  (begin
+    (define-simple-macro
+      (name . pattern) pattern-directive ...
+      template)
+    (provide name)))
 
 (define-syntax-rule*
   (define-syntax-parameter* id e)
