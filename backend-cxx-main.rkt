@@ -6,7 +6,8 @@ C++ back end.
 
 |#
 
-(require "app-util.rkt" "ast-magnolisp.rkt" "backend-util.rkt"
+(require "app-util.rkt" "ast-id-coll.rkt"
+         "ast-magnolisp.rkt" "backend-util.rkt"
          "compiler-rewrites.rkt" "strategy.rkt"
          "strategy-stratego.rkt" "strategy-term.rkt"
          "util.rkt"
@@ -933,39 +934,38 @@ C++ back end.
   (-> CxxDefun? CxxDefun?)
   (fun-ensure-mutable-assigns def)
 
-  (define param-binds
-    (for/seteq ((par (CxxDefun-params def)))
-      (define id (Param-id par))
-      (Id-bind id)))
+  (define param-ids
+    (for/mutable-setId ((par (CxxDefun-params def)))
+      (Param-id par)))
 
-  (unless (set-empty? param-binds)
-    (define targets (mutable-seteq))
+  (unless (set-empty? param-ids)
+    (define par-lv-ids (mutable-setId))
     ((topdown-visitor
       (match-lambda
         ((AssignStat _ (Var _ lv-id) _)
-         #:when (set-member? param-binds (Id-bind lv-id))
-         (set-add! targets (Id-bind lv-id)))
+         #:when (set-member? param-ids lv-id)
+         (set-add! par-lv-ids lv-id))
         (_ (void))))
      def)
 
-    (unless (set-empty? targets)
+    (unless (set-empty? par-lv-ids)
       (define arg-lst
         (for/list ((par (CxxDefun-params def))
-                   #:when (set-member? targets (Id-bind (Param-id par))))
+                   #:when (set-member? par-lv-ids (Param-id par)))
           (list par (another-ast-identifier (Param-id par)))))
       (define arg-h
-        (for/hasheq ((arg arg-lst))
+        (for/mutable-hashId ((arg arg-lst))
           (define par (first arg))
-          (values (Id-bind (Param-id par)) (second arg))))
+          (values (Param-id par) (second arg))))
       (define body (CxxDefun-s def))
       (match-define (SeqStat a ss) body)
       (define rw
-        (topdown
+        (alltd
          (match-lambda
            ((Var a id)
-            #:when (set-member? targets (Id-bind id))
-            (Var a (hash-ref arg-h (Id-bind id))))
-           (ast ast))))
+            #:when (set-member? par-lv-ids id)
+            (Var a (dict-ref arg-h id)))
+           (ast #f))))
       (define n-ss
         (append (for/list ((arg arg-lst))
                   (define par (first arg))

@@ -25,6 +25,8 @@
      (hash-set! (SetId-h st) (Id-bind v) v))
    (define (set-remove! st v)
      (hash-remove! (SetId-h st) (Id-bind v)))
+   (define (set-empty? st)
+     (hash-empty? (SetId-h st)))
    (define (in-set st)
      (in-hash-values (SetId-h st)))])
 
