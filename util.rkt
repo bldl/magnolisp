@@ -128,21 +128,22 @@
 
 ;; Different syntax from 'for' in that 'empty-expr' is an extra
 ;; expression for constructing an empty dictionary. This is required
-;; as a dictionary is an abstract concept.
+;; as a dictionary is an abstract concept. Only works for immutable
+;; dictionaries.
 (define-syntax* (for/dict stx)
   (syntax-case stx ()
-    ((_ empty-expr (clause ...) . body)
-     (with-syntax ((original stx)
-                   ([(pre-body ...) post-body]
-                    (split-for-body stx #'body)))
+    [(_ empty-expr (clause ...) . body)
+     (with-syntax ([original stx]
+                   [((pre-body ...) post-body)
+                    (split-for-body stx #'body)])
        (syntax/loc stx
          (for/fold/derived
           original
-          ((d empty-expr))
+          ([d empty-expr])
           (clause ...)
           pre-body ...
-          (let-values (([k v] (begin . post-body)))
-            (dict-set d k v))))))))
+          (let-values ([(k v) (begin . post-body)])
+            (dict-set d k v)))))]))
 
 #|
 
