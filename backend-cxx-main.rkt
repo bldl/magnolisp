@@ -144,35 +144,57 @@ C++ back end.
     (if sym
         (values r sym)
         (decide-name-for-id r id stem)))
+
+  (define (CxxDefun-specified-ext ast) ;; (or/c #f #t identifier?)
+    (define a (Ast-annos ast))
+    (or (get-export-name a)
+        (get-foreign-name a)))
   
-  ;; We must collect all top-level IDs (and decide on their C++ name)
-  ;; before renaming any locals.
-  (for-each
-   (lambda (ast)
-     (match ast
-       [(? CxxDefun?)
-        (define a (Ast-annos ast))
+  (define (fun-register-requested! ast)
+    (when (CxxDefun? ast)
+      (define specified-ext (CxxDefun-specified-ext ast))
+      (when (identifier? specified-ext)
         (define id (Def-id ast))
-        (define export-name (get-export-name a))
-        (define foreign-name (get-foreign-name a))
-        (define orig-s (ast-identifier->string id))
-        (when-let owner-id (hash-ref a 'owner-id #f)
-          (set! orig-s (string-append (ast-identifier->string owner-id)
-                                      "_" orig-s)))
-        (define (use-or-make name)
-          (and name
-               (if (identifier? name)
-                   (symbol->string (syntax-e name))
-                   (string->exported-cxx-id orig-s))))
-        (define cand-s
-          (or (use-or-make export-name)
-              (use-or-make foreign-name)
-              (string->internal-cxx-id orig-s #:default "f")))
-        (define n-sym (string->symbol cand-s))
-        (set!-values (r n-sym) (next-gensym r n-sym))
-        (record-cxx-name! id n-sym)]
-       [_ (void)]))
-   ast-lst)
+        (define id-s (ast-identifier->string id))
+        (define cxx-sym
+          (let ()
+            (define sym (syntax-e specified-ext))
+            (unless (string-cxx-id? (symbol->string sym))
+              (error 'cxx-rename
+                     "unallowed C++ name: ~a" specified-ext))
+            sym))
+        (let ((uniq-cxx-sym #f))
+          (set!-values (r uniq-cxx-sym) (next-gensym r cxx-sym)))
+        (record-cxx-name! id cxx-sym))))
+
+  (define (fun-register-derived! ast)
+    (when (CxxDefun? ast)
+      (define specified-ext (CxxDefun-specified-ext ast))
+      (unless (identifier? specified-ext)
+        (define id (Def-id ast))
+        (define id-s (ast-identifier->string id))
+        (define cxx-sym
+          (match specified-ext
+            [#t
+             (string->symbol (string->exported-cxx-id id-s))]
+            [#f
+             (define a (Ast-annos ast))
+             (define local-s
+               (if-let owner-id (hash-ref a 'owner-id #f)
+                 (string-append (ast-identifier->string owner-id) "_" id-s)
+                 id-s))
+             (define cand-s
+               (string->internal-cxx-id local-s #:default "f"))
+             (string->symbol cand-s)]))
+        (set!-values (r cxx-sym) (next-gensym r cxx-sym))
+        (record-cxx-name! id cxx-sym))))
+        
+  ;; We must collect all top-level IDs (and decide on their C++ name)
+  ;; before renaming any locals. We first record explicitly requested
+  ;; names, and only after that assign derived names to ensure that we
+  ;; do not derive a requested name.
+  (for-each fun-register-requested! ast-lst)
+  (for-each fun-register-derived! ast-lst)
 
   ;; Returns (values r ast).
   (define (rw r ast)
@@ -1204,7 +1226,6 @@ C++ back end.
                 (defs->partition 'private-implementations def-lst)))
       ;;(for-each writeln c-unit) (exit)
       (define s (format-c c-unit))
-      ;; xxx uncrustify
       (write-generated-output
        path out
        (thunk
@@ -1227,7 +1248,6 @@ C++ back end.
                 (list harness-end)))
       ;;(for-each writeln c-unit) (exit)
       (define s (format-c c-unit))
-      ;; xxx uncrustify
       (write-generated-output
        path out
        (thunk

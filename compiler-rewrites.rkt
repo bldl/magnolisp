@@ -83,7 +83,7 @@
    (else #f)))
 
 ;;; 
-;;; exports
+;;; foreign names
 ;;; 
 
 (define* (get-export-name x)
@@ -95,16 +95,6 @@
      'get-export-name
      "(or/c hash? Def?)" x))))
 
-(define* (get-export-name-as-symbol x)
-  (define y (get-export-name x))
-  (if (identifier? y)
-      (syntax-e y)
-      y))
-
-;;; 
-;;; externals
-;;; 
-
 (define* (get-foreign-name x)
   (cond
    ((hash? x) (hash-ref x 'foreign #f))
@@ -114,11 +104,10 @@
      'get-foreign-name
      "(or/c hash? Def?)" x))))
 
-(define* (get-foreign-name-as-symbol x)
-  (define y (get-foreign-name x))
-  (if (identifier? y)
-      (syntax-e y)
-      y))
+(define* (identifier?->symbol name)
+  (if (identifier? name)
+      (syntax-e name)
+      name))
 
 ;;; 
 ;;; types
