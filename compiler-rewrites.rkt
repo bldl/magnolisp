@@ -104,11 +104,6 @@
      'get-foreign-name
      "(or/c hash? Def?)" x))))
 
-(define* (identifier?->symbol name)
-  (if (identifier? name)
-      (syntax-e name)
-      name))
-
 ;;; 
 ;;; types
 ;;; 

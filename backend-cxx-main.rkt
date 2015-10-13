@@ -51,6 +51,7 @@ C++ back end.
 ;;; C++ identifiers
 ;;; 
 
+;; does not support qualified names or operator names
 (define (string-cxx-id? s)
   (not (or (regexp-match? #rx"^[^a-zA-Z_]" s)
            (regexp-match? #rx"[^a-zA-Z0-9_]" s)
@@ -159,9 +160,6 @@ C++ back end.
         (define cxx-sym
           (let ()
             (define sym (syntax-e specified-ext))
-            (unless (string-cxx-id? (symbol->string sym))
-              (error 'cxx-rename
-                     "unallowed C++ name: ~a" specified-ext))
             sym))
         (let ((uniq-cxx-sym #f))
           (set!-values (r uniq-cxx-sym) (next-gensym r cxx-sym)))
