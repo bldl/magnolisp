@@ -615,10 +615,12 @@ For sample Magnolisp programs, see the @filepath{test-*.rkt} files in the @filep
 
 Note that some of the example programs are written in Magnolisp language variants other than @racketmodname[magnolisp] (which is the only one documented here), but the differences are typically minor and superficial.
 
-@section{Software Download}
+@section{Source Code}
 
 A Git repository of the Magnolisp source code can be found at:
 @nested[#:style 'inset]{@url{https://github.com/bldl/magnolisp}}
+
+@section[#:tag "install"]{Installation}
 
 Racket version 6 is required to run the software.
 The software has been tested with version 6.2.1, but any version between 6.1--6.2.1 is expected to work.
