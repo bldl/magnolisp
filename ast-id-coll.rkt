@@ -77,7 +77,13 @@
   [(define (dict-ref dict key [failure-result not-found])
      (define e (hash-ref (HashId-h dict) (Id-bind key) not-found))
      (if (eq? not-found e)
-         (or failure-result (key-failure 'dict-ref dict key))
+         (cond
+           [(eq? failure-result not-found)
+            (key-failure 'dict-ref (HashId-h dict) key)]
+           [(procedure? failure-result)
+            (failure-result)]
+           [else
+            failure-result])
          (cdr e)))
    (define (dict-set! dict key v)
      (hash-set! (HashId-h dict) (Id-bind key) (cons key v)))

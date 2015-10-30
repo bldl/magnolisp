@@ -108,7 +108,7 @@
 ;;; types
 ;;; 
 
-(define* (NameT-from-id id)
+(define (NameT-from-id id)
   (ast-annotated id NameT id))
 
 (define* (def-get-type def)
@@ -611,7 +611,7 @@
   (innermost-rewriter
    (match-lambda
     [(LetLocalEc _ (Var _ k1) (list (AppLocalEc _ (Var _ k2) e)))
-     #:when (ast-identifier=? k1 k2)
+     #:when (Id=? k1 k2)
      e]
     [(IfExpr a c t e)
      #:when (equal? t e)

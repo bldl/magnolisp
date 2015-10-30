@@ -17,7 +17,8 @@ optimization.
 
 |#
 
-(require "app-util.rkt" "ast-magnolisp.rkt" "ast-repr.rkt"
+(require "app-util.rkt" "ast-id-coll.rkt"
+         "ast-magnolisp.rkt" "ast-repr.rkt"
          "backend-magnolisp-print.rkt"
          "compiler-rewrites.rkt" "parse.rkt"
          "strategy.rkt" "strategy-stratego.rkt"
@@ -137,7 +138,7 @@ optimization.
    (lambda (ast)
      (match ast
        [(Begin0 a (list e bs ..1))
-        (define id (fresh-ast-identifier 'begin0))
+        (define id (fresh-Id 'begin0))
         (define dv (annoless DefVar id the-AnyT e))
         (LetExpr a dv (append bs (list (annoless Var id))))]
        [_ ast]))))
@@ -154,18 +155,17 @@ optimization.
    (topdown-visitor
     (lambda (ast)
       (match ast
-        ((fields ApplyExpr [f e])
+        [(fields ApplyExpr [f e])
          (assert (Var? e))
          (define id (Var-id e))
          (define def (ast-identifier-lookup bind->def id))
          ;; Base namespace names may be unresolved. (For now.)
          (when def
-           (unless (matches? def (or (fields DefVar [body (? Lambda?)])
-                                     (fields Defun)))
+           (unless (Defun? def)
              (raise-language-error/ast
               "application target does not name a function"
-              ast e))))
-        (_ (void)))))
+              ast e)))]
+        [_ (void)])))
    def-lst))
 
 (define (topdown-has-matching? p? ast)
@@ -177,22 +177,12 @@ optimization.
      ast)
     #f))
 
-;; The `ast` argument is only used for error reporting. The `f?`
-;; flag indicates whether the function is foreign. Any original
-;; annotations for the binding should be in `annos`. The `Param`eter
-;; list `ps` and function `body` are optional for foreign functions.
+;; The `ast` argument is only used for error reporting. The `f?` flag
+;; indicates whether the function is foreign. Any original annotations
+;; for the binding should be in `annos`. The `Param`eter list `ps` and
+;; function `body` must be specified also for foreign functions, even
+;; if they must be inferred.
 (define (mk-Defun ast f? annos n t ps body)
-  (when f?
-    (unless ps
-      (define ft 
-        (or (type-expr-FunT-type t)
-            (raise-argument-error 'mk-Defun "function type expression" t)))
-      (define ats (FunT-ats ft))
-      (set! ps (for/list ([at ats])
-                 (define id (fresh-ast-identifier 'arg))
-                 (annoless Param id the-AnyT))))
-    (set! body the-NoBody))
-
   (when (topdown-has-matching? ForAllT? t)
     (unless f?
       (raise-language-error/ast
@@ -210,27 +200,91 @@ optimization.
     (Defun annos n t ps body))
   ;;(writeln n-ast)
   n-ast)
+
+(define-datatype (UseKind)
+  ((UseType) (UseVar) (UseFunc arity)))
+
+;; Accumulates information about name uses in `ast`, updating `kinds`
+;; with that information (of type `UseKind`).
+(define-with-contract
+  (-> hash? Ast? void?)
+  (update-kinds-with! kinds ast)
   
+  (define (visit-any-type ast)
+    (define t (Expr-type ast))
+    (when t
+      (rw t))
+    (void))
+  
+  (define rw
+    (alltd
+     (lambda (ast)
+       (match ast
+         [(Var _ id)
+          (dict-set! kinds id (UseVar))
+          (visit-any-type ast)]
+         [(NameT _ id)
+          (dict-set! kinds id (UseType))]
+         [(ApplyExpr _ (Var _ id) as)
+          (dict-set! kinds id (UseFunc (length as)))
+          (visit-any-type ast)
+          (for-each rw as)]
+         [_ #f]))))
+
+  (rw ast)
+  (void))
+
 ;; Turns variable definitions into function definitions as
 ;; appropriate.
 (define-with-contract
-  (-> Def? Def?)
-  (def-make-Defuns ast)
+  (-> dict? Def? Def?)
+  (def-make-Defuns kinds ast)
 
   (define (foreign? annos)
     (and (hash-ref annos 'foreign #f) #t))
 
+  (define (fun-use id)
+    (dict-ref kinds id #f))
+  
   (define rw
     (topdown
      (lambda (ast)
        (match ast
-         [(DefVar a n t (Lambda _ ps body))
-          (mk-Defun ast (foreign? a) a n t ps body)]
-         [(DefVar (? foreign? a) n (? type-expr-FunT-type t) _)
-          (mk-Defun ast #t a n t #f #f)]
+         [(DefVar a n t e)
+          (define f? (foreign? a))
+          (define use (fun-use n))
+          ;;(writeln (list use f? ast))
+          (match e
+            [(Lambda _ ps orig-body)
+             (define body (if f? the-NoBody orig-body))
+             (mk-Defun ast f? a n t ps body)]
+            [_
+             (cond
+               [(and f? (UseFunc? use))
+                (define arity (UseFunc-arity use))
+                (define ps
+                  (for/list ([at (in-range arity)])
+                    (define id (fresh-Id 'arg))
+                    (annoless Param id the-AnyT)))
+                (define body the-NoBody)
+                (mk-Defun ast f? a n t ps body)]
+               [else
+                ast])])]
          [_ ast]))))
 
   (rw ast))
+
+(define (defs-make-Defuns def-lst)
+  (define kinds (make-hashId))
+  (for ((def def-lst))
+    (update-kinds-with! kinds def))
+  ;;(pretty-print kinds) (exit)
+
+  (define lst
+    (for/list ((def def-lst))
+      (def-make-Defuns kinds def)))
+  ;;(pretty-print lst) (exit)
+  lst)
 
 (define-with-contract
   (-> Def? Def?)
@@ -608,7 +662,7 @@ optimization.
   (set! def-lst (map ast-trim-dead-constants def-lst))
   (set! def-lst (map ast-simplify-multi-innermost def-lst))
   ;;(pretty-print def-lst) (exit)
-  (set! def-lst (map def-make-Defuns def-lst))
+  (set! def-lst (defs-make-Defuns def-lst))
   (set! def-lst (map def-drop-dead-local-Defuns def-lst))
   (defs-check-ApplyExpr-target def-lst)
   (set! def-lst (defs-lift-typedefs def-lst))

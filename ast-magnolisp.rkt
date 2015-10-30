@@ -194,47 +194,47 @@ Assumptions for AST node types:
 ;;; identifiers
 ;;; 
 
-(define (id-write v out mode)
+(define (Id-write v out mode)
   (fprintf out "~a«~a»" (Id-name v) (Id-bind v)))
 
 ;; [name symbol?] is the name of the identifier. [bind symbol?] is
 ;; used for comparison with other identifiers, and solely determines
 ;; if two identifiers access the same binding.
 (define-ast* Id (Ast) ((#:none annos) (#:none name) (#:none bind))
-  #:custom-write id-write)
+  #:custom-write Id-write)
 
 (define-with-contract*
   (-> Id? Id? boolean?)
-  (ast-identifier=? x y)
+  (Id=? x y)
   (eq? (Id-bind x) (Id-bind y)))
 
 (define-with-contract*
   (-> Id? string?)
-  (ast-identifier->string x)
+  (Id->string x)
   (symbol->string (Id-name x)))
 
-(define* (ast-identifier<? x y)
-  (string<? (ast-identifier->string x)
-            (ast-identifier->string y)))
+(define* (Id<? x y)
+  (string<? (Id->string x)
+            (Id->string y)))
 
 ;; Creates a fresh identifier with the specified basename `sym` that
-;; is not (yet) ast-identifier=? to any other. An uninterned value is
+;; is not (yet) Id=? to any other. An uninterned value is
 ;; given to `bind`.
 (define-with-contract*
   (->* () ((or/c symbol? string?)) Id?)
-  (fresh-ast-identifier [sym 'g])
+  (fresh-Id [sym 'g])
   (annoless Id sym (gensym sym)))
 
 (define-with-contract*
   (-> Id? Id?)
-  (another-ast-identifier other)
-  (fresh-ast-identifier (Id-name other)))
+  (another-Id other)
+  (fresh-Id (Id-name other)))
 
 ;; Converts the specified syntax object identifier to an Id one,
-;; making it ast-identifier=? to `other` (if any is given).
+;; making it Id=? to `other` (if any is given).
 (define-with-contract*
   (->* (identifier?) (#:bind (or/c symbol? Id?)) Id?)
-  (identifier->ast id #:bind [other #f])
+  (identifier->Id id #:bind [other #f])
   (define name (syntax-e id))
   (define bind (cond
                 ((symbol? other) other)
@@ -506,7 +506,7 @@ Assumptions for AST node types:
 ;;; 
 
 (define ((make-NameT-pred id) ast)
-  (matches? ast (NameT _ (? (lambda (x) (ast-identifier=? x id))))))
+  (matches? ast (NameT _ (? (lambda (x) (Id=? x id))))))
 
 ;; By convention any built-ins get the "bare" bind value, i.e. the
 ;; same symbol as the name.

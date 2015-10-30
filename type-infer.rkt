@@ -26,7 +26,7 @@
    ((VarT? x) #t)
    ((VarT? y) #t)
    ((and (NameT? x) (NameT? y))
-    (ast-identifier=? (NameT-id x) (NameT-id y)))
+    (Id=? (NameT-id x) (NameT-id y)))
    ((and (FunT? x) (FunT? y))
     (define x-rt (FunT-rt x))
     (define y-rt (FunT-rt y))
@@ -290,7 +290,7 @@
       (hash-set! h y-sym x)
       #t)
      ((and (NameT? x) (NameT? y))
-      (ast-identifier=? (NameT-id x) (NameT-id y)))
+      (Id=? (NameT-id x) (NameT-id y)))
      ((and (FunT? x) (FunT? y))
       (define x-rt (FunT-rt x))
       (define y-rt (FunT-rt y))
@@ -442,10 +442,12 @@
          (unless (type-unifies!? r-t b-t)
            (raise-language-error/ast
             "function return type does not match body expression"
-            #:fields (list (list "declared return type"
-                                 (ast-displayable/datum r-t))
-                           (list "actual return type"
-                                 (ast-displayable/datum b-t)))
+            #:fields (list
+                      (list "function" id)
+                      (list "declared return type"
+                            (ast-displayable/datum r-t))
+                      (list "actual return type"
+                            (ast-displayable/datum b-t)))
             ast b)))
        (void))
       

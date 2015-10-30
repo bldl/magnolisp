@@ -85,7 +85,7 @@ same variables at the same phase level).
              "differing bindings for the same ID: ~s != ~s (~s)"
              old-bi bi id))
     (hash-set! bind->binding bind bi)
-    (identifier->ast id #:bind bind))
+    (identifier->Id id #:bind bind))
   
   (define def-lst
     (for/list ([(id def) (in-dict defs)])

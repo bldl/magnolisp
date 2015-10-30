@@ -125,7 +125,7 @@ C++ back end.
   ;; characters, `stem` is used instead as the base name. Returns
   ;; (values r sym).
   (define (decide-name-for-id r id stem)
-    (define orig-s (ast-identifier->string id))
+    (define orig-s (Id->string id))
     (define cand-s (string->internal-cxx-id orig-s #:default stem))
     (define-values (n-r n-sym) (next-gensym r (string->symbol cand-s)))
     (record-cxx-name! id n-sym)
@@ -156,7 +156,7 @@ C++ back end.
       (define specified-ext (CxxDefun-specified-ext ast))
       (when (identifier? specified-ext)
         (define id (Def-id ast))
-        (define id-s (ast-identifier->string id))
+        (define id-s (Id->string id))
         (define cxx-sym
           (let ()
             (define sym (syntax-e specified-ext))
@@ -170,7 +170,7 @@ C++ back end.
       (define specified-ext (CxxDefun-specified-ext ast))
       (unless (identifier? specified-ext)
         (define id (Def-id ast))
-        (define id-s (ast-identifier->string id))
+        (define id-s (Id->string id))
         (define cxx-sym
           (match specified-ext
             [#t
@@ -179,7 +179,7 @@ C++ back end.
              (define a (Ast-annos ast))
              (define local-s
                (if-let owner-id (hash-ref a 'owner-id #f)
-                 (string-append (ast-identifier->string owner-id) "_" id-s)
+                 (string-append (Id->string owner-id) "_" id-s)
                  id-s))
              (define cand-s
                (string->internal-cxx-id local-s #:default "f"))
@@ -334,9 +334,9 @@ C++ back end.
       [(LetLocalEc a (Var _ k) ss)
        (define t (Expr-type ast))
        (define void-t? (equal? t the-Void-type))
-       (define lbl-id (fresh-ast-identifier 'b))
+       (define lbl-id (fresh-Id 'b))
        (define rv-id (and (not void-t?)
-                          (fresh-ast-identifier 'r)))
+                          (fresh-Id 'r)))
        (define tgt (cons lbl-id rv-id))
        (define n-ss
          (parameterize ((le-tgt (hash-set (le-tgt) (Id-bind k) tgt)))
@@ -397,7 +397,7 @@ C++ back end.
       [(SeqExpr a es)
        (define t (Expr-type ast))
        (define void-t? (equal? t the-Void-type))
-       (define id (fresh-ast-identifier 'lifted))
+       (define id (fresh-Id 'lifted))
        (unless void-t?
          (set! es (list-map-last
                    (lambda (e) (annoless AssignStat
@@ -602,8 +602,8 @@ C++ back end.
         (values def ref))
        (else
         (define tmp-id (if (Var? ast)
-                           (another-ast-identifier (Var-id ast))
-                           (fresh-ast-identifier 'lifted)))
+                           (another-Id (Var-id ast))
+                           (fresh-Id 'lifted)))
         (define def (rw-stat (annoless DefVar tmp-id t ast)))
         (define ref (Var (hasheq 'type t) tmp-id))
         (values def ref))))
@@ -662,7 +662,7 @@ C++ back end.
            ;; other statements), but said lifts can go into the new
            ;; statement context.
            (define if-typ (Expr-type ast))
-           (define if-id (fresh-ast-identifier 'lifted))
+           (define if-id (fresh-Id 'lifted))
            (define if-decl (annoless DeclVar if-id if-typ))
            (define if-ref (Var (hasheq 'type if-typ) if-id))
            (define t-ast (wrap-expr-as-Assign if-ref t))
@@ -822,7 +822,7 @@ C++ back end.
          (values (hash-set bind->val lv-bind this-num)
                  (cond
                   [(and (eq? this-num tgt-num)
-                        (ast-identifier=? tgt-id lv-id))
+                        (Id=? tgt-id lv-id))
                    ;;(writeln `(deleting ,ast))
                    a-noop]
                   [else
@@ -861,7 +861,7 @@ C++ back end.
                  [else
                   (values (merge t-st e-st)
                           (IfStat a n-c n-t n-e))])])])]
-        [(Var a (? (lambda (id) (ast-identifier=? id tgt-id)) id))
+        [(Var a (? (lambda (id) (Id=? id tgt-id)) id))
          (define this-bind (Id-bind id))
          (define this-num (hash-ref bind->val this-bind))
          (assert (not (eq? this-num 'nothing)))
@@ -972,7 +972,7 @@ C++ back end.
       (define arg-lst
         (for/list ((par (CxxDefun-params def))
                    #:when (set-member? par-lv-ids (Param-id par)))
-          (list par (another-ast-identifier (Param-id par)))))
+          (list par (another-Id (Param-id par)))))
       (define arg-h
         (for/mutable-hashId ((arg arg-lst))
           (define par (first arg))
@@ -1030,12 +1030,12 @@ C++ back end.
        (define-values (st1 n-e) (g st e))
        ;; We do account for the special case where both branches of an
        ;; IfStat begin with the same label.
-       (values (and st0 st1 (ast-identifier=? st0 st1) st0)
+       (values (and st0 st1 (Id=? st0 st1) st0)
                (IfStat a c n-t n-e))]
       [(LabelDef _ id) 
        ;;(writeln `(store ,id))
        (values id s)]
-      [(Goto _ (? (lambda (id) (and st (ast-identifier=? st id)))))
+      [(Goto _ (? (lambda (id) (and st (Id=? st id)))))
        ;;(writeln `(delete ,s))
        (values st a-noop)]
       [_ 
@@ -1106,7 +1106,7 @@ C++ back end.
   (define (do-Defun ast)
     (match-define (Defun a id t ps b) ast)
     (define oid (owner-id))
-    (unless (ast-identifier=? id oid)
+    (unless (Id=? id oid)
       (set! a (hash-set a 'owner-id oid)))
     (set! b (ast-splice-SeqExpr (rw-body b)))
     (hash-set! n-defs (Id-bind id) (Defun a id t ps b)))

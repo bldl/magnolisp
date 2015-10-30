@@ -43,7 +43,7 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
         (set! cxx? #t))
        (("--dont-touch") "don't overwrite unmodified files"
         (set! dont-touch? #t))
-       (("--mgl") "generate IR dump as Magnolisp"
+       (("--mgl" "-l") "generate IR dump as Magnolisp"
         (set! mgl? #t))
        (("--outdir" "-o") dirname "output directory"
         (set! out-dir (path->directory-path (adjust-path dirname))))
