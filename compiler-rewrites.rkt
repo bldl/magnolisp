@@ -331,7 +331,7 @@
 (define (annos-set-result-discarded h discarded)
   (hash-set h 'result-discarded discarded))
 
-;; Flags expression whose results are not required by their context,
+;; Flags expressions whose results are not required by their context,
 ;; and will thus be discarded. Assumes that sequences have been
 ;; spliced. It is a syntax error if empty SeqExpr nodes appear in the
 ;; input where a value is required. We also assume that dead code

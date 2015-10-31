@@ -408,8 +408,8 @@ Assumptions for AST node types:
 (define-ast* Lambda (Ast Expr) 
   ((#:none annos) (#:many params) (#:just body)))
 
-;; Assignment. Both expression and statement variants. In C++ it is an
-;; expression, and in Magnolisp it is a statement.
+;; Assignment. Both expression and statement variants. In Magnolisp it
+;; is a statement, and in C++ it could be either.
 (define-ast* AssignExpr (Ast Expr) 
   ((#:none annos) (#:just lv) (#:just rv)))
 (define-ast* AssignStat (Ast Stat) 

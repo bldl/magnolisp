@@ -1196,9 +1196,9 @@ C++ back end.
     (thread1->
      defs-t
      defs->cxx
-     ;;pp-exit
+     ;;pp-exit ;;pp-only
      cxx-rm-LiftStatExpr
-     ;;pp-only
+     ;;pp-exit
      cxx-fun-optimize
      ;;pp-exit
      (curry map ast-rm-SeqStat)
