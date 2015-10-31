@@ -201,9 +201,6 @@ language.
          [(_ v) (app/local-ec k v)])])
      body ...)))
 
-;; DEPRECATED
-(provide (rename-out [begin-return do]))
-
 (define-syntax* (if-target stx)
   (syntax-parse stx
     [(_ name:id t:expr e:expr)
