@@ -115,20 +115,6 @@
 
 (define-annos-wrapper* typedef)
 
-(define-syntax* (let/local-ec stx)
-  (syntax-case stx ()
-    [(_ . rest)
-     (syntax-property
-      (syntax/loc stx (let/ec . rest))
-      'local-ec #t)]))
-
-(define-syntax* (apply/local-ec stx)
-  (syntax-case stx ()
-    [(_ k e)
-     (syntax-property
-      (syntax/loc stx (k e))
-      'local-ec #t)]))
-
 (define-syntax* (begin-racket stx)
   (syntax-case stx ()
     [(_ e ...)

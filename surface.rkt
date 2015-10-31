@@ -175,20 +175,6 @@ language.
              (abstract-type)))]
     ))
 
-(define-syntax* (let/local-ec stx)
-  (syntax-parse stx
-    [(_ . rest)
-     (syntax-property
-      (syntax/loc stx (let/ec . rest))
-      'local-ec #t)]))
-
-(define-syntax* (app/local-ec stx)
-  (syntax-parse stx
-    [(_ k:id e:expr)
-     (syntax-property
-      (syntax/loc stx (k e))
-      'local-ec #t)]))
-
 (define-syntax* (if-target stx)
   (syntax-parse stx
     [(_ name:id t:expr e:expr)

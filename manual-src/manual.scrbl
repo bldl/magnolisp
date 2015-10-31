@@ -262,25 +262,6 @@ For example:
   nine)
 }
 
-@defform[(let/local-ec k body ...+)]{
-A block that binds an escape continuation to the label @racket[k], and contains a sequence of expressions @racket[body ...]. The value of the overall expression is given either by the last expression of its body, or the argument expression @racket[_expr] of any evaluated @racket[(app/local-ec k _expr)] within the body. All value giving expressions in a block must be of the same type.
-
-For example:
-@(interaction #:eval the-eval
-  (let/local-ec outer-k
-    (when #f
-      (app/local-ec outer-k 5))
-    (let/local-ec middle-k
-      (when #f
-        (app/local-ec middle-k 6))
-      (let/local-ec inner-k
-        (app/local-ec outer-k 7))
-      8)))
-}
-
-@defform[(app/local-ec k expr)]{
-An expression that causes a jump to a surrounding continuation labeled by @racket[k], with the continuation yielding the value given by expression @racket[expr]. It is possible to jump beyond other, intermediate @racket[let/local-ec] blocks, but jumping outside the surrounding function body is not possible.}
-
 @defform[(if-target name then-expr else-expr)]{
 A compile-time conditional expression that depends on the intended execution target. Currently the only meaningful target language @racket[name] is @racketidfont{cxx}, which stands for C++. When code is being compiled for a target matching @racket[name], only @racket[then-expr] will be included in generated executable code; otherwise it is @racket[else-expr] that will be subject to evaluation in the target environment.
 
