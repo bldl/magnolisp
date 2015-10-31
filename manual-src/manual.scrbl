@@ -407,8 +407,6 @@ Anything of the form @(indirect-id _id) is actually a non-terminal like @racketv
       	  (#%plain-app #,(indirect-id void) mgl-expr ...)
 	  (#%plain-app #,(indirect-id values) mgl-expr)
 	  (#%plain-app #,(indirect-id values))
-          local-ec-block
-	  local-ec-jump
 	  (#%plain-app id-expr mgl-expr ...)
 	  (#,(stxprop-elem annotate) 
            let-values ([() (begin mgl-anno-expr 
@@ -430,10 +428,6 @@ Anything of the form @(indirect-id _id) is actually a non-terminal like @racketv
        (#%plain-app #,(indirect-id values) mgl-expr ...)]
       [() mgl-expr]
       [(id) mgl-expr]]
-[local-ec-block (#,(stxprop-elem local-ec) 
-                 #%plain-app #,(indirect-id call/ec) 
-                 (#%plain-lambda (id) mgl-expr ...+))]
-[local-ec-jump #,(stxpropped (racket (#%plain-app id-expr mgl-expr)) local-ec)]
 [if-target-expr
           (#,(stxprop-elem if-target = 'cxx)
            if #,(ign-nt Racket-expr) mgl-expr #,(ign-nt Racket-expr))
@@ -478,12 +472,6 @@ A Racket submodule definition. Submodules are not actually supported by the @rac
 
 @specsubform[anno-expr]{
 An annotation expression, containing an identifier @racket[_id] naming the kind of annotation, and an expression specifying the ``value'' of the annotation. In the generic case, any symbol can be used to name an annotation kind, and any @racket[quote]d or @racket[quote-syntax]ed datum can give the value. Only annotations of kind @racket['type] are parsed in a specific way.}
-
-@specsubform[local-ec-block]{
-A restricted form of @racket[call/ec] invocation, which is flagged with the syntax property @racket['local-ec]. The semantic restriction is that non-local escapes (beyond the enclosing function's body) are not allowed.}
-
-@specsubform[local-ec-jump]{
-A restricted form of escape continuation invocation, flagged with the syntax property @racket['local-ec]. The escape must be local, and it must be within the lexical scope of a matching @racket[_local-ec-block].}
 
 @warning{For some of the @(indirect-id id) non-terminals, the current parser actually assumes a direct @racket[_id].}
 

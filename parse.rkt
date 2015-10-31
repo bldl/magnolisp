@@ -449,19 +449,6 @@
       ((#%plain-app values)
        (syntaxed stx SeqExpr '()))
 
-      ((#%plain-app call/ec
-        (#%plain-lambda (k) . bs))
-       (syntax-property stx 'local-ec)
-       (syntaxed stx LetLocalEc
-                 (Var (hasheq 'stx #'k 'type the-KontT) #'k) 
-                 (map parse-expr (syntax->list #'bs))))
-      
-      ((#%plain-app k e)
-       (and (syntax-property stx 'local-ec) (identifier? #'k))
-       (syntaxed stx AppLocalEc 
-                 (Var (hasheq 'stx #'k 'type the-KontT) #'k) 
-                 (parse-expr #'e)))
-      
       ((#%plain-app p-expr . a-expr)
        (let ()
          (define f-ast (parse-expr #'p-expr))
