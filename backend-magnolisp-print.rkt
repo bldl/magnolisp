@@ -47,6 +47,10 @@ source code.
                    ,(for/list ((e as))
                       `(sp ,(pp-expr e))))) ")"))
 
+    ((AssignStat _ lv rv)
+     `("(set! " (in (gr ,(pp-expr lv) sp 
+                        ,(pp-expr rv))) ")"))
+
     (else
      (~s ast))))
 
