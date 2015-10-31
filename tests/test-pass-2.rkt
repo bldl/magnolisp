@@ -13,10 +13,10 @@
 
 (function (f x)
   #:: (export (type (-> int int)))
-  (begin-return
+  (let ()
     (void)
-    (return x)
-    (void)))
+    x
+    (void))
+  x)
 
 (f 1)
-

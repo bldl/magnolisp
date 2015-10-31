@@ -4,11 +4,10 @@
 
 (function (f x)
   #:: (export (type (-> int int)))
-  (begin-return
+  (let ()
     (function (g x) #:: (^(-> int int)) x)
-    (return
-     (begin-return
-       (function (g x) #:: (^(-> int int)) x)
-       (return (g x))))))
+    (let ()
+      (function (g x) #:: (^(-> int int)) x)
+      (g x))))
 
 (f 1)

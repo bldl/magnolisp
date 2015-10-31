@@ -262,38 +262,24 @@ For example:
   nine)
 }
 
-@defform[(begin-return expr ...+)]{
-A @deftech{return block} containing a sequence of expressions. The block must produce a single value by @racket[return]ing it, or by letting it ``fall out'' of the block. The returned or fallen-out value becomes the value of the containing @racket[begin-return] expression. All value giving expressions in a block must be of the same type.
-
-For example:
-@(interaction #:eval the-eval
-  (begin-return
-    (when #t
-      (return (five)))
-    (seven)))
-}
-
-@defform[(return expr)]{
-An expression that causes any enclosing @racket[begin-return] block (which must exist) to yield the value of the expression @racket[expr].}
-
 @defform[(let/local-ec k body ...+)]{
-A more general variant of @racket[begin-return] which assigns a label @racket[k] to the escape continuation. The value of the overall expression is given either by the last expression of its body, or the argument expression @racket[_expr] of any evaluated @racket[(app/local-ec k _expr)] within the body.
+A block that binds an escape continuation to the label @racket[k], and contains a sequence of expressions @racket[body ...]. The value of the overall expression is given either by the last expression of its body, or the argument expression @racket[_expr] of any evaluated @racket[(app/local-ec k _expr)] within the body. All value giving expressions in a block must be of the same type.
 
 For example:
 @(interaction #:eval the-eval
   (let/local-ec outer-k
     (when #f
       (app/local-ec outer-k 5))
-    (begin-return
+    (let/local-ec middle-k
       (when #f
-        (return 6))
+        (app/local-ec middle-k 6))
       (let/local-ec inner-k
         (app/local-ec outer-k 7))
       8)))
 }
 
 @defform[(app/local-ec k expr)]{
-An expression that causes a jump to a surrounding continuation labeled by @racket[k], with the continuation yielding the value given by expression @racket[expr]. It is possible to jump beyond other, intermediate @racket[let/local-ec] (or @racket[begin-return]) blocks, but jumping outside the surrounding function body is not possible.}
+An expression that causes a jump to a surrounding continuation labeled by @racket[k], with the continuation yielding the value given by expression @racket[expr]. It is possible to jump beyond other, intermediate @racket[let/local-ec] blocks, but jumping outside the surrounding function body is not possible.}
 
 @defform[(if-target name then-expr else-expr)]{
 A compile-time conditional expression that depends on the intended execution target. Currently the only meaningful target language @racket[name] is @racketidfont{cxx}, which stands for C++. When code is being compiled for a target matching @racket[name], only @racket[then-expr] will be included in generated executable code; otherwise it is @racket[else-expr] that will be subject to evaluation in the target environment.

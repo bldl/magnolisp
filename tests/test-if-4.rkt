@@ -9,13 +9,13 @@
 
 (function (f x)
   #:: (export (type (-> int int)))
-  (begin-return
-    (if (holds? x)
-        (if (if #t #f #t)
-            (return 7)
-            (if #f (return 8) (return (if #t 9 10))))
-        (return 1))))
+  (if (holds? x)
+      (if (if #t #f #t)
+          7
+          (if #f
+              8
+              (if #t 9 10)))
+      1))
 
 (f 5) ;; => 9
 (f 0) ;; => 1
-

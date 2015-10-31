@@ -10,9 +10,9 @@
    (let/local-ec outer-k
      (when #f
        (app/local-ec outer-k (five)))
-     (begin-return
+     (let/local-ec middle-k
       (when #f
-        (return (inc (five))))
+        (app/local-ec middle-k (inc (five))))
       (let/local-ec inner-k
         (if (non-zero? (seven))
             (app/local-ec outer-k (seven))

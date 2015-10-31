@@ -7,13 +7,13 @@
      (let ([i (syntax-e #'n)])
        (if (= i 0)
            #'init
-           #`(begin-return
+           #`(let ()
               (var tmp lst)
               (if (IntList-empty? tmp)
-                  (return init)
-                  (return (op (IntList-head tmp) 
-                              (mfold op init (IntList-tail tmp) 
-                                     #,(sub1 i))))))))]))
+                  init
+                  (op (IntList-head tmp) 
+                      (mfold op init (IntList-tail tmp) 
+                             #,(sub1 i)))))))]))
            
 (function (sum-2 lst)
   (mfold int-add 0 lst 2))

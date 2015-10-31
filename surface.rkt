@@ -189,18 +189,6 @@ language.
       (syntax/loc stx (k e))
       'local-ec #t)]))
 
-(define-syntax-parameter* return
-  (syntax-rules ()))
-
-(define-syntax-rule*
-  (begin-return body ...)
-  (let/local-ec k
-    (syntax-parameterize
-     ([return
-       (syntax-rules ()
-         [(_ v) (app/local-ec k v)])])
-     body ...)))
-
 (define-syntax* (if-target stx)
   (syntax-parse stx
     [(_ name:id t:expr e:expr)

@@ -8,17 +8,16 @@
 
 (function (g)
   #:: (export (type (-> Bool)))
-  (begin-return
+  (let ()
     (var r #f)
-    (return r)))
+    r))
 
 (g)
 
 (function (h)
   #:: (export (type (-> Bool)))
-  (begin-return
-    (var r #f)
-    (var x r)
-    (return x)))
+  (var r #f)
+  (var x r)
+  x)
 
 (h)

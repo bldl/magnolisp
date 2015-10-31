@@ -13,12 +13,11 @@
 (function (main anEncoding aMaxNumThreads 
                 aDataBaseName aDoFlushToDisk)
   #:: (^(-> string int string Bool DataBaseSession) export)
-  (begin-return
+  (begin
     (var enc anEncoding)
     (var th aMaxNumThreads)
     (var name aDataBaseName)
     (when (badCond)
-      (return (main anEncoding aMaxNumThreads 
-                    aDataBaseName aDoFlushToDisk)))
-    (return (openDataBase name))))
-
+      (main anEncoding aMaxNumThreads 
+            aDataBaseName aDoFlushToDisk))
+    (openDataBase name)))
