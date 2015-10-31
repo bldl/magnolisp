@@ -288,10 +288,6 @@ C++ back end.
      (map cxx->partition def-lst))))
 
 (define (defs->cxx defs-t)
-  ;; Tracks surrounding LetLocalEc scopes, by mapping continuation
-  ;; bind -> (cons/c label-id var-id).
-  (define le-tgt (make-parameter #hasheq()))
-  
   (define (def->cxx ast)
     (match ast
       [(Defun a id t ps b)
@@ -331,39 +327,6 @@ C++ back end.
        (IfExpr a (expr->cxx c) (expr->cxx t) (expr->cxx e))]
       [(AssignStat a lhs rhs)
        (AssignStat a (expr->cxx lhs) (expr->cxx rhs))]
-      [(LetLocalEc a (Var _ k) ss)
-       (define t (Expr-type ast))
-       (define void-t? (equal? t the-Void-type))
-       (define lbl-id (fresh-Id 'b))
-       (define rv-id (and (not void-t?)
-                          (fresh-Id 'r)))
-       (define tgt (cons lbl-id rv-id))
-       (define n-ss
-         (parameterize ((le-tgt (hash-set (le-tgt) (Id-bind k) tgt)))
-           (map expr->cxx ss)))
-       (define es 
-         `(,@n-ss
-           ,(annoless LabelDef lbl-id)))
-       (if void-t?
-           (SeqStat a es)
-           (LiftStatExpr a rv-id es))]
-      [(AppLocalEc a (Var _ k) e)
-       (define tgt (hash-ref (le-tgt) (Id-bind k) #f))
-       (unless tgt
-         (raise-language-error/ast
-          "local escape out of context"
-          ast (AppLocalEc-k ast)))
-       (define lbl-id (car tgt))
-       (define rv-id (cdr tgt))
-       (define n-e (expr->cxx e))
-       (define n-ast
-         (if rv-id
-             (SeqStat a 
-                      (list (annoless AssignStat (annoless Var rv-id) n-e)
-                            (annoless Goto lbl-id)))
-             (annoless Goto lbl-id)))
-       ;;(writeln n-ast)
-       n-ast]
       [_
        (raise-argument-error
         'expr->cxx "supported ExprLike?" ast)]))

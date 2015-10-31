@@ -668,7 +668,6 @@ optimization.
   (set! def-lst (defs-lift-typedefs def-lst))
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
   ;;(pretty-print def-lst) (exit)
-  (set! def-lst (map ast-normalize-LetLocalEc def-lst))
   (set! def-lst (map ast-update-ExprLike-result-annos def-lst))
   ;;(pretty-print def-lst) (exit)
   ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values all-defs))))

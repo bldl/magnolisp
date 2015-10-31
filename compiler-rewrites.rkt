@@ -334,10 +334,10 @@
 ;; Flags expressions whose results are not required by their context,
 ;; and will thus be discarded. Assumes that sequences have been
 ;; spliced. It is a syntax error if empty SeqExpr nodes appear in the
-;; input where a value is required. We also assume that dead code
-;; (particularly after AppLocalEc) has been dropped, since the results
-;; of such code will not be required (of course correct annotations
-;; may be pointless in nodes that will subsequently be dropped).
+;; input where a value is required. We also assume that dead code has
+;; been dropped, since the results of such code will not be required
+;; (of course correct annotations may be pointless in nodes that will
+;; subsequently be dropped).
 (define* (ast-update-ExprLike-result-annos ast)
   (define (rw-expr-used ast)
     (rw-expr #f ast))
@@ -380,13 +380,6 @@
       [(LetExpr a dv es)
        (define-values (n-es di) (rw-expr-seq d? ast es))
        (LetExpr (annos-set-result-discarded a di) (rw-any dv) n-es)]
-      [(LetLocalEc a k es)
-       (define-values (n-es di) (rw-expr-seq d? ast es))
-       (LetLocalEc (annos-set-result-discarded a d?)
-                   (rw-expr-used k) n-es)]
-      [(AppLocalEc a k e)
-       (AppLocalEc (annos-set-result-discarded a #t)
-                   (rw-expr-used k) (rw-expr-used e))]
       [else
        (assert (ExprLike? ast))
        (error 'update-ExprLike-result-annos
@@ -467,126 +460,6 @@
 ;;; simplification
 ;;; 
 
-(define* (ast-normalize-LetLocalEc in-ast)
-  (define (rw-lst ast-lst)
-    (define target #f)
-    (define r '())
-    (let loop ((ast-lst ast-lst))
-      (unless (null? ast-lst)
-        (define ast (car ast-lst))
-        (define-values (st n-ast) (rw ast))
-        (set! r (cons n-ast r))
-        (if st
-            (set! target st)
-            (loop (cdr ast-lst)))))
-    (values target (reverse r)))
-  
-  (define scopes (make-parameter '()))
-  
-  (define (target-sum x y)
-    (cond
-     ((and x y)
-      (let/ec k
-        (for ((s (scopes)))
-          (when (or (eq? s x) (eq? s y))
-            (k s)))
-        (error 'ast-normalize-LetLocalEc
-               "escapes ~a and ~a beyond context ~a"
-               x y (scopes))))
-     (else
-      #f)))
-  
-  (define (rw ast)
-    (match ast
-      [(or (? Var?) (? Literal?) (? RacketExpr?) (? VoidStat?))
-       (values #f ast)]
-      [(AssignStat a lv rv)
-       (let-values ([(target rv) (rw rv)])
-         (values target
-                 (if target 
-                     rv 
-                     (AssignStat a lv rv))))]
-      [(ApplyExpr a f as)
-       (define-values (target n-as) (rw-lst as))
-       (values target
-               (if target
-                   (SeqExpr (annos-remove-type a) n-as)
-                   (ApplyExpr a f n-as)))]
-      [(IfExpr a c t e)
-       (define-values (c-target c-ast) (rw c))
-       (if c-target
-           (values c-target c-ast)
-           (let ()
-             (define-values (t-target t-ast) (rw t))
-             (define-values (e-target e-ast) (rw e))
-             (values (target-sum t-target e-target)
-                     (IfExpr a c-ast t-ast e-ast))))]
-      [(SeqExpr a es)
-       (let-values (((target es) (rw-lst es)))
-         (when target (set! a (annos-remove-type a)))
-         (values target (SeqExpr a es)))]
-      [(LetExpr a (and dv (DefVar dv-a dv-id dv-t dv-e)) es)
-       (let-values (((dv-target dv-ast) (rw dv-e)))
-         (if dv-target
-             (let ()
-               (unless (AnyT? dv-t)
-                 (set! dv-e (set-ExprLike-type dv-e dv-t)))
-               (values dv-target dv-e))
-             (let-values (((es-target es) (rw-lst es)))
-               (values es-target
-                       (LetExpr (annos-remove-type a) dv es)))))]
-      [(LetExpr a (? Defun? dv) es)
-       (define n-dv (ast-normalize-LetLocalEc dv))
-       (let-values (((target es) (rw-lst es)))
-         (when target (set! a (annos-remove-type a)))
-         (values target (LetExpr a n-dv es)))]
-      [(LetLocalEc a k es)
-       ;; We normalize so that if `es` does not already end with a
-       ;; definite escape to `k` or beyond, we add an escape to `k` as
-       ;; the last thing to evaluate within `es`. It follows that if
-       ;; there is no escape to `k`, than the corresponding
-       ;; `LetLocalEc` block has no value at all.
-       (define k-id (Var-id k))
-       (define target (Id-bind k-id))
-       (parameterize ((scopes (cons target (scopes))))
-         (let-values (((es-target es) (rw-lst es)))
-           (cond
-            (es-target
-             (cond
-              ((not (memq es-target (scopes)))
-               (error 'ast-normalize-LetLocalEc
-                      "escapes ~a beyond context ~a"
-                      es-target (scopes)))
-              ((eq? es-target target)
-               (values #f (LetLocalEc a k es)))
-              (else ;; always escapes beyond this block
-               (values es-target (SeqExpr a es)))))
-            (else
-             (define n-es (list-map-last
-                           (lambda (e) (annoless AppLocalEc k e))
-                           es))
-             (values #f (LetLocalEc a k n-es))))))]
-      [(AppLocalEc a (Var _ k-id) e)
-       (let-values (((e-target e-ast) (rw e)))
-         (if e-target
-             (values e-target e-ast)
-             (let ((target (Id-bind k-id)))
-               (values target ast))))]
-      [else
-       (assert (ExprLike? ast))
-       (error 'ast-normalize-LetLocalEc
-              "unimplemented for expression ~s" ast)]))
-  
-  (define (rw-any-LetLocalEc ast)
-    (cond
-     ((LetLocalEc? ast)
-      (define-values (target n-ast) (rw ast))
-      n-ast)
-     (else
-      (term-rewrite-all rw-any-LetLocalEc ast))))
-          
-  (ast-splice-SeqExpr (rw-any-LetLocalEc in-ast)))
-
 ;; Where a SeqExpr appears within another SeqCont of some kind,
 ;; inlines the SeqExpr contents within the outer container.
 (define* ast-splice-SeqExpr
@@ -610,9 +483,6 @@
 (define* ast-simplify-multi-innermost
   (innermost-rewriter
    (match-lambda
-    [(LetLocalEc _ (Var _ k1) (list (AppLocalEc _ (Var _ k2) e)))
-     #:when (Id=? k1 k2)
-     e]
     [(IfExpr a c t e)
      #:when (equal? t e)
      (SeqExpr a (list c t))]

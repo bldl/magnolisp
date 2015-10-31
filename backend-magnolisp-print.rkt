@@ -47,14 +47,6 @@ source code.
                    ,(for/list ((e as))
                       `(sp ,(pp-expr e))))) ")"))
 
-    ((LetLocalEc _ k es)
-     `("(let/local-ec " (in (gr ,(pp-expr k)
-                                ,(for/list ((e es))
-                                   `(sp ,(pp-expr e))))) ")"))
-    
-    ((AppLocalEc _ k e)
-     `("(app/local-ec " (in (gr ,(pp-expr k) sp ,(pp-expr e))) ")"))
-
     (else
      (~s ast))))
 

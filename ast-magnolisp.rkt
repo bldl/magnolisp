@@ -435,17 +435,6 @@ Assumptions for AST node types:
 (define-ast* ExprStat (Ast Stat) 
   ((#:none annos) (#:just e)))
 
-;; Transient. Corresponds to a let/ec that only escapes to a local,
-;; immediately surrounding call/cc continuation. `k` is a label (an
-;; ID) naming the continuation.
-(define-ast* LetLocalEc (Ast Expr SeqCont) 
-  ((#:none annos) (#:just k) (#:many ss)))
-
-;; Escapes to the named LetLocalEc continuation `k` (an ID) with the
-;; value given by expression `e`.
-(define-ast* AppLocalEc (Ast Stat) 
-  ((#:none annos) (#:just k) (#:just e)))
-
 ;; A Racket expression. Should get dropped at some point during
 ;; compilation as most back ends cannot handle it. Its type can also
 ;; only be determined from context.

@@ -467,29 +467,8 @@
        (raise-argument-error
         'ti-def "supported Def?" ast))))
 
-  ;; Keyed by `bind` for each LetLocalEc continuation. Unifiable types
-  ;; are expected for any AppLocalEc expressions within, and there
-  ;; should be at least one.
-  (define return-type (make-hasheq))
-  
   (define (ti-stat ast) ;; Stat? -> void?
     (match ast
-      ((AppLocalEc _ (Var _ k) e)
-       (define t (ti-expr e))
-       (define bind (Id-bind k))
-       (define expect-t (hash-ref return-type bind #f))
-       (cond
-        ((not expect-t)
-         (hash-set! return-type bind t))
-        (else 
-         (unless (type-unifies!? expect-t t)
-           (raise-language-error/ast
-            "conflicting return type in block"
-            ast e
-            #:fields (list (list "previously"
-                                 (ast-displayable/datum expect-t)))))))
-       (void))
-      
       ((SeqStat _ ss)
        (for-each ti-stat ss))
       
@@ -546,16 +525,6 @@
        (define t (ti-expr-seq es))
        (expr-unify! ast t))
       
-      ((LetLocalEc _ (Var _ k) es)
-       (ti-expr-seq es)
-       (define bind (Id-bind k))
-       (define t (hash-ref return-type bind #f))
-       (unless t
-         (raise-language-error/ast
-          "escape block without result expressions"
-          ast))
-       (expr-unify! ast t))
-
       ((? Var?)
        (define t (lookup ast))
        (when (FunT? t)
