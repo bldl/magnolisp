@@ -1,11 +1,12 @@
-#lang magnolisp/2014
+#lang magnolisp
+(require (only-in racket/base))
 
-(typedef int (#:annos foreign))
+(typedef int #:: (foreign))
 
 (function (f x)
-  (#:annos export (type (fn int int)))
-  (do
-    (function (g x) #an(^(fn int int)) x)
-    (return (g x))))
+  #:: (export (type (-> int int)))
+  (let ()
+    (function (g x) #:: (^(-> int int)) x)
+    (g x)))
 
 (f 1)

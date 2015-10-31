@@ -19,13 +19,10 @@
 
 (function (f x)
   (#:annos export (type (fn int int)))
-  (do
-    (cast int (begin-racket 4 5 6))
-    7
-    x
-    (when (holds? x)
-      (return 1))
-    (return 2)))
+  (cast int (begin-racket 4 5 6))
+  7
+  x
+  (if (holds? x) 1 2))
 
 (f 5)
 (f 6)

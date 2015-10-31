@@ -14,13 +14,12 @@
   (let ((f 5)) f))
 
 (function (f) #an(export)
-  (do
-    (define (f) (let ((f 5)) (equal? f (g))))
-    (define five=seven (do
-                         (define (f) (g))
-                         (return (equal? (f) (seven)))))
-    (define seven=eight (equal? (seven) (eight)))
-    (define five (let ((x (g))) (let ((x x)) (let ((x x)) x))))
-    (return (f))))
+  (define (f) (let ((f 5)) (equal? f (g))))
+  (define five=seven (let ()
+                       (define (f) (g))
+                       (equal? (f) (seven))))
+  (define seven=eight (equal? (seven) (eight)))
+  (define five (let ((x (g))) (let ((x x)) (let ((x x)) x))))
+  (f))
 
 (f)

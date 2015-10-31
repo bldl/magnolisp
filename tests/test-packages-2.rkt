@@ -14,7 +14,7 @@ A simple test of Racket's "packages".
   (function (f) #an(^(fn int)) 5))
 
 (function (g) #an(export)
-  (do (open-package p1)
-      (return (f))))
+  (open-package p1)
+  (f))
 
 (g)

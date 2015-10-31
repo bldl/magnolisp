@@ -8,8 +8,8 @@
 
 (function (f x)
   (#:annos export (type (fn int int)))
-  (do (if (holds? x)
-          (return (if (holds? x) 1 2))
-          (begin (void) (return 3)))))
+  (if (holds? x)
+      (if (holds? x) 1 2)
+      (begin (void) 3)))
 
 (f 5)

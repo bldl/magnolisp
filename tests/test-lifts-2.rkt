@@ -6,11 +6,9 @@
   (+ x y))
 
 (function (main3 x) (#:annos export [type (fn int int)])
-  (do
-    (var y 1)
-    (set! y (add (add y y) 
-                 (do (set! y x) 
-                     (return y))))
-    (return y)))
+  (define y 1)
+  (set! y (add (add y y) 
+               (begin (set! y x) y)))
+  y)
 
 (main3 7) ;; => 9

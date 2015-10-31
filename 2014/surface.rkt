@@ -129,18 +129,6 @@
       (syntax/loc stx (k e))
       'local-ec #t)]))
 
-(define-syntax-parameter* return
-  (syntax-rules ()))
-
-(define-syntax-rule*
-  (do body ...)
-  (let/local-ec k
-    (syntax-parameterize
-     ([return
-       (syntax-rules ()
-         [(_ v) (apply/local-ec k v)])])
-     body ...)))
-
 (define-syntax* (begin-racket stx)
   (syntax-case stx ()
     [(_ e ...)

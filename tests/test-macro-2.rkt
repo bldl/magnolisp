@@ -41,10 +41,9 @@ functions can become quite convenient.
 
 (function (f in-obj)
   #an(export ^(fn Obj Obj))
-  (do
-    (var obj in-obj)
-    (bind-accessors x obj Obj-get-x Obj-set-x)
-    (set! x (inc x))
-    (return obj)))
+  (var obj in-obj)
+  (bind-accessors x obj Obj-get-x Obj-set-x)
+  (set! x (inc x))
+  obj)
     
 (f (MyObj 0 0))

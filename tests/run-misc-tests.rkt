@@ -54,13 +54,12 @@
  '(submod "." m3)
  #rx"program is not fully typed")
 
-(module m4 magnolisp/2014
+(module m4 magnolisp
   (function (f)
-    (#:annos export (type (fn Bool)))
-    (do
-      (var x #t)
-      (var y (x))
-      (return x)))
+    #:: (export (type (-> Bool)))
+    (var x #t)
+    (var y (x))
+    x)
   (define x 3))
 
 (check-not-compile-mgl-mod

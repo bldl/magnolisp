@@ -19,8 +19,8 @@ annotations.
       "Anastasia")))
 
 (function (g)
-  (do (open-package big-russian-doll)
-      (open-package middle-russian-doll)
-      (return (little-russian-doll))))
+  (open-package big-russian-doll)
+  (open-package middle-russian-doll)
+  (little-russian-doll))
 
 (g)

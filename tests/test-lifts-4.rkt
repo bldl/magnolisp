@@ -9,12 +9,11 @@
   (= x 1))
 
 (function (main3 x) (#:annos export [type (fn int int)])
-  (do
-    (var y 1)
-    (when (holds? x)
-      (set! y x)) ;; not safe to remove since in branch
-    (set! y y) ;; copy propagation should propagate `y`
-    (return y)))
+  (define y 1)
+  (when (holds? x)
+    (set! y x)) ;; not safe to remove since in branch
+  (set! y y) ;; copy propagation should propagate `y`
+  y)
 
 (main3 1) ;; => 1
 (main3 7) ;; => 7

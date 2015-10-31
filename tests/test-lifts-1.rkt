@@ -6,44 +6,40 @@
   (+ x y))
 
 (function (main1 x) (#:annos export [type (fn int int)])
-  (do
-    (var y 1)
-    (set! y (add y (add (do (set! y x) (return x)) y)))
-    (return y)))
+  (define y 1)
+  (set! y (add y (add (begin (set! y x) x) y)))
+  y)
 
 (function (main2 x) (#:annos export [type (fn int int)])
-  (do
-    (var y 1)
-    (set! y (add (add y (do (set! y x) (return x))) y))
-    (return y)))
+  (define y 1)
+  (set! y (add (add y (begin (set! y x) x)) y))
+  y)
 
 (function (main3 x) (#:annos export [type (fn int int)])
-  (do
-    (var y 1)
-    (set! y (add (add y y) (do (set! y x) (return y))))
-    (return y)))
+  (define y 1)
+  (set! y (add (add y y) (begin (set! y x) y)))
+  y)
 
 (function (main4 x) (#:annos export [type (fn int int)])
-  (do
-    (var y 1)
-    (set! y (add (do (set! y x) (return y)) (add y y)))
-    (return y)))
+  (define y 1)
+  (set! y (add (begin (set! y x) y) (add y y)))
+  y)
 
 (function (main5 x) (#:annos export [type (fn int int)])
-  (do
-    (var y 1)
-    (set! y (add (do (set! y x) (return (add y y))) (add y y)))
-    (return y)))
+  (define y 1)
+  (set! y (add (begin (set! y x) (add y y)) (add y y)))
+  y)
 
 (function (main6 x) (#:annos export [type (fn int int)])
-  (do
-    (var y 1)
+  (let ()
+    (define y 1)
     (set! y (add 
-             (do (set! y (do (set! y (add x y)) 
-                             (return y))) 
-                 (return y))
+             (begin
+               (set! y (begin (set! y (add x y)) 
+                              y))
+                 y)
              (add y y)))
-    (return y)))
+    y))
 
 (main1 7) ;; => 15
 (main2 7) ;; => 15

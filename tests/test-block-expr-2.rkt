@@ -7,16 +7,12 @@
   (begin-racket (equal? x y)))
 
 (function (default e f d) #an([export dflt])
-  (do
-    (if (equal e f)
-        (return d)
-        (return e))))
+  (if (equal e f) d e))
 
 (function (f x)
   (#:annos export)
-  (do
-    (var y (default x 2 7))
-    (return (default x 1 7))))
+  (define y (default x 2 7))
+  (default x 1 7))
 
 (f 1)
 (f 2)

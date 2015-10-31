@@ -12,8 +12,7 @@
 
 (function (f x)
   (#:annos export (type (fn int int)))
-  (do
-    (var y (let ((x x)) (one)))
-    (return y)))
+  (define y (let ((x x)) (one)))
+  y)
 
 (f 1)

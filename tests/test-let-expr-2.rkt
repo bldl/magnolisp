@@ -12,9 +12,8 @@
 
 (function (f x)
   (#:annos export (type (fn int int)))
-  (do
-    (var x #an(^int) (let-var y #an(^int) (one) (inc y)))
-    (return x)))
+  (var x #an(^int) (let-var y #an(^int) (one) (inc y)))
+  x)
 
 (f 1)
 

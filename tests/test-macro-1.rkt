@@ -1,9 +1,10 @@
-#lang magnolisp/2014
+#lang magnolisp
+(require (only-in racket/base equal?))
 
-(typedef int (#:annos foreign))
+(typedef int #:: (foreign))
 
 (function (equal x y)
-  (#:annos (type (fn int int Bool)) foreign)
+  #:: ((type (-> int int Bool)) foreign)
   (equal? x y))
 
 (function (compute x)
@@ -11,15 +12,12 @@
 
 (define-syntax-rule
   (default e f d)
-  (do
-    (var ret e)
-    (return
-     (if (equal ret f)
-         d
-         ret))))
+  (let ((ret e))
+    (if (equal ret f)
+        d
+        ret)))
 
-(function (f x)
-  (#:annos export)
+(function (f x) #:: (export)
   (default (compute x) 0 (compute 42)))
 
 (default 1 1 7)

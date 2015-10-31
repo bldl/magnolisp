@@ -15,8 +15,8 @@ A "packages" example adapted from Racket docs.
     (define (little-russian-doll) (cast string "Anastasia"))))
 
 (function (g) #an(export)
-  (do (open-package big-russian-doll)
-      (open-package middle-russian-doll)
-      (return (little-russian-doll))))
+  (open-package big-russian-doll)
+  (open-package middle-russian-doll)
+  (little-russian-doll))
 
 (g)

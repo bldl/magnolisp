@@ -10,10 +10,7 @@
 
 (function (f x)
   (#:annos export [type (fn int int)])
-  (do
-    (begin-racket 4 5 6)
-    (when (holds? x)
-      (return 1))
-    (return 2)))
+  (begin-racket 4 5 6)
+  (if (holds? x) 1 2))
 
 (f 5)

@@ -32,13 +32,12 @@ Conditional compilation, #if ... #elif ... #endif style.
   w)
 
 (function (init-any-ui w) #an(export ^(fn World World))
-  (do
-    (static-cond
-     [(or on-bb10 on-harmattan on-sailfish)
-      (return (init-qt-ui w))]
-     [on-console
-      (return (init-ncurses-ui w))]
-     [else
-      (return w)])))
+  (static-cond
+   [(or on-bb10 on-harmattan on-sailfish)
+    (init-qt-ui w)]
+   [on-console
+    (init-ncurses-ui w)]
+   [else
+    w]))
 
 (init-any-ui 7)
