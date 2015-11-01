@@ -73,6 +73,9 @@ website : rm-dist html-manual pdf-manual pkg website-local
 test :
 	raco test --jobs 2 --run-if-absent tests/run-*.rkt
 
+test-with-cc :
+	raco test tests/run-cc-on-files.rkt
+
 gh-homepage :
 	( cd gh-pages && git clean -d -f && git rm --ignore-unmatch -rf . )
 	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --html --dest gh-pages --dest-name gh-pages/index.html manual-src/manual.scrbl

@@ -768,7 +768,7 @@ C++ back end.
       (set! to-examine (cons item to-examine)))
     n-a)
   
-  ;; Assigns value numbers to each "assignment", and adds potentials
+  ;; Assigns a value number for each "assignment", and adds potentials
   ;; for removal to `to-examine`. Note that a `DeclVar` has no value.
   (define assign-val-nums
     (topdown
@@ -790,131 +790,150 @@ C++ back end.
   ;; execution order in order to do data-flow analysis.
   (define (rw-by-item examine-item def)
     ;;(writeln `(examining ,examine-item))
-    
-    (define tgt-num (first examine-item))
-    (define tgt-id (second examine-item))
+
+    (match-define (list tgt-num tgt-id tgt-rv-ast) examine-item)
     (define tgt-bind (Id-bind tgt-id))
-    (define tgt-rv (third examine-item))
+    (match-define (Var _ tgt-rv-id) tgt-rv-ast)
+    (define tgt-rv-bind (Id-bind tgt-rv-id))
+    (define tgt-rv-num #f)
     
     ;; For each Goto target (indexed by `bind` value), a sum of their
-    ;; bind->val assignments. All Gotos to a LabelDef will have been
+    ;; bind->num assignments. All Gotos to a LabelDef will have been
     ;; seen before we reach the LabelDef, and hence the set of
     ;; assignments will be complete at that point.
-    (define label->bind->val (make-hasheq))
-    
+    (define label->bind->num (make-hasheq))
+
     (define (merge h1 h2)
       (define keys (list->mutable-seteq (hash-keys h1)))
-      (for ((k (hash-keys h2)))
+      (for ([k (hash-keys h2)])
         (set-add! keys k))
       (for/fold ((h #hasheq())) ((k (in-set keys)))
         (define v1 (hash-ref h1 k 'nothing))
         (define v2 (hash-ref h2 k 'nothing))
         (hash-set h k (val-num+ v1 v2))))
     
-    (define (rw bind->val ast)
-      ;;(writeln `(rw of ,ast))
+    (define (rw bind->num ast)
+      ;;(writeln `(rw of ,ast when ,bind->num))
       (match ast
         [(AssignStat a lv rv)
          (define this-num (hash-ref a 'val-num))
          (assert (Var? lv))
          (define lv-id (Var-id lv))
          (define lv-bind (Id-bind lv-id))
-         (values (hash-set bind->val lv-bind this-num)
+         (values (hash-set bind->num lv-bind this-num)
                  (cond
                   [(and (eq? this-num tgt-num)
                         (Id=? tgt-id lv-id))
-                   ;;(writeln `(deleting ,ast))
+                   ;;(writeln `(deleting ,this-num : ,lv-id := ,rv))
+                   (define rv-bind (Id-bind (Var-id rv)))
+                   (set! tgt-rv-num (hash-ref bind->num rv-bind))
                    a-noop]
                   [else
-                   (define n-rv (rw-discard bind->val rv)) 
+                   (define n-rv (rw-discard bind->num rv)) 
                    (and n-rv (AssignStat a lv n-rv))]))]
-        [(DefVar a id t rv)
+        [(DefVar a lv-id t rv)
          (define this-num (hash-ref a 'val-num))
-         (define lv-bind (Id-bind id))
-         (values (hash-set bind->val lv-bind this-num)
+         (define lv-bind (Id-bind lv-id))
+         (values (hash-set bind->num lv-bind this-num)
                  (cond
-                  [(eq? this-num tgt-num)
-                   (DeclVar a id t)]
-                  [else
-                   (define n-rv (rw-discard bind->val rv))
-                   (and n-rv (DefVar a id t n-rv))]))]
+                   [(eq? this-num tgt-num)
+                    ;;(writeln `(deleting ,this-num : ,lv-id := ,rv))
+                    (define rv-bind (Id-bind (Var-id rv)))
+                    (set! tgt-rv-num (hash-ref bind->num rv-bind))
+                    (DeclVar a lv-id t)]
+                   [else
+                    (define n-rv (rw-discard bind->num rv))
+                    (and n-rv (DefVar a lv-id t n-rv))]))]
         [(Param a id t)
          (define this-num (hash-ref a 'val-num))
          (assert (not (eq? this-num tgt-num)))
          (define lv-bind (Id-bind id))
-         (values (hash-set bind->val lv-bind this-num) ast)]
+         (values (hash-set bind->num lv-bind this-num) ast)]
         [(IfStat a c t e)
-         (define n-c (rw-discard bind->val c))
+         (define n-c (rw-discard bind->num c))
          (cond
            [(not n-c)
-            (values bind->val #f)]
+            (values bind->num #f)]
            [else
-            (define-values (t-st n-t) (rw bind->val t))
+            (define-values (t-st n-t) (rw bind->num t))
             (cond 
               [(not n-t)
-               (values bind->val #f)]
+               (values bind->num #f)]
               [else
-               (define-values (e-st n-e) (rw bind->val e))
+               (define-values (e-st n-e) (rw bind->num e))
                (cond
                  [(not n-e)
-                  (values bind->val #f)]
+                  (values bind->num #f)]
                  [else
                   (values (merge t-st e-st)
                           (IfStat a n-c n-t n-e))])])])]
-        [(Var a (? (lambda (id) (Id=? id tgt-id)) id))
+        [(Var a (? (fix Id=? tgt-id) id))
          (define this-bind (Id-bind id))
-         (define this-num (hash-ref bind->val this-bind))
-         (assert (not (eq? this-num 'nothing)))
-         ;;(writeln `(Var id= ,id num= ,this-num))
-         (values bind->val
+         (define this-num (hash-ref bind->num this-bind))
+         ;;(writeln `(examining Var id= ,id num= ,this-num rv= ,tgt-rv-ast num= ,(hash-ref bind->num tgt-rv-bind #f)))
+         (assert (not (eq? this-num 'nothing))) ;; undefined, cannot use
+         (values bind->num
                  (cond
-                  ;; The target assignment is in effect here.
-                  ((eq? this-num tgt-num)
-                   tgt-rv)
-                  ;; The target assignment might be in effect here, but we
-                  ;; don't know, and hence cannot make this optimization.
-                  ((Phi? this-num)
-                   (define vs (Phi-set this-num))
-                   (if (set-member? vs tgt-num)
-                       #f
-                       ast))
-                  ;; The target assignment is not in effect here.
-                  (else
-                   ast)))]
+                   ;; The target assignment is in effect here, so we
+                   ;; must substitute the R-value variable, but this
+                   ;; only works if it still has the same R-value.
+                   [(eq? this-num tgt-num)
+                    (assert tgt-rv-num)
+                    (define this-rv-num (hash-ref bind->num tgt-rv-bind))
+                    (unless this-rv-num
+                      (raise-assertion-error
+                       'fun-propagate-copies
+                       "no value binding for R-value: ~a := ~a (~a)"
+                       tgt-id tgt-rv-id this-num))
+                    (and (eq? this-rv-num tgt-rv-num) tgt-rv-ast)]
+                   ;; The target assignment might be in effect here,
+                   ;; but we don't know if it is, and hence cannot make
+                   ;; this optimization.
+                   [(and (Phi? this-num)
+                         (set-member? (Phi-set this-num) tgt-num))
+                    #f]
+                   ;; The target assignment is not in effect here, so
+                   ;; this use is unaffected.
+                   [else
+                    ast]))]
         [(Goto _ id)
          (define bind (Id-bind id))
-         (define lbl-vals 
-           (merge (hash-ref label->bind->val bind #hasheq()) bind->val))
-         (hash-set! label->bind->val bind lbl-vals)
-         (values bind->val ast)]
+         (define lbl-nums 
+           (merge (hash-ref label->bind->num bind #hasheq()) bind->num))
+         (hash-set! label->bind->num bind lbl-nums)
+         (values bind->num ast)]
         [(LabelDef _ id)
          (define bind (Id-bind id))
-         (define lbl-vals 
+         (define lbl-nums 
            (merge 
             ;; any value assignments from Gotos to this label
-            (hash-ref label->bind->val bind #hasheq()) 
+            (hash-ref label->bind->num bind #hasheq()) 
             ;; the "fall-in" value assignments
-            bind->val))
-         (values lbl-vals ast)]
+            bind->num))
+         (values lbl-nums ast)]
         [_
-         (rw-all bind->val ast)]))
-    
-    (define (rw-discard bind->val ast)
-      (define-values (r n-ast) (rw bind->val ast))
+         ;;(writeln `(no special action for ,ast))
+         (rw-all bind->num ast)]))
+
+    ;; Rewrites `ast` and returns the modified AST (or #f), discarding
+    ;; changes to assignment table.
+    (define (rw-discard bind->num ast)
+      (define-values (r n-ast) (rw bind->num ast))
       n-ast)
     
-    (define (rw-all bind->val ast)
-      (term-rewrite-all/stateful rw bind->val ast))
-    
-    (let-values ([(dummy ast) (rw #hasheq() def)])
-      ;;(pretty-print ast)
-      ast))
+    (define (rw-all bind->num ast)
+      (term-rewrite-all/stateful rw bind->num ast))
+
+    (rw-discard #hasheq() def)) ;; end rw-by-item
   
   ;; Tries to rewrite `ast` to remove each of the assignments in
   ;; `to-examine`, but preserves `ast` where removal is not possible.
   (define (examine-all ast)
-    (for/fold ((ast ast)) ((item to-examine))
-      (or (rw-by-item item ast) ast)))
+    ;;(pretty-print to-examine)
+    (for/fold ([ast ast]) ([item to-examine])
+      (define res (rw-by-item item ast))
+      ;;(writeln (list 'TRIED item res))
+      (or res ast)))
   
   (examine-all (assign-val-nums def)))
 
@@ -922,7 +941,7 @@ C++ back end.
 ;;; removal of unreferenced variables
 ;;; 
 
-(define (fun-rm-unreferenced-var-decl def)
+(define (rm-unreferenced-var-decl an-ast)
   (define refs (mutable-seteq))
   
   ((topdown-visitor
@@ -931,7 +950,7 @@ C++ back end.
         (define id (Var-id ast))
         (define bind (Id-bind id))
         (set-add! refs bind))))
-   def)
+   an-ast)
   
   ((topdown
     (lambda (ast)
@@ -942,7 +961,7 @@ C++ back end.
              ast
              a-noop)]
         [_ ast])))
-   def))
+   an-ast))
 
 ;;; 
 ;;; introduce variables for arguments
@@ -1072,11 +1091,11 @@ C++ back end.
     (define s (CxxDefun-s ast))
     (set! s (stat-rm-goto-next s))
     (set! s (stat-rm-unused-labels s))
-    ;;(pretty-print `(,(CxxDefun-id ast) before ,s))
-    (set! s (fun-propagate-copies s))
-    ;;(pretty-print `(,(CxxDefun-id ast) after ,s))
-    (set! s (fun-rm-unreferenced-var-decl s))
-    (set-CxxDefun-s ast s))
+    (define def (set-CxxDefun-s ast s))
+    ;;(pretty-print `(BEFORE ,def))
+    (set! def (fun-propagate-copies def))
+    ;;(pretty-print `(AFTER ,def))
+    (rm-unreferenced-var-decl def))
   
   (map (lambda (def)
          (if (CxxDefun? def)
@@ -1176,6 +1195,10 @@ C++ back end.
                           "either 'cc or 'hh" kind))
   (values (second p)))
 
+(define (pp-exit obj)
+  (pretty-print obj)
+  (exit))
+  
 (define-with-contract*
   (-> (listof symbol?) hash? path-string? (or/c #f output-port?)
       boolean? void?)
@@ -1187,10 +1210,6 @@ C++ back end.
   (define (pp-only obj)
     (pretty-print obj)
     obj)
-  
-  (define (pp-exit obj)
-    (pretty-print obj)
-    (exit))
   
   (define def-lst
     (thread1->

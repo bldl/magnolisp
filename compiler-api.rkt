@@ -138,7 +138,7 @@ optimization.
    (lambda (ast)
      (match ast
        [(Begin0 a (list e bs ..1))
-        (define id (fresh-Id 'begin0))
+        (define id (fresh-Id 'bg))
         (define dv (annoless DefVar id the-AnyT e))
         (LetExpr a dv (append bs (list (annoless Var id))))]
        [_ ast]))))
