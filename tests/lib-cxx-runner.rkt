@@ -26,6 +26,10 @@
   #:: ((type (-> int int)) foreign)
   (r.add1 x))
 
+(function* (zero? x) 
+  #:: ([type (-> int Bool)] foreign)
+  (r.= x 0))
+
 (function* (non-zero? x) 
   #:: ([type (-> int Bool)] foreign)
   (r.not (r.= x 0)))

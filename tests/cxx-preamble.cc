@@ -26,6 +26,10 @@ static int inc(int x) {
   return x + 1;
 }
 
+static bool is_zero(int x) {
+  return x == 0;
+}
+
 static bool is_non_zero(int x) {
   return x != 0;
 }

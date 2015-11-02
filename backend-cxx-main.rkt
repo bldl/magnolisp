@@ -739,8 +739,14 @@ C++ back end.
      (lambda (ast)
        (match ast
          [(AssignStat a lv rv)
-          (define n-a (annos-add-val-num! a (Var-id lv) rv))
-          (AssignStat n-a lv rv)]
+          (cond
+            [(and (Var? rv) (equal? lv rv))
+             ;; Special case of `x := x`, so can remove
+             ;; unconditionally.
+             a-noop]
+            [else
+             (define n-a (annos-add-val-num! a (Var-id lv) rv))
+             (AssignStat n-a lv rv)])]
          [(DefVar a id t rv)
           (define n-a (annos-add-val-num! a id rv))
           (DefVar n-a id t rv)]
