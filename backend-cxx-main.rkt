@@ -759,17 +759,18 @@ C++ back end.
   ;; (listof (list/c val-num lv rv))
   (define to-examine null)
   
-  (define (annos-add-val-num! a lv-id [rv #f])
+  (define (annos-add-val-num! a lv-id [rv-ast #f])
     (define val-num (gensym 'vn))
     (define n-a (hash-set a 'val-num val-num))
-    (when (and rv (Var? rv))
-      (define item (list val-num lv-id rv))
+    (when (and rv-ast (any-pred-holds Var? Literal? rv-ast))
+      (define item (list val-num lv-id rv-ast))
       ;;(writeln `(potential ,item))
       (set! to-examine (cons item to-examine)))
     n-a)
   
   ;; Assigns a value number for each "assignment", and adds potentials
-  ;; for removal to `to-examine`. Note that a `DeclVar` has no value.
+  ;; for removal to `to-examine`. Note that: a `DeclVar` has no value;
+  ;; and a `Param` has some value, but no expression giving it.
   (define assign-val-nums
     (topdown
      (lambda (ast)
@@ -791,11 +792,19 @@ C++ back end.
   (define (rw-by-item examine-item def)
     ;;(writeln `(examining ,examine-item))
 
-    (match-define (list tgt-num tgt-id tgt-rv-ast) examine-item)
-    (define tgt-bind (Id-bind tgt-id))
-    (match-define (Var _ tgt-rv-id) tgt-rv-ast)
-    (define tgt-rv-bind (Id-bind tgt-rv-id))
-    (define tgt-rv-num #f)
+    (match-define (list tgt-num tgt-lv-id tgt-rv-ast) examine-item)
+
+    (define tgt-rv-id ;; true for Vars, not Literals
+      (match tgt-rv-ast
+        [(Var _ id) id]
+        [(? Literal?) #f]))
+    (define tgt-rv-bind (and tgt-rv-id (Id-bind tgt-rv-id)))
+    (define tgt-rv-num #f) ;; determined later if `tgt-rv-id`
+
+    (define (maybe-set-rv-num! bind->num rv-ast)
+      (when (Var? rv-ast)
+        (define rv-bind (Id-bind (Var-id rv-ast)))
+        (set! tgt-rv-num (hash-ref bind->num rv-bind))))
     
     ;; For each Goto target (indexed by `bind` value), a sum of their
     ;; bind->num assignments. All Gotos to a LabelDef will have been
@@ -823,10 +832,9 @@ C++ back end.
          (values (hash-set bind->num lv-bind this-num)
                  (cond
                   [(and (eq? this-num tgt-num)
-                        (Id=? tgt-id lv-id))
+                        (Id=? tgt-lv-id lv-id))
                    ;;(writeln `(deleting ,this-num : ,lv-id := ,rv))
-                   (define rv-bind (Id-bind (Var-id rv)))
-                   (set! tgt-rv-num (hash-ref bind->num rv-bind))
+                   (maybe-set-rv-num! bind->num rv)
                    a-noop]
                   [else
                    (define n-rv (rw-discard bind->num rv)) 
@@ -838,8 +846,7 @@ C++ back end.
                  (cond
                    [(eq? this-num tgt-num)
                     ;;(writeln `(deleting ,this-num : ,lv-id := ,rv))
-                    (define rv-bind (Id-bind (Var-id rv)))
-                    (set! tgt-rv-num (hash-ref bind->num rv-bind))
+                    (maybe-set-rv-num! bind->num rv)
                     (DeclVar a lv-id t)]
                    [else
                     (define n-rv (rw-discard bind->num rv))
@@ -867,7 +874,7 @@ C++ back end.
                  [else
                   (values (merge t-st e-st)
                           (IfStat a n-c n-t n-e))])])])]
-        [(Var a (? (fix Id=? tgt-id) id))
+        [(Var a (? (fix Id=? tgt-lv-id) id))
          (define this-bind (Id-bind id))
          (define this-num (hash-ref bind->num this-bind))
          ;;(writeln `(examining Var id= ,id num= ,this-num rv= ,tgt-rv-ast num= ,(hash-ref bind->num tgt-rv-bind #f)))
@@ -875,17 +882,22 @@ C++ back end.
          (values bind->num
                  (cond
                    ;; The target assignment is in effect here, so we
-                   ;; must substitute the R-value variable, but this
-                   ;; only works if it still has the same R-value.
+                   ;; must substitute the R-value variable or literal,
+                   ;; but this only works if it still has the same
+                   ;; R-value (literals obviously do).
                    [(eq? this-num tgt-num)
-                    (assert tgt-rv-num)
-                    (define this-rv-num (hash-ref bind->num tgt-rv-bind))
-                    (unless this-rv-num
-                      (raise-assertion-error
-                       'fun-propagate-copies
-                       "no value binding for R-value: ~a := ~a (~a)"
-                       tgt-id tgt-rv-id this-num))
-                    (and (eq? this-rv-num tgt-rv-num) tgt-rv-ast)]
+                    (cond
+                      [tgt-rv-bind ;; Var
+                       (assert tgt-rv-num)
+                       (define this-rv-num (hash-ref bind->num tgt-rv-bind))
+                       (unless this-rv-num
+                         (raise-assertion-error
+                          'fun-propagate-copies
+                          "no value binding for R-value: ~a := ~a (~a)"
+                          tgt-lv-id tgt-rv-id this-num))
+                       (and (eq? this-rv-num tgt-rv-num) tgt-rv-ast)]
+                      [else ;; Literal
+                       tgt-rv-ast])]
                    ;; The target assignment might be in effect here,
                    ;; but we don't know if it is, and hence cannot make
                    ;; this optimization.
