@@ -205,7 +205,7 @@ Assumptions for AST node types:
 
 (define-with-contract*
   (-> Id? Id? boolean?)
-  (Id=? x y)
+  (Id-bind=? x y)
   (eq? (Id-bind x) (Id-bind y)))
 
 (define-with-contract*
@@ -218,7 +218,7 @@ Assumptions for AST node types:
             (Id->string y)))
 
 ;; Creates a fresh identifier with the specified basename `sym` that
-;; is not (yet) Id=? to any other. An uninterned value is
+;; is not (yet) Id-bind=? to any other. An uninterned value is
 ;; given to `bind`.
 (define-with-contract*
   (->* () ((or/c symbol? string?)) Id?)
@@ -231,7 +231,7 @@ Assumptions for AST node types:
   (fresh-Id (Id-name other)))
 
 ;; Converts the specified syntax object identifier to an Id one,
-;; making it Id=? to `other` (if any is given).
+;; making it Id-bind=? to `other` (if any is given).
 (define-with-contract*
   (->* (identifier?) (#:bind (or/c symbol? Id?)) Id?)
   (identifier->Id id #:bind [other #f])
@@ -495,7 +495,7 @@ Assumptions for AST node types:
 ;;; 
 
 (define ((make-NameT-pred id) ast)
-  (matches? ast (NameT _ (? (lambda (x) (Id=? x id))))))
+  (matches? ast (NameT _ (? (lambda (x) (Id-bind=? x id))))))
 
 ;; By convention any built-ins get the "bare" bind value, i.e. the
 ;; same symbol as the name.

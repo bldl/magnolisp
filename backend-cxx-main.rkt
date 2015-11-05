@@ -801,7 +801,7 @@ C++ back end.
          (values (hash-set bind->num lv-bind this-num)
                  (cond
                   [(and (eq? this-num tgt-num)
-                        (Id=? tgt-lv-id lv-id))
+                        (Id-bind=? tgt-lv-id lv-id))
                    ;;(writeln `(deleting ,this-num : ,lv-id := ,rv))
                    (maybe-set-rv-num! bind->num rv)
                    a-noop]
@@ -843,7 +843,7 @@ C++ back end.
                  [else
                   (values (merge t-st e-st)
                           (IfStat a n-c n-t n-e))])])])]
-        [(Var a (? (fix Id=? tgt-lv-id) id))
+        [(Var a (? (fix Id-bind=? tgt-lv-id) id))
          (define this-bind (Id-bind id))
          (define this-num (hash-ref bind->num this-bind))
          ;;(writeln `(examining Var id= ,id num= ,this-num rv= ,tgt-rv-ast num= ,(hash-ref bind->num tgt-rv-bind #f)))
@@ -1030,12 +1030,12 @@ C++ back end.
        (define-values (st1 n-e) (g st e))
        ;; We do account for the special case where both branches of an
        ;; IfStat begin with the same label.
-       (values (and st0 st1 (Id=? st0 st1) st0)
+       (values (and st0 st1 (Id-bind=? st0 st1) st0)
                (IfStat a c n-t n-e))]
       [(LabelDef _ id) 
        ;;(writeln `(store ,id))
        (values id s)]
-      [(Goto _ (? (lambda (id) (and st (Id=? st id)))))
+      [(Goto _ (? (lambda (id) (and st (Id-bind=? st id)))))
        ;;(writeln `(delete ,s))
        (values st a-noop)]
       [_ 
@@ -1106,7 +1106,7 @@ C++ back end.
   (define (do-Defun ast)
     (match-define (Defun a id t ps b) ast)
     (define oid (owner-id))
-    (unless (Id=? id oid)
+    (unless (Id-bind=? id oid)
       (set! a (hash-set a 'owner-id oid)))
     (set! b (ast-splice-SeqExpr (rw-body b)))
     (hash-set! n-defs (Id-bind id) (Defun a id t ps b)))

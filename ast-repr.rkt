@@ -238,10 +238,10 @@ Assumptions for AST node types:
 ;;; 
 
 ;; Returns (listof syntax?).
-(define-for-syntax (mkstx-extra-accessors conc-id fld-id-lst provide?)
+(define-for-syntax (mkstx-extra-accessors conc-id fld-id-lst def-stx)
   (define conc-name (syntax-e conc-id))
   (with-syntax ([conc conc-id]
-                [def (if provide? #'define* #'define)])
+                [def def-stx])
     (define copy-impl
       (with-syntax ([(fld ...) fld-id-lst]
                     [c-copy (format-id conc-id "~a-copy" conc-name)])
@@ -287,6 +287,24 @@ Assumptions for AST node types:
   
   (list equal-stx hash-stx hash2-stx))
 
+(define-for-syntax (mkstx-ast=? conc-id def-stx)
+  (define conc-name (syntax-e conc-id))
+  (with-syntax
+    ([def def-stx]
+     [expected (format "~a?" conc-name)]
+     [ast? (format-id conc-id "~a?" conc-name)]
+     [ast=? (format-id conc-id "~a=?" conc-name)])
+    #'(def (ast=? x y)
+        (cond
+         [(not (ast? x))
+          (raise-argument-error (quote ast=?) expected 0 x y)]
+         [(eq? x y)
+          #t]
+         [(not (ast? y))
+          (raise-argument-error (quote ast=?) expected 1 x y)]
+         [else
+          (equal? x y)]))))
+
 ;;; 
 ;;; concrete AST node definition
 ;;; 
@@ -309,6 +327,9 @@ Assumptions for AST node types:
              #:attr spec (list #'fld (attribute t.qty))))
 
   (define def-stx
+    (if provide? #'define* #'define))
+  
+  (define def-ast-stx
     (syntax-parse stx
       [(_ name:id (view:vw ...) (fld:fspec ...)
           (~optional (~seq #:singleton (arg:expr ...)))
@@ -361,14 +382,15 @@ Assumptions for AST node types:
                    null))))
        #`(begin
            #,struct-def
-           #,@(mkstx-extra-accessors conc-id fld-id-lst provide?)
+           #,(mkstx-ast=? conc-id def-stx)
+           #,@(mkstx-extra-accessors conc-id fld-id-lst def-stx)
            #,@(if singleton?
                   (with-syntax ((the-name singleton-id)
-                                (def (if provide? #'define* #'define)))
+                                (def def-stx))
                     (list #'(def the-name (name arg ...))))
                   null))]))
-  ;;(pretty-print (syntax->datum def-stx))
-  def-stx)
+  ;;(pretty-print (syntax->datum def-ast-stx))
+  def-ast-stx)
 
 (define-syntax* (define-ast stx)
   (mkstx-define-ast stx #f))
