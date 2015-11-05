@@ -285,3 +285,23 @@
   (define ast2 (A (list ast1) 1 (list ast0)))
   (define ast2b ((topdown-rewriter f #:rewrite-all both-all) ast2))
   (check-eqv? 7 (count ast2b)))
+
+;;; 
+;;; implied views
+;;; 
+(let ()
+  (define-view R ([#:field r]))
+  (define-view V ([#:field v]) #:also (R))
+  (define-ast A (V) ([#:none a] [#:none r] [#:none v]))
+  (define a0 (A 1 2 3))
+  (check-pred A? a0)
+  (check-pred V? a0)
+  (check-pred R? a0)
+  (check-eqv? 1 (A-a a0))
+  (check-eqv? 3 (V-v a0))
+  (check-eqv? 2 (A-r a0))
+  (check-eqv? 2 (R-r a0))
+  (check-true (V=? a0 (A 3 4 3)))
+  (check-true (R=? a0 (A 0 2 7)))
+  (check-eqv? 9 (R-r (set-R-r a0 9)))
+  (check-eqv? 9 (R-r (V-copy (R-copy a0 9) 8))))

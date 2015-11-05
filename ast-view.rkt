@@ -32,9 +32,9 @@ E.g.,
 |#
 
 (require racket/generic racket/match racket/unsafe/ops "util.rkt"
-         (for-syntax racket/base racket/list racket/match
+         (for-syntax racket/base racket/dict racket/list racket/match
                      racket/pretty racket/syntax
-                     syntax/parse syntax/strip-context
+                     syntax/id-table syntax/parse syntax/strip-context
                      "util/module.rkt"))
 
 ;; A version of `struct-copy` that does not take field accessor
@@ -196,6 +196,9 @@ E.g.,
 ;;; 
 
 (begin-for-syntax
+  ;; flds : (listof ViewFld), others : (listof identifier)
+  (struct ViewInfo (flds others) #:transparent)
+  
   (define-syntax-class* term-qty
     #:attributes (qty)
     (pattern #:none #:attr qty 'none)
@@ -209,7 +212,7 @@ E.g.,
              #:attr qty (attribute tq.qty)))
 
   ;; The `qty` field value is optional, and may be #f.
-  (define-datatype* (ViewFld id qty)
+  (define-datatype (ViewFld id qty)
     ([FieldViewFld] [AccessViewFld get set]) #:transparent)
 
   (define (term-ViewFld? fld)
@@ -255,7 +258,7 @@ E.g.,
 
 (define-for-syntax (make-define-view def-gen-id def-stx-id 
                                      def-pat-id def-fun-id stx)
-  (define (generate view-id fld-spec-lst trav? opt-stx-lst)
+  (define (generate view-id fld-spec-lst other-id-lst trav? opt-stx-lst)
     (define view-name (syntax-e view-id))
     (define fld-ids (map ViewFld-id fld-spec-lst))
 
@@ -285,10 +288,11 @@ E.g.,
                     [def-equ (make-view-equal view-id fld-ids def-fun-id)]
                     [view-info (format-id stx "view:~a" view-name)]
                     [(gen-opt ...) opt-stx-lst]
+                    [(other ...) other-id-lst]
                     [(entry ...) (map ViewFld->syntax fld-spec-lst)])
         #'(begin
             (def-stx view-info
-              (list entry ...))
+              (ViewInfo (list entry ...) (list #'other ...)))
             (def-gen view
               gen-opt ...
               method ...)
@@ -298,10 +302,15 @@ E.g.,
   
   (syntax-parse stx
     [(_ view:id flds:vspec
-        (~optional (~and #:traversable support-traversals))
-        (~optional (~seq #:generics-options (opt ...))))
+        (~seq (~or
+               (~optional (~seq #:also (other-view:id ...)))
+               (~optional (~and #:traversable support-traversals))
+               (~optional (~seq #:generics-options (opt ...)))) ...))
      (generate #'view 
                (attribute flds.fspec-lst)
+               (if (attribute other-view)
+                   (syntax->list #'(other-view ...))
+                   null)
                (and (attribute support-traversals) #t)
                (if (attribute opt)
                    (syntax->list #'(opt ...))
@@ -316,6 +325,40 @@ E.g.,
                     #'define-match-expander* #'define* stx))
 
 ;;; 
+;;; implied views
+;;;
+
+;; Adds implied views to `view-spec-lst`, removing duplicates.
+;; Requires transformer context.
+(define-for-syntax* (extend-with-implied-views view-spec-lst)
+  (define (get-others-for view-id)
+    (define view-info ;; ViewInfo
+      (syntax-local-value (format-id view-id "view:~a" (syntax-e view-id))))
+    (ViewInfo-others view-info))
+
+  (define tbl (make-free-id-table))
+
+  ;; Explicitly specified views.
+  (for ((view-spec view-spec-lst))
+    (match-define (list view-id fld-override-lst
+                        copy-lambda-stx) view-spec)
+    (free-id-table-set! tbl view-id view-spec))
+  
+  ;; Implied views.
+  (for ((view-spec view-spec-lst))
+    (define id (car view-spec))
+    (define others (get-others-for id))
+    (for ((other-id others))
+      ;; Introduce it as if the user had specified it.
+      (let ((other-id (syntax-local-introduce other-id)))
+        (unless (dict-has-key? tbl other-id)
+          ;; Naturally, any overrides must be specified explicitly; here
+          ;; we assume no overrides.
+          (free-id-table-set! tbl other-id (list other-id null #f))))))
+
+  (dict-values tbl))
+
+;;; 
 ;;; view implementation
 ;;; 
 
@@ -325,12 +368,14 @@ E.g.,
 ;; (struct ....) declaration. E.g., (generate-view-methods #'C (list
 ;; #'V '() #f) ....) -> (list #'#:methods #'gen:V #'(....)).
 (define-for-syntax* (generate-view-methods conc-id view-spec conc-info-h)
+  ;;(writeln (list conc-id view-spec))
   (match-define (list view-id fld-override-lst copy-lambda-stx) view-spec)
   (define view-name (syntax-e view-id))
   (define conc-name (syntax-e conc-id))
-  (define fld-info-lst ;; (listof ViewFld)
+  (define view-info ;; ViewInfo
     ;; Note that this call requires transformer context.
     (syntax-local-value (format-id view-id "view:~a" view-name)))
+  (define fld-info-lst (ViewInfo-flds view-info)) ;; (listof ViewFld)
   
   (unless (null? fld-override-lst)
     ;;(write `(before override ,fld-info-lst)) (newline)

@@ -371,7 +371,9 @@ Assumptions for AST node types:
             #,@(let ((view-spec-lst (attribute view.spec)))
                  (if (null? view-spec-lst)
                      null
-                     (let ((h (mk-conc-info-h)))
+                     (let ((h (mk-conc-info-h))
+                           (view-spec-lst
+                            (extend-with-implied-views view-spec-lst)))
                        (apply
                         append
                         (for/list ([view-spec view-spec-lst])
