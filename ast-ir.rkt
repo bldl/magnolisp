@@ -288,10 +288,6 @@ Assumptions for AST node types:
 (define-ast* PhiT (Ast Type) 
   ((#:none annos) (#:just t1) (#:just t2)))
 
-;; The type of a reified continuation.
-(define-ast* KontT (Ast Type)
-  ((#:none annos)) #:singleton (#hasheq()))
-
 ;; `id` is an `Id` object
 (define-ast* NameT (Ast Type)
   ((#:none annos) (#:none id)))
@@ -307,14 +303,6 @@ Assumptions for AST node types:
 ;; `id` is a Racket identifier
 (define-ast* ForeignNameT (Ast Type) 
   ((#:none annos) (#:none id)))
-
-;; C++ only
-(define-ast* ConstT (Ast Type) 
-  ((#:none annos) (#:just t)))
-
-;; C++ only
-(define-ast* RefT (Ast Type) 
-  ((#:none annos) (#:just t)))
 
 ;;; 
 ;;; annotations
@@ -353,9 +341,6 @@ Assumptions for AST node types:
                               (#:just t) (#:many params)
                               (#:just body)))
 
-;; `t` is a Magnolisp type expression.
-(define-ast* TypeAlias (Ast Def) ((#:none annos) (#:none id) (#:just t)))
-
 ;; `frg-t` is a foreign type expression.
 (define-ast* ForeignTypeDecl (Ast Def) ((#:none annos) (#:none id)
                                         (#:just frg-t)))
@@ -379,10 +364,6 @@ Assumptions for AST node types:
 ;; There is a 'let-kind annotation.
 (define-ast* LetExpr (Ast Expr SeqCont) 
   ((#:none annos) (#:just def) (#:many ss)))
-
-;; Sequence of statements.
-(define-ast* CxxBlockStat (Ast Stat SeqCont) 
-  ((#:none annos) (#:many ss)))
 
 ;; Spliced sequence of statements.
 (define-ast* SeqStat (Ast Stat SeqCont) 
@@ -440,55 +421,6 @@ Assumptions for AST node types:
 ;; only be determined from context.
 (define-ast* RacketExpr (Ast Expr) 
   ((#:none annos)))
-
-;;; 
-;;; C++
-;;;
-
-;; kind is either 'user or 'system.
-(define-ast* Include (Ast) ((#:none annos) (#:none kind) (#:none s)))
-
-;; `rtype` is the return type, only. `s` is the body statement, which
-;; should be a `CxxBlockStat` for printing, or it can be `NoBody` also.
-(define-ast* CxxDefun (Ast Def) ((#:none annos) (#:none id)
-                                 (#:none modifs) (#:just rtype)
-                                 (#:many params) (#:just s)))
-
-;; A C++ function prototype declaration. No body, and some modifiers
-;; may have to be different compared to the function definition.
-(define-ast* Proto (Ast Def) ((#:none annos) (#:none id)
-                              (#:none modifs) (#:just rtype)
-                              (#:many params)))
-
-(define-ast* ReturnStat (Ast Stat) ((#:none annos) (#:just e)))
-
-(define-ast* PpCxxIfStat (Ast) ((#:none annos) (#:just c)
-                                (#:many ts) (#:many es)))
-
-(define-ast* DeclVar (Ast Def) 
-  ((#:none annos) (#:none id) (#:just t)))
-
-;; An expression whose value is given by variable `id`, and assigned
-;; to by the statement sequence `ss`, except where the expression has
-;; unit type. The variable will be automatically declared upon
-;; lifting, and the statements will be lifted to a suitable context.
-;; The result should always get assigned to by the statements, at
-;; least if the lifted expression is ever to be evaluated.
-(define-ast* LiftStatExpr (Ast Expr SeqCont) 
-  ((#:none annos) (#:none id) (#:many ss)))
-
-;; Label for the following statements. Itself a statement. `id` is the
-;; label Id.
-(define-ast* LabelDef (Ast Stat)
-  ((#:none annos) (#:none id)))
-
-;; Where `id` is a label Id. A statement.
-(define-ast* Goto (Ast Stat) 
-  ((#:none annos) (#:none id)))
-
-;; Top-level verbatim string.
-(define-ast* TlVerbatim (Ast) 
-  ((#:none annos) (#:none s)))
 
 ;;; 
 ;;; built-in types

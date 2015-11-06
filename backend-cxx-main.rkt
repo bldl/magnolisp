@@ -16,6 +16,7 @@ C++ back end.
          "app-util.rkt"
          "ast-id-coll.rkt"
          "ast-ir.rkt"
+         "backend-cxx-ast.rkt"
          "backend-cxx-print.rkt"
          "backend-util.rkt"
          "compiler-rewrites.rkt"

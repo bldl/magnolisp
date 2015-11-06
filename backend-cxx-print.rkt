@@ -12,6 +12,7 @@
          (rename-in "pp-yield.rkt" (pp pp-y))
          "app-util.rkt"
          "ast-ir.rkt"
+         "backend-cxx-ast.rkt"
          "util.rkt")
 
 (define (pp . ds)
