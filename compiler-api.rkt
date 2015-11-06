@@ -18,7 +18,7 @@ optimization.
 |#
 
 (require "app-util.rkt" "ast-id-coll.rkt"
-         "ast-magnolisp.rkt" "ast-repr.rkt"
+         "ast-ir.rkt" "ast-repr.rkt"
          "backend-magnolisp-print.rkt"
          "compiler-rewrites.rkt" "parse.rkt"
          "strategy.rkt" "strategy-stratego.rkt"

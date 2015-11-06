@@ -7,7 +7,7 @@ code for them.
 
 |#
 
-(require "ast-magnolisp.rkt" "backend-build-writer.rkt"
+(require "ast-ir.rkt" "backend-build-writer.rkt"
          "backend-util.rkt" "app-util.rkt"
          "util.rkt" "util/order.rkt"
          data/order data/splay-tree)

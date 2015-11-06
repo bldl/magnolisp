@@ -3,7 +3,7 @@
 #|
 |#
 
-(require "app-util.rkt" "ast-magnolisp.rkt" "backend-util.rkt" 
+(require "app-util.rkt" "ast-ir.rkt" "backend-util.rkt" 
          (rename-in "pp-yield.rkt" [pp pp-y]) "util.rkt")
 
 (define (pp . ds)

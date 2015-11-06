@@ -4,7 +4,7 @@
 
 |#
 
-(require "app-util.rkt" "ast-magnolisp.rkt" "ast-view.rkt"
+(require "app-util.rkt" "ast-ir.rkt" "ast-view.rkt"
          "strategy.rkt" "strategy-stratego.rkt" "util.rkt"
          syntax/id-table)
 

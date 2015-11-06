@@ -3,7 +3,7 @@
 #|
 |#
 
-(require "app-util.rkt" "ast-magnolisp.rkt" "compiler-rewrites.rkt" 
+(require "app-util.rkt" "ast-ir.rkt" "compiler-rewrites.rkt" 
          "strategy.rkt" "strategy-stratego.rkt" "util.rkt")
 
 ;;; 

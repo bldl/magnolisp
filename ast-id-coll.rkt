@@ -3,7 +3,7 @@
 #|
 |#
 
-(require "ast-magnolisp.rkt" "util.rkt"
+(require "ast-ir.rkt" "util.rkt"
          unstable/custom-write
          (for-syntax racket/base syntax/parse))
 

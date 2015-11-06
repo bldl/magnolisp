@@ -7,7 +7,7 @@ C++ back end.
 |#
 
 (require "app-util.rkt" "ast-id-coll.rkt"
-         "ast-magnolisp.rkt" "backend-util.rkt"
+         "ast-ir.rkt" "backend-util.rkt"
          "compiler-rewrites.rkt" "strategy.rkt"
          "strategy-stratego.rkt" "strategy-term.rkt"
          "util.rkt"
