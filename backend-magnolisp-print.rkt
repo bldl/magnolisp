@@ -42,6 +42,11 @@ source code.
        (in (gr ,(for/list ((e es))
                   `(sp ,(pp-expr e))))) ")"))
 
+    ((SeqExpr _ es)
+     `("(begin"
+       (in (gr ,(for/list ((e es))
+                  `(sp ,(pp-expr e))))) ")"))
+
     ((ApplyExpr _ f as)
      `("(" (in (gr ,(pp-expr f)
                    ,(for/list ((e as))
@@ -50,6 +55,9 @@ source code.
     ((AssignStat _ lv rv)
      `("(set! " (in (gr ,(pp-expr lv) sp 
                         ,(pp-expr rv))) ")"))
+
+    ((VoidStat _)
+     "(void)")
 
     (else
      (~s ast))))
