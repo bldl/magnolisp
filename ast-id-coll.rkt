@@ -105,7 +105,7 @@
 (define* (make-hashId [assocs null])
   (HashId (make-hasheq
            (for/list ([e assocs])
-             (values (Id-bind (car e)) e)))))
+             (cons (Id-bind (car e)) e)))))
 
 (define* (mutable-hashId . kv)
   (define h (make-hasheq))
