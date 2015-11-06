@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -6,7 +6,9 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
 
 |#
 
-(require "compiler-api.rkt" "util.rkt")
+(require racket/cmdline racket/dict racket/function
+         racket/list racket/string
+         "compiler-api.rkt" "util.rkt")
 
 ;;; 
 ;;; command-line interface

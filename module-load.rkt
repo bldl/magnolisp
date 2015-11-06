@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -6,8 +6,12 @@ Module loading.
 
 |#
 
-(require "util.rkt"
-         syntax/modresolve)
+(require (for-syntax racket/base)
+         racket/contract/base
+         racket/function
+         racket/match
+         syntax/modresolve
+         "util.rkt")
 
 ;;; 
 ;;; utilities

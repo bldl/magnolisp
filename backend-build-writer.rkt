@@ -1,9 +1,11 @@
-#lang racket
+#lang racket/base
 
 #|
 |#
 
-(require "backend-util.rkt"
+(require racket/function
+         racket/list
+         "backend-util.rkt"
          "util.rkt")
 
 ;;; 

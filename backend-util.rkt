@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -6,7 +6,13 @@ Utilities useful for implementing compiler back ends.
 
 |#
 
-(require "util.rkt")
+(require (for-syntax racket/base)
+         racket/contract/base
+         racket/file
+         racket/port
+         racket/pretty
+         racket/string
+         "util.rkt")
 
 ;;; 
 ;;; data processing

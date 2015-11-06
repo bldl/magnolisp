@@ -1,16 +1,23 @@
-#lang racket
+#lang racket/base
 
 #|
 
-Routines for parsing and collecting 'build annotations, and generating
+Routines for parsing and collecting `build` annotations, and generating
 code for them.
 
 |#
 
-(require "ast-ir.rkt" "backend-build-writer.rkt"
-         "backend-util.rkt" "app-util.rkt"
-         "util.rkt" "util/order.rkt"
-         data/order data/splay-tree)
+(require data/order
+         data/splay-tree
+         racket/contract/base
+         racket/dict
+         racket/function
+         "app-util.rkt"
+         "ast-ir.rkt"
+         "backend-build-writer.rkt"
+         "backend-util.rkt"
+         "util.rkt"
+         "util/order.rkt")
 
 ;;; 
 ;;; parsing

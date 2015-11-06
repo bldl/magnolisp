@@ -1,10 +1,18 @@
-#lang racket
+#lang racket/base
 
 #|
 |#
 
-(require "app-util.rkt" "ast-ir.rkt" "backend-util.rkt" 
-         (rename-in "pp-yield.rkt" [pp pp-y]) "util.rkt")
+(require (for-syntax racket/base)
+         racket/format
+         racket/list
+         racket/match
+         racket/port
+         racket/string
+         (rename-in "pp-yield.rkt" (pp pp-y))
+         "app-util.rkt"
+         "ast-ir.rkt"
+         "util.rkt")
 
 (define (pp . ds)
   (call-with-output-string

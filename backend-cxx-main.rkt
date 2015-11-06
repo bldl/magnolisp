@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -6,18 +6,28 @@ C++ back end.
 
 |#
 
-(require "app-util.rkt" "ast-id-coll.rkt"
-         "ast-ir.rkt" "backend-util.rkt"
-         "compiler-rewrites.rkt" "strategy.rkt"
-         "strategy-stratego.rkt" "strategy-term.rkt"
+(require racket/contract/base
+         racket/dict
+         racket/function
+         racket/list
+         racket/match
+         racket/pretty
+         racket/set
+         "app-util.rkt"
+         "ast-id-coll.rkt"
+         "ast-ir.rkt"
+         "backend-cxx-print.rkt"
+         "backend-util.rkt"
+         "compiler-rewrites.rkt"
+         "strategy-stratego.rkt"
+         "strategy-term.rkt"
+         "strategy.rkt"
          "util.rkt"
-         racket/syntax syntax/id-table)
+         "util/system.rkt")
 
 ;;; 
 ;;; reformatting
 ;;; 
-
-(require "util/system.rkt")
 
 ;; Not quite perfect as does not appear to insert line breaks.
 ;; http://astyle.sourceforge.net/
@@ -1164,8 +1174,6 @@ C++ back end.
 ;;; 
 ;;; driver routines
 ;;; 
-
-(require "backend-cxx-print.rkt")
 
 (define (get-suffix kind)
   (define tbl `((cc ".cpp")

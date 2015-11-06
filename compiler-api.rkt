@@ -1,4 +1,4 @@
-#lang racket
+#lang racket/base
 
 #|
 
@@ -17,13 +17,26 @@ optimization.
 
 |#
 
-(require "app-util.rkt" "ast-id-coll.rkt"
-         "ast-ir.rkt" "ast-repr.rkt"
+(require racket/contract/base
+         racket/dict
+         racket/function
+         racket/list
+         racket/match
+         racket/set
+         "app-util.rkt"
+         "ast-id-coll.rkt"
+         "ast-ir.rkt"
+         "backend-build-main.rkt"
+         "backend-cxx-main.rkt"
          "backend-magnolisp-print.rkt"
-         "compiler-rewrites.rkt" "parse.rkt"
-         "strategy.rkt" "strategy-stratego.rkt"
-         "util.rkt" "util/field.rkt" "util/struct.rkt"
-         syntax/moddep)
+         "backend-util.rkt"
+         "compiler-rewrites.rkt"
+         "module-load.rkt"
+         "strategy-stratego.rkt"
+         "strategy.rkt"
+         "type-infer.rkt"
+         "util.rkt"
+         "util/field.rkt")
 
 ;;;
 ;;; AnnoExpr removal
@@ -365,8 +378,6 @@ optimization.
 ;;; program contents resolution
 ;;;
 
-(require "module-load.rkt")
-
 ;; Compilation state. [defs hash?] maps bind symbols to AST nodes.
 ;; [eps (set/c symbol? #:cmp 'eq)] contains bind symbols for program
 ;; entry points.
@@ -549,8 +560,6 @@ optimization.
 ;;; compilation
 ;;;
 
-(require "type-infer.rkt")
-
 (define (load-program ep-mp-lst rel-to-path-v)
   ;; resolved-module-path? is eq? comparable
   (define mods (make-hasheq)) ;; rr-mp -> Mod
@@ -719,10 +728,6 @@ optimization.
 ;;;
 ;;; code generation
 ;;;
-
-(require "backend-build-main.rkt")
-(require "backend-cxx-main.rkt")
-(require "backend-util.rkt")
 
 (define (string-file-id? s)
   (regexp-match? #rx"^[a-zA-Z0-9_][a-zA-Z0-9_-]*$" s))

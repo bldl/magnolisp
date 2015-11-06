@@ -1,12 +1,19 @@
-#lang racket
+#lang racket/base
 
 #|
 
 |#
 
-(require "app-util.rkt" "ast-ir.rkt" "ast-view.rkt"
-         "strategy.rkt" "strategy-stratego.rkt" "util.rkt"
-         syntax/id-table)
+(require racket/contract/base
+         racket/dict
+         racket/function
+         racket/match
+         racket/pretty
+         racket/set
+         "ast-ir.rkt"
+         "strategy-stratego.rkt"
+         "strategy.rkt"
+         "util.rkt")
 
 ;;; 
 ;;; definition table management
