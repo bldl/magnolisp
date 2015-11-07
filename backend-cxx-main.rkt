@@ -721,11 +721,16 @@ C++ back end.
   ((topdown
     (lambda (ast)
       (match ast
-        [(DeclVar a id t)
+        [(DeclVar _ id _)
          (define bind (Id-bind id))
          (if (set-member? refs bind)
              ast
              a-noop-stat)]
+        [(DefVar _ id _ e)
+         (define bind (Id-bind id))
+         (if (set-member? refs bind)
+             ast
+             (annoless ExprStat e))]
         [_ ast])))
    an-ast))
 
