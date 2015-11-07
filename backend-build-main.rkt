@@ -227,14 +227,14 @@ code for them.
 ;;;
 
 (define-with-contract*
-  (-> hash? (listof (list/c Id? syntax?)))
-  (defs-collect-build-annos defs)
+  (-> list? (listof (list/c Id? syntax?)))
+  (defs-collect-build-annos def-lst)
   (define lst null)
 
   (define (add! id build-stx)
     (set! lst (cons (list id build-stx) lst)))
   
-  (for (((id def) (in-dict defs)))
+  (for ((def def-lst))
     (assert (Def? def))
     (define b (ast-anno-maybe def 'build))
     (when b (add! (Def-id def) b)))

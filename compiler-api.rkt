@@ -163,7 +163,7 @@ optimization.
 (define-with-contract
   (-> list? void?)
   (defs-check-ApplyExpr-target def-lst)
-  (define bind->def (build-defs-table def-lst))
+  (define bind->def (build-full-defs-table def-lst))
   (for-each
    (topdown-visitor
     (lambda (ast)
@@ -374,22 +374,63 @@ optimization.
 
   (map rw defs))
 
+;;; 
+;;; lifting of local functions
+;;; 
+
+(define-with-contract
+  (-> (listof Def?) hash?)
+  (defs-lift-local-Defuns def-lst)
+  
+  (define n-defs (make-hasheq))
+  (define owner-id (make-parameter #f))
+
+  (define rw-body
+    (topdown
+     (lambda (ast)
+       (cond
+        [(and (LetExpr? ast) (Defun? (LetExpr-def ast)))
+         (match-define (LetExpr a b ss) ast)
+         (do-Defun b)
+         (SeqExpr a ss)]
+        [else
+         ast]))))
+  
+  (define (do-Defun ast)
+    (match-define (Defun a id t ps b) ast)
+    (define oid (owner-id))
+    (unless (Id-bind=? id oid)
+      (set! a (hash-set a 'owner-id oid)))
+    (set! b (ast-splice-SeqExpr (rw-body b)))
+    (hash-set! n-defs (Id-bind id) (Defun a id t ps b)))
+  
+  (for ([def def-lst])
+    (cond
+     [(Defun? def)
+      (when (ast-anno-maybe def 'top)
+        (parameterize ((owner-id (Def-id def)))
+          (do-Defun def)))]
+     [else
+      (hash-set! n-defs (Id-bind (Def-id def)) def)]))
+  
+  n-defs)
+
 ;;;
 ;;; program contents resolution
 ;;;
 
-;; Compilation state. [defs hash?] maps bind symbols to AST nodes.
-;; [eps (set/c symbol? #:cmp 'eq)] contains bind symbols for program
-;; entry points.
+;; Compilation state. [defs (listof Def?)] lists top-level
+;; definitions. [eps (set/c symbol? #:cmp 'eq)] contains bind symbols
+;; for program entry points.
 (struct St (defs eps) #:transparent)
 
 (define* compilation-state? St?)
 
 ;; Merges the definitions of the specified modules `mods`, which is a
 ;; (hash/c rr-mp Mod). Returns the definitions for the whole program
-;; as (values all-defs eps-in-prog prelude-sym->bind).
+;; as (values def-lst eps-in-prog prelude-sym->bind).
 (define-with-contract
-  (-> hash? (values hash? (set/c symbol? #:cmp 'eq) hash?))
+  (-> hash? (values (listof Def?) (set/c symbol? #:cmp 'eq) hash?))
   (merge-defs mods)
 
   (define eps-in-prog (mutable-seteq)) ;; of bind
@@ -465,7 +506,7 @@ optimization.
     (void)) ;; end (for ([(rr-mp/mgl mod) mods])
 
   ;;(pretty-print `(after-merge ,(map Def-id (hash-values all-defs))))
-  (values all-defs eps-in-prog prelude-bind->bind))
+  (values (hash-values all-defs) eps-in-prog prelude-bind->bind))
 
 ;; Returns a list of all Id-bind's appearing within a Def.
 (define-with-contract
@@ -498,7 +539,7 @@ optimization.
       (listof Def?))
   (defs-drop-unreachable tl-def-lst eps)
 
-  (define globals (build-global-defs-table tl-def-lst)) ;; bind -> Def?
+  (define globals (build-tl-defs-table tl-def-lst)) ;; bind -> Def?
   ;;(pretty-print `(ORIGINAL-DEFS ,globals eps ,eps))
   (define processed-ids (mutable-seteq)) ;; (set/c bind)
   (define processed-defs null) ;; (listof Def?)
@@ -649,12 +690,8 @@ optimization.
 
   (set! mods (mods-rm-AnnoExpr mods))
   ;;(pretty-print mods) (exit)
-  (define-values (all-defs eps-in-prog prelude-bind->bind)
+  (define-values (def-lst eps-in-prog prelude-bind->bind)
     (merge-defs mods))
-  ;;(writeln `(eps-in-prog ,eps-in-prog))
-  ;;(pretty-print (list all-defs eps-in-prog rr-mp-sym->bind)) (exit)
-
-  (define def-lst (hash-values all-defs))
 
   (set! def-lst
         (switch-ids-for-builtins! def-lst eps-in-prog
@@ -678,22 +715,16 @@ optimization.
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-update-ExprLike-result-annos def-lst))
-  ;;(pretty-print def-lst) (exit)
-  ;;(parameterize ((show-bindings? #t)) (pretty-print (map ast->sexp (dict-values all-defs))))
   ;;(pretty-print def-lst)
-  (set! all-defs (build-defs-table def-lst))
-  ;;(pretty-print all-defs) (exit)
-  ;;(pp-mgl (filter Defun? (hash-values all-defs))) (newline) (exit)
-  (set! all-defs (defs-type-infer all-defs))
-  ;;(pretty-print all-defs) (exit)
-  (set! all-defs (defs-map/bind ast-rm-dead-constants all-defs))
-  ;;(pretty-print all-defs) (exit)
-  ;;(pretty-print (dict-values all-defs)) (exit)
-  (set! all-defs (defs-set-formats-to-Literals all-defs))
 
-  ;;(pretty-print (map ast->sexp (dict-values all-defs)))
+  (let ((def-h (build-full-defs-table def-lst)))
+    (set! def-h (defs-type-infer def-h))
+    (set! def-lst (map ast-rm-dead-constants (hash-values def-h)))
+    (set! def-lst (defs-set-formats-to-Literals def-h def-lst))
+    (set! def-h (defs-lift-local-Defuns def-lst)) ;; (hash/c bind Def)
+    (set! def-lst (hash-values def-h)))
 
-  (St all-defs eps-in-prog))
+  (St def-lst eps-in-prog))
 
 ;; Compiles the modules defined in the specified files. Returns a
 ;; compilation state with a full IR for the entire program. The
@@ -716,10 +747,10 @@ optimization.
   (-> St? (or/c #f syntax?))
   (get-expected-anno-value st)
 
-  (define defs (St-defs st))
+  (define def-lst (St-defs st))
 
   (let/ec k
-    (for (((id def) (in-dict defs)))
+    (for ([def def-lst])
       (define v (ast-anno-maybe def 'expected))
       (when v
         (k v)))
@@ -757,27 +788,27 @@ optimization.
     (when-let entry (assq 'mgl backends)
       (match entry
         [(list _ (list (? symbol? opts) ...))
-         (define ast-lst (hash-values (St-defs st)))
+         (define def-lst (St-defs st))
          (define mgl-file (build-path outdir
                                       (string-append basename ".ir.rkt")))
-         (generate-mgl-file ast-lst out mgl-file banner?)]))
+         (generate-mgl-file def-lst out mgl-file banner?)]))
 
     (when-let entry (assq 'cxx backends)
       (match entry
         [(list _ (list (? symbol? kinds) ...))
          (unless (null? kinds)
            (set! kinds (remove-duplicates kinds eq?))
-           (define defs (St-defs st))
+           (define def-lst (St-defs st))
            (define path-stem (build-path outdir basename))
-           (generate-cxx-file kinds defs path-stem out banner?))]))
+           (generate-cxx-file kinds def-lst path-stem out banner?))]))
 
     (when-let entry (assq 'build backends)
       (match entry
         ((list _ (list (? symbol? kinds) ...))
          (unless (null? kinds)
            (set! kinds (remove-duplicates kinds eq?))
-           (define defs (St-defs st))
-           (define opts-stx (defs-collect-build-annos defs))
+           (define def-lst (St-defs st))
+           (define opts-stx (defs-collect-build-annos def-lst))
            (define opts-lst (parse-analyze-build-annos opts-stx))
            (define path-stem (build-path outdir (string-append basename "_build")))
            (for ([kind kinds])

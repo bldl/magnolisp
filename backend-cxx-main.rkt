@@ -105,7 +105,7 @@ C++ back end.
 ;; Renames Ids to legal C++ symbols. Tracks renamings using a map.
 ;; Does fairly "stable" renaming by limiting the context of locals to
 ;; the function body.
-(define (cxx-rename ast-lst)
+(define (defs-cxx-rename ast-lst)
   ;;(pretty-print ast-lst) (exit)
   
   ;; We use (next-gensym r sym) with this to do numbering. All the
@@ -147,7 +147,7 @@ C++ back end.
     (define sym (lookup-cxx-name id))
     (unless sym
       (raise-assertion-error
-       'cxx-rename
+       'defs-cxx-rename
        "expected C++ name to have been decided for ~s" id))
     sym)
 
@@ -298,7 +298,7 @@ C++ back end.
    (parameterize ((cxx-kind kind))
      (map cxx->partition def-lst))))
 
-(define (defs->cxx defs-t)
+(define (defs->cxx a-def-lst)
   (define (def->cxx ast)
     (match ast
       [(Defun a id t ps b)
@@ -342,13 +342,10 @@ C++ back end.
        (raise-argument-error
         'expr->cxx "supported ExprLike?" ast)]))
 
-  (define def-lst (filter Defun? (hash-values defs-t)))
-  ;;(pretty-print def-lst) (exit)
-  (set! def-lst (map def->cxx def-lst))
-  ;;(pretty-print def-lst) (exit)
-  (set! def-lst (map CxxDefun-rm-SeqExpr def-lst))
-  ;;(pretty-print def-lst)
-  def-lst)
+  (let-> def-lst
+    (filter Defun? a-def-lst)
+    (map def->cxx def-lst)
+    (map CxxDefun-rm-SeqExpr def-lst)))
 
 (define (CxxDefun-rm-SeqExpr def)
   (define (can-be-expr? ast)
@@ -432,7 +429,7 @@ C++ back end.
    def)
   targets)
 
-(define (types-to-cxx defs-t def-lst)
+(define (defs-types-to-cxx defs-t def-lst)
   (define (annos-type-param? as)
     (hash-ref as 'type-param #f))
 
@@ -701,9 +698,6 @@ C++ back end.
       (rw-all-stats ast))
     ;;(pretty-print `(def-rm-LiftStatExpr FROM ,ast TO ,n-ast))
     n-ast))
-
-(define (cxx-rm-LiftStatExpr def-lst)
-  (map def-rm-LiftStatExpr def-lst))
 
 ;;; 
 ;;; copy propagation
@@ -1024,14 +1018,14 @@ C++ back end.
     (define-values (n-st n-x) (f st x))
     (values n-st (cons n-x lst))))
 
-(define (cxx-fun-optimize def-lst)
+(define (defs-cxx-fun-optimize def-lst)
   ;; Note that a no-op does not change state.
   (define (g st s)
     ;;(writeln `(g on ,s))
     (match s
       [(? LetStat?)
        (raise-assertion-error 
-        'cxx-fun-optimize
+        'defs-cxx-fun-optimize
         "assumed no LetStat")]
       [(SeqCont ss)
        (define-values (n-st n-ss) (map/reverse/state g st ss))
@@ -1087,8 +1081,8 @@ C++ back end.
     ;;(pretty-print `(BEFORE ,def))
     (set! def (fun-propagate-copies def))
     ;;(pretty-print `(AFTER ,def))
-    (rm-unreferenced-var-decl def))
-  
+    (ast-rm-SeqStat (rm-unreferenced-var-decl def)))
+
   (map (lambda (def)
          (if (CxxDefun? def)
              (defun-optimize def)
@@ -1096,55 +1090,17 @@ C++ back end.
        def-lst))
 
 ;;; 
-;;; lifting of local functions
-;;; 
-
-(define (defs-lift-locals defs)
-  (define n-defs (make-hasheq))
-  (define owner-id (make-parameter #f))
-
-  (define rw-body
-    (topdown
-     (lambda (ast)
-       (cond
-        [(and (LetExpr? ast) (Defun? (LetExpr-def ast)))
-         (match-define (LetExpr a b ss) ast)
-         (do-Defun b)
-         (SeqExpr a ss)]
-        [else
-         ast]))))
-  
-  (define (do-Defun ast)
-    (match-define (Defun a id t ps b) ast)
-    (define oid (owner-id))
-    (unless (Id-bind=? id oid)
-      (set! a (hash-set a 'owner-id oid)))
-    (set! b (ast-splice-SeqExpr (rw-body b)))
-    (hash-set! n-defs (Id-bind id) (Defun a id t ps b)))
-  
-  (for ([(bind def) defs])
-    (cond
-     [(Defun? def)
-      (when (ast-anno-maybe def 'top)
-        (parameterize ((owner-id (Def-id def)))
-          (do-Defun def)))]
-     [else
-      (hash-set! n-defs bind def)]))
-  
-  n-defs)
-
-;;; 
 ;;; sorting of top-level declarations
 ;;; 
 
-(define (cxx-decl-sort lst)
+(define (defs-cxx-decl-sort lst)
   (sort lst symbol<? #:key Def-id))
 
 ;;; 
 ;;; pretty-printing preparation
 ;;; 
 
-(define (cxx->pp lst)
+(define (defs-cxx->pp lst)
   (define (s->ss ast)
     (cond
      ((CxxBlockStat? ast) (CxxBlockStat-ss ast))
@@ -1190,31 +1146,29 @@ C++ back end.
   (exit))
   
 (define-with-contract*
-  (-> (listof symbol?) hash? path-string? (or/c #f output-port?)
-      boolean? void?)
-  (generate-cxx-file kinds defs path-stem out banner?)
+  (-> (listof symbol?) (listof Def?)
+      path-string? (or/c #f output-port?) boolean?
+      void?)
+  (generate-cxx-file kinds a-def-lst path-stem out banner?)
 
-  (define defs-t
-    (defs-lift-locals defs))
-  
   (define (pp-only obj)
     (pretty-print obj)
     obj)
   
   (define def-lst
-    (thread1->
-     defs-t
-     defs->cxx
-     ;;pp-exit ;;pp-only
-     cxx-rm-LiftStatExpr
-     ;;pp-exit
-     cxx-fun-optimize
-     ;;pp-exit
-     (curry map ast-rm-SeqStat)
-     (curry types-to-cxx defs-t)
-     cxx-rename
-     cxx-decl-sort
-     cxx->pp))
+    (let ((defs-t (build-tl-defs-table a-def-lst)))
+      (let-> lst
+        a-def-lst
+        (defs->cxx lst)
+        ;;pp-exit ;;pp-only
+        (map def-rm-LiftStatExpr lst)
+        ;;pp-exit
+        (defs-cxx-fun-optimize lst)
+        ;;pp-exit
+        (defs-types-to-cxx defs-t lst)
+        (defs-cxx-rename lst)
+        (defs-cxx-decl-sort lst)
+        (defs-cxx->pp lst))))
   
   (for ((kind kinds))
     (cond

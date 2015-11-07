@@ -1,9 +1,11 @@
-#lang racket
+#lang racket/base
 
 #|
 |#
 
-(require "ast-ir.rkt" "ast-repr.rkt" "util.rkt")
+(require "ast-ir.rkt"
+         "ast-repr.rkt"
+         "util.rkt")
 
 ;;; 
 ;;; type expressions

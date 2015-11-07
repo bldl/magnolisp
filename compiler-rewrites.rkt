@@ -48,7 +48,7 @@
 
   defs)
 
-(define* (build-defs-table tl-def-lst
+(define* (build-full-defs-table tl-def-lst
                            #:init [defs #hasheq()]
                            #:put [put ast-identifier-put])
   (define (put! def)
@@ -64,7 +64,7 @@
 
   defs)
 
-(define* (build-global-defs-table tl-def-lst)
+(define* (build-tl-defs-table tl-def-lst)
   (for/hasheq ([def tl-def-lst])
     (values (Id-bind (Def-id def)) def)))
 
@@ -499,7 +499,12 @@
 ;;; type-specific literal formatting
 ;;;
 
-(define* (defs-set-formats-to-Literals defs)
+;; The `defs-t` argument is a definition lookup table, for looking up
+;; type (and formatting) information.
+(define-with-contract*
+  (-> hash? list? list?)
+  (defs-set-formats-to-Literals defs-t def-lst)
+  
   (define rw
     (topdown
      (lambda (ast)
@@ -507,7 +512,7 @@
          [(Literal (and (app (lambda (h) (hash-ref h 'type))
                              (? NameT? t-ref)) a) dat)
           (define bind (Id-bind (NameT-id t-ref)))
-          (define t-def (hash-ref defs bind #f))
+          (define t-def (hash-ref defs-t bind #f))
           (unless t-def
             (raise-language-error/ast
              "reference to undefined type" ast t-ref))
@@ -517,7 +522,7 @@
               ast)]
          [_ ast]))))
   
-  (defs-map/bind rw defs))
+  (map rw def-lst))
 
 ;;; 
 ;;; AST dumping
