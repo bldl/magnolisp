@@ -24,13 +24,13 @@ optimization.
          racket/match
          racket/set
          "app-util.rkt"
-         "ast-id-coll.rkt"
-         "ast-ir.rkt"
+         "ir-id-coll.rkt"
+         "ir-ast.rkt"
          "backend-build-main.rkt"
          "backend-cxx-main.rkt"
          "backend-mgl-print.rkt"
          "backend-util.rkt"
-         "compiler-rewrites.rkt"
+         "ir-transform.rkt"
          "module-load.rkt"
          "strategy.rkt"
          "strategy-stratego.rkt"

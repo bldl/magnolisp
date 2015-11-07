@@ -4,7 +4,7 @@
 
 |#
 
-(require "ast-ir.rkt" "app-util.rkt" "util.rkt"
+(require "ir-ast.rkt" "app-util.rkt" "util.rkt"
          racket/contract racket/dict racket/function racket/list
          racket/match racket/pretty
          syntax/id-table syntax/kerncase syntax/parse syntax/stx

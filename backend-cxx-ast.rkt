@@ -3,7 +3,7 @@
 #|
 |#
 
-(require "ast-ir.rkt"
+(require "ir-ast.rkt"
          "ast-repr.rkt"
          "util.rkt")
 

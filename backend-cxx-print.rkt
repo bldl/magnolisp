@@ -11,7 +11,7 @@
          racket/string
          (rename-in "pp-yield.rkt" (pp pp-y))
          "app-util.rkt"
-         "ast-ir.rkt"
+         "ir-ast.rkt"
          "backend-cxx-ast.rkt"
          "util.rkt")
 

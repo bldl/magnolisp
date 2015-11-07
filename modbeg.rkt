@@ -24,7 +24,7 @@ same variables at the same phase level).
           racket/base racket/dict racket/list racket/pretty
           syntax/id-table syntax/modresolve syntax/quote
           "app-util.rkt" 
-          "ast-ir.rkt" "ast-serialize.rkt"
+          "ir-ast.rkt" "ast-serialize.rkt"
           "parse.rkt" "util.rkt"))
 
 (define-for-syntax (make-definfo-submodule 
@@ -100,7 +100,7 @@ same variables at the same phase level).
   ;;(writeln (list (current-module-declare-source) (current-module-declare-name)))
   
   #`(module magnolisp-s2s racket/base
-      (require magnolisp/ast-ir)
+      (require magnolisp/ir-ast)
       (define r-mp #,(syntactifiable-mkstx orig-r-mp))
       (define bind->binding #,(syntactifiable-mkstx bind->binding))
       (define def-lst #,(syntactifiable-mkstx def-lst))

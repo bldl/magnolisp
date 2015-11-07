@@ -4,7 +4,7 @@
 |#
 
 (require (relative-in magnolisp
-                      "ast-ir.rkt" "ast-repr.rkt")
+                      "ir-ast.rkt" "ast-repr.rkt")
          racket/generic rackunit)
 
 (let ((ast (annoless Var (fresh-Id))))

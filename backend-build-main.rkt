@@ -13,7 +13,7 @@ code for them.
          racket/dict
          racket/function
          "app-util.rkt"
-         "ast-ir.rkt"
+         "ir-ast.rkt"
          "backend-build-writer.rkt"
          "backend-util.rkt"
          "util.rkt"

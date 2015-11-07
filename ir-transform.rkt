@@ -10,7 +10,7 @@
          racket/match
          racket/pretty
          racket/set
-         "ast-ir.rkt"
+         "ir-ast.rkt"
          "strategy.rkt"
          "strategy-stratego.rkt"
          "strategy-term.rkt"

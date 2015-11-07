@@ -3,7 +3,7 @@
 #|
 |#
 
-(require "ast-ir.rkt" "util.rkt"
+(require "ir-ast.rkt" "util.rkt"
          unstable/custom-write
          (for-syntax racket/base syntax/parse))
 

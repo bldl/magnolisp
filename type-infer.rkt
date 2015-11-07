@@ -9,8 +9,8 @@
          racket/list
          racket/match
          racket/set
-         "ast-ir.rkt"
-         "compiler-rewrites.rkt"
+         "ir-ast.rkt"
+         "ir-transform.rkt"
          "strategy-stratego.rkt"
          "strategy.rkt"
          "util.rkt")

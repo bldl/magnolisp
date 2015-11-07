@@ -14,12 +14,12 @@ C++ back end.
          racket/pretty
          racket/set
          "app-util.rkt"
-         "ast-id-coll.rkt"
-         "ast-ir.rkt"
+         "ir-id-coll.rkt"
+         "ir-ast.rkt"
          "backend-cxx-ast.rkt"
          "backend-cxx-print.rkt"
          "backend-util.rkt"
-         "compiler-rewrites.rkt"
+         "ir-transform.rkt"
          "strategy-stratego.rkt"
          "strategy-term.rkt"
          "strategy.rkt"

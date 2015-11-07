@@ -7,7 +7,7 @@ source code.
 
 |#
 
-(require "ast-ir.rkt" "backend-util.rkt" "compiler-rewrites.rkt"
+(require "ir-ast.rkt" "backend-util.rkt" "ir-transform.rkt"
          (rename-in "pp-yield.rkt" [pp pp-y])
          "util.rkt"
          racket/contract racket/format racket/list 
