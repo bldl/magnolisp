@@ -682,7 +682,7 @@ optimization.
   (set! def-lst (map ast-simplify-multi-innermost def-lst))
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (defs-make-Defuns def-lst))
-  (set! def-lst (map def-drop-dead-local-Defuns def-lst))
+  (set! def-lst (map def-drop-unused-local-Defuns def-lst))
   (defs-check-ApplyExpr-target def-lst)
   (set! def-lst (defs-lift-typedefs def-lst))
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))

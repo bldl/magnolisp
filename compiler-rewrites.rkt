@@ -634,7 +634,7 @@
 ;; definitions present.
 (define-with-contract*
   (-> Def? Def?)
-  (def-drop-dead-local-Defs def)
+  (def-drop-unused-local-Defs def)
 
   (define refs (mutable-seteq)) ;; set of bind
 
@@ -652,8 +652,10 @@
     (alltd
      (lambda (ast)
        (match ast
-         [(LetExpr a (fields Def [id (? unreferenced?)]) body)
-          (SeqExpr a (map rw body))]
+         [(LetExpr a (fields Def d [id (? unreferenced?)]) body)
+          (if (DefVar? d)
+              (SeqExpr a (map rw (cons (DefVar-body d) body)))
+              (SeqExpr a (map rw body)))]
          [_ #f]))))
   
   (rw def))
@@ -661,7 +663,7 @@
 ;; Removes unused local function definitions.
 (define-with-contract*
   (-> Def? Def?)
-  (def-drop-dead-local-Defuns def)
+  (def-drop-unused-local-Defuns def)
 
   (define refs (mutable-seteq)) ;; set of bind
 

@@ -80,8 +80,12 @@ source code.
              (cons (pp-id id)
                    (map pp-def ps))
              'sp) ")"
-       ,(and (not (NoBody? b)) 
-             `(in (br ,(pp-expr b))))
+       ,(cond
+          ((NoBody? b) null)
+          ((SeqExpr? b) `(in (br (gr ,(add-between
+                                       (map pp-expr (SeqExpr-ss b))
+                                       'sp)))))
+          (else `(in (br ,(pp-expr b)))))
        ")"))
     
     ((DefVar _ id t v)
@@ -104,7 +108,7 @@ source code.
     ;;(pretty-print `(BEFORE ,def))
     (set! def (fun-propagate-copies def))
     ;;(pretty-print `(AFTER ,def))
-    (set! def (def-drop-dead-local-Defs def))
+    (set! def (def-drop-unused-local-Defs def))
     (set! def (ast-trim-VoidStat def))
     def)
 
