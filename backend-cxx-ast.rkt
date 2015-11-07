@@ -36,9 +36,6 @@
                               (#:none modifs) (#:just rtype)
                               (#:many params)))
 
-(define-ast* DeclVar (Ast Def) 
-  ((#:none annos) (#:none id) (#:just t)))
-
 ;; Label for the following statements. Itself a statement. `id` is the
 ;; label Id.
 (define-ast* LabelDef (Ast Stat)

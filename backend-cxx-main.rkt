@@ -311,6 +311,8 @@ C++ back end.
                   (else (annoless ReturnStat (expr->cxx b)))))]
       [(? Param?)
        ast]
+      [(? DeclVar?)
+       ast]
       [(DefVar a id t v)
        (DefVar a id t (expr->cxx v))]
       [_
@@ -703,25 +705,7 @@ C++ back end.
 ;;; copy propagation
 ;;; 
 
-(define a-noop (annoless SeqStat null))
-
-;; A Φ value type, as in compiler literature. The `set` is a set of
-;; value numbers. Each number is a symbol of the form 'vn* for an
-;; actual value, or 'nothing to indicate no value assignment.
-(struct Phi (set) #:transparent)
-
-;; Sums together value numbers `xs`. Where `xs` are all the same
-;; number, returns the number. Otherwise returns Phi(x ...), where `x`
-;; are all distinct numbers.
-(define (val-num+ . xs)
-  (define vs
-    (for/fold ((sum (seteq))) ((x xs))
-      (if (Phi? x)
-          (set-union sum (Phi-set x))
-          (set-add sum x))))
-  (if (= (set-count vs) 1)
-      (set-first vs)
-      (Phi vs)))
+(define a-noop-stat (annoless SeqStat null))
 
 (define (fun-propagate-copies def)
   ;; (listof (list/c val-num lv rv))
@@ -748,7 +732,7 @@ C++ back end.
             [(and (Var? rv) (equal? lv rv))
              ;; Special case of `x := x`, so can remove
              ;; unconditionally.
-             a-noop]
+             a-noop-stat]
             [else
              (define n-a (annos-add-val-num! a (Var-id lv) rv))
              (AssignStat n-a lv rv)])]
@@ -786,15 +770,6 @@ C++ back end.
     ;; assignments will be complete at that point.
     (define label->bind->num (make-hasheq))
 
-    (define (merge h1 h2)
-      (define keys (list->mutable-seteq (hash-keys h1)))
-      (for ([k (hash-keys h2)])
-        (set-add! keys k))
-      (for/fold ((h #hasheq())) ((k (in-set keys)))
-        (define v1 (hash-ref h1 k 'nothing))
-        (define v2 (hash-ref h2 k 'nothing))
-        (hash-set h k (val-num+ v1 v2))))
-    
     (define (rw bind->num ast)
       ;;(writeln `(rw of ,ast when ,bind->num))
       (match ast
@@ -809,7 +784,7 @@ C++ back end.
                         (Id-bind=? tgt-lv-id lv-id))
                    ;;(writeln `(deleting ,this-num : ,lv-id := ,rv))
                    (maybe-set-rv-num! bind->num rv)
-                   a-noop]
+                   a-noop-stat]
                   [else
                    (define n-rv (rw-discard bind->num rv)) 
                    (and n-rv (AssignStat a lv n-rv))]))]
@@ -846,7 +821,7 @@ C++ back end.
                  [(not n-e)
                   (values bind->num #f)]
                  [else
-                  (values (merge t-st e-st)
+                  (values (env-val-num-merge t-st e-st)
                           (IfStat a n-c n-t n-e))])])])]
         [(Var a (? (fix Id-bind=? tgt-lv-id) id))
          (define this-bind (Id-bind id))
@@ -885,13 +860,13 @@ C++ back end.
         [(Goto _ id)
          (define bind (Id-bind id))
          (define lbl-nums 
-           (merge (hash-ref label->bind->num bind #hasheq()) bind->num))
+           (env-val-num-merge (hash-ref label->bind->num bind #hasheq()) bind->num))
          (hash-set! label->bind->num bind lbl-nums)
          (values bind->num ast)]
         [(LabelDef _ id)
          (define bind (Id-bind id))
          (define lbl-nums 
-           (merge 
+           (env-val-num-merge 
             ;; any value assignments from Gotos to this label
             (hash-ref label->bind->num bind #hasheq()) 
             ;; the "fall-in" value assignments
@@ -945,7 +920,7 @@ C++ back end.
          (define bind (Id-bind id))
          (if (set-member? refs bind)
              ast
-             a-noop)]
+             a-noop-stat)]
         [_ ast])))
    an-ast))
 
@@ -1042,7 +1017,7 @@ C++ back end.
        (values id s)]
       [(Goto _ (? (lambda (id) (and st (Id-bind=? st id)))))
        ;;(writeln `(delete ,s))
-       (values st a-noop)]
+       (values st a-noop-stat)]
       [_ 
        (values #f s)]))
   
@@ -1068,7 +1043,7 @@ C++ back end.
           [(LabelDef _ (? (lambda (id)
                             (define bind (Id-bind id))
                             (not (set-member? targets bind)))))
-           a-noop]
+           a-noop-stat]
           [_ ast])))
      s))
   

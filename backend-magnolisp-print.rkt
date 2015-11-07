@@ -21,6 +21,9 @@ source code.
     ((DefVar _ id t v)
      `("(" (in (gr ,(pp-id id) sp ,(pp-expr v))) ")"))
 
+    ((DeclVar _ id t)
+     `("(" (in (gr ,(pp-id id) sp "#<undefined>")) ")"))
+
     (else
      (~s ast))))
 

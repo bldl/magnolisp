@@ -330,8 +330,12 @@ Assumptions for AST node types:
 ;; top-level.
 
 ;; Variable definition.
-(define-ast* DefVar (Ast Def) ((#:none annos) (#:none id)
-                               (#:just t) (#:just body)))
+(define-ast* DefVar (Ast Def)
+  ((#:none annos) (#:none id) (#:just t) (#:just body)))
+
+;; Variable declaration.
+(define-ast* DeclVar (Ast Def) 
+  ((#:none annos) (#:none id) (#:just t)))
 
 ;; Function parameter declaration.
 (define-ast* Param (Ast Def) ((#:none annos) (#:none id) (#:just t)))
@@ -361,7 +365,7 @@ Assumptions for AST node types:
 (define-ast* LetStat (Ast Stat SeqCont) 
   ((#:none annos) (#:just def) (#:many ss)))
 
-;; There is a 'let-kind annotation.
+;; Includes a 'let-kind annotation for original nodes.
 (define-ast* LetExpr (Ast Expr SeqCont) 
   ((#:none annos) (#:just def) (#:many ss)))
 
@@ -372,6 +376,9 @@ Assumptions for AST node types:
 ;; Spliced sequence of expressions. Like `begin`.
 (define-ast* SeqExpr (Ast Expr SeqCont) 
   ((#:none annos) (#:many ss)))
+
+(define* (empty-SeqExpr? ast)
+  (matches? ast (SeqExpr _ (list))))
 
 (define-ast* Begin0 (Ast Expr SeqCont) 
   ((#:none annos) (#:many ss)))
@@ -454,6 +461,7 @@ Assumptions for AST node types:
   (list the-Bool-id the-Void-id))
 
 (define* a-VoidExpr (VoidExpr (hasheq 'type the-Void-type)))
+(define* a-VoidStat (annoless VoidStat))
 
 ;;; 
 ;;; annotation merging

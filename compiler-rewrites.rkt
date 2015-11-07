@@ -6,14 +6,14 @@
 
 (require racket/contract/base
          racket/dict
-         racket/function
+         racket/function racket/list
          racket/match
          racket/pretty
          racket/set
          "ast-ir.rkt"
          "strategy-stratego.rkt"
          "strategy.rkt"
-         "util.rkt")
+         "util.rkt" "util/field.rkt")
 
 ;;; 
 ;;; definition table management
@@ -399,42 +399,131 @@
 
   (rw-any ast))
 
+;;; 
+;;; data-flow analysis
+;;; 
+
+;; A Φ value type, as in compiler literature. The `set` is a set of
+;; value numbers. Each number is a symbol of the form 'vn* for an
+;; actual value, or 'nothing to indicate no value assignment.
+(concrete-struct* Phi (set) #:transparent)
+
+;; Sums together value numbers `xs`. Where `xs` are all the same
+;; number, returns the number. Otherwise returns Phi(x ...), where `x`
+;; are all distinct numbers.
+(define* (val-num+ . xs)
+  (define vs
+    (for/fold ((sum (seteq))) ((x xs))
+      (if (Phi? x)
+          (set-union sum (Phi-set x))
+          (set-add sum x))))
+  (if (= (set-count vs) 1)
+      (set-first vs)
+      (Phi vs)))
+
+(define* (env-val-num-merge h1 h2)
+  (define keys (list->mutable-seteq (hash-keys h1)))
+  (for ([k (hash-keys h2)])
+    (set-add! keys k))
+  (for/fold ((h #hasheq())) ((k (in-set keys)))
+    (define v1 (hash-ref h1 k 'nothing))
+    (define v2 (hash-ref h2 k 'nothing))
+    (hash-set h k (val-num+ v1 v2))))
+    
+;;; 
+;;; dead-code elimination
+;;; 
+
+;; Removes unused local definitions. Assumes that there are no type
+;; definitions present.
+(define-with-contract*
+  (-> Def? Def?)
+  (def-drop-dead-local-Defs def)
+
+  (define refs (mutable-seteq)) ;; set of bind
+
+  ((topdown-visitor
+    (match-lambda
+      [(Var _ id)
+       (set-add! refs (Id-bind id))]
+      [_ (void)]))
+   def)
+
+  (define (unreferenced? id)
+    (not (set-member? refs (Id-bind id))))
+
+  (define rw
+    (alltd
+     (lambda (ast)
+       (match ast
+         [(LetExpr a (fields Def [id (? unreferenced?)]) body)
+          (SeqExpr a (map rw body))]
+         [_ #f]))))
+  
+  (rw def))
+
+;; Removes unused local function definitions.
+(define-with-contract*
+  (-> Def? Def?)
+  (def-drop-dead-local-Defuns def)
+
+  (define refs (mutable-seteq)) ;; set of bind
+
+  ((topdown-visitor
+    (match-lambda
+      [(fields ApplyExpr [f e])
+       (assert (Var? e))
+       (define id (Var-id e))
+       (set-add! refs (Id-bind id))]
+      [_ (void)]))
+   def)
+
+  (define (unreferenced? id)
+    (not (set-member? refs (Id-bind id))))
+
+  (define rw
+    (alltd
+     (lambda (ast)
+       (match ast
+         [(LetExpr a (fields Defun [id (? unreferenced?)]) body)
+          (SeqExpr a (map rw body))]
+         [_ #f]))))
+  
+  (rw def))
+
 ;; Optimizes by removing some dead constant expressions, i.e. ones
 ;; that have no side effects, and whose results are not required.
-;; Relies of 'result-discarded annotations.
-(define* (ast-rm-dead-constants in-ast)
+;; Relies of 'result-discarded annotations. May remove useful type
+;; information.
+(define* (ast-rm-result-discarded-constants in-ast)
   (define a-noop
     (SeqExpr #hasheq((result-discarded . #t)) '()))
   
-  ;; We assume `in-ast` had none of these.
-  (define (noop? ast)
-    (matches? ast (SeqExpr _ (list))))
-  
   (define dead->SeqExpr
-    (topdown
+    (alltd
      (lambda (ast)
        (cond
-        ((and (or (Var? ast) (Literal? ast) 
+        [(and (or (Var? ast) (Literal? ast) 
                   (RacketExpr? ast) (VoidStat? ast))
               (get-result-discarded ast))
-         a-noop)
-        (else
-         ast)))))
+         a-noop]
+        [else
+         #f]))))
   
   (define optimize
-    (topdown
+    (alltd
      (lambda (ast)
        (match ast
-         [(IfExpr _ c (? noop?) (? noop?))
-          c]
+         [(IfExpr _ c (? empty-SeqExpr?) (? empty-SeqExpr?))
+          (optimize c)]
          [else
-          ast]))))
+          #f]))))
 
   (define voidify
     (topdown
      (lambda (ast)
        (cond
-        [(noop? ast) (annoless VoidStat)]
+        [(empty-SeqExpr? ast) (annoless VoidStat)]
         [else ast]))))
   
   (voidify
@@ -442,7 +531,10 @@
     (ast-splice-SeqExpr
      (dead->SeqExpr in-ast)))))
 
-(define* (ast-trim-dead-constants ast)
+;; Removes obviously useless constant expressions, i.e., ones that
+;; directly appear in a result-discarded position, are side-effect
+;; free, and have no useful type information.
+(define* (ast-trim-useless-constants ast)
   (define dead?
     (lambda (e)
       (or (Literal? e)
@@ -462,6 +554,61 @@
           ast]))))
   
   (rw (ast-splice-SeqExpr ast)))
+
+(define* (ast-trim-VoidStat ast)
+  ;; Does shallow splicing, too.
+  (define (rw-lst ast-lst)
+    (append-map
+     (lambda (ast)
+       (match (rw #f ast)
+         [(SeqExpr _ lst) lst]
+         [(? VoidStat?) null]
+         [e (list e)]))
+     ast-lst))
+
+  (define (fail-at ast)
+    (error 'ast-trim-VoidStat
+           "not a value-giving expression: ~a" (ast-~a ast)))
+
+  (define (chk-lst ctx vc? lst)
+    (when (and vc? (null? lst))
+      (fail-at ctx))
+    lst)
+
+  (define (chk ctx vc? ast)
+    (when (and vc? (empty-SeqExpr? ast))
+      (fail-at ctx))
+    ast)
+  
+  (define (rw-all ast) ;; (-> Ast? Ast?)
+    (term-rewrite-all (fix rw #t) ast))
+  
+  ;; `vc?` = value-expecting context
+  (define (rw vc? ast) ;; (-> boolean? Ast? Ast?)
+    (define n-ast
+      (match ast
+        [(SeqExpr a lst)
+         (let ((lst (rw-lst lst)))
+           (chk-lst ast vc? lst)
+           (match lst
+             [(list e) e]
+             [_ (SeqExpr a lst)]))]
+        [(LetExpr a def lst)
+         (let ((lst (rw-lst lst)))
+           (chk-lst ast vc? lst)
+           (LetExpr a (rw #t def) lst))]
+        [(IfExpr a c t e)
+         (let ((c (rw #t c))
+               (t (rw #t t))
+               (e (rw #t e)))
+           (if (equal? t e)
+               (SeqExpr a (list c t))
+               (IfExpr a c t e)))]
+        [else
+         (rw-all ast)]))
+    (chk ast vc? n-ast))
+
+  (rw #t ast))
 
 ;;; 
 ;;; simplification
