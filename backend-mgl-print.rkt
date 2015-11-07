@@ -7,11 +7,15 @@ source code.
 
 |#
 
-(require "ast-ir.rkt" "backend-util.rkt" 
+(require "ast-ir.rkt" "backend-util.rkt" "compiler-rewrites.rkt"
          (rename-in "pp-yield.rkt" [pp pp-y])
          "util.rkt"
          racket/contract racket/format racket/list 
          racket/match racket/port racket/pretty)
+
+;;; 
+;;; pretty printing
+;;;
 
 (define (pp-id id) ;; Id? -> spec
   (symbol->string (Id-name id)))
@@ -89,6 +93,31 @@ source code.
     (else
      (~s ast))))
 
+;;; 
+;;; copy propagation
+;;; 
+
+;; Assumes that there are no local functions. Preserves any type
+;; annotations.
+(define (defs-propagate-copies def-lst)
+  (define (fun-optimize def)
+    ;;(pretty-print `(BEFORE ,def))
+    (set! def (fun-propagate-copies def))
+    ;;(pretty-print `(AFTER ,def))
+    (set! def (def-drop-dead-local-Defs def))
+    (set! def (ast-trim-VoidStat def))
+    def)
+
+  (map (lambda (def)
+         (if (Defun? def)
+             (fun-optimize def)
+             def)) 
+       def-lst))
+
+;;; 
+;;; API
+;;;
+
 (define* (pp-mgl ast-lst #:yield [yield display])
   (define spec
     (add-between (map pp-def ast-lst) '(br br)))
@@ -113,7 +142,7 @@ source code.
    (lambda ()
     (when banner?
       (display-banner ";;" filename))
-    (pp-mgl ast-lst)
+    (pp-mgl (defs-propagate-copies ast-lst))
     (newline)))
 
   (void))

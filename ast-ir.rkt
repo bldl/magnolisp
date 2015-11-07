@@ -28,7 +28,7 @@ Assumptions for AST node types:
 (define-view* Def (#:fields id))
 (define-view* Stat ())
 (define-view* SeqCont (#:fields ss))
-(define-view* If ([#:field c] [#:field t] [#:field e]))
+(define-view* IfStxp ([#:field annos] [#:field c] [#:field t] [#:field e]))
 
 (define-syntax-rule*
   (define-Ast-anno-accessors name get set)
@@ -404,12 +404,12 @@ Assumptions for AST node types:
   ((#:none annos) (#:just lv) (#:just rv)))
 
 ;; If expression.
-(define-ast* IfExpr (Ast Expr If) ([#:none annos] [#:just c] 
-                                   [#:just t] [#:just e]))
+(define-ast* IfExpr (Ast Expr IfStxp)
+  ([#:none annos] [#:just c] [#:just t] [#:just e]))
 
 ;; If statement.
-(define-ast* IfStat (Ast Stat If) ([#:none annos] [#:just c] 
-                                   [#:just t] [#:just e]))
+(define-ast* IfStat (Ast Stat IfStxp)
+  ([#:none annos] [#:just c] [#:just t] [#:just e]))
 
 ;; A literal datum.
 (define-ast* Literal (Ast Expr) ((#:none annos) (#:none datum)))
@@ -428,6 +428,15 @@ Assumptions for AST node types:
 ;; only be determined from context.
 (define-ast* RacketExpr (Ast Expr) 
   ((#:none annos)))
+
+;; Where `id` is a label Id. A statement.
+(define-ast* Goto (Ast Stat) 
+  ((#:none annos) (#:none id)))
+
+;; Label for the following statements. Itself a statement. `id` is the
+;; label Id.
+(define-ast* LabelDef (Ast Stat)
+  ((#:none annos) (#:none id)))
 
 ;;; 
 ;;; built-in types

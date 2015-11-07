@@ -36,11 +36,6 @@
                               (#:none modifs) (#:just rtype)
                               (#:many params)))
 
-;; Label for the following statements. Itself a statement. `id` is the
-;; label Id.
-(define-ast* LabelDef (Ast Stat)
-  ((#:none annos) (#:none id)))
-
 ;; Top-level verbatim string.
 (define-ast* TlVerbatim (Ast) 
   ((#:none annos) (#:none s)))
@@ -57,10 +52,6 @@
 
 (define-ast* PpCxxIfStat (Ast) ((#:none annos) (#:just c)
                                 (#:many ts) (#:many es)))
-
-;; Where `id` is a label Id. A statement.
-(define-ast* Goto (Ast Stat) 
-  ((#:none annos) (#:none id)))
 
 ;;; 
 ;;; expressions

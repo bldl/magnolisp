@@ -11,8 +11,9 @@
          racket/pretty
          racket/set
          "ast-ir.rkt"
-         "strategy-stratego.rkt"
          "strategy.rkt"
+         "strategy-stratego.rkt"
+         "strategy-term.rkt"
          "util.rkt" "util/field.rkt")
 
 ;;; 
@@ -430,6 +431,201 @@
     (define v2 (hash-ref h2 k 'nothing))
     (hash-set h k (val-num+ v1 v2))))
     
+;;; 
+;;; copy and constant propagation
+;;;
+
+(define* (fun-propagate-copies def
+                               #:noop [noop a-VoidStat])
+  (define to-examine null) ;; (listof (list/c val-num lv rv))
+  
+  (define (annos-add-val-num! a lv-id [rv-ast #f])
+    (define val-num (gensym 'vn))
+    (define n-a (hash-set a 'val-num val-num))
+    (when (and rv-ast (any-pred-holds Var? Literal? rv-ast))
+      (define item (list val-num lv-id rv-ast))
+      (set! to-examine (cons item to-examine)))
+    n-a)
+  
+  ;; Assigns a value number for each "assignment", and adds potentials
+  ;; for removal to `to-examine`. Note that: a `DeclVar` has no value;
+  ;; and a `Param` has some value, but no expression giving it.
+  (define assign-val-nums
+    (topdown
+     (lambda (ast)
+       (match ast
+         [(AssignStat a lv rv)
+          (cond
+            [(and (Var? rv) (equal? lv rv))
+             ;; Special case of `x := x`, so can remove
+             ;; unconditionally.
+             noop]
+            [else
+             (define n-a (annos-add-val-num! a (Var-id lv) rv))
+             (AssignStat n-a lv rv)])]
+         [(DefVar a id t rv)
+          (define n-a (annos-add-val-num! a id rv))
+          (DefVar n-a id t rv)]
+         [(Param a id t)
+          (define n-a (annos-add-val-num! a id))
+          (Param n-a id t)]
+         [_ ast]))))
+  
+  ;; Rewrites `def` to remove the assignment identified by
+  ;; `examine-item`, or fails returning #f. Traverses `def` in
+  ;; execution order in order to do data-flow analysis.
+  (define (rw-by-item examine-item def)
+    ;;(writeln `(examining ,examine-item))
+
+    (match-define (list tgt-num tgt-lv-id tgt-rv-ast) examine-item)
+
+    (define tgt-rv-id ;; true for Vars, not Literals
+      (match tgt-rv-ast
+        [(Var _ id) id]
+        [(? Literal?) #f]))
+    (define tgt-rv-bind (and tgt-rv-id (Id-bind tgt-rv-id)))
+    (define tgt-rv-num #f) ;; determined later if `tgt-rv-id`
+
+    (define (maybe-set-rv-num! bind->num rv-ast)
+      (when (Var? rv-ast)
+        (define rv-bind (Id-bind (Var-id rv-ast)))
+        (set! tgt-rv-num (hash-ref bind->num rv-bind))))
+    
+    ;; For each Goto target (indexed by `bind` value), a sum of their
+    ;; bind->num assignments. All Gotos to a LabelDef will have been
+    ;; seen before we reach the LabelDef, and hence the set of
+    ;; assignments will be complete at that point.
+    (define label->bind->num (make-hasheq))
+
+    (define (rw bind->num ast)
+      ;;(writeln `(rw of ,ast when ,bind->num))
+      (match ast
+        [(AssignStat a lv rv)
+         (define this-num (hash-ref a 'val-num))
+         (assert (Var? lv))
+         (define lv-id (Var-id lv))
+         (define lv-bind (Id-bind lv-id))
+         (values (hash-set bind->num lv-bind this-num)
+                 (cond
+                  [(and (eq? this-num tgt-num)
+                        (Id-bind=? tgt-lv-id lv-id))
+                   ;;(writeln `(deleting ,this-num : ,lv-id := ,rv))
+                   (maybe-set-rv-num! bind->num rv)
+                   noop]
+                  [else
+                   (define n-rv (rw-discard bind->num rv)) 
+                   (and n-rv (AssignStat a lv n-rv))]))]
+        [(DefVar a lv-id t rv)
+         (define this-num (hash-ref a 'val-num))
+         (define lv-bind (Id-bind lv-id))
+         (values (hash-set bind->num lv-bind this-num)
+                 (cond
+                   [(eq? this-num tgt-num)
+                    ;;(writeln `(deleting ,this-num : ,lv-id := ,rv))
+                    (maybe-set-rv-num! bind->num rv)
+                    (DeclVar a lv-id t)]
+                   [else
+                    (define n-rv (rw-discard bind->num rv))
+                    (and n-rv (DefVar a lv-id t n-rv))]))]
+        [(Param a id t)
+         (define this-num (hash-ref a 'val-num))
+         (assert (not (eq? this-num tgt-num)))
+         (define lv-bind (Id-bind id))
+         (values (hash-set bind->num lv-bind this-num) ast)]
+        [(IfStxp a c t e)
+         (define n-c (rw-discard bind->num c))
+         (cond
+           [(not n-c)
+            (values bind->num #f)]
+           [else
+            (define-values (t-st n-t) (rw bind->num t))
+            (cond 
+              [(not n-t)
+               (values bind->num #f)]
+              [else
+               (define-values (e-st n-e) (rw bind->num e))
+               (cond
+                 [(not n-e)
+                  (values bind->num #f)]
+                 [else
+                  (values (env-val-num-merge t-st e-st)
+                          (IfStxp-copy ast a n-c n-t n-e))])])])]
+        [(Var a (? (fix Id-bind=? tgt-lv-id) id))
+         (define this-bind (Id-bind id))
+         (define this-num (hash-ref bind->num this-bind))
+         ;;(writeln `(examining Var id= ,id num= ,this-num rv= ,tgt-rv-ast num= ,(hash-ref bind->num tgt-rv-bind #f)))
+         (assert (not (eq? this-num 'nothing))) ;; undefined, cannot use
+         (values bind->num
+                 (cond
+                   ;; The target assignment is in effect here, so we
+                   ;; must substitute the R-value variable or literal,
+                   ;; but this only works if it still has the same
+                   ;; R-value (literals obviously do).
+                   [(eq? this-num tgt-num)
+                    (cond
+                      [tgt-rv-bind ;; Var
+                       (assert tgt-rv-num)
+                       (define this-rv-num (hash-ref bind->num tgt-rv-bind))
+                       (unless this-rv-num
+                         (raise-assertion-error
+                          'fun-propagate-copies
+                          "no value binding for R-value: ~a := ~a (~a)"
+                          tgt-lv-id tgt-rv-id this-num))
+                       (and (eq? this-rv-num tgt-rv-num) tgt-rv-ast)]
+                      [else ;; Literal
+                       tgt-rv-ast])]
+                   ;; The target assignment might be in effect here,
+                   ;; but we don't know if it is, and hence cannot make
+                   ;; this optimization.
+                   [(and (Phi? this-num)
+                         (set-member? (Phi-set this-num) tgt-num))
+                    #f]
+                   ;; The target assignment is not in effect here, so
+                   ;; this use is unaffected.
+                   [else
+                    ast]))]
+        [(Goto _ id)
+         (define bind (Id-bind id))
+         (define lbl-nums 
+           (env-val-num-merge
+            (hash-ref label->bind->num bind #hasheq()) bind->num))
+         (hash-set! label->bind->num bind lbl-nums)
+         (values bind->num ast)]
+        [(LabelDef _ id)
+         (define bind (Id-bind id))
+         (define lbl-nums 
+           (env-val-num-merge 
+            ;; any value assignments from Gotos to this label
+            (hash-ref label->bind->num bind #hasheq()) 
+            ;; the "fall-in" value assignments
+            bind->num))
+         (values lbl-nums ast)]
+        [_
+         ;;(writeln `(no special action for ,ast))
+         (rw-all bind->num ast)]))
+
+    ;; Rewrites `ast` and returns the modified AST (or #f), discarding
+    ;; changes to assignment table.
+    (define (rw-discard bind->num ast)
+      (define-values (r n-ast) (rw bind->num ast))
+      n-ast)
+    
+    (define (rw-all bind->num ast)
+      (term-rewrite-all/stateful rw bind->num ast))
+
+    (rw-discard #hasheq() def)) ;; end rw-by-item
+  
+  ;; Tries to rewrite `ast` to remove each of the assignments in
+  ;; `to-examine`, but preserves `ast` where removal is not possible.
+  (define (examine-all ast)
+    ;;(pretty-print to-examine)
+    (for/fold ([ast ast]) ([item to-examine])
+      (define res (rw-by-item item ast))
+      ;;(writeln (list 'TRIED item res))
+      (or res ast)))
+  
+  (examine-all (assign-val-nums def)))
+
 ;;; 
 ;;; dead-code elimination
 ;;; 
