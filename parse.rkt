@@ -402,9 +402,6 @@
          (define e-stx-lst (syntax->list #'exprs))
          (define par-ast-lst
            (map (lambda (id)
-                  ;; Annotations would probably have to be propagated
-                  ;; from any binding whose value this lambda is, but
-                  ;; that must wait until later.
                   (make-Param stx id))
                 par-id-lst))
          (define e-ast-lst (map parse-expr e-stx-lst))
@@ -439,9 +436,9 @@
        (let ()
          (define e-lst (map parse-expr (syntax->list #'exprs)))
          (if (null? e-lst)
-             (syntaxed stx VoidStat)
+             (syntaxed stx VoidExpr)
              (syntaxed stx SeqExpr 
-                       (append e-lst (list (annoless VoidStat)))))))
+                       (append e-lst (list (annoless VoidExpr)))))))
       
       ((#%plain-app values e)
        (parse-expr #'e))
@@ -483,7 +480,7 @@
 
       ((set! id expr)
        (identifier? #'id)
-       (syntaxed stx AssignStat (parse-expr #'id) (parse-expr #'expr)))
+       (syntaxed stx AssignExpr (parse-expr #'id) (parse-expr #'expr)))
 
       ((quote lit)
        (make-Literal stx #'lit))

@@ -497,18 +497,7 @@
        (ti-stat t)
        (ti-stat e))
       
-      ((AssignStat _ lhs rhs)
-       (define lhs-t (ti-expr lhs))
-       (define rhs-t (ti-expr rhs))
-       (unless (type-unifies!? lhs-t rhs-t)
-         (raise-language-error/ast
-          "assignment between different types"
-          ast
-          #:fields (list (list "lvalue type" (ast-displayable/datum lhs-t))
-                         (list "rvalue type" (ast-displayable/datum rhs-t)))))
-       (void))
-      
-      ((? VoidStat?)
+      ((? NopStat?)
        (void))
       
       (else
@@ -649,15 +638,29 @@
                       )))
          (type-unify! ast-t t-t)]))
 
+      ((VoidExpr _)
+       (expr-unify! ast the-Void-type))
+      
+      ((AssignExpr _ lhs rhs)
+       (define lhs-t (ti-expr lhs))
+       (define rhs-t (ti-expr rhs))
+       (unless (type-unifies!? lhs-t rhs-t)
+         (raise-language-error/ast
+          "assignment between different types"
+          ast
+          #:fields (list (list "lvalue type" (ast-displayable/datum lhs-t))
+                         (list "rvalue type" (ast-displayable/datum rhs-t)))))
+       (expr-unify! ast the-Void-type))
+      
+      ((? RacketExpr?)
+       (Expr-type ast))
+      
       ;; Statements can appear in an expression position. They are
       ;; always of the unit type.
       ((? Stat?)
        (ti-stat ast)
        the-Void-type)
 
-      ((? RacketExpr?)
-       (Expr-type ast))
-      
       (else
        (raise-argument-error
         'ti-expr "supported ExprLike?" ast))))

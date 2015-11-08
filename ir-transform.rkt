@@ -341,11 +341,11 @@
 
 ;; Flags expressions whose results are not required by their context,
 ;; and will thus be discarded. Assumes that sequences have been
-;; spliced. It is a syntax error if empty SeqExpr nodes appear in the
-;; input where a value is required. We also assume that dead code has
-;; been dropped, since the results of such code will not be required
-;; (of course correct annotations may be pointless in nodes that will
-;; subsequently be dropped).
+;; spliced. It is a syntax error if empty `SeqExpr` nodes appear in
+;; the input where a value is required. We also assume that dead code
+;; has been dropped, since the results of such code will not be
+;; required (of course correct annotations may be pointless in nodes
+;; that will subsequently be dropped).
 (define* (ast-update-ExprLike-result-annos ast)
   (define (rw-expr-used ast)
     (rw-expr #f ast))
@@ -372,7 +372,7 @@
     (match ast
       [(or (? Var?) (? Literal?) (? RacketExpr?))
        (set-result-discarded ast d?)]
-      [(or (? ApplyExpr?) (? AssignStat?))
+      [(or (? ApplyExpr?) (? AssignExpr?))
        (define n-ast (term-rewrite-all rw-expr-used ast))
        (set-result-discarded n-ast d?)]
       [(IfExpr a c t e)
@@ -380,8 +380,8 @@
                              (rw-expr d? t)
                              (rw-expr d? e)))
        (set-result-discarded n-ast d?)]
-      [(VoidStat a)
-       (VoidStat (annos-set-result-discarded a d?))]
+      [(VoidExpr a)
+       (VoidExpr (annos-set-result-discarded a d?))]
       [(SeqExpr a es)
        (define-values (n-es di) (rw-expr-seq d? ast es))
        (SeqExpr (annos-set-result-discarded a di) n-es)]
@@ -436,7 +436,7 @@
 ;;;
 
 (define* (fun-propagate-copies def
-                               #:noop [noop a-VoidStat])
+                               #:noop [noop the-VoidExpr])
   (define to-examine null) ;; (listof (list/c val-num lv rv))
   
   (define (annos-add-val-num! a lv-id [rv-ast #f])
@@ -454,7 +454,7 @@
     (topdown
      (lambda (ast)
        (match ast
-         [(AssignStat a lv rv)
+         [(AssignStxp a lv rv)
           (cond
             [(and (Var? rv) (equal? lv rv))
              ;; Special case of `x := x`, so can remove
@@ -462,7 +462,7 @@
              noop]
             [else
              (define n-a (annos-add-val-num! a (Var-id lv) rv))
-             (AssignStat n-a lv rv)])]
+             (set-AssignStxp-annos ast n-a)])]
          [(DefVar a id t rv)
           (define n-a (annos-add-val-num! a id rv))
           (DefVar n-a id t rv)]
@@ -500,7 +500,7 @@
     (define (rw bind->num ast)
       ;;(writeln `(rw of ,ast when ,bind->num))
       (match ast
-        [(AssignStat a lv rv)
+        [(AssignStxp a lv rv)
          (define this-num (hash-ref a 'val-num))
          (assert (Var? lv))
          (define lv-id (Var-id lv))
@@ -514,7 +514,7 @@
                    noop]
                   [else
                    (define n-rv (rw-discard bind->num rv)) 
-                   (and n-rv (AssignStat a lv n-rv))]))]
+                   (and n-rv (set-AssignStxp-rv ast n-rv))]))]
         [(DefVar a lv-id t rv)
          (define this-num (hash-ref a 'val-num))
          (define lv-bind (Id-bind lv-id))
@@ -702,7 +702,7 @@
      (lambda (ast)
        (cond
         [(and (or (Var? ast) (Literal? ast) 
-                  (RacketExpr? ast) (VoidStat? ast))
+                  (RacketExpr? ast) (VoidExpr? ast))
               (get-result-discarded ast))
          a-noop]
         [else
@@ -721,7 +721,7 @@
     (topdown
      (lambda (ast)
        (cond
-        [(empty-SeqExpr? ast) (annoless VoidStat)]
+        [(empty-SeqExpr? ast) the-VoidExpr]
         [else ast]))))
   
   (voidify
@@ -737,7 +737,7 @@
     (lambda (e)
       (or (Literal? e)
           (RacketExpr? e)
-          (VoidStat? e)
+          (VoidExpr? e)
           (and (Var? e) (not (Expr-typed? e))))))
   
   (define rw
@@ -753,19 +753,19 @@
   
   (rw (ast-splice-SeqExpr ast)))
 
-(define* (ast-trim-VoidStat ast)
+(define* (ast-trim-VoidExpr ast)
   ;; Does shallow splicing, too.
   (define (rw-lst ast-lst)
     (append-map
      (lambda (ast)
        (match (rw #f ast)
          [(SeqExpr _ lst) lst]
-         [(? VoidStat?) null]
+         [(? VoidExpr?) null]
          [e (list e)]))
      ast-lst))
 
   (define (fail-at ast)
-    (error 'ast-trim-VoidStat
+    (error 'ast-trim-VoidExpr
            "not a value-giving expression: ~a" (ast-~a ast)))
 
   (define (chk-lst ctx vc? lst)

@@ -695,7 +695,10 @@ optimization.
     (set! def-lst (map ast-rm-result-discarded-constants (hash-values def-h)))
     (set! def-lst (defs-set-formats-to-Literals def-h def-lst))
     (set! def-h (defs-lift-local-Defuns def-lst)) ;; (hash/c bind Def)
-    (set! def-lst (hash-values def-h)))
+    (set! def-lst (hash-values def-h))
+    (set! def-lst (filter
+                   (lambda (def) (any-pred-holds Defun? ForeignTypeDecl? def))
+                   def-lst)))
 
   (St def-lst eps-in-prog))
 

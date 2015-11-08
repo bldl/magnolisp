@@ -28,7 +28,6 @@ Assumptions for AST node types:
 (define-view* Def (#:fields id))
 (define-view* Stat ())
 (define-view* SeqCont (#:fields ss))
-(define-view* IfStxp ([#:field annos] [#:field c] [#:field t] [#:field e]))
 
 (define-syntax-rule*
   (define-Ast-anno-accessors name get set)
@@ -266,6 +265,35 @@ Assumptions for AST node types:
   (for ([(bind def) (in-dict defs)])
     (rw def)))
 
+(define* (ast-rw-Ids rw-id ast)
+  (define (rw-annos annos)
+    (define type (hash-ref annos 'type #f))
+    (and type
+         (hash-set annos 'type (rw type))))
+
+  (define (ast-rw-annos ast)
+    (define annos (rw-annos (Ast-annos ast)))
+    (if annos (set-Ast-annos ast annos) ast))
+  
+  (define rw
+    (topdown-rewriter
+     (lambda (ast)
+       (match ast
+         ((? Def?)
+          (define id (Def-id ast))
+          (define id-ast (rw-id id))
+          (Def-copy ast id-ast))
+         ((Var a id)
+          (define id-ast (rw-id id))
+          (Var (or (rw-annos a) a) id-ast))
+         ((NameT a id)
+          (define id-ast (rw-id id))
+          (NameT a id-ast))
+         (else
+          (ast-rw-annos ast))))))
+
+  (rw ast))
+
 ;;; 
 ;;; type expressions
 ;;; 
@@ -305,6 +333,37 @@ Assumptions for AST node types:
   ((#:none annos) (#:none id)))
 
 ;;; 
+;;; built-in types
+;;; 
+
+(define ((make-NameT-pred id) ast)
+  (matches? ast (NameT _ (? (lambda (x) (Id-bind=? x id))))))
+
+;; By convention any built-ins get the "bare" bind value, i.e. the
+;; same symbol as the name.
+(define-syntax (define-builtin-type* stx)
+  (syntax-case stx ()
+    ((_ name)
+     (let ((sym (syntax->datum #'name)))
+       (with-syntax ((the-id (format-id stx "the-~a-id" sym))
+                     (the-type (format-id stx "the-~a-type" sym))
+                     (type? (format-id stx "~a-type?" sym)))
+         #'(begin
+             (define* the-id (annoless Id 'name 'name))
+             (define* the-type (annoless NameT the-id))
+             (define* type? (make-NameT-pred the-id))))))))
+
+;; The unit type.
+(define-builtin-type* Void)
+
+;; The boolean type.
+(define* the-Bool-id (annoless Id 'Bool 'Bool))
+(define* the-Bool-type (annoless NameT the-Bool-id))
+
+(define* builtin-type-id-lst
+  (list the-Bool-id the-Void-id))
+
+;;; 
 ;;; annotations
 ;;; 
 
@@ -319,6 +378,19 @@ Assumptions for AST node types:
 ;; its (parsed) value
 (define-ast* GenericAnno (Ast Anno) ((#:none annos) (#:none kind)
                                      (#:none datum)))
+
+;; Later annotations in `hs` are of increasing significance. Any 'type
+;; annotations are treated specially, so that `AnyT` types are not as
+;; significant as others.
+(define* (merge-annos . hs)
+  (for/fold ([r #hasheq()]) ([h hs])
+    (for ([(k v) h])
+      (cond
+       [(and (eq? 'type k) (hash-has-key? r k) (AnyT? v))
+        (void)]
+       [else
+        (set! r (hash-set r k v))]))
+    r))
 
 ;;; 
 ;;; definitions
@@ -383,12 +455,16 @@ Assumptions for AST node types:
 (define-ast* Begin0 (Ast Expr SeqCont) 
   ((#:none annos) (#:many ss)))
 
-;; A statement that does nothing.
-(define-ast* VoidStat (Ast Stat) ((#:none annos)))
-
-;; An expression of unit type (C++ only).
+;; An expression of unit type.
 (define-ast* VoidExpr (Ast Expr) ((#:none annos)))
 
+(define* the-VoidExpr (VoidExpr (hasheq 'type the-Void-type)))
+
+(define* the-NopStat (annoless SeqStat null))
+
+(define* (NopStat? ast)
+  (matches? ast (SeqStat _ (list))))
+  
 ;; Variable reference.
 (define-ast* Var (Ast Expr) ((#:none annos) (#:none id)))
 
@@ -396,18 +472,19 @@ Assumptions for AST node types:
 (define-ast* Lambda (Ast Expr) 
   ((#:none annos) (#:many params) (#:just body)))
 
-;; Assignment. Both expression and statement variants. In Magnolisp it
-;; is a statement, and in C++ it could be either.
-(define-ast* AssignExpr (Ast Expr) 
+;; Assignment. Both expression and statement variants. C++ has both.
+(define-view* AssignStxp
+  ([#:field annos] [#:field lv] [#:field rv]))
+(define-ast* AssignExpr (Ast Expr AssignStxp) 
   ((#:none annos) (#:just lv) (#:just rv)))
-(define-ast* AssignStat (Ast Stat) 
+(define-ast* AssignStat (Ast Stat AssignStxp)
   ((#:none annos) (#:just lv) (#:just rv)))
 
-;; If expression.
+;; If expression and statement.
+(define-view* IfStxp
+  ([#:field annos] [#:field c] [#:field t] [#:field e]))
 (define-ast* IfExpr (Ast Expr IfStxp)
   ([#:none annos] [#:just c] [#:just t] [#:just e]))
-
-;; If statement.
 (define-ast* IfStat (Ast Stat IfStxp)
   ([#:none annos] [#:just c] [#:just t] [#:just e]))
 
@@ -429,98 +506,14 @@ Assumptions for AST node types:
 (define-ast* RacketExpr (Ast Expr) 
   ((#:none annos)))
 
-;; Where `id` is a label Id. A statement.
-(define-ast* Goto (Ast Stat) 
-  ((#:none annos) (#:none id)))
-
 ;; Label for the following statements. Itself a statement. `id` is the
 ;; label Id.
 (define-ast* LabelDef (Ast Stat)
   ((#:none annos) (#:none id)))
 
-;;; 
-;;; built-in types
-;;; 
-
-(define ((make-NameT-pred id) ast)
-  (matches? ast (NameT _ (? (lambda (x) (Id-bind=? x id))))))
-
-;; By convention any built-ins get the "bare" bind value, i.e. the
-;; same symbol as the name.
-(define-syntax (define-builtin-type* stx)
-  (syntax-case stx ()
-    ((_ name)
-     (let ((sym (syntax->datum #'name)))
-       (with-syntax ((the-id (format-id stx "the-~a-id" sym))
-                     (the-type (format-id stx "the-~a-type" sym))
-                     (type? (format-id stx "~a-type?" sym)))
-         #'(begin
-             (define* the-id (annoless Id 'name 'name))
-             (define* the-type (annoless NameT the-id))
-             (define* type? (make-NameT-pred the-id))))))))
-
-;; The unit type.
-(define-builtin-type* Void)
-
-;; The boolean type.
-(define* the-Bool-id (annoless Id 'Bool 'Bool))
-(define* the-Bool-type (annoless NameT the-Bool-id))
-
-(define* builtin-type-id-lst
-  (list the-Bool-id the-Void-id))
-
-(define* a-VoidExpr (VoidExpr (hasheq 'type the-Void-type)))
-(define* a-VoidStat (annoless VoidStat))
-
-;;; 
-;;; annotation merging
-;;; 
-
-;; Later annotations in `hs` are of increasing significance. Any 'type
-;; annotations are treated specially, so that `AnyT` types are not as
-;; significant as others.
-(define* (merge-annos . hs)
-  (for/fold ([r #hasheq()]) ([h hs])
-    (for ([(k v) h])
-      (cond
-       [(and (eq? 'type k) (hash-has-key? r k) (AnyT? v))
-        (void)]
-       [else
-        (set! r (hash-set r k v))]))
-    r))
-
-;;; 
-;;; Id replacing AST rewrite
-;;;
-
-(define* (ast-rw-Ids rw-id ast)
-  (define (rw-annos annos)
-    (define type (hash-ref annos 'type #f))
-    (and type
-         (hash-set annos 'type (rw type))))
-
-  (define (ast-rw-annos ast)
-    (define annos (rw-annos (Ast-annos ast)))
-    (if annos (set-Ast-annos ast annos) ast))
-  
-  (define rw
-    (topdown-rewriter
-     (lambda (ast)
-       (match ast
-         ((? Def?)
-          (define id (Def-id ast))
-          (define id-ast (rw-id id))
-          (Def-copy ast id-ast))
-         ((Var a id)
-          (define id-ast (rw-id id))
-          (Var (or (rw-annos a) a) id-ast))
-         ((NameT a id)
-          (define id-ast (rw-id id))
-          (NameT a id-ast))
-         (else
-          (ast-rw-annos ast))))))
-
-  (rw ast))
+;; Where `id` is a label Id. A statement.
+(define-ast* Goto (Ast Stat) 
+  ((#:none annos) (#:none id)))
 
 ;;; 
 ;;; location info dumping

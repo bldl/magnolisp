@@ -59,11 +59,11 @@ source code.
                    ,(for/list ((e as))
                       `(sp ,(pp-expr e))))) ")"))
 
-    ((AssignStat _ lv rv)
+    ((AssignExpr _ lv rv)
      `("(set! " (in (gr ,(pp-expr lv) sp 
                         ,(pp-expr rv))) ")"))
 
-    ((VoidStat _)
+    ((VoidExpr _)
      "(void)")
 
     (else
@@ -82,9 +82,8 @@ source code.
              'sp) ")"
        ,(cond
           ((NoBody? b) null)
-          ((SeqExpr? b) `(in (br (gr ,(add-between
-                                       (map pp-expr (SeqExpr-ss b))
-                                       'sp)))))
+          ((SeqExpr? b) `(in ,(for/list ((e (SeqExpr-ss b)))
+                                `(br ,(pp-expr e)))))
           (else `(in (br ,(pp-expr b)))))
        ")"))
     
@@ -109,7 +108,7 @@ source code.
     (set! def (fun-propagate-copies def))
     ;;(pretty-print `(AFTER ,def))
     (set! def (def-drop-unused-local-Defs def))
-    (set! def (ast-trim-VoidStat def))
+    (set! def (ast-trim-VoidExpr def))
     def)
 
   (map (lambda (def)

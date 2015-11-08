@@ -328,7 +328,7 @@ C++ back end.
        ast]
       [(? Literal?)
        ast]
-      [(? VoidStat?)
+      [(? VoidExpr?)
        ast]
       [(ApplyExpr a f es)
        (ApplyExpr a f (map expr->cxx es))]
@@ -338,7 +338,7 @@ C++ back end.
        (SeqExpr a (cons (def->cxx dv) (map expr->cxx ss)))]
       [(IfExpr a c t e)
        (IfExpr a (expr->cxx c) (expr->cxx t) (expr->cxx e))]
-      [(AssignStat a lhs rhs)
+      [(AssignExpr a lhs rhs)
        (AssignStat a (expr->cxx lhs) (expr->cxx rhs))]
       [_
        (raise-argument-error
@@ -350,17 +350,6 @@ C++ back end.
     (map CxxDefun-rm-SeqExpr def-lst)))
 
 (define (CxxDefun-rm-SeqExpr def)
-  (define (can-be-expr? ast)
-    (match ast
-      [(or (? Var?) (? Literal?) (? ApplyExpr?) (? IfExpr?))
-       #t]
-      [(or (? AssignStat?) (? Goto?) (? Def?) (? ReturnStat?)
-           (? SeqStat?) (? SeqExpr?) (? VoidStat?))
-       #f]
-      [_
-       (raise-argument-error
-        'can-be-expr? "supported ExprLike? or Def?" ast)]))
-  
   (define (to-expr ast)
     (match ast
       [(or (? Var?) (? Literal?))
@@ -403,7 +392,7 @@ C++ back end.
       [(IfExpr a c t e)
        ;; Discarding result due to statement context.
        (IfStat a c (to-stat t) (to-stat e))]
-      [(VoidStat a)
+      [(VoidExpr a)
        ;; Discarding result due to statement context.
        (SeqStat a '())]
       [(LiftStatExpr a id ss)
@@ -571,7 +560,7 @@ C++ back end.
       (cond
        ((equal? t the-Void-type)
         (define def (rw-stat (annoless ExprStat ast)))
-        (define ref a-VoidExpr)
+        (define ref the-VoidExpr)
         (values def ref))
        (else
         (define tmp-id (if (Var? ast)
@@ -594,7 +583,7 @@ C++ back end.
       (define t (Expr-type ast))
       (cond
        ((equal? t the-Void-type)
-        (values ds (append n-ss ss) a-VoidExpr))
+        (values ds (append n-ss ss) the-VoidExpr))
        (else
         (define decl (annoless DeclVar id t))
         (define ref (Var (hasheq 'type t) id))
@@ -705,8 +694,6 @@ C++ back end.
 ;;; removal of unreferenced variables
 ;;; 
 
-(define a-noop-stat (annoless SeqStat null))
-
 (define (rm-unreferenced-var-decl an-ast)
   (define refs (mutable-seteq))
   
@@ -725,7 +712,7 @@ C++ back end.
          (define bind (Id-bind id))
          (if (set-member? refs bind)
              ast
-             a-noop-stat)]
+             the-NopStat)]
         [(DefVar _ id _ e)
          (define bind (Id-bind id))
          (if (set-member? refs bind)
@@ -827,7 +814,7 @@ C++ back end.
        (values id s)]
       [(Goto _ (? (lambda (id) (and st (Id-bind=? st id)))))
        ;;(writeln `(delete ,s))
-       (values st a-noop-stat)]
+       (values st the-NopStat)]
       [_ 
        (values #f s)]))
   
@@ -853,7 +840,7 @@ C++ back end.
           [(LabelDef _ (? (lambda (id)
                             (define bind (Id-bind id))
                             (not (set-member? targets bind)))))
-           a-noop-stat]
+           the-NopStat]
           [_ ast])))
      s))
   
@@ -864,7 +851,7 @@ C++ back end.
     (set! s (stat-rm-unused-labels s))
     (define def (set-CxxDefun-s ast s))
     ;;(pretty-print `(BEFORE ,def))
-    (set! def (fun-propagate-copies def #:noop a-noop-stat))
+    (set! def (fun-propagate-copies def #:noop the-NopStat))
     ;;(pretty-print `(AFTER ,def))
     (ast-rm-SeqStat (rm-unreferenced-var-decl def)))
 

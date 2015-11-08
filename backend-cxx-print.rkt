@@ -96,7 +96,7 @@
                ,(format-sub-stats es)))))
     ((ReturnStat _ [format-expr . produces . expr])
      (list "return " expr ";"))
-    ((ReturnStat _ (? VoidStat?))
+    ((ReturnStat _ (? VoidExpr?))
      (list "return;"))
     ((AssignStat _ [format-expr . produces . x] [format-expr . produces . v])
      (list x " = " v ";"))
