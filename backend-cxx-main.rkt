@@ -484,13 +484,15 @@ C++ back end.
   (map rw-def def-lst))
 
 ;;; 
-;;; statement unsplicing
+;;; simplification
 ;;; 
 
 (define (empty-CxxBlockStat? ast)
   (matches? ast (CxxBlockStat _ (list))))
 
 (define (ast-rm-SeqStat ast)
+  ;;(pretty-print ast)
+  
   (define (pointless-nest? ast)
     (or (SeqStat? ast)
         (empty-CxxBlockStat? ast)))
@@ -499,12 +501,15 @@ C++ back end.
     (bottomup
      (lambda (ast)
        (match ast
-         [(SeqCont (? (curry ormap pointless-nest?) ss))
+         [(SeqCont ss)
+          #:when (ormap pointless-nest? ss)
           (define n-ss
-            (apply append (for/list ((s ss))
-                            (if (pointless-nest? s)
-                                (SeqCont-ss s)
-                                (list s)))))
+            (append-map
+             (lambda (s)
+               (if (pointless-nest? s)
+                   (SeqCont-ss s)
+                   (list s)))
+             ss))
           (SeqCont-copy ast n-ss)]
          [else ast]))))
   

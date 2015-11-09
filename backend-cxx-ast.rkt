@@ -48,10 +48,11 @@
 (define-ast* CxxBlockStat (Ast Stat SeqCont) 
   ((#:none annos) (#:many ss)))
 
-(define-ast* ReturnStat (Ast Stat) ((#:none annos) (#:just e)))
+(define-ast* ReturnStat (Ast Stat)
+  ((#:none annos) (#:just e)))
 
-(define-ast* PpCxxIfStat (Ast) ((#:none annos) (#:just c)
-                                (#:many ts) (#:many es)))
+(define-ast* PpCxxIfStat (Ast)
+  ((#:none annos) (#:just c) (#:many ts) (#:many es)))
 
 ;;; 
 ;;; expressions

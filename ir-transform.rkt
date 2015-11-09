@@ -627,7 +627,7 @@
   (examine-all (assign-val-nums def)))
 
 ;;; 
-;;; dead-code elimination
+;;; simplification and dead-code elimination
 ;;; 
 
 ;; Removes unused local definitions. Assumes that there are no type
@@ -689,6 +689,10 @@
   
   (rw def))
 
+(define* (ineffective-atom? ast)
+  (or (Var? ast) (Literal? ast) 
+      (RacketExpr? ast) (VoidExpr? ast)))
+
 ;; Optimizes by removing some dead constant expressions, i.e. ones
 ;; that have no side effects, and whose results are not required.
 ;; Relies of 'result-discarded annotations. May remove useful type
@@ -701,8 +705,7 @@
     (alltd
      (lambda (ast)
        (cond
-        [(and (or (Var? ast) (Literal? ast) 
-                  (RacketExpr? ast) (VoidExpr? ast))
+        [(and (ineffective-atom? ast)
               (get-result-discarded ast))
          a-noop]
         [else
@@ -729,43 +732,51 @@
     (ast-splice-SeqExpr
      (dead->SeqExpr in-ast)))))
 
+(define (shallow-drop-exprs-non-result ineffective? lst)
+  (match lst
+    [(list es ... e)
+     #:when (ormap ineffective? es)
+     (append (filter (negate ineffective?) es) (list e))]
+    [_ lst]))
+
+(define (shallow-drop-SeqCont-non-result ineffective? ast)
+  (match ast
+    [(SeqCont es)
+     (define n-es (shallow-drop-exprs-non-result ineffective? es))
+     (if (eq? n-es es)
+         ast
+         (set-SeqCont-ss ast n-es))]
+    [_ ast]))
+
 ;; Removes obviously useless constant expressions, i.e., ones that
 ;; directly appear in a result-discarded position, are side-effect
 ;; free, and have no useful type information.
 (define* (ast-trim-useless-constants ast)
   (define dead?
     (lambda (e)
-      (or (Literal? e)
-          (RacketExpr? e)
-          (VoidExpr? e)
-          (and (Var? e) (not (Expr-typed? e))))))
+      (and (ineffective-atom? e)
+           (not (Expr-typed? e)))))
   
   (define rw
     (topdown
-     (lambda (ast)
-       (match ast
-         [(SeqCont (list es ... e))
-          #:when (ormap dead? es)
-          (define n-es (filter (negate dead?) es))
-          (set-SeqCont-ss ast (append n-es (list e)))]
-         [else
-          ast]))))
+     (fix shallow-drop-SeqCont-non-result dead?)))
   
   (rw (ast-splice-SeqExpr ast)))
 
-(define* (ast-trim-VoidExpr ast)
+(define* (ast-trim-comprehensively ast)
   ;; Does shallow splicing, too.
   (define (rw-lst ast-lst)
-    (append-map
-     (lambda (ast)
-       (match (rw #f ast)
-         [(SeqExpr _ lst) lst]
-         [(? VoidExpr?) null]
-         [e (list e)]))
-     ast-lst))
+    (define lst
+      (append-map
+       (lambda (ast)
+         (match (rw #f ast)
+           [(SeqExpr _ lst) lst]
+           [e (list e)]))
+       ast-lst))
+    (shallow-drop-exprs-non-result ineffective-atom? lst))
 
   (define (fail-at ast)
-    (error 'ast-trim-VoidExpr
+    (error 'ast-trim-comprehensively
            "not a value-giving expression: ~a" (ast-~a ast)))
 
   (define (chk-lst ctx vc? lst)
@@ -808,38 +819,35 @@
 
   (rw #t ast))
 
-;;; 
-;;; simplification
-;;; 
-
-;; Where a SeqExpr appears within another SeqCont of some kind,
-;; inlines the SeqExpr contents within the outer container.
-(define* ast-splice-SeqExpr
-  (topdown
-   (repeat
-    (lambda (ast)
-      (match ast
-        [(SeqExpr _ (list e))
-         e]
-        [(SeqCont ss)
-         #:when (ormap SeqExpr? ss)
-         (define n-ss
-           (apply append (for/list ((s ss))
-                           (if (SeqExpr? s)
-                               (SeqExpr-ss s)
-                               (list s)))))
-         (set-SeqCont-ss ast n-ss)]
-        [else
-         #f])))))
-       
-(define* ast-simplify-multi-innermost
-  (innermost-rewriter
+(define* ast-rm-useless-conds
+  (bottomup
    (match-lambda
     [(IfExpr a c t e)
      #:when (equal? t e)
      (SeqExpr a (list c t))]
-    [else #f])))
+    [ast ast])))
 
+;; Where a SeqExpr appears within another SeqCont of some kind,
+;; inlines the SeqExpr contents within the outer container.
+(define* ast-splice-SeqExpr
+  (bottomup
+   (lambda (ast)
+     (match ast
+       [(SeqExpr _ (list e))
+        e]
+       [(SeqCont ss)
+        #:when (ormap SeqExpr? ss)
+        (let ((ss
+               (append-map
+                (lambda (s)
+                  (if (SeqExpr? s)
+                      (SeqExpr-ss s)
+                      (list s)))
+                ss)))
+          (set-SeqCont-ss ast ss))]
+       [else
+        ast]))))
+       
 ;;; 
 ;;; type-specific literal formatting
 ;;;

@@ -248,7 +248,7 @@
       [(? NameT?)
        ast]
       [(FunT a ats rt)
-       (define n-ats (map (curry loop vars) ats))
+       (define n-ats (map (fix loop vars) ats))
        (define n-rt (loop vars rt))
        (if (and (eq? rt n-rt) (andmap eq? ats n-ats))
            ast
@@ -261,7 +261,7 @@
            (PhiT a n-t n-u))]
       [(ParamT a bt ats)
        (define n-bt (loop vars bt))
-       (define n-ats (map (curry loop vars) ats))
+       (define n-ats (map (fix loop vars) ats))
        (if (and (eq? bt n-bt) (andmap eq? ats n-ats))
            ast
            (ParamT a n-bt n-ats))]
@@ -308,7 +308,7 @@
       (and
        (= (length x-ats) (length y-ats))
        (unify! h x-rt y-rt)
-       (andmap (curry unify! h) x-ats y-ats)))
+       (andmap (fix unify! h) x-ats y-ats)))
      ((and (ParamT? x) (ParamT? y))
       (define x-t (ParamT-t x))
       (define y-t (ParamT-t y))
@@ -317,7 +317,7 @@
       (and
        (= (length x-ats) (length y-ats))
        (unify! h x-t y-t)
-       (andmap (curry unify! h) x-ats y-ats)))
+       (andmap (fix unify! h) x-ats y-ats)))
      ((and (PhiT? x) (unify-with-PhiT? y))
       (and (unify! (PhiT-t1 x) y)
            (unify! (PhiT-t2 x) y)))
@@ -667,7 +667,7 @@
 
   (set! defs (defs-add-VarT defs))
   (defs-for-each/bind ti-def defs)
-  (set! defs (defs-map/bind (curry ast-rm-VarT var-h) defs))
+  (set! defs (defs-map/bind (fix ast-rm-VarT var-h) defs))
   (unless (hash-empty? apply-h)
     (set! defs (defs-add-type<> var-h apply-h defs)))
   defs)

@@ -566,7 +566,7 @@ optimization.
         id
         (set-Id-bind id v)))
 
-  (define rw (curry ast-rw-Ids rw-id))
+  (define rw (fix ast-rw-Ids rw-id))
 
   (map rw def-lst))
 
@@ -679,7 +679,7 @@ optimization.
   ;;(pretty-print `(prelude-map ,prelude-bind->bind defs ,def-lst eps ,eps-in-prog)) (exit)
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (map ast-trim-useless-constants def-lst))
-  (set! def-lst (map ast-simplify-multi-innermost def-lst))
+  (set! def-lst (map ast-rm-useless-conds def-lst))
   ;;(pretty-print def-lst) (exit)
   (set! def-lst (defs-make-Defuns def-lst))
   (set! def-lst (map def-drop-unused-local-Defuns def-lst))

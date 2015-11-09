@@ -108,7 +108,9 @@ source code.
     (set! def (fun-propagate-copies def))
     ;;(pretty-print `(AFTER ,def))
     (set! def (def-drop-unused-local-Defs def))
-    (set! def (ast-trim-VoidExpr def))
+    ;;(pretty-print `(AFTER ,def)) (exit)
+    (set! def (ast-trim-comprehensively def))
+    ;;(pretty-print `(AFTER ,def)) (exit)
     def)
 
   (map (lambda (def)
