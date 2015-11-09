@@ -254,7 +254,7 @@ C++ back end.
   ast-lst)
 
 ;;; 
-;;; C++ translation
+;;; partitioning
 ;;; 
 
 ;; One of:
@@ -297,15 +297,83 @@ C++ back end.
    (parameterize ((cxx-kind kind))
      (map cxx->partition def-lst))))
 
-;; Performs initial translation from IR to C++.
-(define (defs->cxx a-def-lst)
+;;; 
+;;; C++ translation
+;;; 
+
+(define (CxxDefun-rm-SeqExpr def)
+  (define (to-expr ast)
+    (match ast
+      [(or (? Var?) (? Literal?) (? VoidExpr?))
+       ast]
+      [(or (? ApplyExpr?) (? IfExpr?))
+       (term-rewrite-all to-expr ast)]
+      [(SeqExpr a es)
+       (define t (Expr-type ast))
+       (define void-t? (equal? t the-Void-type))
+       (define id (fresh-Id 'lifted))
+       (unless void-t?
+         (set! es (list-map-last
+                   (lambda (e) (annoless AssignStat
+                                    (annoless Var id) e)) es)))
+       (define ss (map to-stat es))
+       (LiftStatExpr (hasheq 'type t) id ss)]
+      [(ExprStat _ e)
+       (to-expr e)]
+      [(LiftStatExpr a id ss)
+       (LiftStatExpr a id (map to-stat ss))]
+      [_
+       (raise-argument-error
+        'to-expr "supported ExprLike? or Def?" ast)]))
+  
+  (define (to-stat ast)
+    (match ast
+      [(or (? Var?) (? Literal?) (? VoidExpr?))
+       ;; Discarding result due to statement context.
+       (annoless SeqStat '())]
+      [(? ApplyExpr?)
+       (annoless ExprStat (term-rewrite-all to-expr ast))]
+      [(or (? AssignStat?) (? ReturnStat?))
+       (term-rewrite-all to-expr ast)]
+      [(AssignExpr a lv rv)
+       (AssignStat a (to-expr lv) (to-expr rv))]
+      [(DefVar a id t b)
+       (DefVar a id t (to-expr b))]
+      [(? SeqStat?)
+       (term-rewrite-all to-stat ast)]
+      [(SeqExpr a es)
+       ;; Due to the statement context, the result of the expression
+       ;; can be discarded.
+       (SeqStat a (map to-stat es))]
+      [(IfExpr a c t e)
+       ;; Discarding result due to statement context.
+       (IfStat a c (to-stat t) (to-stat e))]
+      [(ExprStat _ e)
+       (to-stat e)]
+      [(LiftStatExpr a id ss)
+       (define dv (annoless DeclVar id (Expr-type ast)))
+       (SeqStat a (cons dv (map to-stat ss)))]
+      [(or (? Goto?) (? DeclVar?) (? NoBody?) (? LabelDef?))
+       ast]
+      [_
+       ;;(writeln `(result-discarded = ,(get-result-discarded ast)))
+       (raise-argument-error
+        'to-stat "supported ExprLike? or Def?" ast)]))
+  
+  (let ((s (CxxDefun-s def)))
+    (set-CxxDefun-s def (to-stat s))))
+
+;; Performs initial translation from IR to C++. If `exprify?`, prefers
+;; to keep expressions as expressions, although that results in
+;; odd-looking C++.
+(define (defs->cxx a-def-lst [exprify? #f])
   (define (fun->cxx ast) ;; (-> Defun? CxxDefun?)
     (define ds null) ;; (listof DeclVar?), in reverse appearance order
 
     (define (add-decl! d)
       (set! ds (cons d ds)))
 
-    (define (local-def->cxx ast) ;; (-> Def? Expr?)
+    (define (local-def->cxx-expr ast) ;; (-> Def? Expr?)
       (match ast
         [(? DeclVar?)
          (add-decl! ast)
@@ -318,7 +386,22 @@ C++ back end.
         [_
          (raise-argument-error
           'local-def->cxx "supported local Def?" ast)]))
-  
+
+    (define (local-def->cxx-stat ast) ;; (-> Def? Stat?)
+      (match ast
+        [(? DeclVar?)
+         ast]
+        [(DefVar a id t v)
+         (DefVar a id t (expr->cxx v))]
+        [_
+         (raise-argument-error
+          'local-def->cxx "supported local Def?" ast)]))
+
+    (define local-def->cxx
+      (if exprify?
+          local-def->cxx-expr
+          local-def->cxx-stat))
+    
     ;; Favors expressions in translation where possible (as they are
     ;; closer to the original), and translates into statements
     ;; otherwise.
@@ -363,7 +446,10 @@ C++ back end.
        (CxxDefun a id null t ps n-b)]))
 
   (for/list ((mgl-fun (filter Defun? a-def-lst)))
-    (fun->cxx mgl-fun)))
+    (define cxx-fun (fun->cxx mgl-fun))
+    (unless exprify?
+      (set! cxx-fun (CxxDefun-rm-SeqExpr cxx-fun)))
+    cxx-fun))
 
 (define-with-contract
   (-> Def? (set/c symbol? #:cmp 'eq))
