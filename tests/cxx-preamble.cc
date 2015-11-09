@@ -5,6 +5,8 @@
 #define MGL_PROTO static
 #define MGL_FUNC static
 
+#define mgl_set(e) ((void)(e))
+
 // --------------------------------------------------
 // integers
 // --------------------------------------------------

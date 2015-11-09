@@ -9,11 +9,11 @@
          racket/match
          racket/port
          racket/string
-         (rename-in "pp-yield.rkt" (pp pp-y))
+         (rename-in "pp-yield.rkt" [pp pp-y])
          "app-util.rkt"
          "ir-ast.rkt"
          "backend-cxx-ast.rkt"
-         "util.rkt")
+         "util.rkt" "util/debug.rkt")
 
 (define (pp . ds)
   (call-with-output-string
@@ -31,18 +31,16 @@
      (app f (and (? values) pat)))))
 
 (define* (format-c decl*)
-  (let ((decl* (map format-decl decl*)))
-    (string-join decl* "\n\n")))
+  (apply string-append
+         (add-between
+          (for/list ((ast decl*))
+            (pp (format-decl ast)))
+          "\n\n")))
 
-(define (format-defun name modifs type args stmt)
-  (pp (add-between (append modifs (list type)) " ")
-      " " (symbol->string name) "(" `(in (gr sp ,args)) " )"
-      (if (NoBody? stmt)
-          ";"
-          `((in " {"
-                ,(for/list ([x (SeqStat-ss stmt)])
-                   `(br ,(format-stat x)))
-                ) br "}"))))
+(define (format-defun-sig name modifs type args)
+  `(,(add-between (append modifs (list (format-type type))) " ")
+    " " ,(symbol->string name)
+    "(" (in (gr sp ,(format-params args))) " )"))
 
 (define (format-decl decl)
   (match decl
@@ -54,16 +52,19 @@
      (string-append "#include " lq header rq))
     ((TlVerbatim _ s)
      s)
-    ((CxxDefun _ name modifs
-               [format-type . produces . type]
-               [format-params . produces . args]
-               stmt)
-     (format-defun name modifs type args stmt))
-    ((Proto _ name modifs
-            [format-type . produces . type]
-            [format-params . produces . args])
-     (format-defun name modifs type args the-NoBody))
-    (else (ew-error 'format-decl "could not format" else))))
+    ((CxxDefun _ name modifs type args stmt)
+     `(,(format-defun-sig name modifs type args)
+       ,(format-fun-stats (SeqStat-ss stmt))))
+    ((Proto _ name modifs type args)
+     `(,(format-defun-sig name modifs type args) ";"))
+    (else
+     (ew-error 'format-decl "could not format" else))))
+
+(define (format-fun-stats ss)
+  (if (null? ss)
+      '(" {" br "}")
+      `(" {" (in ,(for/list ((s ss))
+                   `(br ,(format-stat s)))) br "}")))
 
 (define (format-sub-stats ss)
   (if (null? ss)
@@ -95,10 +96,11 @@
                "else"
                ,(format-sub-stats es)))))
     ((ReturnStat _ [format-expr . produces . expr])
-     (list "return " expr ";"))
+     `("return " (in ,expr) ";"))
     ((ReturnStat _ (? VoidExpr?))
      (list "return;"))
-    ((AssignStat _ [format-expr . produces . x] [format-expr . produces . v])
+    ((AssignStat _ [format-expr . produces . x]
+                 [format-expr . produces . v])
      (list x " = " v ";"))
     ((Goto _ name)
      (string-append "goto " (format-ident name) ";"))
@@ -168,7 +170,7 @@
                      ">"))
            "(" `(in (gr ,args)) ")"))
     ((AssignExpr _ [format-expr . produces . x] [format-expr . produces . v])
-     (list "(" x " = " v ")"))
+     (list "mgl_set(" x " = " v ")"))
     ((SeqExpr _ es)
      (define xs (add-between (map format-expr es) '("," sp)))
      (list "(" `(in (gr ,xs)) ")"))
@@ -225,7 +227,8 @@
   (match arg
     ((Param _ n [format-type . produces . t])
      (list t " " (symbol->string n)))
-    (arg (ew-error 'format-param "could not format" arg))))
+    (arg
+     (ew-error 'format-param "could not format" arg))))
 
 (define (string-pad s up-to-len pad-ch)
   (define len (string-length s))

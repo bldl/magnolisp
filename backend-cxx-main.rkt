@@ -23,8 +23,7 @@ C++ back end.
          "strategy-stratego.rkt"
          "strategy-term.rkt"
          "strategy.rkt"
-         "util.rkt"
-         "util/system.rkt")
+         "util.rkt" "util/debug.rkt" "util/system.rkt")
 
 ;;; 
 ;;; reformatting
@@ -298,115 +297,73 @@ C++ back end.
    (parameterize ((cxx-kind kind))
      (map cxx->partition def-lst))))
 
+;; Performs initial translation from IR to C++.
 (define (defs->cxx a-def-lst)
-  (define (def->cxx ast)
+  (define (fun->cxx ast) ;; (-> Defun? CxxDefun?)
+    (define ds null) ;; (listof DeclVar?), in reverse appearance order
+
+    (define (add-decl! d)
+      (set! ds (cons d ds)))
+
+    (define (local-def->cxx ast) ;; (-> Def? Expr?)
+      (match ast
+        [(? DeclVar?)
+         (add-decl! ast)
+         the-empty-SeqExpr]
+        [(DefVar a id t v)
+         (add-decl! (DeclVar a id t))
+         (annoless AssignExpr
+                   (annoless Var id)
+                   (expr->cxx v))]
+        [_
+         (raise-argument-error
+          'local-def->cxx "supported local Def?" ast)]))
+  
+    ;; Favors expressions in translation where possible (as they are
+    ;; closer to the original), and translates into statements
+    ;; otherwise.
+    (define (expr->cxx ast)
+      (match ast
+        [(? Var?)
+         ast]
+        [(? Literal?)
+         ast]
+        [(? VoidExpr?)
+         ast]
+        [(ApplyExpr a f es)
+         (ApplyExpr a f (map expr->cxx es))]
+        [(SeqExpr a ss)
+         (SeqExpr a (map expr->cxx ss))]
+        [(LetExpr a dv ss)
+         (SeqExpr a (cons (local-def->cxx dv) (map expr->cxx ss)))]
+        [(IfExpr a c t e)
+         (IfExpr a (expr->cxx c) (expr->cxx t) (expr->cxx e))]
+        [(AssignExpr a lhs rhs)
+         (AssignExpr a (expr->cxx lhs) (expr->cxx rhs))]
+        [_
+         (raise-argument-error
+          'expr->cxx "supported Expr?" ast)]))
+
     (match ast
       [(Defun a id t ps b)
        (define foreign? (and (get-foreign-name a) #t))
-       (CxxDefun a id null t
-                 (map def->cxx ps)
-                 (cond
-                  (foreign? the-NoBody)
-                  ((equal? (FunT-rt t) the-Void-type) (expr->cxx b))
-                  (else (annoless ReturnStat (expr->cxx b)))))]
-      [(? Param?)
-       ast]
-      [(? DeclVar?)
-       ast]
-      [(DefVar a id t v)
-       (DefVar a id t (expr->cxx v))]
-      [_
-       (raise-argument-error
-        'def->cxx "supported Def?" ast)]))
-  
-  ;; Favors expressions in translation (as they are closer to the
-  ;; original), and statements otherwise. Leaves in some SeqExpr for
-  ;; the time being.
-  (define (expr->cxx ast)
-    (match ast
-      [(? Var?)
-       ast]
-      [(? Literal?)
-       ast]
-      [(? VoidExpr?)
-       ast]
-      [(ApplyExpr a f es)
-       (ApplyExpr a f (map expr->cxx es))]
-      [(SeqExpr a ss)
-       (SeqExpr a (map expr->cxx ss))]
-      [(LetExpr a dv ss)
-       (SeqExpr a (cons (def->cxx dv) (map expr->cxx ss)))]
-      [(IfExpr a c t e)
-       (IfExpr a (expr->cxx c) (expr->cxx t) (expr->cxx e))]
-      [(AssignExpr a lhs rhs)
-       (AssignStat a (expr->cxx lhs) (expr->cxx rhs))]
-      [_
-       (raise-argument-error
-        'expr->cxx "supported ExprLike?" ast)]))
+       (define n-b
+         (cond
+           [foreign?
+            the-NoBody]
+           [else
+            (define n-e (expr->cxx b))
+            (define ls
+              (if (equal? (FunT-rt t) the-Void-type)
+                  (if (ineffective-atom? n-e)
+                      null
+                      (list (annoless ExprStat n-e)))
+                  (list (annoless ReturnStat n-e))))
+            (annoless SeqStat (append (reverse ds) ls))]))
+       (CxxDefun a id null t ps n-b)]))
 
-  (let-> def-lst
-    (filter Defun? a-def-lst)
-    (map def->cxx def-lst)
-    (map CxxDefun-rm-SeqExpr def-lst)))
-
-(define (CxxDefun-rm-SeqExpr def)
-  (define (to-expr ast)
-    (match ast
-      [(or (? Var?) (? Literal?))
-       ast]
-      [(or (? ApplyExpr?) (? IfExpr?))
-       (term-rewrite-all to-expr ast)]
-      [(SeqExpr a es)
-       (define t (Expr-type ast))
-       (define void-t? (equal? t the-Void-type))
-       (define id (fresh-Id 'lifted))
-       (unless void-t?
-         (set! es (list-map-last
-                   (lambda (e) (annoless AssignStat
-                                    (annoless Var id) e)) es)))
-       (define ss (map to-stat es))
-       (LiftStatExpr (hasheq 'type t) id ss)]
-      [(LiftStatExpr a id ss)
-       (LiftStatExpr a id (map to-stat ss))]
-      [_
-       (raise-argument-error
-        'to-expr "supported ExprLike? or Def?" ast)]))
-  
-  (define (to-stat ast)
-    (match ast
-      [(or (? Var?) (? Literal?))
-       ;; Discarding result due to statement context.
-       (annoless SeqStat '())]
-      [(? ApplyExpr?)
-       (annoless ExprStat (term-rewrite-all to-expr ast))]
-      [(or (? AssignStat?) (? ReturnStat?))
-       (term-rewrite-all to-expr ast)]
-      [(DefVar a id t b)
-       (DefVar a id t (to-expr b))]
-      [(? SeqStat?)
-       (term-rewrite-all to-stat ast)]
-      [(SeqExpr a es)
-       ;; Due to the statement context, the result of the expression
-       ;; can be discarded.
-       (SeqStat a (map to-stat es))]
-      [(IfExpr a c t e)
-       ;; Discarding result due to statement context.
-       (IfStat a c (to-stat t) (to-stat e))]
-      [(VoidExpr a)
-       ;; Discarding result due to statement context.
-       (SeqStat a '())]
-      [(LiftStatExpr a id ss)
-       (define dv (annoless DeclVar id (Expr-type ast)))
-       (SeqStat a (cons dv (map to-stat ss)))]
-      [(or (? Goto?) (? DeclVar?) (? NoBody?) (? LabelDef?))
-       ast]
-      [_
-       ;;(writeln `(result-discarded = ,(get-result-discarded ast)))
-       (raise-argument-error
-        'to-stat "supported ExprLike? or Def?" ast)]))
-  
-  (let ((s (CxxDefun-s def)))
-    (set-CxxDefun-s def (to-stat s))))
+  (for/list ((mgl-fun (filter Defun? a-def-lst)))
+    (fun->cxx mgl-fun)))
 
 (define-with-contract
   (-> Def? (set/c symbol? #:cmp 'eq))
@@ -414,7 +371,7 @@ C++ back end.
   (define targets (mutable-seteq))
   ((topdown-visitor
     (match-lambda
-      ((AssignStat _ (Var _ lv-id) _)
+      ((AssignStxp _ (Var _ lv-id) _)
        (set-add! targets (Id-bind lv-id)))
       (_ (void))))
    def)
@@ -487,6 +444,9 @@ C++ back end.
 ;;; simplification
 ;;; 
 
+(define (ineffective-atomic-stat? ast)
+  (matches? ast (ExprStat _ (? ineffective-atom?))))
+  
 (define (ast-cxx-trim-comprehensively ast)
   ;;(pretty-print ast)
 
@@ -496,32 +456,33 @@ C++ back end.
        e]
       [(SeqExpr a ss)
        #:when (ormap SeqExpr? ss)
-       (let* ([ss
-               (append-map
-                (match-lambda
-                  [(SeqExpr _ ss) ss]
-                  [s (list s)])
-                ss)]
-              [ss
-               (shallow-drop-exprs-non-result ineffective-atom? ss)])
+       (let ([ss
+              (append-map
+               (match-lambda
+                 [(SeqExpr _ ss) ss]
+                 [s (list s)])
+               ss)])
          (rw (SeqExpr a ss)))]
+      [(SeqExpr a (list es ... e))
+       #:when (ormap ineffective-atom? es)
+       (define n-es
+         (filter (negate ineffective-atom?) es))
+       (rw (SeqExpr a (append n-es (list e))))]
       [(IfExpr a c t e)
        #:when (equal? t e)
        (rw (SeqExpr a (list c t)))]
       [(SeqStat _ (list e))
        e]
       [(SeqStat a ss)
-       #:when (ormap SeqStat? ss)
+       #:when (ormap (lambda (x) (or (SeqStat? x)
+                                (ineffective-atomic-stat? x))) ss)
        (let ([ss
-              (filter
+              (append-map
                (match-lambda
-                 [(ExprStat _ (? ineffective-atom?)) #f]
-                 [_ #t])
-               (append-map
-                (match-lambda
-                  [(SeqStat _ ss) ss]
-                  [s (list s)])
-                ss))])
+                 [(SeqStat _ ss) ss]
+                 [(? ineffective-atomic-stat?) null]
+                 [s (list s)])
+               ss)])
          (rw (SeqStat a ss)))]
       [(IfStat a c t e)
        #:when (equal? t e)
@@ -861,7 +822,7 @@ C++ back end.
     (set! s (stat-rm-unused-labels s))
     (define def (set-CxxDefun-s ast s))
     ;;(pretty-print `(BEFORE ,def))
-    (set! def (fun-propagate-copies def #:noop the-NopStat))
+    (set! def (fun-propagate-copies def))
     ;;(pretty-print `(AFTER ,def))
     (set! def (rm-unreferenced-var-decl def))
     (set! def (ast-cxx-trim-comprehensively def))
@@ -943,11 +904,9 @@ C++ back end.
       (let-> lst
         a-def-lst
         (defs->cxx lst)
-        ;;pp-exit ;;pp-only
         (map def-rm-LiftStatExpr lst)
-        ;;pp-exit
         (defs-cxx-fun-optimize lst)
-        ;;pp-exit
+        ;;(pp-exit lst)
         (defs-types-to-cxx defs-t lst)
         (defs-cxx-rename lst)
         (defs-cxx-decl-sort lst)

@@ -14,8 +14,7 @@
          "strategy.rkt"
          "strategy-stratego.rkt"
          "strategy-term.rkt"
-         "util.rkt" "util/field.rkt")
-(require-if-declared unstable/debug)
+         "util.rkt" "util/debug.rkt" "util/field.rkt")
 
 ;;; 
 ;;; definition table management
@@ -436,9 +435,11 @@
 ;;; copy and constant propagation
 ;;;
 
-(define* (fun-propagate-copies def
-                               #:noop [noop the-VoidExpr])
+(define* (fun-propagate-copies def)
   (define to-examine null) ;; (listof (list/c val-num lv rv))
+
+  (define (noop-for ast)
+    (if (Expr? ast) the-VoidExpr the-NopStat))
   
   (define (annos-add-val-num! a lv-id [rv-ast #f])
     (define val-num (gensym 'vn))
@@ -460,7 +461,7 @@
             [(and (Var? rv) (equal? lv rv))
              ;; Special case of `x := x`, so can remove
              ;; unconditionally.
-             noop]
+             (noop-for ast)]
             [else
              (define n-a (annos-add-val-num! a (Var-id lv) rv))
              (set-AssignStxp-annos ast n-a)])]
@@ -512,7 +513,7 @@
                         (Id-bind=? tgt-lv-id lv-id))
                    ;;(writeln `(deleting ,this-num : ,lv-id := ,rv))
                    (maybe-set-rv-num! bind->num rv)
-                   noop]
+                   (noop-for ast)]
                   [else
                    (define n-rv (rw-discard bind->num rv)) 
                    (and n-rv (set-AssignStxp-rv ast n-rv))]))]

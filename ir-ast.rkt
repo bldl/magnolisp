@@ -449,6 +449,9 @@ Assumptions for AST node types:
 (define-ast* SeqExpr (Ast Expr SeqCont) 
   ((#:none annos) (#:many ss)))
 
+(define* the-empty-SeqExpr
+  (annoless SeqExpr null))
+
 (define* (empty-SeqExpr? ast)
   (matches? ast (SeqExpr _ (list))))
 
