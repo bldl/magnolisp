@@ -40,7 +40,7 @@
       (if (NoBody? stmt)
           ";"
           `((in " {"
-                ,(for/list ([x (CxxBlockStat-ss stmt)])
+                ,(for/list ([x (SeqStat-ss stmt)])
                    `(br ,(format-stat x)))
                 ) br "}"))))
 
@@ -73,7 +73,7 @@
 
 (define (format-stat stmt)
   (match stmt
-    ((CxxBlockStat _ stmt*)
+    ((SeqStat _ stmt*)
      (if (null? stmt*)
          "{}"
          `("{"

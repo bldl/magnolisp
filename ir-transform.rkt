@@ -732,7 +732,7 @@
     (ast-splice-SeqExpr
      (dead->SeqExpr in-ast)))))
 
-(define (shallow-drop-exprs-non-result ineffective? lst)
+(define* (shallow-drop-exprs-non-result ineffective? lst)
   (match lst
     [(list es ... e)
      #:when (ormap ineffective? es)

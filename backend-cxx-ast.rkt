@@ -25,7 +25,7 @@
 (define-ast* Include (Ast) ((#:none annos) (#:none kind) (#:none s)))
 
 ;; `rtype` is the return type, only. `s` is the body statement, which
-;; should be a `CxxBlockStat` for printing, or it can be `NoBody` also.
+;; should be a `SeqStat` for printing, or it can be `NoBody` also.
 (define-ast* CxxDefun (Ast Def) ((#:none annos) (#:none id)
                                  (#:none modifs) (#:just rtype)
                                  (#:many params) (#:just s)))
@@ -43,10 +43,6 @@
 ;;; 
 ;;; statements
 ;;; 
-
-;; Sequence of statements.
-(define-ast* CxxBlockStat (Ast Stat SeqCont) 
-  ((#:none annos) (#:many ss)))
 
 (define-ast* ReturnStat (Ast Stat)
   ((#:none annos) (#:just e)))

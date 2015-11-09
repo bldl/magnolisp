@@ -487,43 +487,48 @@ C++ back end.
 ;;; simplification
 ;;; 
 
-(define (empty-CxxBlockStat? ast)
-  (matches? ast (CxxBlockStat _ (list))))
-
-(define (ast-rm-SeqStat ast)
+(define (ast-cxx-trim-comprehensively ast)
   ;;(pretty-print ast)
-  
-  (define (pointless-nest? ast)
-    (or (SeqStat? ast)
-        (empty-CxxBlockStat? ast)))
-  
-  (define un-nest
-    (bottomup
-     (lambda (ast)
-       (match ast
-         [(SeqCont ss)
-          #:when (ormap pointless-nest? ss)
-          (define n-ss
-            (append-map
-             (lambda (s)
-               (if (pointless-nest? s)
-                   (SeqCont-ss s)
-                   (list s)))
-             ss))
-          (SeqCont-copy ast n-ss)]
-         [else ast]))))
-  
-  (define convert
-    (bottomup
-     (lambda (ast)
-       (match ast
-         [(SeqStat a ss)
-          (match ss
-            [(list s) s]
-            [_ (CxxBlockStat a ss)])]
-         [_ ast]))))
-  
-  (convert (un-nest ast)))
+
+  (define (rw ast)
+    (match ast
+      [(SeqExpr _ (list e))
+       e]
+      [(SeqExpr a ss)
+       #:when (ormap SeqExpr? ss)
+       (let* ([ss
+               (append-map
+                (match-lambda
+                  [(SeqExpr _ ss) ss]
+                  [s (list s)])
+                ss)]
+              [ss
+               (shallow-drop-exprs-non-result ineffective-atom? ss)])
+         (rw (SeqExpr a ss)))]
+      [(IfExpr a c t e)
+       #:when (equal? t e)
+       (rw (SeqExpr a (list c t)))]
+      [(SeqStat _ (list e))
+       e]
+      [(SeqStat a ss)
+       #:when (ormap SeqStat? ss)
+       (let ([ss
+              (filter
+               (match-lambda
+                 [(ExprStat _ (? ineffective-atom?)) #f]
+                 [_ #t])
+               (append-map
+                (match-lambda
+                  [(SeqStat _ ss) ss]
+                  [s (list s)])
+                ss))])
+         (rw (SeqStat a ss)))]
+      [(IfStat a c t e)
+       #:when (equal? t e)
+       (rw (SeqStat a (list (annoless ExprStat c) t)))]
+      [_ ast]))
+
+  ((bottomup rw) ast))
 
 ;;; 
 ;;; lifting of statements
@@ -858,7 +863,10 @@ C++ back end.
     ;;(pretty-print `(BEFORE ,def))
     (set! def (fun-propagate-copies def #:noop the-NopStat))
     ;;(pretty-print `(AFTER ,def))
-    (ast-rm-SeqStat (rm-unreferenced-var-decl def)))
+    (set! def (rm-unreferenced-var-decl def))
+    (set! def (ast-cxx-trim-comprehensively def))
+    ;;(pretty-print `(AFTER ,def))
+    def)
 
   (map (lambda (def)
          (if (CxxDefun? def)
@@ -880,8 +888,8 @@ C++ back end.
 (define (defs-cxx->pp lst)
   (define (s->ss ast)
     (cond
-     ((CxxBlockStat? ast) (CxxBlockStat-ss ast))
-     (else (list ast))))
+     [(SeqStat? ast) (SeqStat-ss ast)]
+     [else (list ast)]))
   
   (define f
     (topdown
@@ -890,14 +898,12 @@ C++ back end.
          [(? CxxDefun?)
           (define b (CxxDefun-s ast))
           (cond
-           ((CxxBlockStat? b)
-            ast)
-           ((NoBody? b) 
-            ast)
-           (else
-            (struct-copy 
-             CxxDefun ast 
-             [s (annoless CxxBlockStat (list b))])))]
+           [(SeqStat? b)
+            ast]
+           [(NoBody? b) 
+            ast]
+           [else
+            (set-CxxDefun-s ast (annoless SeqStat (list b)))])]
          [(IfStat a c t e)
           (PpCxxIfStat a c (s->ss t) (s->ss e))]
          [_
