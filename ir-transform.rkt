@@ -15,6 +15,7 @@
          "strategy-stratego.rkt"
          "strategy-term.rkt"
          "util.rkt" "util/field.rkt")
+(require-if-declared unstable/debug)
 
 ;;; 
 ;;; definition table management

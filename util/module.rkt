@@ -79,13 +79,6 @@
                (define #,id #,rhs)
                (provide #,id))))]))
 
-(define-syntax* (require-if-unbound stx)
-  (syntax-case stx ()
-    [(_ id spec ...)
-     (if (identifier-binding #'id)
-         #'(begin)
-         #'(require spec ...))]))
-
 (define-syntax-rule*
   (concrete-struct nm rest ...)
   (struct nm rest ...))
@@ -174,6 +167,30 @@
   (begin
     (require (only-in mod n ...) ...)
     (provide (combine-out n ...) ...)))
+
+(define-syntax* (require-if-unbound stx)
+  (syntax-case stx ()
+    [(_ id spec ...)
+     (if (identifier-binding #'id)
+         #'(begin)
+         #'(require spec ...))]))
+
+(define-syntax (when-module-declared stx)
+  (syntax-parse stx
+    [(_ mod:expr load:boolean code:expr ...+)
+     (if (module-declared? (syntax->datum #'mod) (syntax-e #'load))
+         #'(begin code ...)
+         #'(begin))]))
+
+(define-syntax-rule* (require-if-declared mod ...)
+  (begin
+    (when-module-declared mod #t (require mod))
+    ...))
+
+(define-syntax-rule* (require*-if-declared mod ...)
+  (begin
+    (when-module-declared mod #t (require* mod))
+    ...))
 
 (define-syntax* (define-generics* stx)
   (define-splicing-syntax-class opts
