@@ -23,7 +23,8 @@ C++ back end.
          "strategy-stratego.rkt"
          "strategy-term.rkt"
          "strategy.rkt"
-         "util.rkt" "util/debug.rkt" "util/system.rkt")
+         "util.rkt" "util/debug.rkt"
+         "util/field.rkt" "util/system.rkt")
 
 ;;; 
 ;;; reformatting
@@ -932,31 +933,50 @@ C++ back end.
 ;;; pretty-printing preparation
 ;;; 
 
-(define (defs-cxx->pp lst)
+(define (defs-cxx->pp def-lst)
   (define (s->ss ast)
     (cond
      [(SeqStat? ast) (SeqStat-ss ast)]
      [else (list ast)]))
+
+  (define (rw in-expr? ast)
+    (define n-ast
+      (match ast
+        [(or (? Var?) (? Literal?) (? Type?))
+         ast]
+        [(IfStat a c t e)
+         (PpCxxIfStat a (rw/no c) (s->ss (rw/no t)) (s->ss (rw/no e)))]
+        [(AssignStat a lv rv)
+         ;; actually an ExprStat of AssignExpr
+         (AssignStat a (rw/yes lv) (rw/yes rv))]
+        [(? Expr?)
+         (define sub-rw (if (Expr? ast) rw/yes rw/no))
+         (term-rewrite-all sub-rw ast)]
+        [(or (? Stat?) (? Def?))
+         (term-rewrite-all rw/no ast)]
+        [_
+         (error 'defs-cxx->pp "unsupported: ~s" ast)]))
+    (when (and in-expr? (any-pred-holds SeqExpr? IfExpr? n-ast))
+      (set! n-ast (annoless Parens n-ast)))
+    n-ast)
+
+  (define rw/no (fix rw #f))
+  (define rw/yes (fix rw #t))
+
+  (define (rw-fun ast)
+    (match ast
+      [(fields CxxDefun [s b])
+       (cond
+         [(NoBody? b) 
+          ast]
+         [else
+          (let* ((b (rw/no b))
+                 (b (if (SeqStat? b)
+                        b
+                        (annoless SeqStat (list b)))))
+            (set-CxxDefun-s ast b))])]))
   
-  (define f
-    (topdown
-     (lambda (ast)
-       (match ast
-         [(? CxxDefun?)
-          (define b (CxxDefun-s ast))
-          (cond
-           [(SeqStat? b)
-            ast]
-           [(NoBody? b) 
-            ast]
-           [else
-            (set-CxxDefun-s ast (annoless SeqStat (list b)))])]
-         [(IfStat a c t e)
-          (PpCxxIfStat a c (s->ss t) (s->ss e))]
-         [_
-          ast]))))
-  
-  (map f lst))
+  (map rw-fun def-lst))
   
 ;;; 
 ;;; driver routines

@@ -1,36 +1,37 @@
-#lang magnolisp/2014
+#lang magnolisp
+(require (only-in racket/base +))
 
-(typedef int (#:annos foreign))
+(typedef int #:: (foreign))
 
-(function (add x y) (#:annos foreign [type (fn int int int)])
+(function (add x y) #:: (foreign [type (-> int int int)])
   (+ x y))
 
-(function (main1 x) (#:annos export [type (fn int int)])
+(function (main1 x) #:: (export [type (-> int int)])
   (define y 1)
   (set! y (add y (add (begin (set! y x) x) y)))
   y)
 
-(function (main2 x) (#:annos export [type (fn int int)])
+(function (main2 x) #:: (export [type (-> int int)])
   (define y 1)
   (set! y (add (add y (begin (set! y x) x)) y))
   y)
 
-(function (main3 x) (#:annos export [type (fn int int)])
+(function (main3 x) #:: (export [type (-> int int)])
   (define y 1)
   (set! y (add (add y y) (begin (set! y x) y)))
   y)
 
-(function (main4 x) (#:annos export [type (fn int int)])
+(function (main4 x) #:: (export [type (-> int int)])
   (define y 1)
   (set! y (add (begin (set! y x) y) (add y y)))
   y)
 
-(function (main5 x) (#:annos export [type (fn int int)])
+(function (main5 x) #:: (export [type (-> int int)])
   (define y 1)
   (set! y (add (begin (set! y x) (add y y)) (add y y)))
   y)
 
-(function (main6 x) (#:annos export [type (fn int int)])
+(function (main6 x) #:: (export [type (-> int int)])
   (let ()
     (define y 1)
     (set! y (add 

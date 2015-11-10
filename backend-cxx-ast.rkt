@@ -62,3 +62,7 @@
 ;; least if the lifted expression is ever to be evaluated.
 (define-ast* LiftStatExpr (Ast Expr SeqCont) 
   ((#:none annos) (#:none id) (#:many ss)))
+
+;; Parenthesized expression. For pretty printing only.
+(define-ast* Parens (Expr Ast)
+  ((#:none annos) (#:just e)))

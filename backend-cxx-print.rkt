@@ -143,10 +143,12 @@
 
 (define (format-expr expr)
   (match expr
+    ((Parens _ e)
+     `("(" ,(format-expr e) ")"))
     ((IfExpr _ [format-expr . produces . test]
              [format-expr . produces . conseq]
              [format-expr . produces . alt])
-     `("(" ,test (in (gr " ?" sp ,conseq " :" sp ,alt ")"))))
+     `(,test (in (gr " ?" sp ,conseq " :" sp ,alt))))
     ((Var _ var) (symbol->string var))
     ((Literal (app (lambda (h) (hash-ref h 'literal #f)) anno-e) dat)
      #:when anno-e
@@ -173,7 +175,7 @@
      (list "mgl_set(" x " = " v ")"))
     ((SeqExpr _ es)
      (define xs (add-between (map format-expr es) '("," sp)))
-     (list "(" `(in (gr ,xs)) ")"))
+     `(in (gr ,xs)))
     ((VoidExpr _)
      "(void)0")
     (else (ew-error 'format-expr "could not format" else))))
