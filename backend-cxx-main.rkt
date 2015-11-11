@@ -754,31 +754,53 @@ C++ back end.
 ;;; 
 
 (define (rm-unreferenced-var-decl an-ast)
-  (define refs (mutable-seteq))
+  (define all-uses (make-hasheq)) ;; bind -> count
+  (define lv-uses (make-hasheq)) ;; bind -> count
+
+  (define (add-use! h bind)
+    (hash-update! h bind (lambda (v) (add1 v)) 0))
   
   ((topdown-visitor
     (lambda (ast)
-      (when (Var? ast)
-        (define id (Var-id ast))
-        (define bind (Id-bind id))
-        (set-add! refs bind))))
-   an-ast)
-  
-  ((topdown
-    (lambda (ast)
       (match ast
-        [(DeclVar _ id _)
+        [(Var _ id)
          (define bind (Id-bind id))
-         (if (set-member? refs bind)
-             ast
-             the-NopStat)]
-        [(DefVar _ id _ e)
+         (add-use! all-uses bind)]
+        [(AssignStxp _ (Var _ id) _)
          (define bind (Id-bind id))
-         (if (set-member? refs bind)
-             ast
-             (annoless ExprStat e))]
+         (add-use! lv-uses bind)]
         [_ ast])))
-   an-ast))
+   an-ast)
+
+  (define lv-only-uses
+    (for*/seteq ([(bind lv-k) lv-uses]
+                 [all-k (in-value (hash-ref all-uses bind))]
+                 #:when (= lv-k all-k))
+                bind))
+  (define uses
+    (set-subtract
+     (for/seteq ([(bind v) all-uses]) bind)
+     lv-only-uses))
+
+  (define (unused-Id? id)
+    (not (set-member? uses (Id-bind id))))
+
+  (define (lv-only-Id? id)
+    (set-member? lv-only-uses (Id-bind id)))
+
+  (define (rw ast)
+    (match ast
+      [(DeclVar _ (? unused-Id? id) _)
+       the-NopStat]
+      [(DefVar _ (? unused-Id? id) _ e)
+       (annoless ExprStat e)]
+      [(AssignStat a (Var _ (? lv-only-Id? id)) e)
+       (ExprStat a e)]
+      [(AssignExpr _ (Var _ (? lv-only-Id? id)) e)
+       e]
+      [_ ast]))
+  
+  ((bottomup rw) an-ast))
 
 ;;; 
 ;;; introduce variables for arguments
