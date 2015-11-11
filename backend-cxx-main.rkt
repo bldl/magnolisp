@@ -311,7 +311,7 @@ C++ back end.
        (term-rewrite-all to-expr ast)]
       [(SeqExpr a es)
        (define t (Expr-type ast))
-       (define void-t? (equal? t the-Void-type))
+       (define void-t? (Void-type? t))
        (define id (fresh-Id 'lifted))
        (unless void-t?
          (set! es (list-map-last
@@ -367,7 +367,7 @@ C++ back end.
 ;; Performs initial translation from IR to C++. If `exprify?`, prefers
 ;; to keep expressions as expressions, although that results in
 ;; odd-looking C++.
-(define (defs->cxx a-def-lst [exprify? #f])
+(define (defs->cxx a-def-lst [exprify? #t])
   (define (fun->cxx ast) ;; (-> Defun? CxxDefun?)
     (define ds null) ;; (listof DeclVar?), in reverse appearance order
 
@@ -520,7 +520,8 @@ C++ back end.
                                    (? identity ts))) f args)
             (ApplyExpr (hash-set a 'type<> (map type->cxx ts)) f args)]
            [(Literal a dat)
-            (Literal (hash-update a 'type type->cxx) dat)]
+            (define cxx-t (type->cxx (Expr-type ast)))
+            (Literal (hash-set a 'cxx-type cxx-t) dat)]
            [_ ast]))))
 
     (rw def))
@@ -616,7 +617,7 @@ C++ back end.
   (define (lift-expr ast)
     (define t (Expr-type ast))
       (cond
-       ((equal? t the-Void-type)
+       ((Void-type? t)
         (define def (rw-stat (annoless ExprStat ast)))
         (define ref the-VoidExpr)
         (values def ref))
@@ -640,7 +641,7 @@ C++ back end.
       (match-define (LiftStatExpr a id n-ss) ast)
       (define t (Expr-type ast))
       (cond
-       ((equal? t the-Void-type)
+       ((Void-type? t)
         (values ds (append n-ss ss) the-VoidExpr))
        (else
         (define decl (annoless DeclVar id t))
@@ -702,7 +703,7 @@ C++ back end.
   (define (wrap-expr-as-Assign lv rv)
     (define t (Expr-type rv))
     (rw-stat
-     (if (equal? t the-Void-type)
+     (if (Void-type? t)
          (annoless ExprStat rv)
          (annoless AssignStat lv rv))))
   
@@ -933,6 +934,44 @@ C++ back end.
 ;;; pretty-printing preparation
 ;;; 
 
+;; Updates expression (not declaration) type information, and inserts
+;; VoidCast nodes as required to restore type consistency as the
+;; interpretation of assignment expressions changes.
+(define-with-contract
+  (-> Ast? Ast?) 
+  (ast-fix-expr-cxx-types an-ast)
+  
+  (define (voidify t e)
+    (if (Void-type? t)
+        e
+        (VoidCast (hasheq 'type the-Void-type) e)))
+
+  (define (rw ast)
+    (match ast
+      [(AssignExpr a lv rv)
+       (define t (Expr-type rv))
+       (assert t)
+       (set-Expr-type ast t)]
+      [(SeqExpr a (list es ... e))
+       (define t (Expr-type e))
+       (assert t)
+       (set-Expr-type ast t)]
+      [(IfExpr a c t e)
+       (define t-t (Expr-type t))
+       (define e-t (Expr-type e))
+       (assert (and t-t e-t))
+       (cond
+         [(equal? t-t e-t)
+          (set-Expr-type ast t-t)]
+         [else
+          (IfExpr (hash-set a 'type the-Void-type)
+                  c
+                  (voidify t-t t)
+                  (voidify e-t e))])]
+      [_ ast]))
+
+  ((bottomup rw) an-ast))
+
 (define (defs-cxx->pp def-lst)
   (define (s->ss ast)
     (cond
@@ -945,20 +984,27 @@ C++ back end.
         [(or (? Var?) (? Literal?) (? Type?))
          ast]
         [(IfStat a c t e)
-         (PpCxxIfStat a (rw/no c) (s->ss (rw/no t)) (s->ss (rw/no e)))]
+         (IfStat a (rw/no c) (s->ss (rw/no t)) (s->ss (rw/no e)))]
         [(AssignStat a lv rv)
-         ;; actually an ExprStat of AssignExpr
-         (AssignStat a (rw/yes lv) (rw/yes rv))]
+         (let ((lv (rw/yes lv))
+               (rv (rw/yes rv)))
+           (ExprStat a (AssignExpr (hasheq 'type (Expr-type rv)) lv rv)))]
+        [(ExprStat a e)
+         (ExprStat a (rw/no e))]
+        [(ReturnStat a e)
+         (ReturnStat a (rw/no e))]
         [(? Expr?)
-         (define sub-rw (if (Expr? ast) rw/yes rw/no))
-         (term-rewrite-all sub-rw ast)]
+         (term-rewrite-all rw/yes ast)]
         [(or (? Stat?) (? Def?))
          (term-rewrite-all rw/no ast)]
         [_
          (error 'defs-cxx->pp "unsupported: ~s" ast)]))
-    (when (and in-expr? (any-pred-holds SeqExpr? IfExpr? n-ast))
-      (set! n-ast (annoless Parens n-ast)))
-    n-ast)
+    
+    (when (and in-expr?
+               (any-pred-holds SeqExpr? IfExpr? AssignExpr? n-ast))
+      (set! n-ast (Parens (hasheq 'type (Expr-type n-ast)) n-ast)))
+    
+    n-ast) ;; end `rw`
 
   (define rw/no (fix rw #f))
   (define rw/yes (fix rw #t))
@@ -970,7 +1016,8 @@ C++ back end.
          [(NoBody? b) 
           ast]
          [else
-          (let* ((b (rw/no b))
+          (let* ((b (ast-fix-expr-cxx-types b))
+                 (b (rw/no b))
                  (b (if (SeqStat? b)
                         b
                         (annoless SeqStat (list b)))))

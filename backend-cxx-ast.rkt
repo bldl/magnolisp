@@ -47,9 +47,6 @@
 (define-ast* ReturnStat (Ast Stat)
   ((#:none annos) (#:just e)))
 
-(define-ast* PpCxxIfStat (Ast)
-  ((#:none annos) (#:just c) (#:many ts) (#:many es)))
-
 ;;; 
 ;;; expressions
 ;;; 
@@ -65,4 +62,7 @@
 
 ;; Parenthesized expression. For pretty printing only.
 (define-ast* Parens (Expr Ast)
+  ((#:none annos) (#:just e)))
+
+(define-ast* VoidCast (Expr Ast)
   ((#:none annos) (#:just e)))

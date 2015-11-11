@@ -88,25 +88,30 @@
     ((DeclVar _ [format-ident . produces . ident]
        [format-type . produces . type])
      (list type " " ident ";"))
-    ((PpCxxIfStat _ [format-expr . produces . test] ts es)
+    ((IfStat _ [format-expr . produces . test]
+             (SeqStat _ ts) (SeqStat _ es))
      `("if (" ,test ")"
        ,(format-sub-stats ts)
        ,(and (not (null? es))
              `(,(if (null? ts) 'br " ")
                "else"
                ,(format-sub-stats es)))))
-    ((ReturnStat _ [format-expr . produces . expr])
-     `("return " (in ,expr) ";"))
-    ((ReturnStat _ (? VoidExpr?))
-     (list "return;"))
-    ((AssignStat _ [format-expr . produces . x]
-                 [format-expr . produces . v])
-     (list x " = " v ";"))
+    ((ReturnStat _ e)
+     (if (VoidExpr? e)
+         (list "return;")
+         (let ([e
+                (format-outer-expr e)]
+               [comma?
+                (matches? e
+                  (SeqExpr _ (? (lambda (x) (> (length x) 1)))))])
+           (if comma?
+               `("return" (in br ,e) ";")
+               `("return " (in ,e) ";")))))
     ((Goto _ name)
      (string-append "goto " (format-ident name) ";"))
     ((LabelDef _ name)
      (string-append (format-ident name) ":"))
-    ((ExprStat _ [format-expr . produces . expr])
+    ((ExprStat _ [format-outer-expr . produces . expr])
      (list expr ";"))
     (else (ew-error 'format-stat "could not format" else))))
 
@@ -141,18 +146,42 @@
           #f "illegal literal formatting item"
           anno-e pp)])))
 
+(define (format-outer-expr expr)
+  (match expr
+    [(SeqExpr a es)
+     (let ((es (map format-expr-in-outer-expr es)))
+       (add-between es '("," br)))]
+    [(AssignExpr _ [format-expr . produces . x]
+                 [format-expr . produces . v])
+     `(,x " = " (in ,v))]
+    [_
+     (format-expr expr)]))
+
+(define (format-expr-in-outer-expr expr)
+  (match expr
+    [(Parens _ e)
+     (format-expr e)]
+    [_
+     (format-expr expr)]))
+
 (define (format-expr expr)
   (match expr
     ((Parens _ e)
      `("(" ,(format-expr e) ")"))
+    ((VoidCast _ e)
+     `("(void)" ,(format-expr e)))
+    ((SeqExpr a es)
+     (let ((es (map format-expr es)))
+       `(gr ,(add-between es '("," sp)))))
     ((IfExpr _ [format-expr . produces . test]
              [format-expr . produces . conseq]
              [format-expr . produces . alt])
      `(,test (in (gr " ?" sp ,conseq " :" sp ,alt))))
-    ((Var _ var) (symbol->string var))
+    ((Var _ var)
+     (symbol->string var))
     ((Literal (app (lambda (h) (hash-ref h 'literal #f)) anno-e) dat)
      #:when anno-e
-     (match-define (ForeignNameT _ tn-stx) (Expr-type expr))
+     (match-define (ForeignNameT _ tn-stx) (ast-anno-must expr 'cxx-type))
      (format-custom-literal anno-e (syntax-e tn-stx) dat))
     ((Literal _ (? number? n))
      (number->string n))
@@ -172,10 +201,7 @@
                      ">"))
            "(" `(in (gr ,args)) ")"))
     ((AssignExpr _ [format-expr . produces . x] [format-expr . produces . v])
-     (list "mgl_set(" x " = " v ")"))
-    ((SeqExpr _ es)
-     (define xs (add-between (map format-expr es) '("," sp)))
-     `(in (gr ,xs)))
+     (list x " = " v))
     ((VoidExpr _)
      "(void)0")
     (else (ew-error 'format-expr "could not format" else))))
