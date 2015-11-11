@@ -94,7 +94,7 @@ For example:
   (define (seven) #:: (foreign [type (-> int)])
     (begin-racket 1 2 3 4 5 6 7)))
 
-Here, @racketid[identity] must have a single, concerete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in multiple different type contexts within a single program.
+Here, @racketid[identity] must have a single, concrete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in multiple different type contexts within a single program.
 
 The second @racket[define] form may also be used to define a function (even a top-level one), provided that the ``variable initializer'' @racket[_expr] is a lambda expression. Alternatively, if the annotations indicate that the definition is for a @racket[foreign] function (whose @racket[type] is explicitly given as a function type), then @racket[id] is also taken to bind a function. For @racket[foreign] function definitions of this form, any @racket[_expr] is ignored as Magnolisp, and may be anything (but typically something suitable for ``simulating'' the foreign behavior).
 

@@ -22,6 +22,7 @@ optimization.
          racket/function
          racket/list
          racket/match
+         racket/pretty
          racket/set
          "app-util.rkt"
          "ir-id-coll.rkt"
@@ -216,7 +217,8 @@ optimization.
   n-ast)
 
 (define-datatype (UseKind)
-  ((UseType) (UseVar) (UseFunc arity)))
+  ((UseType) (UseVar) (UseFunc arity))
+  #:transparent)
 
 ;; Accumulates information about name uses in `ast`, updating `kinds`
 ;; with that information (of type `UseKind`).
@@ -267,7 +269,7 @@ optimization.
          [(DefVar a n t e)
           (define f? (foreign? a))
           (define use (fun-use n))
-          ;;(writeln (list use f? ast))
+          ;;(writeln (list f? use ast))
           (match e
             [(Lambda _ ps orig-body)
              (define body (if f? the-NoBody orig-body))
