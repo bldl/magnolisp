@@ -10,11 +10,13 @@
          racket/match
          racket/pretty
          racket/set
+         data/order
          "ir-ast.rkt"
          "strategy.rkt"
          "strategy-stratego.rkt"
          "strategy-term.rkt"
-         "util.rkt" "util/debug.rkt" "util/field.rkt")
+         "util.rkt" "util/debug.rkt"
+         "util/field.rkt" "util/order.rkt")
 
 ;;; 
 ;;; definition table management

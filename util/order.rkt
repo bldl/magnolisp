@@ -3,7 +3,8 @@
 #|
 |#
 
-(require "module.rkt" data/order racket/bool)
+(require "module.rkt" data/order racket/bool
+         (for-syntax racket/base syntax/parse))
 
 (define* number-order
   (order 'number-order number? = <))
@@ -29,5 +30,17 @@
 (define* boolean-order
   (order 'boolean-order boolean? boolean=? boolean<?))
 
-
-
+(define-syntax* (define-comparator stx)
+  (syntax-parse stx
+    [(_ n:id [k:expr e:expr] ...)
+     (with-syntax ([(key ...) (generate-temporaries #'(k ...))]
+                   [(cmp ...) (generate-temporaries #'(e ...))])
+       #'(define n
+           (let ([cmp e] ...
+                 [key k] ...)
+             (lambda (x y)
+               (cond
+                 [(let ([r (cmp (key x) (key y))])
+                    (and (not (eq? r '=)) r)) => (lambda (x) x)]
+                 ...
+                 [else '=])))))]))

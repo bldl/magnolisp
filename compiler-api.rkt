@@ -353,6 +353,181 @@ optimization.
 ;;; lifting of local functions
 ;;; 
 
+;; Removes the free variables that local functions close over. Assumes
+;; a fully typed AST, without local types, but possibly with local
+;; functions.
+(define-with-contract
+  (-> Def? Def?)
+  (fun-rm-free-vars def)
+
+  (define this (make-parameter #f))
+  (struct FunInfo (id args vars calls uses) #:transparent)
+  (define fun-lst null)
+  (define seen-use-lst null)
+  (define types-h (mutable-hashId)) ;; for Param, DefVar, and DeclVar
+
+  (define (find-uses)
+    (define (collect ast)
+      (match ast
+        [(Defun _ id _ ps b)
+         (for ((p ps))
+           (dict-set! types-h (Param-id p) (Param-t p)))
+         (define info (FunInfo id
+                               (for/mutable-setId ((p ps))
+                                 (Param-id p))
+                               (mutable-setId)
+                               (mutable-setId)
+                               (mutable-setId)))
+         (set! fun-lst (cons info fun-lst))
+         (parameterize ((this info))
+           (collect b))]
+        [(DefVar _ id t b)
+         (dict-set! types-h id t)
+         (set-add! (FunInfo-vars (this)) id)
+         (collect b)]
+        [(DeclVar _ id t)
+         (dict-set! types-h id t)
+         (set-add! (FunInfo-vars (this)) id)]
+        [(ApplyExpr _ (Var _ id) as)
+         (set-add! (FunInfo-calls (this)) id)
+         ;; important not to add `id` into `uses`
+         (map collect as)]
+        [(Var _ id)
+         (set-add! (FunInfo-uses (this)) id)
+         (set! seen-use-lst (cons id seen-use-lst))]
+        [_
+         (term-visit-all collect ast)]))
+
+    (collect def)
+
+    (for ((info fun-lst))
+      ;; make it just direct free var `uses`
+      (set-subtract! (FunInfo-uses info)
+                     (FunInfo-args info)
+                     (FunInfo-vars info))))
+
+  (define (any-free-vars?)
+    (ormap (lambda (info)
+             (not (set-empty? (FunInfo-uses info))))
+           fun-lst))
+
+   ;; Returns a dictionary mapping Id -> (listof Id). A corresponding
+   ;; fresh argument must be added for each of the listed free
+   ;; variables, for each of the functions.
+  (define (compute-extra-args)
+    (let ((fun-ids (for/mutable-setId ((info fun-lst))
+                     (FunInfo-id info))))
+      (for ((info fun-lst))        
+        ;; Restrict examination to local calls.
+        (set-intersect! (FunInfo-calls info) fun-ids)
+
+        ;; Remove "self" calls, since no additional information to be
+        ;; found from there.
+        (set-remove! (FunInfo-calls info) (FunInfo-id info))
+
+        ;; Arguments are also local variables.
+        (set-union! (FunInfo-vars info) (FunInfo-args info))))
+        
+    (define id-ranks ;; used for deterministic ordering of new args
+      (for/mutable-hashId ([id seen-use-lst]
+                           [j (in-naturals)])
+        (values id j)))
+
+    (define (sort-Ids r) ;; (-> set list)
+      (map cdr
+           (sort
+            (for/list ((id (in-set r)))
+              (cons (dict-ref id-ranks id) id))
+            < #:key car)))
+
+    (define fun-h ;; function Id -> FunInfo
+      (for/mutable-hashId ((info fun-lst))
+        (values (FunInfo-id info) info)))
+      
+    (define work-lst
+      (for/list ((info fun-lst))
+        (define self-uses (FunInfo-uses info))
+        (define call-uses-lst
+          (for/list ((id (in-set (FunInfo-calls info))))
+            (FunInfo-uses (dict-ref fun-h id))))
+        (list (FunInfo-id info) self-uses
+              call-uses-lst (FunInfo-vars info))))
+    (let loop ()
+      (let ((progress? #f))
+        (for ((item work-lst))
+          (match-define (list id self-uses call-uses-lst self-vars) item)
+          (define count (set-count self-uses))
+          (apply set-union! self-uses call-uses-lst)
+          ;; What is free in a called function may not be free here.
+          (set-subtract! self-uses self-vars)
+          (when (> (set-count self-uses) count)
+            (set! progress? #t)))
+        (when progress?
+          (loop))))
+
+    (define extra-args
+      (for/mutable-hashId ([item work-lst])
+        (match-define (list id self-uses call-uses-lst self-vars) item)
+        (values id (sort-Ids self-uses))))
+
+    extra-args) ;; end compute-extra-args
+
+  (define (rm-free-vars free-vars)
+    (define (rw ast)
+      (match ast
+        [(Defun a id t ps b)
+         (define fv-lst (dict-ref free-vars id))
+         (define fv->xp (mutable-hashId))
+         (define x-ps
+           (for/list ((fv fv-lst))
+             (define fv-t (dict-ref types-h fv))
+             (define x-id (another-Id fv))
+             (dict-set! fv->xp fv x-id)
+             (annoless Param x-id fv-t)))
+         (parameterize ((this (cons id fv->xp)))
+           (define ats (FunT-ats t))
+           (define n-t (set-FunT-ats t (append ats (map Param-t x-ps))))
+           (define n-ps (append ps x-ps))
+           (Defun a id n-t n-ps (rw b)))]
+        [(Var a id)
+         (define n-id (dict-ref (cdr (this)) id #f))
+         (if n-id (Var a n-id) ast)]
+        [(ApplyExpr _ (Var _ f-id) es) (=> fail)
+         ;; `x-ids` will be #f for another top-level function
+         (define x-ids (dict-ref free-vars f-id #f))
+         (when (or (not x-ids) (null? x-ids))
+           (fail))
+         (define x-es
+           (for/list ((fv-id x-ids))
+             (define a-t (dict-ref types-h fv-id))
+             (define fv->xp (cdr (this)))
+             ;; `fv-id` may not be free in current context,
+             ;; hence the default
+             (define a-id (dict-ref fv->xp fv-id fv-id))
+             (Var (hasheq 'type a-t) a-id)))
+         (set-ApplyExpr-args ast (append (map rw es) x-es))]
+        [(AssignStxp _ (Var _ id) _)
+         #:when (dict-has-key? (cdr (this)) id)
+         (raise-language-error/ast
+          "free variable not allowed as an L-value"
+          ast (AssignStxp-lv ast))]
+        [_
+         (term-rewrite-all rw ast)]))
+
+    (rw def))
+
+  (let ()
+    (find-uses)
+    (cond
+      [(not (any-free-vars?))
+       ;; Optimize for the case where there are none.
+       def]
+      [else
+       ;;(pretty-print fun-lst)
+       (define free-vars (compute-extra-args))
+       ;;(pretty-print free-vars)
+       (rm-free-vars free-vars)])))
+  
 (define-with-contract
   (-> (listof Def?) hash?)
   (defs-lift-local-Defuns def-lst)
@@ -384,7 +559,7 @@ optimization.
      [(Defun? def)
       (when (ast-anno-maybe def 'top)
         (parameterize ((owner-id (Def-id def)))
-          (do-Defun def)))]
+          (do-Defun (fun-rm-free-vars def))))]
      [else
       (hash-set! n-defs (Id-bind (Def-id def)) def)]))
   

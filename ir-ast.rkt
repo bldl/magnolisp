@@ -212,10 +212,6 @@ Assumptions for AST node types:
   (Id->string x)
   (symbol->string (Id-name x)))
 
-(define* (Id<? x y)
-  (string<? (Id->string x)
-            (Id->string y)))
-
 ;; Creates a fresh identifier with the specified basename `sym` that
 ;; is not (yet) Id-bind=? to any other. An uninterned value is
 ;; given to `bind`.

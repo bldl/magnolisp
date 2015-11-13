@@ -142,12 +142,14 @@ source code.
 
   (define filename (path-basename-as-string path))
 
+  ;;(set! ast-lst (defs-propagate-copies ast-lst))
+  
   (write-generated-output
    path out
    (lambda ()
     (when banner?
       (display-banner ";;" filename))
-    (pp-mgl (defs-propagate-copies ast-lst))
+    (pp-mgl ast-lst)
     (newline)))
 
   (void))
