@@ -15,6 +15,10 @@
 
 (define another-add #:: (foreign ^(-> int int int)) +)
 
+(define two1 #:: ([type (-> int)]) (#%plain-lambda () 2))
+(define two2 (#%plain-lambda () 2))
+(define (use-two) #:: (export) (another-add (two1) (two2)))
+
 (define (main x y) #:: (export)
   (sub x (add y y))
   (define z1 (add x x))
@@ -25,3 +29,4 @@
 
 (main 2 3)
 (sub 12 2)
+(use-two)

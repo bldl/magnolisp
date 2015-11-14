@@ -57,13 +57,15 @@ As Magnolisp has almost no standard library, it is ultimately necessary to defin
 @defform*[((define #:type id maybe-annos)
            (define id maybe-annos expr)
 	   (define (id arg ...) maybe-annos expr ...)
-	   (define (id arg ...) maybe-annos #:function expr))]{
+	   (define (id arg ...) maybe-annos #:function Racket-expr))]{
 The first form defines a type. Presently only foreign types may be defined, and @racket[id] gives the corresponding Magnolisp name. The @racket[foreign] annotation should always be provided.
 
 For example:
 @(racketblock+eval #:eval the-eval
   (define #:type int #:: (foreign))
   (define #:type long #:: ([foreign my_cxx_long])))
+
+It is acceptable to define a type for a local (lexical) scope, if the type is not referenced elsewhere.
 
 The second form defines a variable with the name @racket[id], and the (initial) value given by @racket[expr]. A @racket[type] annotation may be included to specify the Magnolisp type of the variable.
 
@@ -73,9 +75,13 @@ For example:
     (define x #:: ([type int]) 5)
     (add1 x)))
 
+Any (module) top-level variable definition will not get translated into C++.
+
 The third form defines a function. The (optional) body of a function is a sequence of expressions, which (if present) must produce a single value.
 
 Unlike in Racket, no tail-call elimination may be assumed even when a recursive function application appears in @emph{tail position}.
+
+Functions may be defined locally within another function. A local function may reference free variables from a surrounding lexical scope, as long as they are not used as L-values (i.e., targets of assignment), and as long as the variables are not top-level.
 
 Where the function is declared as @racket[foreign], the Magnolisp compiler will ignore any body @racket[expr ...] sequence. When a function without a body is invoked as Racket, the result is @|void-const|. When a @racket[foreign] function has a body, it is typically there to ``simulate'' the behavior of the C++ implementation in the Racket VM. For purposes of simulation it can be useful to make use of the full Racket runtime language; to implement a function body in Racket syntax instead of Magnolisp syntax, enclose the body expression within a @racket[begin-racket] form.
 
@@ -92,20 +98,27 @@ For example:
   (define (inc x) #:: (foreign [type (-> int int)])
     (add1 x))
   (define (seven) #:: (foreign [type (-> int)])
-    (begin-racket 1 2 3 4 5 6 7)))
+    1 2 3 4 5 6 7)
+  (define (nine) #:: (foreign [type (-> int)])
+    (define x (seven))
+    (define (compute)
+      (inc (inc x)))
+    (compute)))
 
 Here, @racketid[identity] must have a single, concrete type, possible to determine from the context of use. It is not a generic function, and hence it may not be used in multiple different type contexts within a single program.
 
-The second @racket[define] form may also be used to define a function (even a top-level one), provided that the ``variable initializer'' @racket[_expr] is a lambda expression. Alternatively, if the annotations indicate that the definition is for a @racket[foreign] function (whose @racket[type] is explicitly given as a function type), then @racket[id] is also taken to bind a function. For @racket[foreign] function definitions of this form, any @racket[_expr] is ignored as Magnolisp, and may be anything (but typically something suitable for ``simulating'' the foreign behavior).
+The second @racket[define] form may also be used to define a function (even a top-level one), provided that the ``variable initializer'' @racket[_expr] is a lambda expression. Alternatively, if the annotations indicate that the definition is for a @racket[foreign] function (whose @racket[type] is explicitly given as a function type), then @racket[id] is also taken to bind a function. Any ``variables'' that are applied in a program are also taken to refer to functions. For @racket[foreign] function definitions of this form, the @racket[_expr] would typically be a function (value) for ``simulating'' the foreign behavior.
 
 For example:
 @(interaction #:eval the-eval
   (let ()
-    (define two #:: ([type (-> int)]) (#%plain-lambda () 2))
+    (define two1 #:: ([type (-> int)]) (#%plain-lambda () 2))
+    (define two2 (#%plain-lambda () 2))
     (define mul #:: (foreign [type (-> int int int)]) *)
-    (mul (two) (two))))
+    (define (four) (mul (two1) (two2)))
+    (mul (four) (four))))
 
-The fourth @racket[define] form (with the @racket[#:function] keyword) may likewise be used to define a function such that its Racket implementation is given as an @racket[expr]ession. The arity of the function value that the expression yields must match the number of declared @racket[arg]uments. When this form is used, it is not necessary to give the type of the function, provided that the type can be inferred from context.}
+The fourth @racket[define] form (with the @racket[#:function] keyword) may likewise be used to define a function, one whose Racket implementation is given as an @racket[Racket-expr]ession (for which Racket syntax is assumed). The arity of the function value that the expression yields must match the number of declared @racket[arg]uments. When this form is used, it is not necessary to give the type of the function, provided that the type can be inferred from context.}
 
 @defform*[((declare #:type id maybe-annos)
            (declare (id arg ...) maybe-annos))]{
@@ -201,13 +214,18 @@ Substituted with the C++ name of the literal's type.}}
 @subsection[#:tag "type-expressions"]{Type Expressions}
 
 @racketgrammar*[
-#:literals (-> <> auto)
+#:literals (-> <> exists ∃ for-all ∀ auto)
 [type-expr type-id
            (-> type-expr ... type-expr)
            (<> type-expr type-expr ...)
+	   (exists type-var-id ... type-expr)
+	   (for-all type-var-id ... type-expr)
 	   (auto)]]
 
-Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type. The only predefined types in Magnolisp are @racket[Void] and @racket[Bool], and any others must be defined using @racket[define #:type] or some other type-binding form.
+Type expressions are parsed according to the above grammar, where @racket[_type-id] must be an identifier that names a type.
+The only predefined types in Magnolisp are @racket[Void] and @racket[Bool], and any others must be defined using @racket[define #:type] or some other type-binding form.
+
+A @racket[_type-var-id] is an identifier that gets bound as a type variable for the context of its type expression.
 
 @defform[(-> type-expr ... type-expr)]{
 A function type expression, containing type expressions the function's arguments and its return value, in that order. A Magnolisp function always returns a single value.}
@@ -221,8 +239,30 @@ For example:
   (define (stack-id x) #:: ([type (-> (<> stack int) (auto))])
     x) (code:comment @#,elem{the C++ type of this @racket[x] use will be @racketid[stack<int>]}))}
 
+@deftogether[(
+  @defform[(exists type-var-id ... type-expr)]
+  @defform[(∃ type-var-id ... type-expr)]
+  )]{
+An existential type. Specified by @racket[type-expr], which should make use of the @racket[type-var-id] type variables. Each type variable is taken to correspond to exactly one concrete type expression, which must be possible to infer.}
+
+@deftogether[(
+  @defform[(for-all type-var-id ... type-expr)]
+  @defform[(∀ type-var-id ... type-expr)]
+  )]{
+A universal type. The @racket[type-var-id] type variables may take on any set of type assignments, which must be possible to infer based on their use context. (Each application context of a universally typed function may end up with a different assignment to the type variables.)
+
+Only @racket[foreign] functions may be universally typed.
+
+For example:
+@(racketblock+eval #:eval the-eval
+  (define #:type Box #:: (foreign))
+  (define (box v) 
+    #:: (foreign [type (∀ E (-> E (<> Box E)))]))
+  (define (unbox box) 
+    #:: (foreign [type (∀ E (-> (<> Box E) E))])))}
+
 @defform[(auto)]{
-A type expression that conveys no information about the thing being typed, indicating that it is expected for the type to be inferable based on the contexts of use of the thing.}
+A type expression that conveys no information about the thing being typed, indicating that it is expected for the type to be inferable based on the contexts of use of the thing. Equivalent to @racket[(exists T T)].}
 
 @subsection{Value Expressions}
 
@@ -258,8 +298,8 @@ For example:
 @(interaction #:eval the-eval
   (let ([x (let-annotate ([type int]) 6)])
     x)
-  (define-values (nine) (let-annotate ([type int]) 9))
-  nine)
+  (define-values (ten) (let-annotate ([type int]) 10))
+  ten)
 }
 
 @defform[(if-target name then-expr else-expr)]{
