@@ -75,7 +75,7 @@ executable, and then comparing actual output against expected output.
 
   (define (generate out)
     (call-with-input-file preamble (lambda (in) (copy-port in out)))
-    (generate-files st '((cxx (cc))) #:banner #f #:out out)
+    (generate-files st '((cxx (parts cc))) #:banner #f #:out out)
     (call-with-input-file postamble (lambda (in) (copy-port in out))))
   
   (when (show-cxx-code?)

@@ -25,17 +25,23 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
     (define banner? #f)
     (define cxx? #f)
     (define mgl? #f)
-    (define tools null)
+    (define tools #f)
     (define supported-tools '(c gnu-make qmake ruby))
     (define dont-touch? #f)
+    (define backends null)
 
+    (define (raise-usage-error fmt . vs)
+      (apply raise-user-error 'mglc fmt vs))
+    
     (define fn-lst
       (command-line
        #:once-each
+       (("--backends" "-B") sexp "use back ends as specified"
+        (set! backends (read (open-input-string sexp))))
        (("--banner" "-n") ("display filename banners"
                            "(only meaningful with --stdout)")
         (set! banner? #t))
-       (("--basename" "-b") basename
+       (("--name" "--basename") basename
         ("for naming generated files"
          "(default: basename of first source file)")
         (set! out-basename basename))
@@ -59,11 +65,33 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
                                         ", ")))
         (define k (string->symbol kind))
         (unless (memq k supported-tools)
-          (error 'command-line
-                 "one of ~a as build include file, got ~s"
-                 supported-tools kind))
-        (set! tools (cons k tools)))
+          (raise-usage-error
+           "expected one of ~a as build include file: ~s"
+           supported-tools kind))
+        (set! tools (if tools (cons k tools) (list k))))
        #:args filename filename))
+
+    (let ()
+      (define (merge ys)
+        (for/fold ([xs null]) ([y ys])
+          (define name (car y))
+          (when-let x (assq name xs)
+            (raise-usage-error
+             "more than one spec for ~a back end: ~s and ~s"
+             name x y))
+          (cons y xs)))
+      
+      (unless (matches? backends
+                (list (cons (or 'build 'cxx 'mgl) _) ...))
+        (raise-usage-error
+         "expected an alist for --backends sexp: ~s"
+         backends))
+      
+      (let ((bs (filter identity
+                        (list (and mgl? '(mgl ()))
+                              (and cxx? '(cxx (parts cc hh)))
+                              (and tools `(build (targets ,@tools)))))))
+        (set! backends (merge (append backends bs)))))
 
     (unless (null? fn-lst)
       (set! fn-lst (map adjust-path fn-lst))
@@ -71,11 +99,7 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
         (set! out-basename
               (path-basename-only-as-string (first fn-lst))))
       (define st (apply compile-files fn-lst))
-      (generate-files st
-                      (filter identity
-                       (list (and mgl? '(mgl ()))
-                             (and cxx? '(cxx (cc hh)))
-                             (and (pair? tools) `(build ,tools))))
+      (generate-files st backends
                       #:outdir (or out-dir (current-directory))
                       #:basename out-basename
                       #:out (and stdout? (current-output-port))

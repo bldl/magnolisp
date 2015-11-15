@@ -1,17 +1,18 @@
-#lang magnolisp/2014
+#lang magnolisp
+(require (only-in racket/base +))
 
-(typedef int (#:annos foreign))
+(typedef int #:: (foreign))
 
 (function (one)
-  (#:annos foreign (type (fn int)))
+  #:: (foreign (type (-> int)))
   1)
 
 (function (add x y)
-  (#:annos foreign (type (fn int int int)) (build need-adder))
+  #:: (foreign (type (-> int int int)) (build need-adder))
   (+ x y))
 
 (function (f x)
-  (#:annos export (type (fn int int)))
+  #:: (export (type (-> int int)))
   (define y (let ((x x)) (one)))
   y)
 

@@ -11,8 +11,8 @@
 (define (compile-mgl-mod mod)
   (let ((st (compile-modules mod #:relative-to (this-source))))
     (generate-files
-     st '((build (gnu-make qmake c ruby))
-          (cxx (cc hh)))
+     st '((build (targets gnu-make qmake c ruby))
+          (cxx (parts cc hh)))
      #:out (open-output-nowhere))))
 
 (define (check-compile-mgl-mod mod)

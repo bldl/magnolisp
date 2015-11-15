@@ -938,36 +938,25 @@ optimization.
      basename))
 
   (parameterize ([dont-touch-generated-file? dont-touch?])
-    (when-let entry (assq 'mgl backends)
-      (match entry
-        [(list _ (list (? symbol? opts) ...))
-         (define def-lst (St-defs st))
-         (define mgl-file (build-path outdir
-                                      (string-append basename ".ir.rkt")))
-         (generate-mgl-file def-lst out mgl-file banner?)]))
+    (when-let spec (assq 'mgl backends)
+      (define def-lst (St-defs st))
+      (define mgl-file (build-path outdir
+                                   (string-append basename ".ir.rkt")))
+      (generate-mgl-file spec def-lst out mgl-file banner?))
 
-    (when-let entry (assq 'cxx backends)
-      (match entry
-        [(list _ (list (? symbol? kinds) ...))
-         (unless (null? kinds)
-           (set! kinds (remove-duplicates kinds eq?))
-           (define def-lst (St-defs st))
-           (define path-stem (build-path outdir basename))
-           (generate-cxx-file kinds def-lst path-stem out banner?))]))
+    (when-let spec (assq 'cxx backends)
+      (define def-lst (St-defs st))
+      (define path-stem (build-path outdir basename))
+      (generate-cxx-file spec def-lst path-stem out banner?))
 
-    (when-let entry (assq 'build backends)
-      (match entry
-        ((list _ (list (? symbol? kinds) ...))
-         (unless (null? kinds)
-           (set! kinds (remove-duplicates kinds eq?))
-           (define def-lst (St-defs st))
-           (define opts-stx (defs-collect-build-annos def-lst))
-           (define opts-lst (parse-analyze-build-annos opts-stx))
-           (define path-stem (build-path outdir (string-append basename "_build")))
-           (for ([kind kinds])
-             (generate-build-file kind opts-lst path-stem out banner?))))))
+    (when-let spec (assq 'build backends)
+      (define def-lst (St-defs st))
+      (define opts-stx (defs-collect-build-annos def-lst))
+      (define opts-lst (parse-analyze-build-annos opts-stx))
+      (define path-stem (build-path outdir (string-append basename "_build")))
+      (generate-build-file spec opts-lst path-stem out banner?)))
 
-    (void)))
+  (void))
 
 ;;;
 ;;; testing
@@ -976,6 +965,6 @@ optimization.
 (module* test #f
   (define st (compile-files "tests/test-locals-3.rkt"))
   (generate-files st '(
-                       ;;(build (gnu-make qmake c ruby))
-                       (cxx (cc hh))
+                       ;;(build (targets gnu-make qmake c ruby))
+                       (cxx (parts cc hh))
                        )))

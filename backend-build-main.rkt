@@ -12,6 +12,8 @@ code for them.
          racket/contract/base
          racket/dict
          racket/function
+         racket/list
+         racket/match
          "app-util.rkt"
          "ir-ast.rkt"
          "backend-build-writer.rkt"
@@ -246,18 +248,27 @@ code for them.
 ;;;
 
 (define-with-contract*
-  (-> symbol? list? path-string? output-port? boolean? void?)
-  (generate-build-file kind attrs path-stem out banner?)
+  (-> list? list? path-string? output-port? boolean? void?)
+  (generate-build-file spec attrs path-stem out banner?)
 
-  (define-values (writer sfx pfx) (get-writer-etc kind))
-  (define path (path-add-suffix path-stem sfx))
-  (define filename (path-basename-as-string path))
+  (define targets '(gnu-make))
+  (let ()
+    (match-define (cons 'build (? list? opt-lst)) spec)
+    (for ([opt opt-lst])
+      (match opt
+        [(list 'targets (and (or 'c 'gnu-make 'qmake 'ruby) lst) ...)
+         (set! targets (remove-duplicates lst eq?))])))
+
+  (for ([target targets])
+    (define-values (writer sfx pfx) (get-writer-etc target))
+    (define path (path-add-suffix path-stem sfx))
+    (define filename (path-basename-as-string path))
   
-  (write-generated-output
-   path out
-   (thunk
-    (when banner?
-      (display-banner pfx filename))
-    (writer path attrs)))
+    (write-generated-output
+     path out
+     (thunk
+      (when banner?
+        (display-banner pfx filename))
+      (writer path attrs))))
 
   (void))

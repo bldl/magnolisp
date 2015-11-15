@@ -367,7 +367,7 @@ C++ back end.
 ;; Performs initial translation from IR to C++. If `exprify?`, prefers
 ;; to keep expressions as expressions, although that results in
 ;; odd-looking C++.
-(define (defs->cxx a-def-lst [exprify? #t])
+(define (defs->cxx exprify? a-def-lst)
   (define (fun->cxx ast) ;; (-> Defun? CxxDefun?)
     (define ds null) ;; (listof DeclVar?), in reverse appearance order
 
@@ -995,10 +995,10 @@ C++ back end.
   ((bottomup rw) an-ast))
 
 (define (defs-cxx->pp def-lst)
-  (define (s->ss ast)
+  (define (s->ss ast) ;; (-> Stat? SeqStat?)
     (cond
-     [(SeqStat? ast) (SeqStat-ss ast)]
-     [else (list ast)]))
+     [(SeqStat? ast) ast]
+     [else (annoless SeqStat (list ast))]))
 
   (define (rw in-expr? ast)
     (define n-ast
@@ -1065,11 +1065,24 @@ C++ back end.
   (exit))
   
 (define-with-contract*
-  (-> (listof symbol?) (listof Def?)
+  (-> list? (listof Def?)
       path-string? (or/c #f output-port?) boolean?
       void?)
-  (generate-cxx-file kinds a-def-lst path-stem out banner?)
+  (generate-cxx-file spec a-def-lst path-stem out banner?)
 
+  (define parts '(cc hh))
+  (define exprify? #t)
+  (let ()
+    (match-define (cons 'cxx (? list? opt-lst)) spec)
+    (for ([opt opt-lst])
+      (match opt
+        [(list 'parts (and (or 'cc 'hh) lst) ...)
+         (set! parts (remove-duplicates lst eq?))]
+        ['expr
+         (set! exprify? #t)]
+        ['stat
+         (set! exprify? #f)])))
+  
   (define (pp-only obj)
     (pretty-print obj)
     obj)
@@ -1078,7 +1091,7 @@ C++ back end.
     (let ((defs-t (build-tl-defs-table a-def-lst)))
       (let-> lst
         a-def-lst
-        (defs->cxx lst)
+        (defs->cxx exprify? lst)
         (map def-rm-LiftStatExpr lst)
         (defs-cxx-fun-optimize lst)
         ;;(pp-exit lst)
@@ -1087,10 +1100,10 @@ C++ back end.
         (defs-cxx-decl-sort lst)
         (defs-cxx->pp lst))))
   
-  (for ((kind kinds))
-    (cond
-     ((eq? kind 'cc)
-      (define sfx (get-suffix kind))
+  (for ([part parts])
+    (match part
+     ['cc
+      (define sfx (get-suffix part))
       (define path (path-add-suffix path-stem sfx))
       (define filename (path-basename-as-string path))
       (define basename (path-basename-only-as-string filename))
@@ -1099,7 +1112,7 @@ C++ back end.
                   (path-basename-as-string 
                    (path-add-suffix path-stem (get-suffix 'hh)))))
       (define c-unit
-        (append (if (memq 'hh kinds) (list hh-incl) null)
+        (append (if (memq 'hh parts) (list hh-incl) null)
                 (defs->partition 'private-prototypes def-lst)
                 (defs->partition 'private-implementations def-lst)))
       ;;(for-each writeln c-unit) (exit)
@@ -1111,9 +1124,9 @@ C++ back end.
           (display-banner "//" filename))
         (display-generated-notice "//")
         (display s)
-        (newline))))
-     ((eq? kind 'hh)
-      (define sfx (get-suffix kind))
+        (newline)))]
+     ['hh
+      (define sfx (get-suffix part))
       (define path (path-add-suffix path-stem sfx))
       (define filename (path-basename-as-string path))
       (define basename (path-basename-only-as-string filename))
@@ -1133,10 +1146,6 @@ C++ back end.
           (display-banner "//" filename))
         (display-generated-notice "//")
         (display s)
-        (newline))))
-     (else
-      (raise-argument-error
-       'generate-cxx-file
-       "set of 'cc or 'hh"
-       kinds))))
+        (newline)))]))
+
   (void))
