@@ -37,7 +37,12 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
       (command-line
        #:once-each
        (("--backends" "-B") sexp "use back ends as specified"
-        (set! backends (read (open-input-string sexp))))
+        (set! backends (read (open-input-string sexp)))
+        (unless (matches? backends
+                  (list (cons (or 'build 'cxx 'mgl) _) ...))
+          (raise-usage-error
+           "expected an alist for --backends sexp: ~s"
+           backends)))
        (("--banner" "-n") ("display filename banners"
                            "(only meaningful with --stdout)")
         (set! banner? #t))
@@ -72,26 +77,11 @@ Implements a command-line interface (CLI) for the Magnolisp compiler.
        #:args filename filename))
 
     (let ()
-      (define (merge ys)
-        (for/fold ([xs null]) ([y ys])
-          (define name (car y))
-          (when-let x (assq name xs)
-            (raise-usage-error
-             "more than one spec for ~a back end: ~s and ~s"
-             name x y))
-          (cons y xs)))
-      
-      (unless (matches? backends
-                (list (cons (or 'build 'cxx 'mgl) _) ...))
-        (raise-usage-error
-         "expected an alist for --backends sexp: ~s"
-         backends))
-      
-      (let ((bs (filter identity
-                        (list (and mgl? '(mgl ()))
-                              (and cxx? '(cxx (parts cc hh)))
-                              (and tools `(build (targets ,@tools)))))))
-        (set! backends (merge (append backends bs)))))
+      (define (add! sexp)
+        (set! backends (cons sexp backends)))
+      (when mgl? (add! '(mgl)))
+      (when cxx? (add! '(cxx (parts cc hh))))
+      (when tools (add! `(build (targets ,@tools)))))
 
     (unless (null? fn-lst)
       (set! fn-lst (map adjust-path fn-lst))

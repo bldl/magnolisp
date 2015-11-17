@@ -938,23 +938,25 @@ optimization.
      basename))
 
   (parameterize ([dont-touch-generated-file? dont-touch?])
-    (when-let spec (assq 'mgl backends)
-      (define def-lst (St-defs st))
-      (define mgl-file (build-path outdir
-                                   (string-append basename ".ir.rkt")))
-      (generate-mgl-file spec def-lst out mgl-file banner?))
-
-    (when-let spec (assq 'cxx backends)
-      (define def-lst (St-defs st))
-      (define path-stem (build-path outdir basename))
-      (generate-cxx-file spec def-lst path-stem out banner?))
-
-    (when-let spec (assq 'build backends)
-      (define def-lst (St-defs st))
-      (define opts-stx (defs-collect-build-annos def-lst))
-      (define opts-lst (parse-analyze-build-annos opts-stx))
-      (define path-stem (build-path outdir (string-append basename "_build")))
-      (generate-build-file spec opts-lst path-stem out banner?)))
+    (for ([spec backends])
+      (match (car spec)
+        ['build
+         (define def-lst (St-defs st))
+         (define opts-stx (defs-collect-build-annos def-lst))
+         (define opts-lst (parse-analyze-build-annos opts-stx))
+         (define path-stem (build-path outdir
+                                       (string-append basename "_build")))
+         (generate-build-file spec opts-lst path-stem out banner?)]
+        ['cxx
+         (define def-lst (St-defs st))
+         (define path-stem (build-path outdir basename))
+         (generate-cxx-file spec def-lst path-stem out banner?)]
+        ['mgl
+         (define def-lst (St-defs st))
+         (define mgl-file (build-path outdir
+                                      (string-append basename ".ir.rkt")))
+         (generate-mgl-file spec def-lst out mgl-file banner?)]
+        )))
 
   (void))
 
