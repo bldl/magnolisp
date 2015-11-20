@@ -325,7 +325,7 @@ C++ back end.
        (LiftStatExpr a id (map to-stat ss))]
       [_
        (raise-argument-error
-        'to-expr "supported ExprLike? or Def?" ast)]))
+        'to-expr "supported Expr? or Stat? or Def?" ast)]))
   
   (define (to-stat ast)
     (match ast
@@ -359,7 +359,7 @@ C++ back end.
       [_
        ;;(writeln `(result-discarded = ,(get-result-discarded ast)))
        (raise-argument-error
-        'to-stat "supported ExprLike? or Def?" ast)]))
+        'to-stat "supported Expr? or Stat? or Def?" ast)]))
   
   (let ((s (CxxDefun-s def)))
     (set-CxxDefun-s def (to-stat s))))

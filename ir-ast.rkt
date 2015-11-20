@@ -48,29 +48,6 @@ Assumptions for AST node types:
 (define-view* Expr ([#:access #:maybe type get-type set-type])
   #:traversable)
 
-;; Either an Expr or a Stat, without any ad-hoc members.
-(define-view* ExprLike ([#:access type get-type set-type])
-  #:generics-options
-  (#:defaults ([Expr?
-                (define (ExprLike-type ast) (get-type ast))
-                (define (set-ExprLike-type ast t) (set-type ast t))
-                (define (ExprLike-copy ast t) (Expr-copy ast t))]
-               [Stat?
-                (define (ExprLike-type ast) the-Void-type)
-                (define (set-ExprLike-type ast t) (void))
-                (define (ExprLike-copy ast t) ast)])))
-
-(define* (ExprLike-set-type-from-annos ast annos)
-  (define t (hash-ref annos 'type #f))
-  (if (and t (not (AnyT? t)))
-      (set-ExprLike-type ast t)
-      ast))
-
-(define* (annos-with-type-from-ExprLike ast)
-  (define t (ExprLike-type ast))
-  (assert t)
-  (hasheq 'type t))
-
 (define* (Expr-typed? ast)
   (define t (Expr-type ast))
   (and t (not (AnyT? t))))

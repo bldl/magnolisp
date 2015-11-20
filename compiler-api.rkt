@@ -864,7 +864,7 @@ optimization.
   (set! def-lst (defs-lift-typedefs def-lst))
   (set! def-lst (defs-drop-unreachable def-lst eps-in-prog))
   ;;(pretty-print def-lst) (exit)
-  (set! def-lst (map ast-update-ExprLike-result-annos def-lst))
+  (set! def-lst (map ast-update-result-discarded-annos def-lst))
   ;;(pretty-print def-lst)
 
   (let ((def-h (build-full-defs-table def-lst)))

@@ -663,7 +663,7 @@
 
       (else
        (raise-argument-error
-        'ti-expr "supported ExprLike?" ast))))
+        'ti-expr "supported Expr? or Stat?" ast))))
 
   (set! defs (defs-add-VarT defs))
   (defs-for-each/bind ti-def defs)

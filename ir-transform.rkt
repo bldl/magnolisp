@@ -330,7 +330,7 @@
   (type-expr-rm-ExistsT (rw in-t)))
 
 ;;; 
-;;; ExprLike annotations
+;;; discarded results
 ;;; 
 
 (define-Ast-anno-accessors*
@@ -348,7 +348,7 @@
 ;; has been dropped, since the results of such code will not be
 ;; required (of course correct annotations may be pointless in nodes
 ;; that will subsequently be dropped).
-(define* (ast-update-ExprLike-result-annos ast)
+(define* (ast-update-result-discarded-annos ast)
   (define (rw-expr-used ast)
     (rw-expr #f ast))
   
@@ -391,12 +391,11 @@
        (define-values (n-es di) (rw-expr-seq d? ast es))
        (LetExpr (annos-set-result-discarded a di) (rw-any dv) n-es)]
       [else
-       (assert (ExprLike? ast))
-       (error 'update-ExprLike-result-annos
+       (error 'ast-update-result-discarded-annos
               "unimplemented for expression ~s" ast)]))
   
   (define (rw-any ast)
-    (if (ExprLike? ast)
+    (if (Expr? ast)
         (rw-expr-used ast)
         (term-rewrite-all rw-any ast)))
 
