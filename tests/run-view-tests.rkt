@@ -4,7 +4,8 @@
 |#
 
 (require (relative-in magnolisp
-                      "ast-repr.rkt" "ast-view.rkt" "strategy.rkt")
+                      "ast-repr.rkt" "ast-view.rkt"
+                      "strategy.rkt" "util.rkt")
          racket/generic rackunit)
 
 (define-view A ([#:field a]))
@@ -28,81 +29,86 @@
 (check-equal? '(4 7) (match (HasAB 4 7) [(AB a b) (list a b)] [_ #f]))
 (check-equal? '(4 7) (match (HasBA 7 4) [(AB a b) (list a b)] [_ #f]))
 
-(define-generics D-impl
-  (get-d D-impl)
-  (set-d D-impl v))
+(let ()
+  (define-generics D-impl
+    (get-d D-impl)
+    (set-d D-impl v))
 
-(struct DoesD (d)
-        #:methods gen:D-impl
-        [(define (get-d x) 1)
-         (define (set-d x v) (void))])
+  (struct DoesD (d)
+    #:methods gen:D-impl
+    [(define (get-d x) 1)
+     (define (set-d x v) (void))])
 
-(define-view D ([#:field a] [#:access d get-d set-d]))
+  (define-view D ([#:field a] [#:access d get-d set-d]))
 
-(define-ast Weird (A AB D) ([#:none a] [#:none b])
-  #:struct-options
-  (#:methods gen:D-impl 
-             [(define (get-d D-impl)
-                (* 2 (Weird-b D-impl)))
-              (define (set-d D-impl v)
-                (set-Weird-b D-impl (/ v 2)))]))
+  (define-ast Weird (A AB D) ([#:none a] [#:none b])
+    #:struct-options
+    (#:methods gen:D-impl 
+     [(define (get-d D-impl)
+        (* 2 (Weird-b D-impl)))
+      (define (set-d D-impl v)
+        (set-Weird-b D-impl (/ v 2)))]))
 
-(check-eqv? 4 (D-d (Weird 1 2)))
-(check-eqv? 3/2 (Weird-b (D-copy (Weird 1 2) 7 3)))
-(check-equal? (Weird 1 2) (D-copy (Weird 10 10) 1 4))
-(check-equal? (Weird 1 2) (set-D-a (Weird 6 2) 1))
-(check-equal? (Weird 1 2) (set-D-d (Weird 1 6) 4))
-(check-equal? '(1 4) (match (Weird 1 2) [(D a d) (list a d)] [_ #f]))
+  (check-eqv? 4 (D-d (Weird 1 2)))
+  (check-eqv? 3/2 (Weird-b (D-copy (Weird 1 2) 7 3)))
+  (check-equal? (Weird 1 2) (D-copy (Weird 10 10) 1 4))
+  (check-equal? (Weird 1 2) (set-D-a (Weird 6 2) 1))
+  (check-equal? (Weird 1 2) (set-D-d (Weird 1 6) 4))
+  (check-equal? '(1 4) (match (Weird 1 2) [(D a d) (list a d)] [_ #f])))
 
-(define-view Ast ([#:field annos]))
-(define (get-type ast)
-  (hash-ref (Ast-annos ast) 'type #f))
-(define (set-type ast t)
-  (set-Ast-annos ast (hash-set (Ast-annos ast) 'type t)))
-(define-view Expr ([#:access type get-type set-type]))
-(define-ast Lit (Ast Expr) ([#:none annos] [#:none dat]))
+(let ()
+  (define-view Ast ([#:field annos]))
+  (define (get-type ast)
+    (hash-ref (Ast-annos ast) 'type #f))
+  (define (set-type ast t)
+    (set-Ast-annos ast (hash-set (Ast-annos ast) 'type t)))
+  (define-view Expr ([#:access type get-type set-type]))
+  (define-ast Lit (Ast Expr) ([#:none annos] [#:none dat]))
+  
+  (check-eq? 'int (Expr-type (Lit #hasheq((type . int)) 5)))
+  
+  (let ((e (Lit #hasheq() 6)))
+    (check-eq? 'int (Expr-type (set-Expr-type e 'int)))))
 
-(check-eq? 'int (Expr-type (Lit #hasheq((type . int)) 5)))
+(let ()
+  (define-view Num (#:fields num))
 
-(let ((e (Lit #hasheq() 6)))
-  (check-eq? 'int (Expr-type (set-Expr-type e 'int))))
+  (define-ast HasNum (Num) ([#:none num]))
 
-(define-view Num (#:fields num))
+  (check-false (Num? "string"))
+  (check-false (Num? (HasA 4)))
+  (check-true (Num? (HasNum 7)))
 
-(define-ast HasNum (Num) ([#:none num]))
+  (check-eqv? 5 (Num-num (HasNum 5)))
+  (check-true (Num=? (HasNum 5) (set-Num-num (HasNum 7) 5)))
+  (check-true (Num=? (HasNum 5) (Num-copy (HasNum 7) 5)))
+  
+  (check-eqv? 15 (match (cons (HasNum 7) (HasNum 8))
+                   [(cons (Num x) (Num y)) (+ x y)]
+                   [_ #f])))
 
-(check-false (Num? "string"))
-(check-false (Num? (HasA 4)))
-(check-true (Num? (HasNum 7)))
+(let ()
+  (define-view HasX (#:fields x))
+  (define-ast FunnyCopy ([HasX (#:copy (lambda (fc x)
+                                         (FunnyCopy 5)))])
+    ([#:none x]))
+  (check-eqv? 5 (HasX-x (HasX-copy (FunnyCopy 1) 7)))
+  
+  (define-ast FunnyOverride ([HasX ([#:field x])]) ([#:none x]))
+  (check-eqv? 6 (HasX-x (FunnyOverride 6)))
+  
+  (define-ast SevenX ([HasX ([#:access x (lambda (obj) 7) (lambda (obj x) obj)])])
+    ([#:none x]))
+  (check-eqv? 7 (HasX-x (set-HasX-x (SevenX 9) 8))))
 
-(check-eqv? 5 (Num-num (HasNum 5)))
-(check-true (Num=? (HasNum 5) (set-Num-num (HasNum 7) 5)))
-(check-true (Num=? (HasNum 5) (Num-copy (HasNum 7) 5)))
-
-(check-eqv? 15 (match (cons (HasNum 7) (HasNum 8))
-                 [(cons (Num x) (Num y)) (+ x y)]
-                 [_ #f]))
-
-(define-view HasX (#:fields x))
-(define-ast FunnyCopy ([HasX (#:copy (lambda (fc x)
-                                       (FunnyCopy 5)))])
-  ([#:none x]))
-(check-eqv? 5 (HasX-x (HasX-copy (FunnyCopy 1) 7)))
-
-(define-ast FunnyOverride ([HasX ([#:field x])]) ([#:none x]))
-(check-eqv? 6 (HasX-x (FunnyOverride 6)))
-
-(define-ast SevenX ([HasX ([#:access x (lambda (obj) 7) (lambda (obj x) obj)])])
-  ([#:none x]))
-(check-eqv? 7 (HasX-x (set-HasX-x (SevenX 9) 8)))
-
-(define (AC-getter obj)
-  (AC-c obj))
-(define (AC-setter obj b)
-  (struct-copy AC obj [c b]))
-(define-ast AC (A [AB ([#:access b AC-getter AC-setter])])
-  ([#:none a] [#:none c]))
-(check-match (A-copy (AB-copy (AC 1 2) 4 5) 6) (AC 6 5))
+(let ()
+  (define (AC-getter obj)
+    (AC-c obj))
+  (define (AC-setter obj b)
+    (struct-copy AC obj [c b]))
+  (define-ast AC (A [AB ([#:access b AC-getter AC-setter])])
+    ([#:none a] [#:none c]))
+  (check-match (A-copy (AB-copy (AC 1 2) 4 5) 6) (AC 6 5)))
 
 ;;; 
 ;;; view-based traversals
@@ -299,3 +305,45 @@
   (check-true (R=? a0 (A 0 2 7)))
   (check-eqv? 9 (R-r (set-R-r a0 9)))
   (check-eqv? 9 (R-r (V-copy (R-copy a0 9) 8))))
+
+;;; 
+;;; partial views
+;;; 
+(let ()
+  (define-view V ([#:field v]) #:partial)
+  (define-ast A (V) ([#:none a] [#:none r] [#:none v]))
+  (define a0 (A 1 2 3))
+  (check-pred A? a0)
+  (check-eqv? 1 (procedure-arity V?))
+  (check-false (V? 42))
+  (check-pred V? a0)
+
+  (define (B-in-V? b)
+    (> (B-v b) 5))
+  (define-ast B ([V (#:predicate B-in-V?)]) ([#:none v]))
+  (check-eqv? 0 (B-v (B 0)))
+  (check-pred V? (B 6))
+  (check-pred (negate V?) (B 5))
+  (check-true (matches? (B 8) (V _)))
+  (check-false (matches? (B 3) (V _)))
+
+  (void))
+
+(let ()
+  (define-view DefVar (#:fields id v) #:partial)
+  (define-ast Undefined () () #:singleton ())
+  (define (def? ast) (not (Undefined? (DeclVar-v ast))))
+  (define-ast DeclVar ([DefVar (#:predicate def?)])
+    ([#:none id] [#:none v]))
+  (check-true (DefVar? (DeclVar 'x 1)))
+  (check-false (DefVar? (DeclVar 'y the-Undefined)))
+  (check-eqv? 2 (length (filter-map
+                         (match-lambda
+                           [(DefVar id v) (list id v)]
+                           [_ #f])
+                         (list
+                          (DeclVar 'x the-Undefined)
+                          (DeclVar 'y 2)
+                          (DeclVar 'z 3)
+                          (DeclVar 'w the-Undefined)))))
+  (void))

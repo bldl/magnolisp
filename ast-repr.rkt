@@ -314,11 +314,12 @@ Assumptions for AST node types:
     #:description "AST node view specification"
     #:attributes (spec)
     (pattern v-id:id
-             #:attr spec (list #'v-id null #f))
-    (pattern (v-id:id v-spec:vspec-with-copy)
+             #:attr spec (list #'v-id null #f #f))
+    (pattern (v-id:id v-spec:conc-vspec)
              #:attr spec (list #'v-id 
                                (attribute v-spec.fspec-lst)
-                               (attribute v-spec.copy))))
+                               (attribute v-spec.copy)
+                               (attribute v-spec.predicate))))
 
   (define-syntax-class fspec
     #:description "AST node field specification"
