@@ -67,25 +67,19 @@
 (let ((e (Lit #hasheq() 6)))
   (check-eq? 'int (Expr-type (set-Expr-type e 'int))))
 
-(define-view Num (#:fields num)
-  #:generics-options
-  (#:defaults ([number? 
-                (define (Num-num x) x)
-                (define (set-Num-num x v) v)
-                (define (Num-copy x v) v)])))
+(define-view Num (#:fields num))
 
 (define-ast HasNum (Num) ([#:none num]))
 
 (check-false (Num? "string"))
-(check-true (Num? 5))
 (check-false (Num? (HasA 4)))
 (check-true (Num? (HasNum 7)))
 
-(check-eqv? 5 (Num-num 5))
-(check-eqv? 5 (set-Num-num 7 5))
-(check-eqv? 5 (Num-copy 7 5))
+(check-eqv? 5 (Num-num (HasNum 5)))
+(check-true (Num=? (HasNum 5) (set-Num-num (HasNum 7) 5)))
+(check-true (Num=? (HasNum 5) (Num-copy (HasNum 7) 5)))
 
-(check-eqv? 15 (match (cons 7 (HasNum 8))
+(check-eqv? 15 (match (cons (HasNum 7) (HasNum 8))
                  [(cons (Num x) (Num y)) (+ x y)]
                  [_ #f]))
 

@@ -8,30 +8,30 @@ E.g.,
 
   (define-view* Def (#:fields annos id))
 
-and then, within a macro, generate-view-methods may be used to
+and then, within a macro, `generate-view-methods` may be used to
 generate syntax for an implementation of the relevant generic methods
 for a given view.
 
 E.g.,
 
-  (generate-view-methods #'DefVar (list #'Def '() #f))
+  (generate-view-methods #'DefVar (list #'Def '() #f) ....)
 
   =>
 
   (list
-    #'#:methods #'gen:Def
-    #'[(define (Def-copy obj annos id)
-         (struct-copy DefVar obj [annos annos] [id id]))
-       (define (Def-annos obj) (DefVar-annos obj))
-       (define (Def-id obj) (DefVar-id obj))
-       (define (set-Def-annos obj annos)
-         (struct-copy DefVar obj [annos annos]))
-       (define (set-Def-id obj id)
-         (struct-copy DefVar obj [id id]))])
+    #'#:property #'prop:Def
+    #'#((lambda (obj annos id) ;; Def-copy 
+          (struct-copy DefVar obj [annos annos] [id id]))
+        (lambda (obj) (DefVar-annos obj)) ;; Def-annos
+        (lambda (obj) (DefVar-id obj)) ;; Def-id
+        (lambda (obj annos) ;; set-Def-annos
+          (struct-copy DefVar obj [annos annos]))
+        (lambda (obj id) ;; set-Def-id
+          (struct-copy DefVar obj [id id]))))
 
 |#
 
-(require racket/generic racket/match racket/unsafe/ops "util.rkt"
+(require racket/match racket/unsafe/ops "util.rkt"
          (for-syntax racket/base racket/dict racket/list racket/match
                      racket/pretty racket/syntax
                      syntax/id-table syntax/parse syntax/strip-context
@@ -47,6 +47,30 @@ E.g.,
                     (map (lambda (x) (replace-context ctx x))
                          (syntax->list #'(field-id ...)))])
        #'(struct-copy type-id obj [cn e] ...))]))
+
+;;; 
+;;; generics
+;;;
+
+(define-syntax (define-generics/prop stx)
+  (syntax-parse stx
+    [(_ g:id def-vals:id ((f:id obj:id arg:id ...) ...))
+     (define ctx #'g)
+     (define g-sym (syntax-e #'g))
+     (define/with-syntax prop:g (format-id ctx "prop:~a" g-sym))
+     (define/with-syntax g? (format-id ctx "~a?" g-sym))
+     (define/with-syntax get-prop:g (format-id ctx "get-prop:~a" g-sym))
+     (define/with-syntax (ix ...)
+       (for/list ([x (syntax->list #'(f ...))]
+                  [i (in-naturals 0)])
+         #`#,i))
+     #'(begin
+         (def-vals (prop:g g? get-prop:g)
+           (make-struct-type-property 'g))
+         (def-vals (f)
+           (lambda (obj arg ...)
+             ((vector-ref (get-prop:g obj) ix) obj arg ...)))
+         ...)]))
 
 ;;; 
 ;;; view-based comparison
@@ -256,30 +280,29 @@ E.g.,
     [pattern (flds:vflds (~optional (~seq #:copy copy:expr)))
              #:attr fspec-lst (attribute flds.spec-lst)]))
 
-(define-for-syntax (make-define-view def-gen-id def-stx-id 
+(define-for-syntax (make-define-view def-vals-id def-stx-id 
                                      def-pat-id def-fun-id stx)
-  (define (generate view-id fld-spec-lst other-id-lst trav? opt-stx-lst)
+  (define (generate view-id fld-spec-lst other-id-lst trav?)
     (define view-name (syntax-e view-id))
     (define fld-ids (map ViewFld-id fld-spec-lst))
 
     (with-syntax ([view view-id]
-                  [(fld ...) fld-ids])
+                  [(fld ...) fld-ids]
+                  [def-fun def-fun-id])
       (define (make-accessor-sigs fld-id)
         (define fld-name (syntax-e fld-id))
-        (define getter-sig
-          #`(#,(format-id stx "~a-~a" view-name fld-name) view))
-        (define setter-sig
-          #`(#,(format-id stx "set-~a-~a" view-name fld-name) view #,fld-id))
-        (list getter-sig setter-sig))
+        (list
+          #`(#,(format-id stx "~a-~a" view-name fld-name) view)
+          #`(#,(format-id stx "set-~a-~a" view-name fld-name) view #,fld-id)))
     
       (define method-sig-lst
         (cons
          #`(#,(format-id stx "~a-copy" view-name) view fld ...)
-         (apply append (map make-accessor-sigs fld-ids))))
-    
+         (append-map make-accessor-sigs fld-ids)))
+
       (with-syntax ([(method ...) method-sig-lst]
-                    [def-gen def-gen-id]
                     [def-stx def-stx-id]
+                    [def-vals def-vals-id]
                     [(def-trav ...)
                      (if trav?
                          (make-trav-accessors def-fun-id view-id fld-spec-lst)
@@ -287,15 +310,13 @@ E.g.,
                     [def-pat (make-view-pattern view-id fld-ids def-pat-id)]
                     [def-equ (make-view-equal view-id fld-ids def-fun-id)]
                     [view-info (format-id stx "view:~a" view-name)]
-                    [(gen-opt ...) opt-stx-lst]
                     [(other ...) other-id-lst]
                     [(entry ...) (map ViewFld->syntax fld-spec-lst)])
         #'(begin
             (def-stx view-info
               (ViewInfo (list entry ...) (list #'other ...)))
-            (def-gen view
-              gen-opt ...
-              method ...)
+            (define-generics/prop
+              view def-vals (method ...))
             def-trav ...
             def-pat
             def-equ))))
@@ -304,24 +325,20 @@ E.g.,
     [(_ view:id flds:vspec
         (~seq (~or
                (~optional (~seq #:also (other-view:id ...)))
-               (~optional (~and #:traversable support-traversals))
-               (~optional (~seq #:generics-options (opt ...)))) ...))
+               (~optional (~and #:traversable support-traversals)))))
      (generate #'view 
                (attribute flds.fspec-lst)
                (if (attribute other-view)
                    (syntax->list #'(other-view ...))
                    null)
-               (and (attribute support-traversals) #t)
-               (if (attribute opt)
-                   (syntax->list #'(opt ...))
-                   null))]))
+               (and (attribute support-traversals) #t))]))
 
 (define-syntax* (define-view stx)
-  (make-define-view #'define-generics #'define-syntax 
+  (make-define-view #'define-values #'define-syntax 
                     #'define-match-expander #'define stx))
 
 (define-syntax* (define-view* stx)
-  (make-define-view #'define-generics* #'define-syntax* 
+  (make-define-view #'define-values* #'define-syntax* 
                     #'define-match-expander* #'define* stx))
 
 ;;; 
@@ -366,7 +383,8 @@ E.g.,
 ;; of the specified view for the specified concrete struct type. The
 ;; resulting list of syntax objects is intended to be spliced into a
 ;; (struct ....) declaration. E.g., (generate-view-methods #'C (list
-;; #'V '() #f) ....) -> (list #'#:methods #'gen:V #'(....)).
+;; #'V '() #f) ....) -> (list #'#:property #'prop:V
+;; #'(vector-immutable ....)).
 (define-for-syntax* (generate-view-methods conc-id view-spec conc-info-h)
   ;;(writeln (list conc-id view-spec))
   (match-define (list view-id fld-override-lst copy-lambda-stx) view-spec)
@@ -433,62 +451,52 @@ E.g.,
         #`(lambda (view) (unsafe-struct*-ref view #,ix)))
       
       (define getter-impl
-        (with-syntax ([v-getter-id
-                       (format-id view-id "~a-~a" view-name fld-name)]
-                      [v-getter-expr
-                       (or get-stx (mk-default-get))])
-          #'(define v-getter-id v-getter-expr)))
+        (or get-stx (mk-default-get)))
       
       (define setter-id (mk-setter-id fld-name))
       (define setter-impl
-        (with-syntax 
-            ([v-setter-id setter-id]
-             [v-setter-expr
-              (or set-stx
-                  (with-syntax ([fld fld-id])
-                    #'(lambda (view fld)
-                        (struct-copy/type-ctx conc view [fld fld]))))])
-          #'(define v-setter-id v-setter-expr)))
+        (or set-stx
+            (with-syntax ([fld fld-id])
+              #'(lambda (view fld)
+                  (struct-copy/type-ctx conc view [fld fld])))))
       
       (list getter-impl setter-impl))
     
     (define copy-impl
-      (with-syntax ([v-copy (format-id view-id "~a-copy" view-name)])
-        (cond
-         [copy-lambda-stx
-          (with-syntax ([copy-impl copy-lambda-stx])
-            #'(define v-copy copy-impl))]
-         [else
-          (with-syntax ([(fld ...) fld-id-lst])
-            ;; `set-info-lst` will have `#:access` fields, while
-            ;; `copy-info-lst` will have `#:field` fields. Can just
-            ;; `struct-copy` the latter, whereas the former must be
-            ;; set as specified.
-            (define-values (set-info-lst copy-info-lst)
-              (partition AccessViewFld? fld-info-lst))
-            #`(define (v-copy view fld ...)
-                #,@(if (null? copy-info-lst)
-                       null
-                       (with-syntax ([(c-fld ...) 
-                                      (map ViewFld-id copy-info-lst)])
-                         (list 
-                          #'(set! view
-                                  (struct-copy/type-ctx
-                                   conc view 
-                                   [c-fld c-fld] ...)))))
-                #,@(for/list ([info set-info-lst])
-                     (define fld-id (ViewFld-id info))
-                     (with-syntax ([s-fld fld-id]
-                                   [set (mk-setter-id (syntax-e fld-id))])
-                       #'(set! view (set view s-fld))))
-                view))])))
+      (cond
+        [copy-lambda-stx
+         copy-lambda-stx]
+        [else
+         (with-syntax ([(fld ...) fld-id-lst])
+           ;; `set-info-lst` will have `#:access` fields, while
+           ;; `copy-info-lst` will have `#:field` fields. Can just
+           ;; `struct-copy` the latter, whereas the former must be
+           ;; set as specified.
+           (define-values (set-info-lst copy-info-lst)
+             (partition AccessViewFld? fld-info-lst))
+           #`(lambda (view fld ...)
+               #,@(if (null? copy-info-lst)
+                      null
+                      (with-syntax ([(c-fld ...) 
+                                     (map ViewFld-id copy-info-lst)])
+                        (list 
+                         #'(set! view
+                                 (struct-copy/type-ctx
+                                  conc view 
+                                  [c-fld c-fld] ...)))))
+               #,@(for/list ([info set-info-lst])
+                    (define fld-id (ViewFld-id info))
+                    (with-syntax ([s-fld fld-id]
+                                  [set (mk-setter-id (syntax-e fld-id))])
+                      #'(set! view (set view s-fld))))
+               view))]))
     
     (define method-impl-lst
       (cons
        copy-impl
-       (apply append (map make-accessor-impls fld-info-lst))))
+       (append-map make-accessor-impls fld-info-lst)))
     
     (list
-     (quote-syntax #:methods)
-     (format-id view-id "gen:~a" view-name)
-     #`(#,@method-impl-lst))))
+     (quote-syntax #:property)
+     (format-id view-id "prop:~a" view-name)
+     #`(vector-immutable #,@method-impl-lst))))
