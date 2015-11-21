@@ -300,7 +300,7 @@ E.g.,
                                   (format-id view-id "~a?" view-name)])
                      #'(def-fun (view? obj)
                          (and (prop:view? obj)
-                              ((vector-ref (prop-value:view obj) 0)
+                              ((unsafe-vector*-ref (prop-value:view obj) 0)
                                obj)))))
                   null)
             ,@(for/list ([sig method-sig-lst]
@@ -309,7 +309,7 @@ E.g.,
                   [(f:id obj:id arg:id ...)
                    (define/with-syntax ix i)
                    #'(def-fun (f obj arg ...)
-                       ((vector-ref (prop-value:view obj) ix)
+                       ((unsafe-vector*-ref (prop-value:view obj) ix)
                         obj arg ...))])))))
       
     (with-syntax ([(generics ...) generics-stx-lst]
