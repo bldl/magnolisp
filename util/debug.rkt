@@ -3,5 +3,6 @@
 #|
 |#
 
-(require magnolisp/util)
+(require "module.rkt")
+
 (require*-if-declared unstable/debug)

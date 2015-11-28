@@ -184,12 +184,12 @@
 
 (define-syntax-rule* (require-if-declared mod ...)
   (begin
-    (when-module-declared mod #t (require mod))
+    (when-module-declared mod #f (require mod))
     ...))
 
 (define-syntax-rule* (require*-if-declared mod ...)
   (begin
-    (when-module-declared mod #t (require* mod))
+    (when-module-declared mod #f (require* mod))
     ...))
 
 (define-syntax* (define-generics* stx)
