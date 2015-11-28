@@ -16,7 +16,7 @@ Assumptions for AST node types:
 (require "ast-serialize.rkt" "ast-view.rkt"
          "strategy.rkt"
          "util.rkt" "util/struct.rkt"
-         racket/generic racket/unsafe/ops unstable/struct
+         racket/generic racket/unsafe/ops racket/struct
          (for-syntax "util/assert.rkt"
                      racket/base racket/function racket/list
                      racket/pretty 
