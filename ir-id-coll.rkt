@@ -4,7 +4,7 @@
 |#
 
 (require "ir-ast.rkt" "util.rkt"
-         unstable/custom-write
+         racket/struct
          (for-syntax racket/base syntax/parse))
 
 ;;; 
