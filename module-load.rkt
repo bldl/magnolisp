@@ -120,6 +120,8 @@ Module loading.
 (define-with-contract*
   (-> resolve-module-path-result? module-path? Mod?)
   (Mod-load r-mp mp)
+
+  ;;(writeln (list 'Mod-load r-mp mp))
   
   ;; Visit the module to determine if it even exists, and is a valid
   ;; module. This must succeed.
@@ -146,13 +148,6 @@ Module loading.
     [(not has-submod?)
      (Mod r-mp #hasheq() null null #hasheq() (make-hasheq))]
     [else
-     (define original-r-mp (load-field 'r-mp #f))
-     (when (and original-r-mp (not (equal? r-mp original-r-mp)))
-       (error 'Mod-load
-              "~a (~s): ~s != ~s (used != recorded)"
-              "resolved module path mismatch"
-              mp r-mp original-r-mp))
-
      (define bind->binding (load-field 'bind->binding #t))
      (define def-lst (load-field 'def-lst #t))
        

@@ -55,8 +55,7 @@
  #rx"program is not fully typed")
 
 (module m4 magnolisp
-  (function (f)
-    #:: (export (type (-> Bool)))
+  (function (f) #:: (export [type (-> Bool)])
     (var x #t)
     (var y (x))
     x)

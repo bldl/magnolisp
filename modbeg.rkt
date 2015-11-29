@@ -30,13 +30,6 @@ same variables at the same phase level).
 
 (define-for-syntax (make-definfo-submodule 
                     orig-mb-id modbeg-stx prelude-stx prelude-ids)
-  (define orig-r-mp
-    (let ((src (syntax-source orig-mb-id)))
-      (and src
-           (let ((mpi (syntax-source-module orig-mb-id #f)))
-             (and mpi
-                  (resolve-module-path-index mpi src))))))
-       
   (define decl-name (current-module-declare-name))
   (define rel-to-path-v
     (cond
@@ -104,12 +97,11 @@ same variables at the same phase level).
     #`(magnolisp-s2s
        racket/base
        (require magnolisp/ir-ast)
-       (define r-mp #,(syntactifiable-mkstx orig-r-mp))
        (define bind->binding #,(syntactifiable-mkstx bind->binding))
        (define def-lst #,(syntactifiable-mkstx def-lst))
        (define prelude-lst #,prelude-stx)
        (define core->bind #,(syntactifiable-mkstx core-syms))
-       (provide r-mp bind->binding def-lst prelude-lst core->bind)))
+       (provide bind->binding def-lst prelude-lst core->bind)))
   #`(module . #,(strip-context mod-stx)))
 
 (define-for-syntax (make-module-begin 
