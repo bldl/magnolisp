@@ -23,6 +23,7 @@ same variables at the same phase level).
          (for-syntax
           racket/base racket/dict racket/list racket/pretty
           syntax/id-table syntax/modresolve syntax/quote
+          syntax/strip-context
           "app-util.rkt" 
           "ir-ast.rkt" "ast-serialize.rkt"
           "parse.rkt" "util.rkt"))
@@ -98,15 +99,18 @@ same variables at the same phase level).
       (hash-set! core-syms (syntax-e id) bind))) 
 
   ;;(writeln (list (current-module-declare-source) (current-module-declare-name)))
-  
-  #`(module magnolisp-s2s racket/base
-      (require magnolisp/ir-ast)
-      (define r-mp #,(syntactifiable-mkstx orig-r-mp))
-      (define bind->binding #,(syntactifiable-mkstx bind->binding))
-      (define def-lst #,(syntactifiable-mkstx def-lst))
-      (define prelude-lst #,prelude-stx)
-      (define core->bind #,(syntactifiable-mkstx core-syms))
-      (provide r-mp bind->binding def-lst prelude-lst core->bind)))
+
+  (define mod-stx
+    #`(magnolisp-s2s
+       racket/base
+       (require magnolisp/ir-ast)
+       (define r-mp #,(syntactifiable-mkstx orig-r-mp))
+       (define bind->binding #,(syntactifiable-mkstx bind->binding))
+       (define def-lst #,(syntactifiable-mkstx def-lst))
+       (define prelude-lst #,prelude-stx)
+       (define core->bind #,(syntactifiable-mkstx core-syms))
+       (provide r-mp bind->binding def-lst prelude-lst core->bind)))
+  #`(module . #,(strip-context mod-stx)))
 
 (define-for-syntax (make-module-begin 
                     stx 
