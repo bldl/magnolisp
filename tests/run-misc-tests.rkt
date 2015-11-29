@@ -26,9 +26,8 @@
    (thunk (compile-mgl-mod mod))
    (format "no expected failure compiling program ~a" mod)))
 
-(module m1 magnolisp/2014
-  (function (f)
-    (#:annos export (type (fn Bool)))
+(module m1 magnolisp
+  (define (f) #:: (export [type (-> Bool)])
     #t)
   (provide f))
 
@@ -39,16 +38,14 @@
     (#:annos export
              (build (+= mixed-bad 1 "2"))
              (type (fn Bool)))
-    #t)
-  (define x 1))
+    #t))
 
 (check-not-compile-mgl-mod
  '(submod "." m2)
  #rx"type mismatch")
 
-(module m3 magnolisp/2014
-  (function (f) (#:annos export) 1)
-  (define x 3)) ;; xxx if do not have this last (unused) definition, then some things are not defined, and we do not get syntax-source-module for #%module-begin either, may be related
+(module m3 magnolisp
+  (function (f) #:: (export) 1))
 
 (check-not-compile-mgl-mod
  '(submod "." m3)
@@ -58,8 +55,7 @@
   (function (f) #:: (export [type (-> Bool)])
     (var x #t)
     (var y (x))
-    x)
-  (define x 3))
+    x))
 
 (check-not-compile-mgl-mod
  '(submod "." m4)
