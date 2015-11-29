@@ -12,7 +12,7 @@ weakness properties of collection types may also not be preserved.
 |#
 
 (require racket/generic
-         "util.rkt" "util/syntax-quote-main.rkt" "util/syntax-quote-extras.rkt"
+         "util.rkt"
          (for-template racket/base))
                      
 (define (quotable? x)
@@ -30,40 +30,13 @@ weakness properties of collection types may also not be preserved.
      'hash-maker-id-for
      "expected (or/c hash-eq? hash-eqv? hash-equal?): ~s" x)]))
 
-;; Custom version so that we can avoid #<path:....> representation for
-;; paths, for example. Then again, there really isn't any one correct
-;; choice for marshaling paths. See "quotable" in the Racket
-;; Reference.
-(define (keep-position/syntactifiable stx dat)
-  (define loc (vector-immutable
-               (syntax-source stx)
-               (syntax-line stx)
-               (syntax-column stx)
-               (syntax-position stx)
-               (syntax-span stx)))
-  #`(datum->syntax (quote-syntax #,(datum->syntax stx 'ctx))
-                   #,dat #,(syntactifiable-mkstx loc)))
-
-(define kept-properties '(origin paren-shape))
-
-(define keep?/syntactifiable
-  (keep?-> keep-position?
-           (make-keep-listed-properties? kept-properties)))
-           
-(define keep/syntactifiable
-  (keep-> keep-position/syntactifiable
-          (make-keep-listed-properties kept-properties syntactifiable-mkstx)))
-
-(define (syntax-preserve/syntactifiable stx)
-  (syntax-preserve keep?/syntactifiable keep/syntactifiable stx))
-
 (define-generics* syntactifiable
   (syntactifiable-mkstx syntactifiable)
   #:defaults
   (
    [syntax?
     (define (syntactifiable-mkstx x)
-      (syntax-preserve/syntactifiable x))]
+      #`(quote-syntax #,x #:local))]
    [null?
     (define (syntactifiable-mkstx x)
       #'null)]

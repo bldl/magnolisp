@@ -613,10 +613,9 @@ A Git repository of the Magnolisp source code can be found at:
 
 @section[#:tag "install"]{Installation}
 
-Racket version 6 is required to run the software.
-The software has been tested with version 6.2.1, but any version between 6.1--6.2.1 is expected to work.
-The software is installable directly off GitHub with the command:
+Racket version 6.3 or higher is required to run the software. The software has been tested with version 6.3 only. Version 6.2.1 will not work due to Racket 6.3 having a different @link["http://www.cs.utah.edu/~mflatt/scope-sets/"]{macro model}, and also due to differences in its @link["http://blog.racket-lang.org/2015/10/retiring-unstable.html"]{organization of @racketmodfont{unstable} libraries}.
 
+The software is installable directly off GitHub with the command:
 @commandline{raco pkg install git://github.com/bldl/magnolisp}
 
 @section{License}
