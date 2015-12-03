@@ -63,6 +63,12 @@ expression positions.
      (~or n:id [n:id :: given-t:expr])
      #:with t (or (attribute given-t) #'(auto))))
 
+  (define-syntax-class maybe-typed-id
+    #:datum-literals (::)
+    (pattern
+     (~or n:id [n:id :: given-t:expr])
+     #:attr t (attribute given-t)))
+
   (define (->ctor id)
     (format-id id "make-~a" (syntax-e id)))
   (define (->pred id)
@@ -71,18 +77,21 @@ expression positions.
     (format-id id "~a-~a" (syntax-e id) (syntax-e fld-id)))
 
   (syntax-parse stx
-    [(_ mgl-n:id (f:fld ...) rkt-os:opts)
-     (define/with-syntax (fld-id ...) #'(f.n ...))
-     (define/with-syntax (fld-t ...) #'(f.t ...))
+    [(_ st:maybe-typed-id (f:fld ...) rkt-os:opts)
+     (define fld-id-lst (syntax->list #'(f.n ...)))
 
-     (define mgl-id #'mgl-n)
+     (define mgl-id #'st.n)
+     (define/with-syntax mgl-n mgl-id)
      (define mgl-sym (syntax-e mgl-id))
-     (define mgl-t-id (format-id stx "t:~a" mgl-sym))
+     (define mgl-t-id (or (attribute st.t)
+                          (format-id stx "t:~a" mgl-sym)))
+     (define static-type? (not (attribute st.t)))
      (define mgl-ctor-id (->ctor mgl-id))
      (define mgl-pred-id (->pred mgl-id))
      (define mgl-get-id-lst
-       (map (lambda (fld-id) (->get mgl-id fld-id))
-            (syntax->list #'(f.n ...))))
+       (map
+        (lambda (fld-id) (->get mgl-id fld-id))
+        fld-id-lst))
      (define/with-syntax mgl-t-n mgl-t-id)
 
      (define rkt-id (generate-temporary mgl-sym))
@@ -98,8 +107,16 @@ expression positions.
              #,(->get mgl-id n-id)
              #:: (foreign [type (-> mgl-t-n t)])
              #,(->get rkt-id n-id)))
-        (syntax->list #'(f.n ...))
+        fld-id-lst
         (syntax->list #'(f.t ...))))
+
+     (define/with-syntax
+       (define-type ...)
+       (if static-type?
+           (list #'(mgl.define
+                    #:type mgl-t-n
+                    #:: ([foreign mgl-n])))
+           null))
      
      #`(begin
          (begin-racket
@@ -107,12 +124,10 @@ expression positions.
              #:constructor-name #,(->ctor rkt-id)
              #:reflection-name 'mgl-n
              . rkt-os))
-         (mgl.define
-          #:type mgl-t-n
-          #:: ([foreign mgl-n]))
+         define-type ...
          (mgl.define
           #,mgl-ctor-id
-          #:: (foreign [type (-> fld-t ... mgl-t-n)])
+          #:: (foreign [type (-> f.t ... mgl-t-n)])
           #,(->ctor rkt-id))
          (mgl.define
           #,mgl-pred-id
