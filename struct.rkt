@@ -12,40 +12,15 @@ expression positions.
 
 |#
 
-(require "util.rkt"
+(require "util.rkt" "util/field.rkt"
          "core.rkt" 
          (only-in "surface.rkt"
                   [define mgl.define] declare begin-racket
                   foreign type
                   -> auto for-all)
          racket/match
-         (for-syntax racket/base racket/list racket/syntax
+         (for-syntax racket/base racket/syntax
                      syntax/parse))
-
-;; Returns syntax for a match pattern transformer, for things of the
-;; specified predicate, and its specified field accessors. Pattern
-;; matching is positional, so the order of the fields in `get-id-lst`
-;; matters. A datum literal pattern `_` is treated specially, to avoid
-;; unnecessary field accesses.
-(define-for-syntax (make-match-pat-lam pred-id get-id-lst)
-  (define pat-id-lst (generate-temporaries get-id-lst))
-  (with-syntax
-    ([pred? pred-id]
-     [(pat ...) pat-id-lst]
-     [(get ...) get-id-lst])
-    #'(lambda (stx)
-        (syntax-case stx ()
-          [(_ pat ...)
-           (with-syntax
-             ([(fld-pat (... ...))
-               (append-map
-                (lambda (get-id pat-stx)
-                  (if (eq? '_ (syntax-e pat-stx))
-                      null
-                      (list #`(app #,get-id #,pat-stx))))
-                (list #'get ...)
-                (syntax->list #'(pat ...)))])
-             #'(? pred? fld-pat (... ...)))]))))
 
 (define-for-syntax (make-match-expr-lam ctor-id t-id)
   (with-syntax ([ctor-n ctor-id]
@@ -145,5 +120,5 @@ expression positions.
           #,(->pred rkt-id))
          define-getter ...
          (define-match-expander mgl-n
-           #,(make-match-pat-lam mgl-pred-id mgl-get-id-lst)
+           #,(make-fields-match-proc-expr mgl-pred-id mgl-get-id-lst)
            #,(make-match-expr-lam mgl-ctor-id mgl-t-id)))]))

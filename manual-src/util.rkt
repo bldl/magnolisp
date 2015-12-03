@@ -8,6 +8,8 @@ Utilities for authoring manual.scrbl.
 
 (require "../util.rkt" scribble/manual)
 
+(define* ErdaCxx @elem{Erda@subscript{@italic{C++}}})
+
 (define* (warning . str)
   (list "(" (italic "Warning: ") str ")"))
 

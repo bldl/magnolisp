@@ -540,6 +540,9 @@ It is possible to implement languages other than Magnolisp that are translatable
 
 ]
 
+For an example of a language targeting Magnolisp core language, see
+@link["http://bldl.github.io/erda/#%28part._.Erda.C__%29"]{@ErdaCxx}.
+
 @defform[(module-begin form ...)]{
 An implementation of Magnolisp's @racketid[#%module-begin].}
 
