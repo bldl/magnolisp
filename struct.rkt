@@ -19,23 +19,33 @@ expression positions.
                   foreign type
                   -> auto for-all)
          racket/match
-         (for-syntax racket/base racket/syntax
+         (for-syntax racket/base racket/list racket/syntax
                      syntax/parse))
 
 ;; Returns syntax for a match pattern transformer, for things of the
 ;; specified predicate, and its specified field accessors. Pattern
 ;; matching is positional, so the order of the fields in `get-id-lst`
-;; matters.
+;; matters. A datum literal pattern `_` is treated specially, to avoid
+;; unnecessary field accesses.
 (define-for-syntax (make-match-pat-lam pred-id get-id-lst)
-  (with-syntax*
+  (define pat-id-lst (generate-temporaries get-id-lst))
+  (with-syntax
     ([pred? pred-id]
-     [(get ...) get-id-lst]
-     [(pat ...) (generate-temporaries get-id-lst)]
-     [(fld-pat ...) #'((app get pat) ...)])
+     [(pat ...) pat-id-lst]
+     [(get ...) get-id-lst])
     #'(lambda (stx)
         (syntax-case stx ()
           [(_ pat ...)
-           #'(? pred? fld-pat ...)]))))
+           (with-syntax
+             ([(fld-pat (... ...))
+               (append-map
+                (lambda (get-id pat-stx)
+                  (if (eq? '_ (syntax-e pat-stx))
+                      null
+                      (list #`(app #,get-id #,pat-stx))))
+                (list #'get ...)
+                (syntax->list #'(pat ...)))])
+             #'(? pred? fld-pat (... ...)))]))))
 
 (define-for-syntax (make-match-expr-lam ctor-id t-id)
   (with-syntax ([ctor-n ctor-id]
