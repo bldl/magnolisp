@@ -244,7 +244,7 @@ Assumptions for AST node types:
                 [def def-stx])
     (define copy-impl
       (with-syntax ([(fld ...) fld-id-lst]
-                    [c-copy (format-id conc-id "~a-copy" conc-name)])
+                    [c-copy (format-id conc-id "copy-~a" conc-name)])
          #'(def (c-copy obj fld ...)
              (conc fld ...))))
     

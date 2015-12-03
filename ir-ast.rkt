@@ -255,7 +255,7 @@ Assumptions for AST node types:
          ((? Def?)
           (define id (Def-id ast))
           (define id-ast (rw-id id))
-          (Def-copy ast id-ast))
+          (copy-Def ast id-ast))
          ((Var a id)
           (define id-ast (rw-id id))
           (Var (or (rw-annos a) a) id-ast))

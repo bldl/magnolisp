@@ -21,7 +21,7 @@ E.g.,
   (list
     #'#:property #'prop:Def
     #'#((lambda (obj) #t) ;; Def?
-        (lambda (obj annos id) ;; Def-copy 
+        (lambda (obj annos id) ;; copy-Def
           (struct-copy DefVar obj [annos annos] [id id]))
         (lambda (obj) (DefVar-annos obj)) ;; Def-annos
         (lambda (obj annos) ;; set-Def-annos
@@ -174,7 +174,7 @@ E.g.,
                                                       (ViewFld-id fld)))])
                            #'(define v (get obj))))]
                         [(v ...) v-id-lst]
-                        [copy (format-id view-id "~a-copy" view-name)])
+                        [copy (format-id view-id "copy-~a" view-name)])
             #'(def (setter obj lst)
                 (match-define (list t-v ...) lst)
                 def-nt-v ...
@@ -279,7 +279,7 @@ E.g.,
     
     (define method-sig-lst
       (cons
-       #`(#,(format-id stx "~a-copy" view-name) view fld ...)
+       #`(#,(format-id stx "copy-~a" view-name) view fld ...)
        (append-map make-accessor-sigs fld-ids)))
 
     (define generics-stx-lst

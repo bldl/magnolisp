@@ -882,7 +882,7 @@ C++ back end.
         "assumed no LetStat")]
       [(SeqCont ss)
        (define-values (n-st n-ss) (map/reverse/state g st ss))
-       (values n-st (SeqCont-copy s n-ss))]
+       (values n-st (copy-SeqCont s n-ss))]
       [(IfStat a c t e)
        (define-values (st0 n-t) (g st t))
        (define-values (st1 n-e) (g st e))

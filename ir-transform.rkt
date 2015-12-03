@@ -159,7 +159,7 @@
        (Defun a id (f ast t) (map rw ps) (rw b)))
       ((Expr t)
        #:when t
-       (Expr-copy (term-rewrite-all rw ast) (f ast t)))
+       (copy-Expr (term-rewrite-all rw ast) (f ast t)))
       (_
        (term-rewrite-all rw ast)))))
 
@@ -552,7 +552,7 @@
                   (values bind->num #f)]
                  [else
                   (values (env-val-num-merge t-st e-st)
-                          (IfStxp-copy ast a n-c n-t n-e))])])])]
+                          (copy-IfStxp ast a n-c n-t n-e))])])])]
         [(Var a (? (fix Id-bind=? tgt-lv-id) id))
          (define this-bind (Id-bind id))
          (define this-num (hash-ref bind->num this-bind))

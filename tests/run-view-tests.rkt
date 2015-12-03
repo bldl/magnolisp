@@ -50,8 +50,8 @@
         (set-Weird-b D-impl (/ v 2)))]))
 
   (check-eqv? 4 (D-d (Weird 1 2)))
-  (check-eqv? 3/2 (Weird-b (D-copy (Weird 1 2) 7 3)))
-  (check-equal? (Weird 1 2) (D-copy (Weird 10 10) 1 4))
+  (check-eqv? 3/2 (Weird-b (copy-D (Weird 1 2) 7 3)))
+  (check-equal? (Weird 1 2) (copy-D (Weird 10 10) 1 4))
   (check-equal? (Weird 1 2) (set-D-a (Weird 6 2) 1))
   (check-equal? (Weird 1 2) (set-D-d (Weird 1 6) 4))
   (check-equal? '(1 4) (match (Weird 1 2) [(D a d) (list a d)] [_ #f])))
@@ -81,7 +81,7 @@
 
   (check-eqv? 5 (Num-num (HasNum 5)))
   (check-true (Num=? (HasNum 5) (set-Num-num (HasNum 7) 5)))
-  (check-true (Num=? (HasNum 5) (Num-copy (HasNum 7) 5)))
+  (check-true (Num=? (HasNum 5) (copy-Num (HasNum 7) 5)))
   
   (check-eqv? 15 (match (cons (HasNum 7) (HasNum 8))
                    [(cons (Num x) (Num y)) (+ x y)]
@@ -92,7 +92,7 @@
   (define-ast FunnyCopy ([HasX (#:copy (lambda (fc x)
                                          (FunnyCopy 5)))])
     ([#:none x]))
-  (check-eqv? 5 (HasX-x (HasX-copy (FunnyCopy 1) 7)))
+  (check-eqv? 5 (HasX-x (copy-HasX (FunnyCopy 1) 7)))
   
   (define-ast FunnyOverride ([HasX ([#:field x])]) ([#:none x]))
   (check-eqv? 6 (HasX-x (FunnyOverride 6)))
@@ -108,7 +108,7 @@
     (struct-copy AC obj [c b]))
   (define-ast AC (A [AB ([#:access b AC-getter AC-setter])])
     ([#:none a] [#:none c]))
-  (check-match (A-copy (AB-copy (AC 1 2) 4 5) 6) (AC 6 5)))
+  (check-match (copy-A (copy-AB (AC 1 2) 4 5) 6) (AC 6 5)))
 
 ;;; 
 ;;; view-based traversals
@@ -304,7 +304,7 @@
   (check-true (V=? a0 (A 3 4 3)))
   (check-true (R=? a0 (A 0 2 7)))
   (check-eqv? 9 (R-r (set-R-r a0 9)))
-  (check-eqv? 9 (R-r (V-copy (R-copy a0 9) 8))))
+  (check-eqv? 9 (R-r (copy-V (copy-R a0 9) 8))))
 
 ;;; 
 ;;; partial views
