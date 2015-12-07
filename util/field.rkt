@@ -53,10 +53,9 @@ See also: `struct*`
      [(get ...) get-id-lst]
      [(pat ...) (generate-temporaries get-id-lst)]
      [(fld-pat ...) #'((app get pat) ...)])
-    #'(lambda (stx)
-        (syntax-case stx ()
-          [(_ pat ...)
-           #'(? pred? (_-or pat fld-pat) ...)]))))
+    #'(syntax-rules ()
+        [(_ pat ...)
+         (? pred? (_-or pat fld-pat) ...)])))
 
 (define-syntax* (define-fields-match-expander stx)
   (syntax-parse stx

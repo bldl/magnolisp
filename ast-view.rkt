@@ -82,31 +82,20 @@ E.g.,
 
 ;; Returns syntax for a match expander definition, for the specified
 ;; view, and its specified fields. Pattern matching is positional, so
-;; the order of the fields in `fld-id-lst` matters.
-(define-for-syntax (make-view-pattern view-id fld-id-lst def-pat-id)
-  (define view-name (syntax-e view-id))
-  
-  (define var-lst
-    (for/list ([id fld-id-lst])
-      (generate-temporary (syntax-e id))))
-  
-  (define getter-lst
-    (for/list ([id fld-id-lst])
-      (format-id view-id "~a-~a" view-name (syntax-e id))))
-  
+;; the order of the fields in `fld-ids` matters.
+(define-for-syntax (make-view-pattern view-id fld-ids def-pat-id)
+  (define name (syntax-e view-id))
   (with-syntax ([def-pat def-pat-id]
                 [pat-name view-id]
-                [view? (format-id view-id "~a?" view-name)]
-                [(var ...) var-lst]
-                [(fld-pat ...) (map
-                                (lambda (x get)
-                                  #`(app #,get #,x))
-                                var-lst getter-lst)])
+                [view? (format-id view-id "~a?" name)]
+                [(get ...)
+                 (for/list ([id fld-ids])
+                   (format-id view-id "~a-~a" name (syntax-e id)))]
+                [(pat ...) (generate-temporaries fld-ids)])
     #'(def-pat pat-name
-        (lambda (stx)
-          (syntax-case stx ()
-            [(_ var ...)
-             #'(? view? fld-pat ...)])))))
+        (syntax-rules ()
+          [(_ pat ...)
+           (? view? (app get pat) ...)]))))
 
 ;;; 
 ;;; view-based term traversal support
@@ -215,15 +204,15 @@ E.g.,
 
   ;; The `qty` field value is optional, and may be #f.
   (define-datatype (ViewFld id qty)
-    ([FieldViewFld] [AccessViewFld get set]) #:transparent)
+    ([FieldViewFld use] [AccessViewFld get set]) #:transparent)
 
   (define (term-ViewFld? fld)
     (not (eq? (ViewFld-qty fld) 'none)))
   
   (define (ViewFld->syntax fld)
     (match fld
-      [(FieldViewFld id qty)
-       #`(FieldViewFld #'#,id '#,qty)]
+      [(FieldViewFld id qty use-id)
+       #`(FieldViewFld #'#,id '#,qty #'#,use-id)]
       [(AccessViewFld id qty get set)
        #`(AccessViewFld #'#,id '#,qty #'#,get #'#,set)]))
   
@@ -231,7 +220,9 @@ E.g.,
     #:description "view field specification"
     #:attributes (spec)
     [pattern (#:field tq:tqty? fld:id) 
-             #:attr spec (FieldViewFld #'fld (attribute tq.qty))]
+             #:attr spec (FieldViewFld #'fld (attribute tq.qty) #'fld)]
+    [pattern (#:field tq:tqty? fld:id #:use use:id) 
+             #:attr spec (FieldViewFld #'fld (attribute tq.qty) #'use)]
     [pattern (#:access tq:tqty? fld:id get:expr set:expr)
              #:attr spec (AccessViewFld #'fld (attribute tq.qty)
                                         #'get #'set)])
@@ -241,7 +232,7 @@ E.g.,
     #:attributes (spec-lst) ;; (listof ViewFld)
     [pattern (~seq #:fields fld:id ...)
              #:attr spec-lst (map
-                              (lambda (id) (FieldViewFld id #f))
+                              (lambda (id) (FieldViewFld id #f id))
                               (syntax->list #'(fld ...)))]
     [pattern (~seq fld:vfld ...)
              #:attr spec-lst (attribute fld.spec)])
@@ -436,16 +427,16 @@ E.g.,
 
   (for ([fld fld-info-lst])
     (when (FieldViewFld? fld)
-      (define name (syntax-e (ViewFld-id fld)))
-      (define c-info (hash-ref conc-info-h name #f))
+      (define v-name (syntax-e (ViewFld-id fld)))
+      (define c-name (FieldViewFld-use fld))
+      (define c-info (hash-ref conc-info-h c-name #f))
       (when c-info
         (define c-qty (first c-info))
         (define v-qty (ViewFld-qty fld))
         (when (and v-qty (not (eq? c-qty v-qty)))
           (error 'generate-view-methods
-                 "quantities differ for field `~a`: ~a"
-                 name
-                 (format "~a (view) vs. ~a (concrete)" v-qty c-qty))))))
+                 "field quantities differ: ~a/~a (view) vs. ~a/~a (concrete)"
+                 v-name v-qty c-name c-qty)))))
   
   (define fld-id-lst (map ViewFld-id fld-info-lst))
   
@@ -456,30 +447,26 @@ E.g.,
                 [conc conc-id])
     ;; Returns (list/c syntax? syntax?) for getter and setter definitions.
     (define (make-accessor-impls fld-info)
-      (match-define (ViewFld fld-id _) fld-info)
-      (define-values (get-stx set-stx)
-        (if (AccessViewFld? fld-info)
-            (values (AccessViewFld-get fld-info)
-                    (AccessViewFld-set fld-info))
-            (values #f #f)))
+      (match-define (ViewFld v-fld-id _) fld-info)
+      (cond
+        [(AccessViewFld? fld-info)
+         (list (AccessViewFld-get fld-info)
+               (AccessViewFld-set fld-info))]
+        [else
+         (define c-fld-id (FieldViewFld-use fld-info))
+         (define c-fld-name (syntax-e c-fld-id))
+         (define c-ix (second (hash-ref conc-info-h c-fld-name)))
+         
+         (define getter-impl
+           #`(lambda (view) (unsafe-struct*-ref view #,c-ix)))
       
-      (define fld-name (syntax-e fld-id))
+         (define setter-impl
+           (with-syntax ([v-fld v-fld-id]
+                         [c-fld c-fld-id])
+             #'(lambda (view v-fld)
+                 (struct-copy/type-ctx conc view [c-fld v-fld]))))
       
-      (define (mk-default-get)
-        (define ix (second (hash-ref conc-info-h fld-name)))
-        #`(lambda (view) (unsafe-struct*-ref view #,ix)))
-      
-      (define getter-impl
-        (or get-stx (mk-default-get)))
-      
-      (define setter-id (mk-setter-id fld-name))
-      (define setter-impl
-        (or set-stx
-            (with-syntax ([fld fld-id])
-              #'(lambda (view fld)
-                  (struct-copy/type-ctx conc view [fld fld])))))
-      
-      (list getter-impl setter-impl))
+         (list getter-impl setter-impl)]))
     
     (define copy-impl
       (or
@@ -492,15 +479,19 @@ E.g.,
          (define-values (set-info-lst copy-info-lst)
            (partition AccessViewFld? fld-info-lst))
          #`(lambda (view fld ...)
+             ;; `#:field` field setting with one `struct-copy`.
              #,@(if (null? copy-info-lst)
                     null
-                    (with-syntax ([(c-fld ...) 
-                                   (map ViewFld-id copy-info-lst)])
+                    (with-syntax ([(v-fld ...) 
+                                   (map ViewFld-id copy-info-lst)]
+                                  [(c-fld ...)
+                                   (map FieldViewFld-use copy-info-lst)])
                       (list 
                        #'(set! view
                                (struct-copy/type-ctx
                                 conc view 
-                                [c-fld c-fld] ...)))))
+                                [c-fld v-fld] ...)))))
+             ;; `#:access` field setting, individually.
              #,@(for/list ([info set-info-lst])
                   (define fld-id (ViewFld-id info))
                   (with-syntax ([s-fld fld-id]

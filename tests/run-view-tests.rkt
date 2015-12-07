@@ -111,6 +111,59 @@
   (check-match (copy-A (copy-AB (AC 1 2) 4 5) 6) (AC 6 5)))
 
 ;;; 
+;;; renamed view fields
+;;; 
+
+(let () ;; "manual" renaming with `#:access`
+  (define-ast Var () ([#:none id]))
+  (define-view Assign ([#:field lv] [#:field rv]))
+  (define-ast AssignStat (Assign) ([#:just lv] [#:just rv]))
+  (define (get-e obj) (AssignExpr-e obj))
+  (define (set-e obj e) (set-AssignExpr-e obj e))
+  (define-ast AssignExpr ([Assign
+                           ([#:access rv get-e set-e])
+                           ]) ([#:just lv] [#:just e]))
+  (check-true (Assign=? (AssignStat (Var 'x) (Var 'y))
+                        (AssignExpr (Var 'x) (Var 'y))))
+  (check-false (Assign=? (AssignStat (Var 'x) (Var 'y))
+                         (AssignExpr (Var 'y) (Var 'y)))))
+
+(let ()
+  (define-ast Var () ([#:none id]))
+  (define-view Assign ([#:field lv] [#:field rv]))
+  (define-ast AssignStat (Assign) ([#:just lv] [#:just rv]))
+  (define-ast AssignExpr ([Assign ([#:field rv #:use e])])
+    ([#:just lv] [#:just e]))
+  (check-true (Assign=? (AssignStat (Var 'x) (Var 'y))
+                        (AssignExpr (Var 'x) (Var 'y))))
+  (check-false (Assign=? (AssignStat (Var 'x) (Var 'y))
+                         (AssignExpr (Var 'y) (Var 'y)))))
+
+(let ()
+  (define-ast Var () ([#:none id]))
+  (define-view Assign ([#:field lv] [#:field rv #:use e]))
+  (define-ast AssignStat (Assign) ([#:just lv] [#:just e]))
+  (define-ast AssignExpr (Assign) ([#:just lv] [#:just e]))
+  (check-eq? 'x (Var-id (Assign-lv (AssignStat (Var 'x) (Var 'y)))))
+  (check-eq? 'x (Var-id (Assign-lv (AssignExpr (Var 'x) (Var 'y)))))
+  (check-eq? 'x (Var-id (AssignStat-lv (AssignStat (Var 'x) (Var 'y)))))
+  (check-eq? 'x (Var-id (AssignExpr-lv (AssignExpr (Var 'x) (Var 'y)))))
+  (check-eq? 'y (Var-id (Assign-rv (AssignStat (Var 'x) (Var 'y)))))
+  (check-eq? 'y (Var-id (Assign-rv (AssignExpr (Var 'x) (Var 'y)))))
+  (check-eq? 'y (Var-id (AssignStat-e (AssignStat (Var 'x) (Var 'y)))))
+  (check-eq? 'y (Var-id (AssignExpr-e (AssignExpr (Var 'x) (Var 'y)))))
+  (check-true (Assign=? (AssignStat (Var 'x) (Var 'y))
+                        (AssignExpr (Var 'x) (Var 'y))))
+  (check-false (Assign=? (AssignStat (Var 'x) (Var 'y))
+                         (AssignExpr (Var 'y) (Var 'y))))
+  (check-equal?
+   (AssignStat (Var 'x) (Var 'y))
+   (copy-Assign (AssignStat (Var 'z) (Var 'z)) (Var 'x) (Var 'y)))
+  (check-match
+   (copy-Assign (AssignExpr (Var 'z) (Var 'z)) (Var 'x) (Var 'y))
+   (Assign (Var 'x) (Var 'y))))
+
+;;; 
 ;;; view-based traversals
 ;;; 
 
@@ -346,4 +399,48 @@
                           (DeclVar 'y 2)
                           (DeclVar 'z 3)
                           (DeclVar 'w the-Undefined)))))
+  (void))
+
+(let () ;; (NopStat) = (SeqStat ())
+  (define-ast Thing () () #:singleton ())
+  (define-view NopStat () #:partial)
+  (define (nop? ast) (null? (SeqStat-ss ast)))
+  (define-ast SeqStat ([NopStat (#:predicate nop?)]) ([#:many ss]))
+  (check-false (NopStat? the-Thing))
+  (check-false (NopStat? (SeqStat (list the-Thing))))
+  (check-true (NopStat? (SeqStat null)))
+  (void))
+
+(let () ;; (AssignStat lv rv) = (ExprStat (AssignExpr lv rv))
+  (define-ast Thing () () #:singleton ())
+  (define-ast Var () ([#:none id]))
+  (define get-lv (match-lambda [(ExprStat (AssignExpr lv rv)) lv]))
+  (define get-rv (match-lambda [(ExprStat (AssignExpr lv rv)) rv]))
+  (define (set-lv ast x)
+    (match ast
+      [(ExprStat (AssignExpr lv rv))
+       (ExprStat (AssignExpr x rv))]))
+  (define (set-rv ast x)
+    (match ast
+      [(ExprStat (AssignExpr lv rv))
+       (ExprStat (AssignExpr lv x))]))
+  (define-view AssignStat
+    ([#:access lv get-lv set-lv]
+     [#:access rv get-rv set-rv])
+    #:partial)
+  (define-ast AssignExpr () ([#:just lv] [#:just rv])) ;; as in C++
+  (define (assign? ast)
+    (AssignExpr? (ExprStat-e ast)))
+  (define-ast ExprStat
+    ([AssignStat (#:predicate assign?)])
+    ([#:just e]))
+  (check-false (AssignStat? the-Thing))
+  (check-false (AssignStat? (ExprStat the-Thing)))
+  (define x (Var 'x))
+  (define y (Var 'y))
+  (check-true (AssignStat? (ExprStat (AssignExpr x y))))
+  (check-equal?
+   (list x y)
+   (match (ExprStat (AssignExpr x y))
+     [(AssignStat lv rv) (list lv rv)]))
   (void))

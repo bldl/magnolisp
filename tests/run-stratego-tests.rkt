@@ -56,24 +56,24 @@
 
 ;; Combined view-based and concrete traversal.
 (let ()
-  (define-view Ast ([#:field annos]))
+  (define-view Ast ([#:field #:none annos]))
 
-  (define (get-type ast)
+  (define (get-type ast) ;; (-> Ast? (or/c Type? #f))
     (hash-ref (Ast-annos ast) 'type #f))
-  (define (set-type ast t)
+  (define (set-type ast t) ;; (-> Ast? (or/c Type? #f) Ast?)
     (set-Ast-annos ast (hash-set (Ast-annos ast) 'type t)))
 
   (define-view Expr
     ([#:access #:maybe type get-type set-type])
-    #:traversable)
+    #:also (Ast) #:traversable)
 
   (define-ast NameT (Ast)
     ([#:none annos] [#:none id]))
   
-  (define-ast Lit (Ast Expr)
+  (define-ast Lit (Expr)
     ([#:none annos] [#:none dat]))
 
-  (define-ast Inc (Ast Expr)
+  (define-ast Inc (Expr)
     ([#:none annos] [#:just e]))
 
   (define Expr-all (make-view-all Expr))
