@@ -19,8 +19,8 @@ Assumptions for AST node types:
          racket/generic racket/unsafe/ops racket/struct
          (for-syntax "util/assert.rkt"
                      racket/base racket/function racket/list
-                     racket/pretty 
-                     racket/syntax syntax/parse)
+                     racket/pretty racket/syntax
+                     syntax/parse syntax/strip-context)
          (for-template racket/base "ast-serialize.rkt"))
 
 ;;; 
@@ -110,7 +110,7 @@ Assumptions for AST node types:
                      (with-syntax ([fld (second fld)]
                                    [tmp (third fld)])
                        #'[fld tmp]))])
-      #'(struct-copy type obj set-fld ...)))
+      #'(struct-copy/type-ctx type obj set-fld ...)))
 
   ;; E.g. output:
   ;; (define (term-rewrite-all s ast)
@@ -200,7 +200,7 @@ Assumptions for AST node types:
                                          #'[fld tmp]))])
           #'(define (set-term-fields ast lst)
               (let-values ([(tmp ...) (apply values lst)])
-                (struct-copy type ast set-fld ...))))))
+                (struct-copy/type-ctx type ast set-fld ...))))))
 
   (define (mkstx-strategic nn-stx f-spec-lst)
     `(,(mkstx-term-visit-all nn-stx f-spec-lst)
@@ -254,7 +254,7 @@ Assumptions for AST node types:
                      (format-id conc-id "set-~a-~a" conc-name fld-name)]
                     [fld fld-id])
         #'(def (c-setter-id obj fld)
-            (struct-copy conc obj [fld fld]))))
+            (struct-copy/type-ctx conc obj [fld fld]))))
     
     (cons copy-impl (map mkstx-setter-impl fld-id-lst))))
 
@@ -309,6 +309,17 @@ Assumptions for AST node types:
 ;;; concrete AST node definition
 ;;; 
 
+;; A version of `struct` that does not take field lexical context from
+;; `field-id`s, but instead uses `type-id`.
+(define-syntax (struct/type-ctx stx)
+  (syntax-parse stx
+    [(_ type-id:id [field-id:id ...] . opts)
+     (define ctx #'type-id)
+     (with-syntax ([(cn ...)
+                    (map (lambda (x) (replace-context ctx x))
+                         (syntax->list #'(field-id ...)))])
+       #'(struct type-id [cn ...] . opts))]))
+
 (define-for-syntax (mkstx-define-ast stx provide?)
   (define-syntax-class vw
     #:description "AST node view specification"
@@ -354,7 +365,7 @@ Assumptions for AST node types:
        
        (define struct-def
          (quasisyntax
-          (#,(if provide? #'concrete-struct* #'struct)
+          (struct/type-ctx
             name
             (#,@fld-id-lst)
             #:methods gen:custom-write
@@ -385,6 +396,9 @@ Assumptions for AST node types:
                    null))))
        #`(begin
            #,struct-def
+           #,@(if provide?
+                  (list #'(provide (struct-out name)))
+                  null)
            #,(mkstx-ast=? conc-id def-stx)
            #,@(mkstx-extra-accessors conc-id fld-id-lst def-stx)
            #,@(if singleton?

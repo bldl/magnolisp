@@ -40,7 +40,7 @@ E.g.,
 
 ;; A version of `struct-copy` that does not take field accessor
 ;; lexical context from `field-id`s, but instead uses `type-id`.
-(define-syntax (struct-copy/type-ctx stx)
+(define-syntax* (struct-copy/type-ctx stx)
   (syntax-parse stx
     [(_ type-id obj [field-id e] ...)
      (define ctx #'type-id)
