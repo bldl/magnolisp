@@ -75,6 +75,7 @@ C++ back end.
     (set! s (string-append (second r) "_equal")))
   (set! s (regexp-replace* #rx"^->" s "to_"))
   (set! s (regexp-replace* #rx"->" s "_to_"))
+  (set! s (regexp-replace* #rx"(?=.)/(?=.)" s "_"))
   s)  
 
 (define (string->maybe-cxx-id s)
