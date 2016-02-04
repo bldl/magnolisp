@@ -5,7 +5,7 @@
 A reader extension to implement annotation shorthand, to precede any
 form, and for type annotations.
 
-#ap(x ...) f is short for (let-annotate (x ...) f), where 'f' is any
+#ap(x ...) f is short for (annotate (x ...) f), where 'f' is any
 arbitrary annotated form.
 
 Orthogonally to the above, we also support ^T as shorthand for (type
@@ -22,7 +22,7 @@ T), where 'T' can be any type expression.
 
 ;; We do not need and should not have any enrichment while reading
 ;; syntax.
-(define anno-id-stx (strip-context #'let-annotate))
+(define anno-id-stx (strip-context #'annotate))
 (define type-id-stx (strip-context #'type))
 
 ;;; 
@@ -51,7 +51,7 @@ T), where 'T' can be any type expression.
 ;;; #a annotations
 ;;; 
 
-;; (x ...) f -> (let-annotate (x ...) f)
+;; (x ...) f -> (annotate (x ...) f)
 (define read-anno-form
   (lambda (ch in src line col pos)
     (let ((s (read-syntax src in)))

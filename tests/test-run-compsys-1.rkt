@@ -15,7 +15,7 @@
                e))))]))
 
 (define<> T id 
-  (let-annotate ([type (-> T T)]) 
+  (annotate ([type (-> T T)]) 
     (lambda (x) x)))
 
 (use id with int as int-id)        

@@ -3,11 +3,11 @@
 (require "lib-declare-1.rkt")
 
 (declare int 
-  (let-annotate (foreign) 
+  (annotate (foreign) 
     (abstract-type)))
 
 (declare add1
-  (let-annotate (foreign ^(-> int int))
+  (annotate (foreign ^(-> int int))
     (lambda (x) (void))))
 
 (define (main x) #:: (export)

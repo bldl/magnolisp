@@ -3,10 +3,10 @@
 (typedef int #:: (foreign))
 
 (define main
-  (let-annotate ([build build-dummy])
-    (let-annotate (export)
-      (let-annotate (^(-> int int))
-        (let-annotate ([build build-another])
+  (annotate ([build build-dummy])
+    (annotate (export)
+      (annotate (^(-> int int))
+        (annotate ([build build-another])
           (lambda (x)
             x))))))
 

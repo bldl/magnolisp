@@ -72,7 +72,7 @@ language.
      #'(CORE 'anno 'expected (quote-syntax (x ...)))]))
 
 ;; A form that annotates not an identifier, but any expression.
-(define-syntax* (let-annotate stx)
+(define-syntax* (annotate stx)
   (syntax-case stx ()
     [(_ () e)
      #'e]
@@ -82,9 +82,12 @@ language.
         (let-values ([() (begin a (values))] ...) e))
       'annotate #t)]))
 
+;; DEPRECATED
+(provide (rename-out [annotate let-annotate]))
+
 (define-syntax-rule*
   (cast t d)
-  (let-annotate ([type t]) d))
+  (annotate ([type t]) d))
 
 (begin-for-syntax
   (define-splicing-syntax-class maybe-annos
@@ -104,19 +107,19 @@ language.
   (syntax-parse stx
     [(_ n:id as:maybe-annos v:expr)
      #'(define n
-         (let-annotate as.bs 
+         (annotate as.bs 
              v))]
     [(_ (f:id p:id ...) as:maybe-annos)
      #'(define f
-         (let-annotate as.bs
+         (annotate as.bs
              (#%plain-lambda (p ...) (void))))]
     [(_ (f:id p:id ...) as:maybe-annos b:expr ...+)
      #'(define f
-         (let-annotate as.bs 
+         (annotate as.bs 
              (#%plain-lambda (p ...) b ...)))]
     [(_ #:type t:id as:maybe-annos)
      #'(define t 
-         (let-annotate as.bs 
+         (annotate as.bs 
              (abstract-type)))]
     [(_ (f:id p:id ...) as:maybe-annos #:function f-e:expr)
      (with-syntax ([f-arity-t
@@ -125,8 +128,8 @@ language.
                               (syntax->list #'(p ...)))
                           (auto))])
        #'(define f
-           (let-annotate ([type f-arity-t])
-             (let-annotate as.bs ;; any `type` here overrides above
+           (annotate ([type f-arity-t])
+             (annotate as.bs ;; any `type` here overrides above
                  (begin-racket f-e)))))]
     ))
 
@@ -135,11 +138,11 @@ language.
   (syntax-parse stx
     [(_ (f:id p:id ...) as:maybe-annos)
      #'(define f
-         (let-annotate as.bs
+         (annotate as.bs
              (#%plain-lambda (p ...) (void))))]
     [(_ (f:id p:id ...) as:maybe-annos b:expr ...+)
      #'(define f
-         (let-annotate as.bs 
+         (annotate as.bs 
              (#%plain-lambda (p ...) b ...)))]))
 
 ;; DEPRECATED
@@ -147,7 +150,7 @@ language.
   (syntax-parse stx
     [(_ n:id as:maybe-annos v:expr)
      #'(define n
-         (let-annotate as.bs 
+         (annotate as.bs 
              v))]))
 
 ;; DEPRECATED
@@ -155,7 +158,7 @@ language.
   (syntax-parse stx
     [(_ t:id as:maybe-annos)
      #'(define t 
-         (let-annotate as.bs 
+         (annotate as.bs 
              (abstract-type)))]))
 
 (define-syntax* (declare stx)
@@ -167,11 +170,11 @@ language.
            (values)))]
     [(_ (f:id p:id ...) as:maybe-annos)
      #'(declare f
-         (let-annotate as.bs
+         (annotate as.bs
              (#%plain-lambda (p ...) (void))))]
     [(_ #:type t:id as:maybe-annos)
      #'(declare t 
-         (let-annotate as.bs 
+         (annotate as.bs 
              (abstract-type)))]
     ))
 
