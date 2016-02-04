@@ -353,8 +353,7 @@ For example:
 
 @defmodule[magnolisp/prelude]
 
-The Magnolisp language includes nothing that would qualify as a standard
-library, but it does include a small number of predefined names. Most notably,
+The Magnolisp language includes a small number of predefined names (that are not syntax). Most notably,
 the compiler expects expressions of type @racket[Bool] and @racket[Void] in
 certain contexts, and it also recognizes their identifiers. While the C++
 translation semantics of these types are @emph{not} built into the compiler,
