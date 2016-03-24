@@ -58,7 +58,7 @@ As Magnolisp has almost no standard library, it is ultimately necessary to defin
            (define id maybe-annos expr)
 	   (define (id arg ...) maybe-annos expr ...)
 	   (define (id arg ...) maybe-annos #:function Racket-expr))]{
-The first form defines a type. Presently only foreign types may be defined, and @racket[id] gives the corresponding Magnolisp name. The @racket[foreign] annotation should always be provided.
+The first form defines a type. Presently only foreign types may be defined using this form, and @racket[id] gives the corresponding Magnolisp name. The @racket[foreign] annotation should always be provided.
 
 For example:
 @(racketblock+eval #:eval the-eval
@@ -124,15 +124,15 @@ The fourth @racket[define] form (with the @racket[#:function] keyword) may likew
            (declare (id arg ...) maybe-annos))]{
 Forms used to declare C++ translation information for types or functions, not to implement them, or to bind the identifier @racket[id]. The binding must already exist.
 
-The first form states that @racket[id] is a type, probably providing annotations for it (declaring types as @racket[foreign] is presently compulsory).
+The first form states that @racket[id] is a type, probably providing annotations for it (@racket[declare]'ing types as @racket[foreign] is presently compulsory).
 
 The second form states that @racket[id] is a function, possibly providing annotations for it. The arguments @racket[arg ...] only serve to specify the arity of the function.
 
 The key difference between @racket[define] and @racket[declare] is that the former binds the identifier, and thus at the same time necessarily specifies any Racket implementation, while the latter does not. That is: @Racket-racket[define] can be used to give a Racket implementation for something; Magnolisp's @racket[define] can be used to give both a Racket implementation (possibly a ``non-implementation'') as well as C++ translation information for something; whereas @racket[declare] only gives the C++ translation information for something.}
 
-@defform[(typedef id maybe-annos)]{
-@deprecated[#:what "form" @racket[define]]{}
-Defines a type.}
+@defform*[((typedef id maybe-annos)
+           (typedef id type-expr))]{
+Defines a type. If a @racket[type-expr] is given, then @racket[id] is bound as an alias for that type expression. Otherwise annotations must specify the semantics for the type.}
 
 @defform/subs[(function (id arg ...) maybe-annos maybe-body)
               ([maybe-body code:blank expr])]{

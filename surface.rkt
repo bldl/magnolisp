@@ -153,13 +153,16 @@ language.
          (annotate as.bs 
              v))]))
 
-;; DEPRECATED
 (define-syntax* (typedef stx)
   (syntax-parse stx
     [(_ t:id as:maybe-annos)
      #'(define t 
          (annotate as.bs 
-             (foreign-type)))]))
+             (foreign-type)))]
+    [(_ t:id texpr:expr)
+     #'(define-syntax (t x)
+         (syntax-parse x
+           [_:id #'texpr]))]))
 
 (define-syntax* (declare stx)
   (syntax-parse stx

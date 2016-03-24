@@ -3,17 +3,16 @@
 
 (typedef Box #:: (foreign))
 
-(function (box v) #:: 
+(define (box v) #:: 
   (foreign [type (for-all E (-> E (<> Box E)))]))
 
-(function (unbox box) #::
+(define (unbox box) #::
   (foreign [type (for-all E (-> (<> Box E) E))]))
 
-(function (main x) #:: (export [type (-> int long)])
+(define (my-main x) #:: ([type (-> int long)])
   (define boxed-int (box x))
   (define boxed-long (box (->long (unbox boxed-int)))) 
   (unbox boxed-long))
 
-(function (run)
-  #:: (export [type (-> Void)] [expected 7])
-  (put-long (main 7)))
+(define (run) #:: (export [type (-> Void)])
+  (put-long (my-main 7)))
