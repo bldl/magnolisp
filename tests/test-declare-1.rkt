@@ -4,7 +4,7 @@
 
 (declare int 
   (annotate (foreign) 
-    (abstract-type)))
+    (foreign-type)))
 
 (declare add1
   (annotate (foreign ^(-> int int))

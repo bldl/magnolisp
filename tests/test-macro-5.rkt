@@ -1,4 +1,4 @@
-#lang magnolisp/2014
+#lang magnolisp
 
 #|
 
@@ -10,7 +10,7 @@ Conditional compilation, #if ... #elif ... #endif style.
 
 (define-syntax (static-cond stx)
   (syntax-case stx (else)
-    [(_) #'(begin)]
+    [(_) #'(void)]
     [(_ [else e]) #'e]
     [(_ [c e] . more)
      (if (syntax-local-eval #'c)
@@ -20,18 +20,21 @@ Conditional compilation, #if ... #elif ... #endif style.
 (begin-for-syntax
  (define on-harmattan #f)
  (define on-bb10 #f)
- (define on-sailfish #f)
- (define on-console #t))
+ (define on-sailfish #t)
+ (define on-console #f))
 
-(typedef World (#:annos foreign))
+(typedef World #:: (foreign))
 
-(function (init-qt-ui w) (#:annos (type (fn World World)) foreign)
+(define (init-qt-ui w) #::
+  ([type (-> World World)] foreign)
   w)
 
-(function (init-ncurses-ui w) (#:annos (type (fn World World)) foreign)
+(define (init-ncurses-ui w)
+  #:: ([type (-> World World)] foreign)
   w)
 
-(function (init-any-ui w) #an(export ^(fn World World))
+(define (init-any-ui w)
+  #:: (export ^(-> World World))
   (static-cond
    [(or on-bb10 on-harmattan on-sailfish)
     (init-qt-ui w)]

@@ -16,7 +16,7 @@
 (define (h)
   #:: (export)
   (let* ((Num (annotate ([foreign int])
-                (abstract-type)))
+                (foreign-type)))
          (x (cast Num 3)))
     x))
 

@@ -98,7 +98,7 @@ language.
       (~seq #:: (~and (a:expr ...) as)))
      #:attr bs (if (attribute as) #'as #'()))))
 
-(define-syntax-rule* (abstract-type)
+(define-syntax-rule* (foreign-type)
   (CORE 'foreign-type))
 
 (provide (rename-out [my-define define]))
@@ -120,7 +120,7 @@ language.
     [(_ #:type t:id as:maybe-annos)
      #'(define t 
          (annotate as.bs 
-             (abstract-type)))]
+             (foreign-type)))]
     [(_ (f:id p:id ...) as:maybe-annos #:function f-e:expr)
      (with-syntax ([f-arity-t
                     #`(-> #,@(map 
@@ -159,7 +159,7 @@ language.
     [(_ t:id as:maybe-annos)
      #'(define t 
          (annotate as.bs 
-             (abstract-type)))]))
+             (foreign-type)))]))
 
 (define-syntax* (declare stx)
   (syntax-parse stx
@@ -175,7 +175,7 @@ language.
     [(_ #:type t:id as:maybe-annos)
      #'(declare t 
          (annotate as.bs 
-             (abstract-type)))]
+             (foreign-type)))]
     ))
 
 (define-syntax* (if-target stx)
