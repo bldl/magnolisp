@@ -488,10 +488,14 @@
       ((#%top . id) ;; module-level variable (can prevent shadowing)
        (identifier? #'id)
        (syntaxed stx Var #'id))
-      
+
       (id
        (identifier? #'id)
        (syntaxed stx Var #'id))
+      
+      ((quote-syntax _) ;; syntax literal
+       ;; Be permissive, as these sometimes appear without being referenced.
+       (syntaxed stx RacketExpr))
       
       (_ (raise-language-error
           #f "illegal syntax in expression context" stx

@@ -6,24 +6,24 @@
 
 (define-foreign-struct Var ([id :: Id]) #:transparent)
 
-(function (main-ctor) #:: (export)
+(define (main-ctor) #:: (export)
   (make-Var "x"))
 
-(function (main-pred-true) #:: (export)
+(define (main-pred-true) #:: (export)
   (Var? (Var "x")))
 
-(function (main-pred-false) #:: (export)
+(define (main-pred-false) #:: (export)
   (Var? (Var-id (Var "x"))))
 
-(function (main-accessor) #:: (export)
+(define (main-accessor) #:: (export)
   (Var-id (Var "x")))
 
-(function (main-match x) #:: (export ^(-> Var Id))
+(define (main-match x) #:: (export ^(-> Var Id))
   (match x
     [(Var y) y]
     [_ "z"]))
 
-(function (main-match-call) #:: (export)
+(define (main-match-call) #:: (export)
   (main-match (Var "x")))
 
 (main-ctor)
