@@ -624,7 +624,7 @@ The software is installable directly off GitHub with the command:
 
 Except where otherwise noted, the following license applies:
 
-Copyright © 2012-2015 University of Bergen and the authors.
+Copyright © 2012-2016 University of Bergen and the authors.
 
 Authors: Tero Hasu
 

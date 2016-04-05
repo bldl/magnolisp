@@ -6,5 +6,6 @@
 (define racket-launcher-libraries '("compiler-cli.rkt"))
 (define racket-launcher-names '("mglc"))
 (define compile-omit-paths '("dist" "etc" "failing" "gh-pages" "retired" "tests"))
-(define deps '(("base" #:version "6.3") "data-lib"))
-(define build-deps '("at-exp-lib" "rackunit-lib" "scribble-lib"))
+(define deps '(("base" #:version "6.3") "data-lib" "scribble-lib"))
+(define build-deps '("at-exp-lib" "racket-doc" "rackunit-lib"))
+(define test-omit-paths 'all)

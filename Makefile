@@ -82,4 +82,4 @@ gh-homepage :
 	( cd gh-pages && git add . && git status )
 
 gh-upload :
-	( cd gh-pages && git commit -m "update $$(date)" && git push )
+	( cd gh-pages && git commit -m "update $$(date -u)" && git push )
