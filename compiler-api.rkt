@@ -964,7 +964,7 @@ optimization.
 ;;; testing
 ;;;
 
-(module* test #f
+(module* interactive-test #f
   (define st (compile-files "tests/test-locals-3.rkt"))
   (generate-files st '(
                        ;;(build (targets gnu-make qmake c ruby))

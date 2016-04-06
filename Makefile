@@ -76,6 +76,9 @@ test :
 test-with-cc :
 	raco test tests/run-cc-on-files.rkt
 
+test-integration :
+	raco test --drdr .
+
 gh-homepage :
 	( cd gh-pages && git clean -d -f && git rm --ignore-unmatch -rf . )
 	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --html --dest gh-pages --dest-name gh-pages/index.html manual-src/manual.scrbl
