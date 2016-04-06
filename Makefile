@@ -40,21 +40,21 @@ clean-with-raco :
 
 api-doc :
 	mkdir -p doc/manual
-	scribble ++xref-in setup/xref load-collections-xref --html --dest doc/manual --dest-name index.html manual-src/manual.scrbl
+	scribble ++xref-in setup/xref load-collections-xref --html --dest doc/manual --dest-name index.html manual-src/$(PKGNAME).scrbl
 
 rm-dist :
 	-rm -r $(DISTHOME)
 
 pdf-manual :
 	mkdir -p $(DISTHOME)
-	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --pdf --dest $(DISTHOME) --dest-name manual.pdf manual-src/manual.scrbl
+	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --pdf --dest $(DISTHOME) --dest-name manual.pdf manual-src/$(PKGNAME).scrbl
 
 html-manual :
 	-rm -r $(DISTHOME)/manual
 	mkdir -p $(DISTHOME)/manual
-	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --html --dest $(DISTHOME)/manual --dest-name index.html manual-src/manual.scrbl
+	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --html --dest $(DISTHOME)/manual --dest-name index.html manual-src/$(PKGNAME).scrbl
 
-MIRROR_DIR := /tmp/raco-tmp/magnolisp
+MIRROR_DIR := /tmp/raco-tmp/$(PKGNAME)
 
 # this indirection ensures that we only get what we would have in a Git repo
 # (using 'git archive' would be more straightforward, but for future proofing)
@@ -81,7 +81,7 @@ test-integration :
 
 gh-homepage :
 	( cd gh-pages && git clean -d -f && git rm --ignore-unmatch -rf . )
-	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --html --dest gh-pages --dest-name gh-pages/index.html manual-src/manual.scrbl
+	scribble ++xref-in setup/xref load-collections-xref --redirect-main http://docs.racket-lang.org/ --html --dest gh-pages --dest-name gh-pages/index.html manual-src/$(PKGNAME).scrbl
 	( cd gh-pages && git add . && git status )
 
 gh-upload :
