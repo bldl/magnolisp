@@ -175,23 +175,6 @@
          #'(begin)
          #'(require spec ...))]))
 
-(define-syntax (when-module-declared stx)
-  (syntax-parse stx
-    [(_ mod:expr load:boolean code:expr ...+)
-     (if (module-declared? (syntax->datum #'mod) (syntax-e #'load))
-         #'(begin code ...)
-         #'(begin))]))
-
-(define-syntax-rule* (require-if-declared mod ...)
-  (begin
-    (when-module-declared mod #f (require mod))
-    ...))
-
-(define-syntax-rule* (require*-if-declared mod ...)
-  (begin
-    (when-module-declared mod #f (require* mod))
-    ...))
-
 (define-syntax* (define-generics* stx)
   (define-splicing-syntax-class opts
     (pattern

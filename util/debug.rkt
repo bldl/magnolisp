@@ -3,6 +3,5 @@
 #|
 |#
 
-(require "module.rkt")
-
-(require*-if-declared unstable/debug)
+(require unstable/debug)
+(provide (all-from-out unstable/debug))
