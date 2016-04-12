@@ -295,6 +295,18 @@ compiler.
 ;;; error reporting
 ;;; 
 
+(define* (read-original-code stx)
+  (let-and path (syntax-source stx)
+    (let-and beg (syntax-position stx)
+      (let ([amt (or (syntax-span stx) 20)])
+        (may-fail
+         (call-with-input-file
+           path
+           (lambda (in)
+             (file-position in (sub1 beg))
+             ;; It's OK for less to be available than `amt`.
+             (read-string amt in))))))))
+
 (define-syntax-rule* (unsupported v ...)
   (error "unsupported" v ...))
 
@@ -345,16 +357,17 @@ compiler.
                  (if sub-expr (list sub-expr) null)
                  (if expr (list expr) null)
                  extra-exprs))
+  (define-syntax-rule
+    (and-let-list x e t ...)
+    (if-let x e (list t ...) null))
   (define (mk s e)
     (if (syntax? e)
-        (list s (syntax->datum e)
-              (string-append s " (syntax)") e
-              (string-append s " (origin)")
-              (let ((orig (syntax-property e 'origin)))
-                (and orig (not (null? orig))
-                     (map (lambda (id)
-                            (if (identifier? id)
-                                (syntax-e id) id)) orig))))
+        `(,s ,(syntax->datum e)
+          ,@(and-let-list txt (read-original-code e)
+              (string-append s " (source)") txt)
+          ,(string-append s " (syntax)") ,e
+          ,@(and-let-list orig (syntax-property e 'origin)
+              (string-append s " (origin)") orig))
         (list s e)))
   (define fields
     (apply append (mk "at" sub-expr) (mk "in" expr) more-fields))
@@ -362,4 +375,3 @@ compiler.
          #:continued continued
          #:constructor (lambda (s cs)
                          (exn:fail:language s cs exprs))))
-

@@ -11,8 +11,15 @@ language.
          racket/stxparam
          (for-syntax "app-util.rkt" "util.rkt"
                      racket/base racket/syntax 
-                     syntax/parse)) 
+                     syntax/parse))
 
+(begin-for-syntax
+  (define (set-loc from stx)
+    (datum->syntax stx (syntax-e stx) from stx stx))
+  (define-syntax-rule
+    (syntax-parse/loc stx . rest)
+    (set-loc stx (syntax-parse stx . rest))))
+    
 ;; Aliases.
 (provide (rename-out [exists ∃] [for-all ∀]))
 
@@ -43,14 +50,14 @@ language.
   (CORE 'anno 'type t))
 
 (define-syntax* (export stx)
-  (syntax-parse stx
+  (syntax-parse/loc stx
     [_:id
      #'(CORE 'anno 'export #t)]
     [(_ name:id)
      #'(CORE 'anno 'export #'name)]))
 
 (define-syntax* (foreign stx)
-  (syntax-parse stx
+  (syntax-parse/loc stx
     [_:id
      #'(CORE 'anno 'foreign #t)]
     [(_ name:id)
@@ -59,17 +66,20 @@ language.
 (define-syntax* (literal stx)
   (syntax-case stx ()
     [(_ ...)
-     #`(CORE 'anno 'literal (quote-syntax #,stx))]))
+     (quasisyntax/loc stx
+       (CORE 'anno 'literal (quote-syntax #,stx)))]))
 
 (define-syntax* (build stx)
   (syntax-case stx ()
     [(_ ...)
-     #`(CORE 'anno 'build (quote-syntax #,stx))]))
+     (quasisyntax/loc stx
+       (CORE 'anno 'build (quote-syntax #,stx)))]))
 
 (define-syntax* (expected stx)
   (syntax-case stx ()
     [(_ x ...)
-     #'(CORE 'anno 'expected (quote-syntax (x ...)))]))
+     (syntax/loc stx
+       (CORE 'anno 'expected (quote-syntax (x ...))))]))
 
 ;; A form that annotates not an identifier, but any expression.
 (define-syntax* (annotate stx)
@@ -104,7 +114,7 @@ language.
 (provide (rename-out [my-define define]))
 
 (define-syntax (my-define stx)
-  (syntax-parse stx
+  (syntax-parse/loc stx
     [(_ n:id as:maybe-annos v:expr)
      #'(define n
          (annotate as.bs 
@@ -130,12 +140,11 @@ language.
        #'(define f
            (annotate ([type f-arity-t])
              (annotate as.bs ;; any `type` here overrides above
-                 (begin-racket f-e)))))]
-    ))
+                 (begin-racket f-e)))))]))
 
 ;; DEPRECATED
 (define-syntax* (function stx)
-  (syntax-parse stx
+  (syntax-parse/loc stx
     [(_ (f:id p:id ...) as:maybe-annos)
      #'(define f
          (annotate as.bs
@@ -147,14 +156,14 @@ language.
 
 ;; DEPRECATED
 (define-syntax* (var stx)
-  (syntax-parse stx
+  (syntax-parse/loc stx
     [(_ n:id as:maybe-annos v:expr)
      #'(define n
          (annotate as.bs 
              v))]))
 
 (define-syntax* (typedef stx)
-  (syntax-parse stx
+  (syntax-parse/loc stx
     [(_ t:id as:maybe-annos)
      #'(define t 
          (annotate as.bs 
@@ -165,7 +174,7 @@ language.
            [_:id #'texpr]))]))
 
 (define-syntax* (declare stx)
-  (syntax-parse stx
+  (syntax-parse/loc stx
     [(_ n:id e:expr)
      #'(define-values ()
          (begin
@@ -178,14 +187,13 @@ language.
     [(_ #:type t:id as:maybe-annos)
      #'(declare t 
          (annotate as.bs 
-             (foreign-type)))]
-    ))
+             (foreign-type)))]))
 
 (define-syntax* (if-target stx)
   (syntax-parse stx
     [(_ name:id t:expr e:expr)
      (syntax-property 
-      #'(if #f t e)
+      (syntax/loc stx (if #f t e))
       'if-target (syntax-e #'name))]))
 
 (define-syntax-rule* (if-cxx t e)
@@ -214,7 +222,7 @@ language.
      (sym:id ... #:from mp:expr)
      #:attr spec #'(only-in mp sym ...)))
   
-  (syntax-parse stx
+  (syntax-parse/loc stx
     ((_ (req:sym-spec ...) e:expr ...+)
      #'(let-racket
         (local-require req.spec ...)

@@ -4,11 +4,11 @@
 (typedef int #:: (foreign))
 
 (function (holds? x)
-  #:: ((type (-> int Bool)) foreign)
+  #:: ([type (-> int Bool)] foreign)
   #t)
 
 (function (f x)
-  #:: (export (type (-> int int)))
+  #:: (export [type (-> int int)])
   (if (holds? x) x 6))
 
 (f 5)

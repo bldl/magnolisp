@@ -53,6 +53,10 @@
   (apply-values f-expr gen-expr)
   (call-with-values (thunk gen-expr) f-expr))
 
+(define-syntax-rule* (may-fail b ...)
+  (with-handlers ([exn:fail? (lambda (e) #f)])
+    b ...))
+
 (define-syntax-rule*
   (define-values-from-list (id ...) lst-expr)
   (define-values (id ...) (apply values lst-expr)))

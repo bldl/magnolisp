@@ -14,15 +14,6 @@ Module loading.
          "util.rkt")
 
 ;;; 
-;;; utilities
-;;; 
-
-(define-syntax-rule (may-fail b ...)
-  (with-handlers
-      ((exn:fail? (lambda (e) #f)))
-    b ...))
-
-;;; 
 ;;; module paths
 ;;;
 
