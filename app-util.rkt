@@ -295,6 +295,14 @@ compiler.
 ;;; error reporting
 ;;; 
 
+(define (port-skip-chars in amt)
+  (let loop ((k amt))
+    (when (> k 0)
+      (define j (min k 2048))
+      (when (eof-object? (read-string j in))
+        (error 'eof))
+      (loop (- k j)))))
+
 (define* (read-original-code stx)
   (let-and path (syntax-source stx)
     (let-and beg (syntax-position stx)
@@ -303,7 +311,7 @@ compiler.
          (call-with-input-file
            path
            (lambda (in)
-             (file-position in (sub1 beg))
+             (port-skip-chars in (sub1 beg))
              ;; It's OK for less to be available than `amt`.
              (read-string amt in))))))))
 
