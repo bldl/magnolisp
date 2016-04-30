@@ -1112,8 +1112,11 @@ C++ back end.
         (annoless Include 'user 
                   (path-basename-as-string 
                    (path-add-suffix path-stem (get-suffix 'hh)))))
+      (define def-impl (annoless TlVerbatim "#define MGL_IMPLEMENTATION 1"))
       (define c-unit
-        (append (if (memq 'hh parts) (list hh-incl) null)
+        (append (if (memq 'hh parts)
+                    (list def-impl hh-incl)
+                    null)
                 (defs->partition 'private-prototypes def-lst)
                 (defs->partition 'private-implementations def-lst)))
       ;;(for-each writeln c-unit) (exit)
@@ -1131,7 +1134,7 @@ C++ back end.
       (define path (path-add-suffix path-stem sfx))
       (define filename (path-basename-as-string path))
       (define basename (path-basename-only-as-string filename))
-      (define config-incl (annoless Include 'user (string-append basename "_config.hpp"))) ;; xxx for now, until we infer required includes
+      (define config-incl (annoless Include 'user (string-append basename "_config.hpp")))
       (define harness-begin (annoless TlVerbatim (string-append "#ifndef " (path-h-ifdefy filename))))
       (define harness-end (annoless TlVerbatim "#endif"))
       (define c-unit
