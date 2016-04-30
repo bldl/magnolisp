@@ -248,7 +248,8 @@ code for them.
 ;;;
 
 (define-with-contract*
-  (-> list? list? path-string? output-port? boolean? void?)
+  (-> list? list? path-string? (or/c #f output-port?) boolean?
+      void?)
   (generate-build-file spec attrs path-stem out banner?)
 
   (define targets '(gnu-make))

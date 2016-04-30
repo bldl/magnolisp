@@ -955,7 +955,7 @@ optimization.
          (define def-lst (St-defs st))
          (define mgl-file (build-path outdir
                                       (string-append basename ".ir.rkt")))
-         (generate-mgl-file spec def-lst out mgl-file banner?)]
+         (generate-mgl-file spec def-lst mgl-file out banner?)]
         )))
 
   (void))

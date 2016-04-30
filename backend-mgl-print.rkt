@@ -137,9 +137,9 @@ source code.
      (pp-mgl ast-lst #:yield yield))))
 
 (define-with-contract*
-  (-> list? (listof Def?) (or/c #f output-port?) path-string? boolean?
+  (-> list? (listof Def?) path-string? (or/c #f output-port?) boolean?
       void?)
-  (generate-mgl-file spec ast-lst out path banner?)
+  (generate-mgl-file spec ast-lst path out banner?)
 
   (match-define (list 'mgl) spec)
   
