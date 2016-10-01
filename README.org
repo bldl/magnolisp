@@ -1,3 +1,3 @@
 This is /Magnolisp/, a toy programming language for playing with experimental language implementation techniques and infrastructure. It is implemented in and on top of [[http://racket-lang.org/][Racket]], in a way that allows Racket tools to be used in the development of Magnolisp programs. Code written in Magnolisp can either be evaluated in the Racket VM, or translated into C++.
 
-More details can be found in the [[http://magnolisp.github.io/][manual]], which also includes [[http://magnolisp.github.io/#%28part._install%29][installation instructions]].
+More details can be found in the [[http://magnolisp.github.io/][manual]], which also includes [[http://magnolisp.github.io/#%28part._magnolisp-install%29][installation instructions]].

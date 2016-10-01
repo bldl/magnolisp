@@ -16,7 +16,7 @@
 @(define the-eval (make-base-eval))
 @(the-eval '(require magnolisp/main))
 
-@title{Magnolisp}
+@title[#:tag "magnolisp"]{Magnolisp}
 
 @author["Tero Hasu"]
 
@@ -26,7 +26,7 @@ Magnolisp is inspired by Racket and the likewise experimental programming langua
 
 Magnolisp is intended to explore and demonstrate techniques for source-to-source compilation on top of Racket, not to support writing of useful applications.
 
-@section{Magnolisp the Language}
+@section[#:tag "magnolisp-lang"]{Magnolisp the Language}
 
 @defmodulelang[magnolisp]
 
@@ -590,7 +590,7 @@ Performs code generation for the program whose intermediate representation (IR) 
 
 @; The C++ backend depends on @exec{uncrustify} as an external tool, and the tool requires a configuration file; one is installable using the provided @filepath{Makefile}.
 
-@section{@exec{mglc}}
+@section[#:tag "magnolisp-cli"]{@exec{mglc}}
 
 The compiler can also be invoked via the @exec{mglc} command-line tool, specifying the program to compile. The tool gets installed by invoking @exec{raco setup}. (Alternatively you may just run it as @exec{./mglc} on Unix platforms.)
 
@@ -602,29 +602,29 @@ An example invocation would be:
 
 which instructs the compiler to print out C++ code into standard output, with banners, for the program @filepath{my-program.rkt}.
 
-@section{Example Code}
+@section[#:tag "magnolisp-examples"]{Example Code}
 
 For sample Magnolisp programs, see the @filepath{test-*.rkt} files in the @filepath{tests} directory of the Magnolisp implementation codebase.
 
 Note that some of the example programs are written in Magnolisp language variants other than @racketmodname[magnolisp] (which is the only one documented here), but the differences are typically minor and superficial.
 
-@section{Source Code}
+@section[#:tag "magnolisp-repo"]{Source Code}
 
-A Git repository of the Magnolisp source code can be found at:
+The Magnolisp source code repository is hosted at:
 @nested[#:style 'inset]{@url{https://github.com/bldl/magnolisp}}
 
-@section[#:tag "install"]{Installation}
+@section[#:tag "magnolisp-install"]{Installation}
 
-Racket version 6.3 or higher is required to run the software. The software has been tested with version 6.4 only. Version 6.2.1 will not work due to Racket 6.3 having a different @link["http://www.cs.utah.edu/~mflatt/scope-sets/"]{macro model}, and also due to differences in its @link["http://blog.racket-lang.org/2015/10/retiring-unstable.html"]{organization of @racketmodfont{unstable} libraries}.
+Racket version 6.3 or higher is required to run the software; a known-compatible version is 6.5, but versions 6.3--6.6 are all expected to work. Version 6.2.1 will not work due to Racket 6.3 having a different @link["http://www.cs.utah.edu/plt/scope-sets/"]{macro model}, and also due to differences in its @link["http://blog.racket-lang.org/2015/10/retiring-unstable.html"]{organization of @racketmodfont{unstable} libraries}.
 
 The software is installable directly off GitHub with the command:
-@commandline{raco pkg install git://github.com/bldl/magnolisp}
+@commandline{raco pkg install @|magnolisp-pkg-url|}
 
-@section{License}
+@section[#:tag "magnolisp-license"]{License}
 
 Except where otherwise noted, the following license applies:
 
-Copyright © 2012-2016 University of Bergen and the authors.
+Copyright © 2012--2016 University of Bergen and the authors.
 
 Authors: Tero Hasu
 

@@ -6,7 +6,9 @@ Utilities for authoring manual.scrbl.
 
 |#
 
-(require "../util.rkt" scribble/manual)
+(require "../util.rkt"
+         racket/runtime-path
+         scribble/manual)
 
 (define* ErdaCxx @elem{Erda@subscript{@italic{C++}}})
 
@@ -100,3 +102,56 @@ Utilities for authoring manual.scrbl.
 
 (define* racket-if (racket/Racket if))
 (define* racket-module-begin (racket/Racket #%module-begin))
+
+;;; 
+;;; software revisions
+;;; 
+
+(define-runtime-path GITREVDIR "..")
+
+(define (git-rev-file pkg)
+  (build-path
+   GITREVDIR
+   (string-append (string-upcase pkg) "GITREV")))
+
+(define* (git-rev pkg)
+  (string-trim
+   (call-with-input-file
+     (git-rev-file pkg)
+     port->string)))
+
+(define* (maybe-git-rev pkg)
+  (with-handlers ([exn:fail:filesystem?
+                   (lambda (ex) #f)])
+    (git-rev pkg)))
+
+(define* (git-rev-shorten rev)
+  (list->string
+   (for/list ([ch (in-string rev 0 7)])
+     ch)))
+
+(define* (short-git-rev pkg)
+  (git-rev-shorten (git-rev pkg)))
+
+(define* (maybe-short-git-rev pkg)
+  (define rev (maybe-git-rev pkg))
+  (and rev (git-rev-shorten rev)))
+
+(define* (sources-browse-url user pkg)
+  (define rev (maybe-git-rev pkg))
+  (if rev
+      (format
+       "https://github.com/~a/~a/tree/~a"
+       user pkg rev)
+      (format
+       "https://github.com/~a/~a"
+       user pkg)))
+
+(define* (pkg-install-url user pkg)
+  (define rev (maybe-short-git-rev pkg))
+  (if rev
+      (format "git://github.com/~a/~a#~a" user pkg rev)
+      (format "git://github.com/~a/~a" user pkg)))
+
+(define* magnolisp-pkg-url
+  (pkg-install-url "bldl" "magnolisp"))
