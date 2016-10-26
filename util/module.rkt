@@ -40,10 +40,15 @@
 
 (define-syntax* define-syntax-rule*
   (syntax-rules ()
-    ((_ (name rest ...) body)
+    [(_ (name rest ... . more) body)
+     (begin
+       (define-syntax-rule (name rest ... . more) body)
+       (provide name))]
+    [(_ (name rest ...) body)
      (begin
        (define-syntax-rule (name rest ...) body)
-       (provide name)))))
+       (provide name))]
+    ))
 
 (define-syntax-rule*
   (define-simple-macro*
@@ -161,19 +166,6 @@
   (begin
     (require n ...)
     (provide (all-from-out n ...))))
-
-(define-syntax-rule*
-  (require*-only-in (mod n ...) ...)
-  (begin
-    (require (only-in mod n ...) ...)
-    (provide (combine-out n ...) ...)))
-
-(define-syntax* (require-if-unbound stx)
-  (syntax-case stx ()
-    [(_ id spec ...)
-     (if (identifier-binding #'id)
-         #'(begin)
-         #'(require spec ...))]))
 
 (define-syntax* (define-generics* stx)
   (define-splicing-syntax-class opts

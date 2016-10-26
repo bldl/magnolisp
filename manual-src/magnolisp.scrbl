@@ -565,7 +565,7 @@ The Magnolisp implementation includes a compiler targeting C++. The @racketmodna
          compilation-state?]
 @defproc[(compile-files [path-s path-string?] ...) compilation-state?]
 )]{
-Invoke the compiler front end for analysing a Magnolisp program, whose ``entry modules'' are specified either as module paths or files. Any specified modules that are not in the @racketmodname[magnolisp] language are effectively ignored, as they do not contain any @racket[export]ed Magnolisp definitions.
+Invoke the compiler front end for analyzing a Magnolisp program, whose ``entry modules'' are specified either as module paths or files. Any specified modules that are not in the @racketmodname[magnolisp] language are effectively ignored, as they do not contain any @racket[export]ed Magnolisp definitions.
 Both functions return an opaque compilation state object, which may be passed to @racket[generate-files] for code generation.
 
 The optional argument @racket[rel-to-path-v] is as for @racket[resolve-module-path]. It is only relevant for relative module paths, and indicates to which path such paths should be considered relative.
