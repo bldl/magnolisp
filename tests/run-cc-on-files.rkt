@@ -18,7 +18,7 @@ executable, and then comparing actual output against expected output.
 (define (query-clang-version exe)
   (let-and s (exe-std-output/maybe (list exe "--version"))
     (cond
-      [(let ((re #px"^clang[[:space:]]+version[[:space:]]+([[:digit:]]+)[.]([[:digit:]]+)[.]([[:digit:]]+)[[:space:]]+"))
+      [(let ((re #px"clang[[:space:]]+version[[:space:]]+([[:digit:]]+)[.]([[:digit:]]+)[.]([[:digit:]]+)[[:space:]-]"))
          (regexp-match re s))
        => (lambda (m)
             (map string->number (take (cdr m) 3)))]

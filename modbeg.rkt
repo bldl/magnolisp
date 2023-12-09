@@ -29,20 +29,7 @@ same variables at the same phase level).
           "parse.rkt" "util.rkt"))
 
 (define-for-syntax (make-definfo-submodule 
-                    orig-mb-id modbeg-stx prelude-stx prelude-ids)
-  (define decl-name (current-module-declare-name))
-  (define rel-to-path-v
-    (cond
-     [decl-name (resolved-module-path-name decl-name)]
-     [else
-      (define src (syntax-source orig-mb-id))
-      (cond
-       [(path? src) src]
-       [else
-        (error 'make-definfo-submodule
-               "cannot determine module path for ~s"
-               orig-mb-id)])]))
-       
+                    rel-to-path-v modbeg-stx prelude-stx prelude-ids)
   ;;(pretty-print (syntax->datum modbeg-stx))
   ;;(pretty-print (syntax->datum/binding modbeg-stx #:conv-id id->datum/phase))
   (define defs
@@ -68,6 +55,7 @@ same variables at the same phase level).
           (let ([mpi (first b)]
                 [sym (second b)]
                 [ph (sixth b)])
+            ;;(writeln (list mpi sym ph))
             ;; Not bound as Magnolisp if the source phase level is not 0.
             (and (eqv? ph 0)
                  (let ((r-mp (resolve-module-path-index mpi rel-to-path-v)))
@@ -116,8 +104,28 @@ same variables at the same phase level).
                     'module-begin null))
        ;;(pretty-print (syntax->datum/loc ast))
        ;;(pretty-print (syntax->datum/loc ast #:stx->datum stx->datum/source))
+
+       (define rel-to-path-v
+         (let ()
+           (define decl-name (current-module-declare-name))
+           (cond
+             [decl-name (resolved-module-path-name decl-name)]
+             [else
+              (define orig-mb-id #'orig-mb)
+              (define src (syntax-source orig-mb-id))
+              (cond
+                [(path? src) src]
+                [else
+                 ;;(error 'make-definfo-submodule
+                 ;;       "cannot determine module path for ~s"
+                 ;;       orig-mb-id)
+                 #f])])))
+
        (define sm-stx 
-         (make-definfo-submodule #'orig-mb ast prelude-stx prelude-ids))
+         (if rel-to-path-v
+             (make-definfo-submodule rel-to-path-v ast prelude-stx prelude-ids)
+             #'(begin)))
+
        (with-syntax ([(mb . bodies) ast]
                      [sm sm-stx])
          (let ([mb-stx #'(mb sm . bodies)])
